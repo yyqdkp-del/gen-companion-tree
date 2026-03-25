@@ -1,19 +1,19 @@
 'use client'
 
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useMemo } from 'react'
 import { createClient } from '@supabase/supabase-js'
-import { motion } from 'framer-motion'
-import { Bell, Heart, Trees, Zap } from 'lucide-react'
+import { motion, AnimatePresence } from 'framer-motion'
+import { Bell, Heart, Trees, Zap, Send } from 'lucide-react'
 
-const THEME = {
-  bg: '#0D0F0E',
-  card: '#1A1E1B',
-  border: '#2A302C',
-  primary: '#7AB89A',
-  accent: '#C8A96E',
-  muted: '#4A5A50',
-  text: '#E8EDE9',
-  textSub: '#8A9E90',
+// 🎨 莫兰迪暖系美学配置
+const COLORS = {
+  bg: '#F9F8F6',      // 暖白底
+  primary: '#8DA08A', // 莫兰迪绿
+  accent: '#B08D57',  // 古铜金
+  text: '#2D3A4A',    // 深岩灰
+  urgent: '#E8A89A',  // 珊瑚粉
+  school: '#9AB7E8',  // 琉璃蓝
+  muted: '#A0A0A0',
 }
 
 const supabase = createClient(
@@ -21,33 +21,31 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
 )
 
-type ChildStatus = { name: string; status: string }
+type ChildStatus = { name: string; status: string; energy: number; emoji: string }
 
 export default function CompanionApp() {
+  // --- 核心功能状态 (不准动) ---
   const [tasks, setTasks] = useState<any[]>([])
   const [children, setChildren] = useState<ChildStatus[]>([
-    { name: 'William', status: 'active' },
-    { name: 'Noah', status: 'active' },
+    { name: 'William', status: 'active', energy: 85, emoji: '👦🏻' },
+    { name: 'Noah', status: 'sleeping', energy: 92, emoji: '👶🏻' },
   ])
   const [childIndex, setChildIndex] = useState(0)
   const [time, setTime] = useState(new Date())
+  const [activeTab, setActiveTab] = useState('base')
 
   useEffect(() => {
     const syncData = async () => {
       const { data: taskData } = await supabase.from('tasks').select('*').eq('status', 'pending')
       setTasks(taskData || [])
-
-      const { data: childData } = await supabase.from('children_status').select('name, status')
+      const { data: childData } = await supabase.from('children_status').select('name, status, energy, emoji')
       if (childData && childData.length > 0) setChildren(childData)
     }
-
     syncData()
-
     const channel = supabase.channel('realtime_sync')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, syncData)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'children_status' }, syncData)
       .subscribe()
-
     const ticker = setInterval(() => setTime(new Date()), 1000)
     return () => { supabase.removeChannel(channel); clearInterval(ticker) }
   }, [])
@@ -55,135 +53,146 @@ export default function CompanionApp() {
   const hour = time.getHours()
   const greeting = hour < 5 ? '深夜安好' : hour < 12 ? '早安' : hour < 18 ? '午后好' : '晚安'
   const currentChild = children[childIndex]
-  const statusMap: Record<string, string> = {
-    sleeping: '睡眠中', active: '活跃', school: '上学中', eating: '用餐中',
-  }
+  const statusMap: Record<string, string> = { sleeping: '睡眠中', active: '活跃', school: '上学', eating: '用餐' }
 
   return (
-    <main style={{ minHeight: '100vh', backgroundColor: THEME.bg, fontFamily: "'Noto Serif SC', Georgia, serif", position: 'relative', overflow: 'hidden' }}>
-
-      {/* 环境光晕 */}
-      <div style={{ position: 'fixed', inset: 0, pointerEvents: 'none', overflow: 'hidden' }}>
-        <motion.div
-          animate={{ scale: [1, 1.15, 1], opacity: [0.06, 0.12, 0.06] }}
-          transition={{ duration: 14, repeat: Infinity, ease: 'easeInOut' }}
-          style={{ position: 'absolute', top: '-20%', right: '-10%', width: '70vw', height: '70vw', borderRadius: '50%', background: `radial-gradient(circle, ${THEME.primary}40 0%, transparent 70%)` }}
+    <main className="min-h-screen relative overflow-hidden font-serif select-none" style={{ backgroundColor: COLORS.bg }}>
+      
+      {/* 1. 流体光影背景 (呼吸感的关键) */}
+      <div className="fixed inset-0 pointer-events-none opacity-40 z-0">
+        <motion.div 
+          animate={{ scale: [1, 1.2, 1], rotate: [0, 90, 0], x: [0, 50, 0] }}
+          transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
+          className="absolute -top-1/4 -left-1/4 w-full h-full rounded-full blur-[120px]"
+          style={{ backgroundColor: COLORS.primary + '25' }}
         />
-        <motion.div
-          animate={{ scale: [1, 1.08, 1], opacity: [0.04, 0.09, 0.04] }}
-          transition={{ duration: 18, repeat: Infinity, ease: 'easeInOut', delay: 3 }}
-          style={{ position: 'absolute', bottom: '10%', left: '-15%', width: '60vw', height: '60vw', borderRadius: '50%', background: `radial-gradient(circle, ${THEME.accent}30 0%, transparent 70%)` }}
+        <motion.div 
+          animate={{ scale: [1.2, 1, 1.2], x: [0, -30, 0] }}
+          transition={{ duration: 15, repeat: Infinity, ease: "linear" }}
+          className="absolute -bottom-1/4 -right-1/4 w-full h-full rounded-full blur-[120px]"
+          style={{ backgroundColor: COLORS.accent + '20' }}
         />
       </div>
 
-      {/* 时间 */}
-      <header style={{ position: 'relative', zIndex: 20, padding: '64px 32px 28px' }}>
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 1.2 }}>
-          <p style={{ fontSize: '11px', letterSpacing: '0.4em', color: THEME.muted, textTransform: 'uppercase', marginBottom: '8px', fontFamily: "'Space Mono', monospace" }}>
-            {time.toLocaleDateString('zh-CN', { month: 'long', day: 'numeric', weekday: 'long' })}
-          </p>
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: '16px' }}>
-            <h1 style={{ fontSize: 'clamp(52px, 15vw, 80px)', fontWeight: 300, color: THEME.text, letterSpacing: '-0.02em', lineHeight: 1, margin: 0, fontFamily: "'Noto Serif SC', serif" }}>
-              {time.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}
-            </h1>
-            <span style={{ fontSize: '13px', color: THEME.textSub, letterSpacing: '0.15em' }}>{greeting}</span>
+      {/* 2. 艺术化页眉 */}
+      <header className="relative z-20 px-10 pt-16 pb-6">
+        <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col gap-2">
+          <div className="flex items-baseline gap-3">
+            <h1 className="text-2xl font-bold tracking-[0.3em] text-[#2D3A4A]">根·陪伴</h1>
+            <span className="text-[10px] tracking-[0.2em] text-gray-400 font-light italic">{greeting}，大叔</span>
           </div>
-          <div style={{ marginTop: '20px', height: '1px', width: '120px', background: `linear-gradient(to right, ${THEME.primary}60, transparent)` }} />
+          <div className="flex items-center gap-4 mt-2">
+            <h2 className="text-5xl font-light tracking-tighter text-[#2D3A4A]" style={{ fontFamily: 'serif' }}>
+              {time.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false })}
+            </h2>
+            <div className="h-[1px] w-12 bg-[#B08D57] opacity-40" />
+          </div>
         </motion.div>
       </header>
 
-      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.4, duration: 1 }}
-        style={{ padding: '0 32px 28px', position: 'relative', zIndex: 20 }}>
-        <p style={{ fontSize: '10px', letterSpacing: '0.5em', color: THEME.muted, textTransform: 'uppercase', fontFamily: "'Space Mono', monospace", margin: 0 }}>
-          根 · Companion System
-        </p>
-      </motion.div>
-
-      {/* 卡片 */}
-      <section style={{ position: 'relative', zIndex: 20, padding: '0 20px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-        <BreathCard icon={<Bell size={16} />} title="任务感应" value={tasks.length > 0 ? `${tasks.length} 条` : '静默'} sub={tasks.length > 0 ? '待处理' : '系统监听中'} color={THEME.primary} alert={tasks.length > 0} delay={0.1} />
-        <BreathCard icon={<Zap size={16} />} title="精力值" value="85" sub="% 良好" color={THEME.accent} alert={false} delay={0.2} />
-
-        {/* 孩子卡 — 点击切换 */}
-        <motion.div
-          initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3, duration: 0.8 }}
-          whileHover={{ y: -3, transition: { duration: 0.2 } }}
+      {/* 3. 核心互动区：宝宝状态 */}
+      <section className="relative z-20 px-8 flex flex-col items-center mt-6">
+        <motion.div 
+          key={currentChild?.name}
           onClick={() => setChildIndex(i => (i + 1) % children.length)}
-          style={{ background: THEME.card, border: `1px solid ${THEME.border}`, borderRadius: '24px', padding: '24px 20px', display: 'flex', flexDirection: 'column', gap: '16px', cursor: 'pointer', position: 'relative', overflow: 'hidden' }}
+          whileTap={{ scale: 0.95 }}
+          className="relative w-36 h-36 rounded-full bg-white shadow-2xl flex items-center justify-center border-4 border-white cursor-pointer group"
         >
-          <div style={{ position: 'absolute', top: '-20px', right: '-20px', width: '80px', height: '80px', borderRadius: '50%', background: 'radial-gradient(circle, #C88A8A18 0%, transparent 70%)', pointerEvents: 'none' }} />
-          <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: '#C88A8A15', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#C88A8A' }}>
-            <Heart size={16} />
-          </div>
-          <div>
-            <motion.p key={currentChild?.name} initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-              style={{ fontSize: '9px', letterSpacing: '0.3em', color: THEME.muted, textTransform: 'uppercase', margin: '0 0 6px', fontFamily: "'Space Mono', monospace" }}>
-              {currentChild?.name ?? '—'}
-            </motion.p>
-            <motion.p key={currentChild?.status} initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }}
-              style={{ fontSize: '22px', fontWeight: 300, color: THEME.text, margin: 0, lineHeight: 1, fontFamily: "'Noto Serif SC', serif" }}>
-              {statusMap[currentChild?.status] ?? currentChild?.status}
-            </motion.p>
-            <p style={{ fontSize: '11px', color: THEME.muted, margin: '4px 0 0' }}>
-              点击切换 · {children.length} 个宝贝
-            </p>
-          </div>
+          <span className="text-6xl">{currentChild?.emoji || '🌳'}</span>
+          <motion.div 
+            className="absolute -bottom-2 right-2 bg-[#2D3A4A] text-white w-8 h-8 rounded-full flex items-center justify-center text-xs shadow-lg"
+            whileHover={{ rotate: 90 }}
+          > + </motion.div>
         </motion.div>
-
-        <BreathCard icon={<Trees size={16} />} title="清迈天气" value="28°" sub="晴朗无云" color="#8AB8C8" alert={false} delay={0.4} />
+        
+        <div className="mt-6 text-center">
+          <h3 className="text-lg tracking-[0.3em] text-[#2D3A4A] font-medium">{currentChild?.name}</h3>
+          <p className="text-[10px] tracking-[0.2em] text-gray-400 mt-1 uppercase">
+            当前：{statusMap[currentChild?.status] || '监测中'}
+          </p>
+          {/* 极简精力条 */}
+          <div className="w-24 mx-auto mt-4 h-[2px] bg-gray-100 rounded-full overflow-hidden">
+            <motion.div 
+              animate={{ width: `${currentChild?.energy || 85}%` }}
+              className="h-full bg-[#8DA08A]"
+              style={{ backgroundColor: (currentChild?.energy || 85) < 30 ? COLORS.urgent : COLORS.primary }}
+            />
+          </div>
+        </div>
       </section>
 
-      {/* Make 状态 */}
-      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.6, duration: 0.8 }}
-        style={{ position: 'relative', zIndex: 20, margin: '24px 20px 0', padding: '14px 20px', background: THEME.card, border: `1px solid ${THEME.border}`, borderRadius: '16px', display: 'flex', alignItems: 'center', gap: '12px' }}>
-        <motion.div animate={{ opacity: [0.4, 1, 0.4] }} transition={{ duration: 2.5, repeat: Infinity }}
-          style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: THEME.primary, flexShrink: 0 }} />
-        <div style={{ flex: 1 }}>
-          <p style={{ fontSize: '11px', color: THEME.textSub, letterSpacing: '0.1em', margin: 0 }}>Make.com 自动化</p>
-          <p style={{ fontSize: '13px', color: THEME.text, margin: '2px 0 0' }}>5 条路由运行中 · Grok 巡逻已激活</p>
+      {/* 4. 艺术感功能气泡 (错落布局) */}
+      <section className="relative z-20 px-8 mt-12 grid grid-cols-2 gap-x-6 gap-y-10">
+        <ArtBubble icon={<Bell size={18} />} label="今日任务" value={tasks.length} color={COLORS.primary} delay={0.1} />
+        <ArtBubble icon={<Zap size={18} />} label="精力状态" value="良好" color={COLORS.accent} delay={0.2} offset="20px" />
+        <ArtBubble icon={<Trees size={18} />} label="清迈天气" value="28°" color={COLORS.school} delay={0.3} />
+        <ArtBubble icon={<Heart size={18} />} label="树洞心情" value="平静" color={COLORS.urgent} delay={0.4} offset="-15px" />
+      </section>
+
+      {/* 5. Make.com 状态条 (玻璃拟态) */}
+      <motion.div 
+        className="relative z-20 mt-16 mx-10 p-4 bg-white/30 backdrop-blur-xl rounded-[2rem] border border-white/50 flex items-center gap-4"
+        initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+      >
+        <div className="w-2 h-2 rounded-full bg-[#8DA08A] animate-pulse" />
+        <div className="flex-1">
+          <p className="text-[9px] tracking-widest text-gray-400 uppercase">Make.com Live</p>
+          <p className="text-xs text-[#2D3A4A] opacity-80 mt-0.5 font-medium">5 路由巡逻中 · Grok 巡逻已激活</p>
         </div>
-        <span style={{ fontSize: '10px', color: THEME.primary, letterSpacing: '0.15em', fontFamily: "'Space Mono', monospace", textTransform: 'uppercase' }}>Live</span>
+        <div className="text-[9px] font-bold text-[#B08D57] tracking-tighter">V2.5</div>
       </motion.div>
 
-      {/* 底部导航 */}
-      <nav style={{ position: 'fixed', bottom: '36px', left: 0, right: 0, zIndex: 50, padding: '0 24px' }}>
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.8, duration: 0.8 }}
-          style={{ maxWidth: '360px', margin: '0 auto', height: '60px', background: 'rgba(26,30,27,0.85)', backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)', borderRadius: '30px', border: `1px solid ${THEME.border}`, display: 'flex', justifyContent: 'space-around', alignItems: 'center', padding: '0 28px' }}>
-          {['基地', '日安', '树洞'].map((label, i) => (
-            <span key={i} style={{ fontSize: '11px', letterSpacing: '0.25em', color: i === 0 ? THEME.primary : THEME.muted, fontFamily: "'Space Mono', monospace", cursor: 'pointer' }}>
-              {label}
-            </span>
-          ))}
-        </motion.div>
+      {/* 6. 底部艺术字块导航 */}
+      <nav className="fixed bottom-10 left-0 right-0 z-50 px-10">
+        <div className="max-w-sm mx-auto flex justify-between items-end">
+          <ArtTab id="base" label="基地" active={activeTab} color={COLORS.primary} onClick={setActiveTab} />
+          <ArtTab id="rian" label="日安" active={activeTab} color={COLORS.accent} onClick={setActiveTab} />
+          <ArtTab id="gen" label="根" active={activeTab} color="#B08D57" onClick={setActiveTab} />
+          <ArtTab id="riqi" label="日栖" active={activeTab} color="#2D3A4A" onClick={setActiveTab} />
+        </div>
       </nav>
 
-      <div style={{ height: '140px' }} />
+      <div className="h-40" />
     </main>
   )
 }
 
-function BreathCard({ icon, title, value, sub, color, alert, delay }: { icon: React.ReactNode; title: string; value: string; sub: string; color: string; alert: boolean; delay: number }) {
+function ArtBubble({ icon, label, value, color, delay, offset = "0px", alert = false }: any) {
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay, duration: 0.8, ease: 'easeOut' }}
-      whileHover={{ y: -3, transition: { duration: 0.2 } }}
-      style={{ background: '#1A1E1B', border: '1px solid #2A302C', borderRadius: '24px', padding: '24px 20px', display: 'flex', flexDirection: 'column', gap: '16px', position: 'relative', overflow: 'hidden' }}
+    <motion.div 
+      style={{ marginTop: offset }}
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay, duration: 0.8 }}
+      className="flex flex-col items-center gap-3"
     >
-      <div style={{ position: 'absolute', top: '-20px', right: '-20px', width: '80px', height: '80px', borderRadius: '50%', background: `radial-gradient(circle, ${color}18 0%, transparent 70%)`, pointerEvents: 'none' }} />
-      <div style={{ position: 'relative', display: 'inline-flex' }}>
-        <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: `${color}15`, display: 'flex', alignItems: 'center', justifyContent: 'center', color }}>
-          {icon}
-        </div>
-        {alert && (
-          <motion.span animate={{ scale: [1, 1.5, 1], opacity: [1, 0.6, 1] }} transition={{ repeat: Infinity, duration: 1.8 }}
-            style={{ position: 'absolute', top: 0, right: 0, width: '8px', height: '8px', borderRadius: '50%', background: '#E87A6A', border: '2px solid #1A1E1B' }} />
-        )}
-      </div>
-      <div>
-        <p style={{ fontSize: '9px', letterSpacing: '0.3em', color: '#4A5A50', textTransform: 'uppercase', margin: '0 0 6px', fontFamily: "'Space Mono', monospace" }}>{title}</p>
-        <p style={{ fontSize: '22px', fontWeight: 300, color: '#E8EDE9', margin: 0, lineHeight: 1, fontFamily: "'Noto Serif SC', serif" }}>{value}</p>
-        <p style={{ fontSize: '11px', color: '#4A5A50', margin: '4px 0 0' }}>{sub}</p>
-      </div>
+      <motion.div 
+        animate={{ y: [0, -6, 0] }}
+        transition={{ duration: 4 + delay*2, repeat: Infinity, ease: "easeInOut" }}
+        className="w-24 h-24 rounded-full bg-white shadow-xl border border-gray-50 flex flex-col items-center justify-center relative overflow-hidden group"
+      >
+        <div className="absolute inset-0 opacity-5 group-hover:opacity-10 transition-opacity" style={{ backgroundColor: color }} />
+        <div style={{ color }}>{icon}</div>
+        <span className="text-[14px] font-light mt-1 text-[#2D3A4A]">{value}</span>
+      </motion.div>
+      <span className="text-[9px] tracking-[0.3em] text-gray-400 uppercase font-bold">{label}</span>
     </motion.div>
+  )
+}
+
+function ArtTab({ id, label, active, color, onClick }: any) {
+  const isActive = active === id
+  return (
+    <button onClick={() => onClick(id)} className="flex flex-col items-center group">
+      <motion.div 
+        animate={{ height: isActive ? 52 : 44, y: isActive ? -10 : 0 }}
+        className="px-6 rounded-2xl flex items-center justify-center shadow-lg transition-all"
+        style={{ backgroundColor: isActive ? color : 'white' }}
+      >
+        <span className={`text-[11px] font-bold tracking-[0.2em] ${isActive ? 'text-white' : 'text-gray-400'}`}>
+          {label}
+        </span>
+      </motion.div>
+    </button>
   )
 }
