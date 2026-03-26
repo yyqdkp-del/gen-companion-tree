@@ -3,13 +3,7 @@
 import React, { useEffect, useState } from 'react'
 import { createClient } from '@supabase/supabase-js'
 import { motion, AnimatePresence } from 'framer-motion'
-// 核心修复：重命名 Home 为 HomeIcon 消除组件名冲突
 import { Bell, Heart, Trees, Zap, Home as HomeIcon, Settings } from 'lucide-react'
-
-const THEME = {
-  bg: 'linear-gradient(180deg, #A7D7D9 0%, #D9A7B4 100%)',
-  text: '#2C3E50', 
-}
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || '',
@@ -26,7 +20,6 @@ export default function HydroApp() {
   const [time, setTime] = useState(new Date())
   const [showBaseMenu, setShowBaseMenu] = useState(false)
 
-  // 🧠 核心逻辑：WF-01/02/08 实时感应层 [cite: 41, 43]
   useEffect(() => {
     const syncData = async () => {
       const { data: taskData } = await supabase.from('tasks').select('*').eq('status', 'pending')
@@ -41,133 +34,110 @@ export default function HydroApp() {
   }, [])
 
   const currentChild = children[childIndex]
-  const hour = time.getHours()
-  const greeting = hour < 5 ? '深夜安好' : hour < 12 ? '早安' : hour < 18 ? '午后好' : '晚安'
+  const greeting = time.getHours() < 12 ? '早安' : time.getHours() < 18 ? '午后好' : '晚安'
 
   return (
-    <main className="fixed inset-0 w-full h-full overflow-hidden select-none z-0" style={{ background: THEME.bg }}>
+    <main style={{ 
+      position: 'fixed', inset: 0, width: '100vw', height: '100vh', overflow: 'hidden',
+      background: 'linear-gradient(180deg, #A7D7D9 0%, #D9A7B4 100%)', fontSans: 'sans-serif'
+    }}>
       
-      {/* 1. 空间重组：背景水印 (0.1 不透明度) [UI 纠偏] */}
-      <div className="absolute top-[15%] right-[-5%] text-[18vw] font-bold text-[#2C3E50] opacity-10 pointer-events-none tracking-tighter italic whitespace-nowrap z-0">
+      {/* 1. 背景层：极巨化水印文字 [UI 纠偏 1] */}
+      <div style={{
+        position: 'absolute', top: '15%', right: '-5%', fontSize: '18vw', fontWeight: 'bold',
+        color: '#2C3E50', opacity: 0.1, pointerEvents: 'none', fontStyle: 'italic', whiteSpace: 'nowrap'
+      }}>
         根·陪伴
       </div>
 
-      {/* 2. 左上角：头像与金色呼吸圈 (WF-01 切换逻辑)  */}
+      {/* 2. 左上角：头像与金色呼吸圈 [修订①/纠偏 1] */}
       <motion.div 
         onClick={() => setChildIndex(i => (i + 1) % children.length)}
-        className="fixed top-[6%] left-[6%] z-50 cursor-pointer active:scale-90"
+        style={{ position: 'absolute', top: '6%', left: '6%', zIndex: 50, cursor: 'pointer' }}
       >
-        <div className="relative">
-          <motion.div 
-            animate={{ boxShadow: ['0 0 15px rgba(212,169,106,0.2)', '0 0 35px rgba(212,169,106,0.5)', '0 0 15px rgba(212,169,106,0.2)'] }}
-            transition={{ duration: 4, repeat: Infinity }}
-            className="w-16 h-16 rounded-full bg-white/80 backdrop-blur-md flex items-center justify-center border border-white/50 shadow-xl overflow-hidden"
-          >
-            <span className="text-3xl">{currentChild?.emoji}</span>
-          </motion.div>
-          <p className="mt-2 text-[10px] tracking-[0.4em] text-[#2C3E50] opacity-40 text-center font-bold uppercase">{currentChild?.name}</p>
-        </div>
+        <motion.div 
+          animate={{ boxShadow: ['0 0 15px rgba(212,169,106,0.2)', '0 0 40px rgba(212,169,106,0.5)', '0 0 15px rgba(212,169,106,0.2)'] }}
+          transition={{ duration: 4, repeat: Infinity }}
+          style={{ 
+            width: '64px', height: '64px', borderRadius: '50%', background: 'rgba(255,255,255,0.8)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid rgba(255,255,255,0.5)'
+          }}
+        >
+          <span style={{ fontSize: '32px' }}>{currentChild?.emoji}</span>
+        </motion.div>
+        <p style={{ marginTop: '8px', fontSize: '10px', color: '#2C3E50', opacity: 0.4, fontWeight: 'bold', textAlign: 'center', letterSpacing: '0.4em' }}>
+          {currentChild?.name}
+        </p>
       </motion.div>
 
-      {/* 3. 右上角：时间与极简排版 [UI 纠偏] */}
-      <header className="fixed top-[6%] right-[8%] z-50 text-right">
-        <h1 className="text-7xl font-extralight tracking-tighter text-[#2C3E50] opacity-90 leading-none">
+      {/* 3. 右上角：大字号时间 [UI 纠偏 1] */}
+      <header style={{ position: 'absolute', top: '6%', right: '8%', zIndex: 50, textAlign: 'right' }}>
+        <h1 style={{ fontSize: '72px', fontWeight: 100, color: '#2C3E50', opacity: 0.9, lineHeight: 1, margin: 0 }}>
           {time.getHours()}:{time.getMinutes() < 10 ? `0${time.getMinutes()}` : time.getMinutes()}
         </h1>
-        <div className="flex flex-col items-end mt-2 text-[#2C3E50]">
-          <span className="text-[12px] tracking-[0.2em] opacity-30 font-medium">{greeting}</span>
-          <p className="text-[13px] tracking-[0.4em] opacity-50 font-bold mt-1 uppercase">Gen Companion</p>
+        <div style={{ marginTop: '8px', color: '#2C3E50', opacity: 0.3, fontSize: '12px', letterSpacing: '0.2em' }}>
+          {greeting}
         </div>
       </header>
 
-      {/* 4. 水珠区：S 型非线性散点分布 (WF-08 预警集成) [cite: 43, 67] */}
-      <section className="absolute inset-0 z-20 pointer-events-none">
-        <LiquidDrop 
-          icon={<Bell size={18}/>} label="任务感应" value={tasks.length > 0 ? `${tasks.length} 条` : '静默'}
-          top="28%" right="15%" color="rgba(141, 160, 138, 0.4)" delay={0} alert={tasks.length > 0} 
-        />
-        <LiquidDrop 
-          icon={<Zap size={18}/>} label="精力状态" value="85%" 
-          top="45%" right="25%" color="rgba(212, 169, 106, 0.4)" delay={1.5} 
-        />
-        <LiquidDrop 
-          icon={<Heart size={18}/>} label="当前状态" value="活跃" 
-          top="58%" right="12%" color="rgba(232, 168, 154, 0.4)" delay={3} 
-        />
-        <LiquidDrop 
-          icon={<Trees size={18}/>} label="清迈天气" value="28°" 
-          top="72%" right="22%" color="rgba(154, 183, 232, 0.4)" delay={4.5} 
-        />
-      </section>
+      {/* 4. 液态水珠：S型散落分布 [UI 纠偏 2] [WF-08 预警集成] */}
+      <LiquidDrop icon={<Bell size={18}/>} label="任务感应" value={tasks.length > 0 ? `${tasks.length} 条` : '静默'} top="28%" right="15%" color="rgba(141, 160, 138, 0.4)" alert={tasks.length > 0} delay={0} />
+      <LiquidDrop icon={<Zap size={18}/>} label="精力状态" value="85%" top="45%" right="28%" color="rgba(212, 169, 106, 0.4)" delay={1.5} />
+      <LiquidDrop icon={<Heart size={18}/>} label="当前状态" value="活跃" top="60%" right="12%" color="rgba(232, 168, 154, 0.4)" delay={3} />
+      <LiquidDrop icon={<Trees size={18}/>} label="清迈天气" value="28°" top="75%" right="24%" color="rgba(154, 183, 232, 0.4)" delay={4.5} />
 
-      {/* 5. 底部交互：基地弹出菜单 (不跳转)  */}
-      <footer className="fixed bottom-12 left-0 right-0 z-50 px-10 flex flex-col items-center">
+      {/* 5. 底部交互：基地弹出菜单 [修订②/UI 纠偏 3] */}
+      <footer style={{ position: 'fixed', bottom: '48px', left: 0, right: 0, zIndex: 60, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
         <AnimatePresence>
           {showBaseMenu && (
             <motion.div 
-              initial={{ opacity: 0, y: 30, scale: 0.9 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 30, scale: 0.9 }}
-              className="mb-6 bg-white/20 backdrop-blur-3xl rounded-[2.5rem] p-3 border border-white/40 flex gap-4 shadow-2xl"
+              initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 20 }}
+              style={{ marginBottom: '24px', background: 'rgba(255,255,255,0.2)', backdropFilter: 'blur(30px)', borderRadius: '40px', padding: '12px', border: '1px solid rgba(255,255,255,0.3)', display: 'flex', gap: '16px' }}
             >
-              {['日安', '根', '日栖'].map((item) => (
-                <button key={item} className="w-16 h-16 rounded-full bg-white/40 border border-white/60 flex items-center justify-center text-[11px] font-bold text-[#2C3E50] opacity-70 tracking-widest hover:bg-white/60 transition-all active:scale-90">
-                  {item}
-                </button>
+              {['日安', '根', '日栖'].map(item => (
+                <button key={item} style={{ width: '64px', height: '64px', borderRadius: '50%', background: 'rgba(255,255,255,0.3)', border: '1px solid rgba(255,255,255,0.5)', color: '#2C3E50', fontSize: '11px', fontWeight: 'bold', letterSpacing: '0.2em' }}>{item}</button>
               ))}
             </motion.div>
           )}
         </AnimatePresence>
 
-        <div className="w-full max-w-sm h-16 bg-white/10 backdrop-blur-2xl border border-white/20 rounded-full flex items-center px-8 justify-between shadow-lg">
-          <button onClick={() => setShowBaseMenu(!showBaseMenu)} className="flex items-center gap-3 active:scale-95 transition-all">
-            <HomeIcon size={20} className={showBaseMenu ? "text-[#B08D57]" : "text-[#2C3E50] opacity-40"} />
-            <span className={`text-[12px] font-bold tracking-[0.3em] ${showBaseMenu ? "text-[#B08D57]" : "text-[#2C3E50] opacity-40"}`}>基地</span>
+        <div style={{ width: '320px', height: '64px', background: 'rgba(255,255,255,0.1)', backdropFilter: 'blur(30px)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '32px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 32px' }}>
+          <button onClick={() => setShowBaseMenu(!showBaseMenu)} style={{ display: 'flex', alignItems: 'center', gap: '12px', color: showBaseMenu ? '#B08D57' : '#2C3E50', opacity: showBaseMenu ? 1 : 0.5, border: 'none', background: 'none', cursor: 'pointer' }}>
+            <HomeIcon size={20} /> <span style={{ fontSize: '12px', fontWeight: 'bold', letterSpacing: '0.3em' }}>基地</span>
           </button>
-          <div className="h-4 w-[1px] bg-[#2C3E50] opacity-10" />
-          <button className="flex items-center gap-3 opacity-20 cursor-default">
-            <Settings size={20} className="text-[#2C3E50]" />
-            <span className="text-[12px] font-bold tracking-[0.3em] text-[#2C3E50]">目安</span>
+          <div style={{ height: '16px', width: '1px', background: 'rgba(44,62,80,0.1)' }} />
+          <button style={{ display: 'flex', alignItems: 'center', gap: '12px', color: '#2C3E50', opacity: 0.2, border: 'none', background: 'none' }}>
+            <Settings size={20} /> <span style={{ fontSize: '12px', fontWeight: 'bold', letterSpacing: '0.3em' }}>目安</span>
           </button>
         </div>
       </footer>
-
-      {/* 🔗 强制样式：使用 !important 确保生产环境不缩水 */}
-      <style jsx global>{`
-        .water-bubble {
-          border-radius: 66% 34% 71% 29% / 37% 53% 47% 63% !important;
-          box-shadow: inset 8px 8px 15px rgba(255, 255, 255, 0.4), 
-                      inset -8px -8px 15px rgba(0, 0, 0, 0.05),
-                      10px 20px 30px rgba(0, 0, 0, 0.05) !important;
-        }
-      `}</style>
     </main>
   )
 }
 
-function LiquidDrop({ icon, label, value, top, right, color, delay, alert = false }: any) {
+function LiquidDrop({ icon, label, value, top, right, color, alert, delay }: any) {
   return (
     <motion.div
-      style={{ top, right, position: 'absolute' }}
       animate={{ y: [0, -20, 0], x: [0, 8, 0], rotate: [0, 4, -4, 0] }}
       transition={{ duration: 8, repeat: Infinity, delay, ease: "easeInOut" }}
-      className="flex flex-col items-center gap-2 pointer-events-auto cursor-pointer"
+      style={{ position: 'absolute', top, right, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}
     >
-      <div 
-        className="w-24 h-24 backdrop-blur-xl border border-white/30 water-bubble flex flex-col items-center justify-center p-4 relative overflow-hidden group"
-        style={{ background: `radial-gradient(circle at 35% 35%, rgba(255,255,255,0.4) 0%, ${color} 100%)` }}
-      >
-        <div className="text-[#2C3E50] opacity-60 mb-0.5">{icon}</div>
-        <span className="text-sm font-light text-[#2C3E50] tracking-tighter leading-none italic">{value}</span>
-        <span className="text-[8px] font-bold text-[#2C3E50] opacity-30 tracking-[0.2em] uppercase mt-1 text-center leading-tight">{label}</span>
+      <div style={{ 
+        width: '96px', height: '96px', backdropFilter: 'blur(20px)', border: '1px solid rgba(255,255,255,0.3)',
+        borderRadius: '66% 34% 71% 29% / 37% 53% 47% 63%', position: 'relative', display: 'flex', flexDirection: 'column', 
+        alignItems: 'center', justifyContent: 'center', background: `radial-gradient(circle at 35% 35%, rgba(255,255,255,0.4) 0%, ${color} 100%)`,
+        boxShadow: 'inset 8px 8px 15px rgba(255, 255, 255, 0.4), inset -8px -8px 15px rgba(0, 0, 0, 0.05), 10px 20px 30px rgba(0, 0, 0, 0.05)'
+      }}>
+        <div style={{ color: '#2C3E50', opacity: 0.6, marginBottom: '2px' }}>{icon}</div>
+        <span style={{ fontSize: '14px', fontWeight: 300, color: '#2C3E50', fontStyle: 'italic' }}>{value}</span>
+        <span style={{ fontSize: '8px', fontWeight: 'bold', color: '#2C3E50', opacity: 0.3, letterSpacing: '0.2em', textTransform: 'uppercase' }}>{label}</span>
         
-        {/* P1/P2 紧急程度预警脉冲 [cite: 67] */}
         {alert && (
-          <motion.div 
-            animate={{ scale: [1, 1.4, 1], opacity: [1, 0.6, 1] }}
-            transition={{ repeat: Infinity, duration: 2 }}
-            className="absolute top-3 right-5 w-3 h-3 bg-[#E8A89A] rounded-full border-2 border-white" 
+          <motion.div animate={{ scale: [1, 1.4, 1], opacity: [1, 0.6, 1] }} transition={{ repeat: Infinity, duration: 2 }}
+            style={{ position: 'absolute', top: '12px', right: '20px', width: '12px', height: '12px', backgroundColor: '#E8A89A', borderRadius: '50%', border: '2px solid white' }} 
           />
         )}
-        <div className="absolute top-4 left-6 w-4 h-2 bg-white/40 rounded-full rotate-[-35deg] blur-[0.5px]" />
+        <div style={{ position: 'absolute', top: '16px', left: '24px', width: '16px', height: '8px', backgroundColor: 'rgba(255,255,255,0.4)', borderRadius: '50%', transform: 'rotate(-35deg)', filter: 'blur(0.5px)' }} />
       </div>
     </motion.div>
   )
