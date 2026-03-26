@@ -3,21 +3,16 @@
 import React, { useEffect, useState } from 'react'
 import { createClient } from '@supabase/supabase-js'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Bell, Heart, Trees, Zap, Home, Settings, Layers } from 'lucide-react'
+import { Bell, Heart, Trees, Zap, Home, Settings } from 'lucide-react'
 
-// 🎨 调色盘：对齐灵感图的清新渐变与深灰蓝文字
-const THEME = {
-  bg: 'linear-gradient(180deg, #A8D5DA 0%, #E9C1C8 100%)',
-  text: '#2C3E50', 
-}
-
+// 🔐 初始化核心：确保环境变量在 Vercel 自动同步 [cite: 77]
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || '',
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
 )
 
 export default function HydroApp() {
-  // --- 🧠 核心逻辑层 (完全保留 v2.1 终版定义) ---
+  // --- 🧠 核心功能逻辑（严格保留 v2.1 终版 [cite: 4, 12]） ---
   const [tasks, setTasks] = useState<any[]>([])
   const [children, setChildren] = useState<any[]>([
     { name: 'William', status: 'active', emoji: '👦🏻' },
@@ -29,7 +24,7 @@ export default function HydroApp() {
 
   useEffect(() => {
     const syncData = async () => {
-      // WF-01/02/08: 同步任务与 Grok 实时情报 [cite: 41, 43]
+      // WF-01/02/08: 同步任务与 Grok 实时热点 [cite: 41, 43]
       const { data: taskData } = await supabase.from('tasks').select('*').eq('status', 'pending')
       setTasks(taskData || [])
       // 同步孩子状态 [cite: 83]
@@ -37,7 +32,7 @@ export default function HydroApp() {
       if (childData?.length) setChildren(childData)
     }
     syncData()
-    // 实时订阅：确保 Make.com 写入后界面秒级感应 [cite: 22, 36]
+    // 实时感应层：Make.com 写入后界面秒动 [cite: 20, 22]
     const channel = supabase.channel('realtime_sync').on('postgres_changes', { event: '*', schema: 'public' }, syncData).subscribe()
     const ticker = setInterval(() => setTime(new Date()), 1000)
     return () => { supabase.removeChannel(channel); clearInterval(ticker) }
@@ -48,41 +43,43 @@ export default function HydroApp() {
   const greeting = hour < 5 ? '深夜安好' : hour < 12 ? '早安' : hour < 18 ? '午后好' : '晚安'
 
   return (
-    <main className="fixed inset-0 w-full h-full overflow-hidden select-none font-sans" style={{ background: THEME.bg }}>
+    // 🎨 整体背景：对齐灵感图的蓝绿到粉褐渐变 
+    <main className="fixed inset-0 w-full h-full overflow-hidden select-none" 
+          style={{ background: 'linear-gradient(135deg, #A8D5DA 0%, #D8A5B2 100%)' }}>
       
-      {/* 1. 背景水印：极巨化标题 (0.1 不透明度) [UI 纠偏 1] */}
+      {/* 背景水印：0.1 不透明度，极巨化  */}
       <div className="absolute top-[12%] right-[-10%] text-[18vw] font-bold text-[#2C3E50] opacity-10 pointer-events-none tracking-tighter italic whitespace-nowrap">
         根·陪伴
       </div>
 
-      {/* 2. 左上角 (5%, 5%): 头像与金色呼吸灯 [UI 纠偏 1] */}
+      {/* 1. 左上角：头像与淡金色呼吸圈  */}
       <motion.div 
         onClick={() => setChildIndex(i => (i + 1) % children.length)}
-        className="absolute top-[6%] left-[6%] z-50 cursor-pointer active:scale-90 transition-transform"
+        className="absolute top-[6%] left-[6%] z-50 cursor-pointer active:scale-90"
       >
         <div className="relative">
           <motion.div 
             animate={{ boxShadow: ['0 0 15px rgba(212,169,106,0.2)', '0 0 35px rgba(212,169,106,0.5)', '0 0 15px rgba(212,169,106,0.2)'] }}
             transition={{ duration: 4, repeat: Infinity }}
-            className="w-16 h-16 rounded-full bg-white/90 backdrop-blur-md flex items-center justify-center border border-white/50 shadow-xl overflow-hidden"
+            className="w-16 h-16 rounded-full bg-white/80 backdrop-blur-md flex items-center justify-center border border-white/50 shadow-xl overflow-hidden"
           >
-            <span className="text-3xl">{currentChild?.emoji || '👶🏻'}</span>
+            <span className="text-3xl">{currentChild?.emoji}</span>
           </motion.div>
           <p className="mt-2 text-[10px] tracking-[0.4em] text-[#2C3E50] opacity-40 text-center font-bold uppercase">{currentChild?.name}</p>
         </div>
       </motion.div>
 
-      {/* 3. 右上角 (5%, 5%): 实时时间 [UI 纠偏 1] */}
+      {/* 2. 右上角：大字号时间  */}
       <header className="absolute top-[6%] right-[8%] z-50 text-right">
         <h1 className="text-6xl font-extralight tracking-tighter text-[#2C3E50] opacity-90 leading-none">
           {time.getHours()}:{time.getMinutes() < 10 ? `0${time.getMinutes()}` : time.getMinutes()}
         </h1>
-        <div className="flex flex-col items-end mt-2">
-          <span className="text-[12px] tracking-[0.2em] text-[#2C3E50] opacity-30 font-medium">{greeting}</span>
+        <div className="flex flex-col items-end mt-2 text-[#2C3E50]">
+          <span className="text-[12px] tracking-[0.2em] opacity-30 font-medium">{greeting}</span>
         </div>
       </header>
 
-      {/* 4. 液态水珠：S 型有机散点分布 [UI 纠偏 2] */}
+      {/* 3. 液态水珠：S 型有机分布  */}
       <section className="absolute inset-0 z-20 pointer-events-none">
         <LiquidDrop 
           icon={<Bell size={18}/>} label="任务感应" value={tasks.length > 0 ? `${tasks.length} 条` : '静默'}
@@ -102,7 +99,7 @@ export default function HydroApp() {
         />
       </section>
 
-      {/* 5. 底部交互：基地弹出菜单 (Pop-up 逻辑) [UI 纠偏 3] [cite: 26, 72] */}
+      {/* 4. 底部交互：基地 Pop-up 菜单  */}
       <footer className="fixed bottom-12 left-0 right-0 z-50 px-10 flex flex-col items-center">
         <AnimatePresence>
           {showBaseMenu && (
@@ -111,7 +108,7 @@ export default function HydroApp() {
               className="mb-6 bg-white/20 backdrop-blur-3xl rounded-[2.5rem] p-3 border border-white/40 flex gap-4 shadow-2xl"
             >
               {['日安', '根', '日栖'].map((item) => (
-                <button key={item} className="w-16 h-16 rounded-full bg-white/40 border border-white/60 flex items-center justify-center text-[11px] font-bold text-[#2C3E50] opacity-70 tracking-widest hover:bg-white/60 transition-all active:scale-90">
+                <button key={item} className="w-16 h-16 rounded-full bg-white/40 border border-white/60 flex items-center justify-center text-[11px] font-bold text-[#2C3E50] opacity-70 tracking-widest active:scale-90">
                   {item}
                 </button>
               ))}
@@ -120,7 +117,7 @@ export default function HydroApp() {
         </AnimatePresence>
 
         <div className="w-full max-w-sm h-16 bg-white/10 backdrop-blur-2xl border border-white/20 rounded-full flex items-center px-8 justify-between shadow-lg">
-          <button onClick={() => setShowBaseMenu(!showBaseMenu)} className="flex items-center gap-3 active:scale-95 transition-all">
+          <button onClick={() => setShowBaseMenu(!showBaseMenu)} className="flex items-center gap-3">
             <Home size={20} className={showBaseMenu ? "text-[#B08D57]" : "text-[#2C3E50] opacity-40"} />
             <span className={`text-[12px] font-bold tracking-[0.3em] ${showBaseMenu ? "text-[#B08D57]" : "text-[#2C3E50] opacity-40"}`}>基地</span>
           </button>
@@ -130,15 +127,17 @@ export default function HydroApp() {
             <span className="text-[12px] font-bold tracking-[0.3em] text-[#2C3E50]">目安</span>
           </button>
         </div>
-      </footer >
+      </footer>
 
-      {/* 🔗 CSS 物理特性：不规则液态水珠 [UI 纠偏 2] */}
+      {/* 🔗 样式注入：解决 Vercel 样式覆盖问题  */}
       <style jsx global>{`
         .liquid-drop {
-          border-radius: 66% 34% 71% 29% / 37% 53% 47% 63%;
+          border-radius: 66% 34% 71% 29% / 37% 53% 47% 63% !important;
+          background: rgba(255, 255, 255, 0.2) !important;
+          backdrop-filter: blur(15px) !important;
           box-shadow: inset 8px 8px 15px rgba(255, 255, 255, 0.4), 
                       inset -8px -8px 15px rgba(0, 0, 0, 0.05),
-                      10px 20px 30px rgba(0, 0, 0, 0.05);
+                      10px 20px 30px rgba(0, 0, 0, 0.05) !important;
         }
       `}</style>
     </main>
@@ -159,9 +158,9 @@ function LiquidDrop({ icon, label, value, top, right, color, delay, alert = fals
       >
         <div className="text-[#2C3E50] opacity-60 mb-0.5">{icon}</div>
         <span className="text-sm font-light text-[#2C3E50] tracking-tighter leading-none italic">{value}</span>
-        <span className="text-[8px] font-bold text-[#2C3E50] opacity-30 tracking-[0.2em] uppercase mt-1">{label}</span>
+        <span className="text-[8px] font-bold text-[#2C3E50] opacity-30 tracking-[0.2em] uppercase mt-1 font-sans">{label}</span>
         
-        {/* P1/P2 紧急程度脉冲 (对齐 Grok 实时报警逻辑)  */}
+        {/* P1/P2 紧急程度脉冲 [cite: 67] */}
         {alert && (
           <motion.div 
             animate={{ scale: [1, 1.4, 1], opacity: [1, 0.6, 1] }}
