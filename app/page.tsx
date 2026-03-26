@@ -5,14 +5,14 @@ import { createClient } from '@supabase/supabase-js'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Bell, Heart, Trees, Zap, Home, Settings } from 'lucide-react'
 
-// 🔐 初始化核心：确保环境变量在 Vercel 自动同步 [cite: 7, 77]
+// 🔐 核心：连接 Supabase 实时数据库 [cite: 38, 83]
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || '',
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
 )
 
 export default function HydroApp() {
-  // --- 🧠 核心功能逻辑（严格保留 v2.1 终版） [cite: 6, 9] ---
+  // --- 🧠 核心逻辑：State & Sync (严格对齐 v2.1 终版) ---
   const [tasks, setTasks] = useState<any[]>([])
   const [children, setChildren] = useState<any[]>([
     { name: 'William', status: 'active', emoji: '👦🏻' },
@@ -24,16 +24,22 @@ export default function HydroApp() {
 
   useEffect(() => {
     const syncData = async () => {
-      // WF-01/02/08: 同步任务与 Grok 实时热点 [cite: 41, 43]
+      // WF-01/02/08: 同步任务与 Grok 实时热点情报 [cite: 41, 65]
       const { data: taskData } = await supabase.from('tasks').select('*').eq('status', 'pending')
       setTasks(taskData || [])
+      
       // 同步孩子状态 
       const { data: childData } = await supabase.from('children_status').select('*')
       if (childData?.length) setChildren(childData)
     }
+
     syncData()
-    // 实时感应层：Make.com 写入后界面秒动 [cite: 20, 22]
-    const channel = supabase.channel('realtime_sync').on('postgres_changes', { event: '*', schema: 'public' }, syncData).subscribe()
+
+    // 实时感应层：监听数据库变更 (Realtime) [cite: 100]
+    const channel = supabase.channel('realtime_sync')
+      .on('postgres_changes', { event: '*', schema: 'public' }, syncData)
+      .subscribe()
+
     const ticker = setInterval(() => setTime(new Date()), 1000)
     return () => { supabase.removeChannel(channel); clearInterval(ticker) }
   }, [])
@@ -43,16 +49,16 @@ export default function HydroApp() {
   const greeting = hour < 5 ? '深夜安好' : hour < 12 ? '早安' : hour < 18 ? '午后好' : '晚安'
 
   return (
-    // 🎨 强制全屏背景：解决 Vercel 容器白边问题
+    // 🎨 强制全屏背景：清透水氧渐变 [UI 纠偏]
     <main className="fixed inset-0 w-full h-full overflow-hidden select-none z-0" 
-          style={{ background: 'linear-gradient(135deg, #A8D5DA 0%, #D8A5B2 100%)' }}>
+          style={{ background: 'linear-gradient(180deg, #A8D5DA 0%, #D8A5B2 100%)' }}>
       
-      {/* 1. 背景纹理：极巨化标题，不透明度 0.1 */}
-      <div className="absolute top-[15%] right-[-10%] text-[18vw] font-bold text-[#2C3E50] opacity-10 pointer-events-none tracking-tighter italic whitespace-nowrap z-0">
+      {/* 1. 背景纹理：0.1 不透明度巨型水印 [UI 纠偏] */}
+      <div className="absolute top-[15%] right-[-5%] text-[18vw] font-bold text-[#2C3E50] opacity-10 pointer-events-none tracking-tighter italic whitespace-nowrap z-0">
         GEN COMPANION
       </div>
 
-      {/* 2. 左上角 (5%, 5%)：头像与淡金色呼吸圈 [修订①要求] */}
+      {/* 2. 左上角 (5%, 5%)：头像与金色呼吸圈 [WF-01] */}
       <motion.div 
         onClick={() => setChildIndex(i => (i + 1) % children.length)}
         className="absolute top-[6%] left-[6%] z-50 cursor-pointer active:scale-90"
@@ -61,7 +67,7 @@ export default function HydroApp() {
           <motion.div 
             animate={{ boxShadow: ['0 0 15px rgba(212,169,106,0.2)', '0 0 35px rgba(212,169,106,0.5)', '0 0 15px rgba(212,169,106,0.2)'] }}
             transition={{ duration: 4, repeat: Infinity }}
-            className="w-16 h-16 rounded-full bg-white/80 backdrop-blur-md flex items-center justify-center border border-white/50 shadow-xl overflow-hidden"
+            className="w-16 h-16 rounded-full bg-white/90 backdrop-blur-md flex items-center justify-center border border-white/50 shadow-xl overflow-hidden"
           >
             <span className="text-3xl">{currentChild?.emoji}</span>
           </motion.div>
@@ -80,7 +86,7 @@ export default function HydroApp() {
         </div>
       </header>
 
-      {/* 4. 液态水珠：S 型非线性分布 [视觉纠偏] */}
+      {/* 4. 液态水珠：S 型有机分布 [UI 纠偏] */}
       <section className="absolute inset-0 z-20 pointer-events-none">
         <LiquidDrop 
           icon={<Bell size={18}/>} label="任务感应" value={tasks.length > 0 ? `${tasks.length} 条` : '静默'}
@@ -91,7 +97,7 @@ export default function HydroApp() {
           top="45%" right="25%" color="rgba(212, 169, 106, 0.4)" delay={1.2} 
         />
         <LiquidDrop 
-          icon={<Heart size={18}/>} label="当前状态" value={statusMap[currentChild?.status] || '活跃'} 
+          icon={<Heart size={18}/>} label="状态" value={statusMap[currentChild?.status] || '活跃'} 
           top="58%" right="12%" color="rgba(232, 168, 154, 0.4)" delay={2.4} 
         />
         <LiquidDrop 
@@ -100,7 +106,7 @@ export default function HydroApp() {
         />
       </section>
 
-      {/* 5. 底部交互：基地弹出菜单 [修订②逻辑] */}
+      {/* 5. 底部交互：基地弹出菜单 (Pop-up 逻辑) [cite: 26, 72] */}
       <footer className="fixed bottom-12 left-0 right-0 z-50 px-10 flex flex-col items-center">
         <AnimatePresence>
           {showBaseMenu && (
@@ -130,7 +136,7 @@ export default function HydroApp() {
         </div>
       </footer>
 
-      {/* 🔗 强制样式：解决 Tailwind 优先级问题 */}
+      {/* 🔗 强制样式：解决 Vercel 样式优先级问题 */}
       <style jsx global>{`
         .water-bubble {
           border-radius: 66% 34% 71% 29% / 37% 53% 47% 63% !important;
@@ -159,7 +165,7 @@ function LiquidDrop({ icon, label, value, top, right, color, delay, alert = fals
         <span className="text-sm font-light text-[#2C3E50] tracking-tighter leading-none italic">{value}</span>
         <span className="text-[8px] font-bold text-[#2C3E50] opacity-30 tracking-[0.2em] uppercase mt-1">{label}</span>
         
-        {/* P1/P2 预警红点 [cite: 67] */}
+        {/* P1/P2 预警红点 (WF-08) [cite: 67] */}
         {alert && (
           <motion.div 
             animate={{ scale: [1, 1.4, 1], opacity: [1, 0.6, 1] }}
@@ -167,8 +173,6 @@ function LiquidDrop({ icon, label, value, top, right, color, delay, alert = fals
             className="absolute top-3 right-5 w-3 h-3 bg-[#E8A89A] rounded-full border-2 border-white" 
           />
         )}
-        
-        {/* 核心视觉细节：表面折射高光 */}
         <div className="absolute top-4 left-6 w-4 h-2 bg-white/40 rounded-full rotate-[-35deg] blur-[0.5px]" />
       </div>
     </motion.div>
