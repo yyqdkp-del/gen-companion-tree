@@ -5,6 +5,9 @@ import { createClient } from '@supabase/supabase-js'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Bell, Heart, Trees, Zap, Home as HomeIcon, Settings } from 'lucide-react'
 
+// 强制 Next.js 跳过静态预渲染，防止构建时因缺失 Env 报错
+export const dynamic = 'force-dynamic'
+
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || '',
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
@@ -22,6 +25,7 @@ export default function HydroApp() {
 
   useEffect(() => {
     const syncData = async () => {
+      // WF-01/02/08: 实时任务与孩子状态同步
       const { data: taskData } = await supabase.from('tasks').select('*').eq('status', 'pending')
       setTasks(taskData || [])
       const { data: childData } = await supabase.from('children_status').select('*')
@@ -39,10 +43,10 @@ export default function HydroApp() {
   return (
     <main style={{ 
       position: 'fixed', inset: 0, width: '100vw', height: '100vh', overflow: 'hidden',
-      background: 'linear-gradient(180deg, #A7D7D9 0%, #D9A7B4 100%)', fontSans: 'sans-serif'
+      background: 'linear-gradient(180deg, #A7D7D9 0%, #D9A7B4 100%)', fontFamily: 'sans-serif'
     }}>
       
-      {/* 1. 背景层：极巨化水印文字 [UI 纠偏 1] */}
+      {/* 1. 空间重组：背景巨型水印 [UI 纠偏] */}
       <div style={{
         position: 'absolute', top: '15%', right: '-5%', fontSize: '18vw', fontWeight: 'bold',
         color: '#2C3E50', opacity: 0.1, pointerEvents: 'none', fontStyle: 'italic', whiteSpace: 'nowrap'
@@ -50,7 +54,7 @@ export default function HydroApp() {
         根·陪伴
       </div>
 
-      {/* 2. 左上角：头像与金色呼吸圈 [修订①/纠偏 1] */}
+      {/* 2. 左上角：头像与金色呼吸圈 [修订①] */}
       <motion.div 
         onClick={() => setChildIndex(i => (i + 1) % children.length)}
         style={{ position: 'absolute', top: '6%', left: '6%', zIndex: 50, cursor: 'pointer' }}
@@ -70,7 +74,7 @@ export default function HydroApp() {
         </p>
       </motion.div>
 
-      {/* 3. 右上角：大字号时间 [UI 纠偏 1] */}
+      {/* 3. 右上角：大字号时间 [UI 纠偏] */}
       <header style={{ position: 'absolute', top: '6%', right: '8%', zIndex: 50, textAlign: 'right' }}>
         <h1 style={{ fontSize: '72px', fontWeight: 100, color: '#2C3E50', opacity: 0.9, lineHeight: 1, margin: 0 }}>
           {time.getHours()}:{time.getMinutes() < 10 ? `0${time.getMinutes()}` : time.getMinutes()}
@@ -80,13 +84,13 @@ export default function HydroApp() {
         </div>
       </header>
 
-      {/* 4. 液态水珠：S型散落分布 [UI 纠偏 2] [WF-08 预警集成] */}
+      {/* 4. 液态水珠：S型散落分布 [UI 纠偏] [WF-08 预警] */}
       <LiquidDrop icon={<Bell size={18}/>} label="任务感应" value={tasks.length > 0 ? `${tasks.length} 条` : '静默'} top="28%" right="15%" color="rgba(141, 160, 138, 0.4)" alert={tasks.length > 0} delay={0} />
       <LiquidDrop icon={<Zap size={18}/>} label="精力状态" value="85%" top="45%" right="28%" color="rgba(212, 169, 106, 0.4)" delay={1.5} />
       <LiquidDrop icon={<Heart size={18}/>} label="当前状态" value="活跃" top="60%" right="12%" color="rgba(232, 168, 154, 0.4)" delay={3} />
       <LiquidDrop icon={<Trees size={18}/>} label="清迈天气" value="28°" top="75%" right="24%" color="rgba(154, 183, 232, 0.4)" delay={4.5} />
 
-      {/* 5. 底部交互：基地弹出菜单 [修订②/UI 纠偏 3] */}
+      {/* 5. 底部交互：基地弹出菜单 [修订②] */}
       <footer style={{ position: 'fixed', bottom: '48px', left: 0, right: 0, zIndex: 60, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
         <AnimatePresence>
           {showBaseMenu && (
@@ -95,18 +99,32 @@ export default function HydroApp() {
               style={{ marginBottom: '24px', background: 'rgba(255,255,255,0.2)', backdropFilter: 'blur(30px)', borderRadius: '40px', padding: '12px', border: '1px solid rgba(255,255,255,0.3)', display: 'flex', gap: '16px' }}
             >
               {['日安', '根', '日栖'].map(item => (
-                <button key={item} style={{ width: '64px', height: '64px', borderRadius: '50%', background: 'rgba(255,255,255,0.3)', border: '1px solid rgba(255,255,255,0.5)', color: '#2C3E50', fontSize: '11px', fontWeight: 'bold', letterSpacing: '0.2em' }}>{item}</button>
+                <button key={item} style={{ 
+                  width: '64px', height: '64px', borderRadius: '50%', background: 'rgba(255,255,255,0.3)', 
+                  border: '1px solid rgba(255,255,255,0.5)', color: '#2C3E50', fontSize: '11px', 
+                  fontWeight: 'bold', letterSpacing: '0.2em', cursor: 'pointer' 
+                }}>{item}</button>
               ))}
             </motion.div>
           )}
         </AnimatePresence>
 
-        <div style={{ width: '320px', height: '64px', background: 'rgba(255,255,255,0.1)', backdropFilter: 'blur(30px)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '32px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 32px' }}>
-          <button onClick={() => setShowBaseMenu(!showBaseMenu)} style={{ display: 'flex', alignItems: 'center', gap: '12px', color: showBaseMenu ? '#B08D57' : '#2C3E50', opacity: showBaseMenu ? 1 : 0.5, border: 'none', background: 'none', cursor: 'pointer' }}>
+        <div style={{ 
+          width: '320px', height: '64px', background: 'rgba(255,255,255,0.1)', backdropFilter: 'blur(30px)', 
+          border: '1px solid rgba(255,255,255,0.2)', borderRadius: '32px', display: 'flex', 
+          alignItems: 'center', justifyContent: 'space-between', padding: '0 32px' 
+        }}>
+          <button onClick={() => setShowBaseMenu(!showBaseMenu)} style={{ 
+            display: 'flex', alignItems: 'center', gap: '12px', color: showBaseMenu ? '#B08D57' : '#2C3E50', 
+            opacity: showBaseMenu ? 1 : 0.5, border: 'none', background: 'none', cursor: 'pointer' 
+          }}>
             <HomeIcon size={20} /> <span style={{ fontSize: '12px', fontWeight: 'bold', letterSpacing: '0.3em' }}>基地</span>
           </button>
           <div style={{ height: '16px', width: '1px', background: 'rgba(44,62,80,0.1)' }} />
-          <button style={{ display: 'flex', alignItems: 'center', gap: '12px', color: '#2C3E50', opacity: 0.2, border: 'none', background: 'none' }}>
+          <button style={{ 
+            display: 'flex', alignItems: 'center', gap: '12px', color: '#2C3E50', 
+            opacity: 0.2, border: 'none', background: 'none', cursor: 'default' 
+          }}>
             <Settings size={20} /> <span style={{ fontSize: '12px', fontWeight: 'bold', letterSpacing: '0.3em' }}>目安</span>
           </button>
         </div>
