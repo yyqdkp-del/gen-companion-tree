@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react'
 import { createClient } from '@supabase/supabase-js'
 import { motion, AnimatePresence } from 'framer-motion'
-// 核心修复：重命名以消除组件冲突 [来自之前对话逻辑]
+// 核心修复：重命名 Home 为 HomeIcon 消除组件名冲突
 import { Bell, Heart, Trees, Zap, Home as HomeIcon, Settings } from 'lucide-react'
 
 const THEME = {
@@ -26,7 +26,7 @@ export default function HydroApp() {
   const [time, setTime] = useState(new Date())
   const [showBaseMenu, setShowBaseMenu] = useState(false)
 
-  // 🧠 核心功能逻辑：WF-01/02/08 实时感应层 [cite: 41, 43]
+  // 🧠 核心逻辑：WF-01/02/08 实时感应层 [cite: 41, 43]
   useEffect(() => {
     const syncData = async () => {
       const { data: taskData } = await supabase.from('tasks').select('*').eq('status', 'pending')
@@ -45,17 +45,17 @@ export default function HydroApp() {
   const greeting = hour < 5 ? '深夜安好' : hour < 12 ? '早安' : hour < 18 ? '午后好' : '晚安'
 
   return (
-    <main className="fixed inset-0 w-full h-full overflow-hidden select-none" style={{ background: THEME.bg }}>
+    <main className="fixed inset-0 w-full h-full overflow-hidden select-none z-0" style={{ background: THEME.bg }}>
       
       {/* 1. 空间重组：背景水印 (0.1 不透明度) [UI 纠偏] */}
       <div className="absolute top-[15%] right-[-5%] text-[18vw] font-bold text-[#2C3E50] opacity-10 pointer-events-none tracking-tighter italic whitespace-nowrap z-0">
         根·陪伴
       </div>
 
-      {/* 2. 左上角：头像与金色呼吸圈 (WF-01 切换逻辑) [cite: 29] */}
+      {/* 2. 左上角：头像与金色呼吸圈 (WF-01 切换逻辑)  */}
       <motion.div 
         onClick={() => setChildIndex(i => (i + 1) % children.length)}
-        className="fixed top-[5%] left-[5%] z-50 cursor-pointer active:scale-90"
+        className="fixed top-[6%] left-[6%] z-50 cursor-pointer active:scale-90"
       >
         <div className="relative">
           <motion.div 
@@ -70,7 +70,7 @@ export default function HydroApp() {
       </motion.div>
 
       {/* 3. 右上角：时间与极简排版 [UI 纠偏] */}
-      <header className="fixed top-[5%] right-[8%] z-50 text-right">
+      <header className="fixed top-[6%] right-[8%] z-50 text-right">
         <h1 className="text-7xl font-extralight tracking-tighter text-[#2C3E50] opacity-90 leading-none">
           {time.getHours()}:{time.getMinutes() < 10 ? `0${time.getMinutes()}` : time.getMinutes()}
         </h1>
@@ -80,7 +80,7 @@ export default function HydroApp() {
         </div>
       </header>
 
-      {/* 4. 水珠区：S 型非线性散点分布 (WF-08 预警集成)  */}
+      {/* 4. 水珠区：S 型非线性散点分布 (WF-08 预警集成) [cite: 43, 67] */}
       <section className="absolute inset-0 z-20 pointer-events-none">
         <LiquidDrop 
           icon={<Bell size={18}/>} label="任务感应" value={tasks.length > 0 ? `${tasks.length} 条` : '静默'}
@@ -100,7 +100,7 @@ export default function HydroApp() {
         />
       </section>
 
-      {/* 5. 底部交互：基地弹出菜单 (不跳转) [cite: 26, 72] */}
+      {/* 5. 底部交互：基地弹出菜单 (不跳转)  */}
       <footer className="fixed bottom-12 left-0 right-0 z-50 px-10 flex flex-col items-center">
         <AnimatePresence>
           {showBaseMenu && (
@@ -159,7 +159,7 @@ function LiquidDrop({ icon, label, value, top, right, color, delay, alert = fals
         <span className="text-sm font-light text-[#2C3E50] tracking-tighter leading-none italic">{value}</span>
         <span className="text-[8px] font-bold text-[#2C3E50] opacity-30 tracking-[0.2em] uppercase mt-1 text-center leading-tight">{label}</span>
         
-        {/* P1/P2 紧急程度预警脉冲 (WF-08) [cite: 67] */}
+        {/* P1/P2 紧急程度预警脉冲 [cite: 67] */}
         {alert && (
           <motion.div 
             animate={{ scale: [1, 1.4, 1], opacity: [1, 0.6, 1] }}
