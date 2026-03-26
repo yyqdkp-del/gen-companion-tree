@@ -3,10 +3,9 @@
 import React, { useEffect, useState } from 'react'
 import { createClient } from '@supabase/supabase-js'
 import { motion, AnimatePresence } from 'framer-motion'
-// 修正点：将 Home 重命名为 HomeIcon 以避免与组件名冲突 [cite: 54]
+// 核心修复：重命名 Home 为 HomeIcon，彻底解决组件命名冲突 [cite: 1]
 import { Bell, Heart, Trees, Zap, Home as HomeIcon, Settings, Layers } from 'lucide-react'
 
-// 🎨 调色盘：深灰蓝文字 (#2C3E50) + 水氧渐变 [cite: 67, 70]
 const THEME = {
   bg: 'linear-gradient(135deg, #A7D7D9 0%, #D9A7B4 100%)',
   text: '#2C3E50', 
@@ -18,7 +17,6 @@ const supabase = createClient(
 )
 
 export default function HydroApp() {
-  // --- 🧠 核心逻辑：State & Sync (严格对齐 v2.1 终版) [cite: 7, 20] ---
   const [tasks, setTasks] = useState<any[]>([])
   const [children, setChildren] = useState<any[]>([
     { name: 'William', status: 'active', emoji: '👦🏻' },
@@ -28,23 +26,16 @@ export default function HydroApp() {
   const [time, setTime] = useState(new Date())
   const [showBaseMenu, setShowBaseMenu] = useState(false)
 
+  // 核心逻辑：监听任务与孩子状态 [cite: 1]
   useEffect(() => {
     const syncData = async () => {
-      // WF-01/02/08: 同步任务与 Grok 实时热点情报 [cite: 41, 43, 65]
       const { data: taskData } = await supabase.from('tasks').select('*').eq('status', 'pending')
       setTasks(taskData || [])
-      
       const { data: childData } = await supabase.from('children_status').select('*')
       if (childData?.length) setChildren(childData)
     }
-
     syncData()
-
-    // 实时感应层：监听数据库变更 (Realtime) [cite: 38, 83, 100]
-    const channel = supabase.channel('realtime_sync')
-      .on('postgres_changes', { event: '*', schema: 'public' }, syncData)
-      .subscribe()
-
+    const channel = supabase.channel('realtime_sync').on('postgres_changes', { event: '*', schema: 'public' }, syncData).subscribe()
     const ticker = setInterval(() => setTime(new Date()), 1000)
     return () => { supabase.removeChannel(channel); clearInterval(ticker) }
   }, [])
@@ -54,25 +45,23 @@ export default function HydroApp() {
   const greeting = hour < 5 ? '深夜安好' : hour < 12 ? '早安' : hour < 18 ? '午后好' : '晚安'
 
   return (
-    // 🎨 强制全屏背景：清透水氧渐变 [cite: 13, 20, 70]
-    <main className="fixed inset-0 w-full h-full overflow-hidden select-none z-0" 
-          style={{ background: THEME.bg }}>
+    <main className="fixed inset-0 w-full h-full overflow-hidden select-none" style={{ background: THEME.bg }}>
       
-      {/* 1. 背景纹理：0.1 不透明度巨型水印 [cite: 22, 51] */}
-      <div className="absolute top-[15%] right-[-5%] text-[18vw] font-bold text-[#2C3E50] opacity-10 pointer-events-none tracking-tighter italic whitespace-nowrap z-0">
-        根·陪伴
+      {/* 1. 背景水印：极巨化标题 (0.1 不透明度) [cite: 1] */}
+      <div className="absolute top-[15%] right-[-5%] text-[15vw] font-bold text-[#2C3E50] opacity-10 pointer-events-none tracking-tighter italic whitespace-nowrap z-0">
+        GEN COMPANION
       </div>
 
-      {/* 2. 左上角 (5%, 5%)：头像与金色呼吸圈 [cite: 22, 51] */}
+      {/* 2. 左上角：头像与金色呼吸圈 [cite: 1] */}
       <motion.div 
         onClick={() => setChildIndex(i => (i + 1) % children.length)}
-        className="absolute top-[6%] left-[6%] z-50 cursor-pointer active:scale-90"
+        className="absolute top-[5%] left-[5%] z-50 cursor-pointer active:scale-90"
       >
         <div className="relative">
           <motion.div 
             animate={{ boxShadow: ['0 0 15px rgba(212,169,106,0.2)', '0 0 35px rgba(212,169,106,0.5)', '0 0 15px rgba(212,169,106,0.2)'] }}
             transition={{ duration: 4, repeat: Infinity }}
-            className="w-16 h-16 rounded-full bg-white/90 backdrop-blur-md flex items-center justify-center border border-white/50 shadow-xl overflow-hidden"
+            className="w-16 h-16 rounded-full bg-white/80 backdrop-blur-md flex items-center justify-center border border-white/50 shadow-xl overflow-hidden"
           >
             <span className="text-3xl">{currentChild?.emoji}</span>
           </motion.div>
@@ -80,18 +69,18 @@ export default function HydroApp() {
         </div>
       </motion.div>
 
-      {/* 3. 右上角 (5%, 8%)：时间与极简问候 [cite: 22, 51] */}
-      <header className="absolute top-[6%] right-[8%] z-50 text-right">
+      {/* 3. 右上角：时间与极简排版 [cite: 1] */}
+      <header className="absolute top-[5%] right-[8%] z-50 text-right">
         <h1 className="text-7xl font-extralight tracking-tighter text-[#2C3E50] opacity-90 leading-none">
           {time.getHours()}:{time.getMinutes() < 10 ? `0${time.getMinutes()}` : time.getMinutes()}
         </h1>
         <div className="flex flex-col items-end mt-2 text-[#2C3E50]">
           <span className="text-[12px] tracking-[0.2em] opacity-30 font-medium">{greeting}</span>
-          <p className="text-[13px] tracking-[0.4em] opacity-50 font-bold mt-1 uppercase">根·Companion</p>
+          <p className="text-[14px] tracking-[0.4em] opacity-50 font-bold mt-1 uppercase">根·Companion</p>
         </div>
       </header>
 
-      {/* 4. 液态水珠：S 型有机分布 [cite: 22, 49, 65] */}
+      {/* 4. 液态水珠：S 型有机分布 [cite: 1] */}
       <section className="absolute inset-0 z-20 pointer-events-none">
         <LiquidDrop 
           icon={<Bell size={18}/>} label="任务感应" value={tasks.length > 0 ? `${tasks.length} 条` : '静默'}
@@ -102,7 +91,7 @@ export default function HydroApp() {
           top="45%" right="25%" color="rgba(212, 169, 106, 0.4)" delay={1.2} 
         />
         <LiquidDrop 
-          icon={<Heart size={18}/>} label="状态" value="活跃" 
+          icon={<Heart size={18}/>} label="当前状态" value="活跃" 
           top="58%" right="12%" color="rgba(232, 168, 154, 0.4)" delay={2.4} 
         />
         <LiquidDrop 
@@ -111,7 +100,7 @@ export default function HydroApp() {
         />
       </section>
 
-      {/* 5. 底部交互：基地弹出菜单 (Pop-up 逻辑)  */}
+      {/* 5. 底部交互：基地弹出菜单 [cite: 1] */}
       <footer className="fixed bottom-12 left-0 right-0 z-50 px-10 flex flex-col items-center">
         <AnimatePresence>
           {showBaseMenu && (
@@ -130,7 +119,6 @@ export default function HydroApp() {
 
         <div className="w-full max-w-sm h-16 bg-white/10 backdrop-blur-2xl border border-white/20 rounded-full flex items-center px-8 justify-between shadow-lg">
           <button onClick={() => setShowBaseMenu(!showBaseMenu)} className="flex items-center gap-3 active:scale-95 transition-all">
-            {/* 修正点：使用 HomeIcon [cite: 54] */}
             <HomeIcon size={20} className={showBaseMenu ? "text-[#B08D57]" : "text-[#2C3E50] opacity-40"} />
             <span className={`text-[12px] font-bold tracking-[0.3em] ${showBaseMenu ? "text-[#B08D57]" : "text-[#2C3E50] opacity-40"}`}>基地</span>
           </button>
@@ -142,7 +130,7 @@ export default function HydroApp() {
         </div>
       </footer>
 
-      {/* 🔗 强制样式：解决 Vercel 样式冲突 [cite: 70, 72] */}
+      {/* 🔗 强制样式：使用 !important 确保生产环境不缩水 [cite: 1] */}
       <style jsx global>{`
         .water-bubble {
           border-radius: 66% 34% 71% 29% / 37% 53% 47% 63% !important;
@@ -169,9 +157,7 @@ function LiquidDrop({ icon, label, value, top, right, color, delay, alert = fals
       >
         <div className="text-[#2C3E50] opacity-60 mb-0.5">{icon}</div>
         <span className="text-sm font-light text-[#2C3E50] tracking-tighter leading-none italic">{value}</span>
-        <span className="text-[8px] font-bold text-[#2C3E50] opacity-30 tracking-[0.2em] uppercase mt-1">{label}</span>
-        
-        {/* P1/P2 预警红点 (WF-08) [cite: 43, 65, 67] */}
+        <span className="text-[8px] font-bold text-[#2C3E50] opacity-30 tracking-[0.2em] uppercase mt-1 text-center leading-tight">{label}</span>
         {alert && (
           <motion.div 
             animate={{ scale: [1, 1.4, 1], opacity: [1, 0.6, 1] }}
