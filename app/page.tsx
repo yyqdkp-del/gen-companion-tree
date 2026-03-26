@@ -3,9 +3,9 @@
 import React, { useEffect, useState } from 'react'
 import { createClient } from '@supabase/supabase-js'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Bell, Heart, Trees, Zap, Home as HomeIcon, Settings } from 'lucide-react'
+import { Bell, Heart, Trees, Zap, Home as HomeIcon, Settings, Plus, Minus, Mic, Camera, Send } from 'lucide-react'
 
-// 强制 Next.js 跳过静态预渲染，防止构建时因缺失 Env 报错
+// 强制动态渲染，确保 Vercel 构建通过
 export const dynamic = 'force-dynamic'
 
 const supabase = createClient(
@@ -16,16 +16,16 @@ const supabase = createClient(
 export default function HydroApp() {
   const [tasks, setTasks] = useState<any[]>([])
   const [children, setChildren] = useState<any[]>([
-    { name: 'William', status: 'active', emoji: '👦🏻' },
-    { name: 'Noah', status: 'active', emoji: '👶🏻' },
+    { name: 'William', status: 'active', emoji: '👦🏻', energy: 85 },
+    { name: 'Noah', status: 'active', emoji: '👶🏻', energy: 42 },
   ])
   const [childIndex, setChildIndex] = useState(0)
   const [time, setTime] = useState(new Date())
   const [showBaseMenu, setShowBaseMenu] = useState(false)
+  const [showInputMode, setShowInputMode] = useState<'none' | 'text' | 'voice' | 'video'>('none')
 
   useEffect(() => {
     const syncData = async () => {
-      // WF-01/02/08: 实时任务与孩子状态同步
       const { data: taskData } = await supabase.from('tasks').select('*').eq('status', 'pending')
       setTasks(taskData || [])
       const { data: childData } = await supabase.from('children_status').select('*')
@@ -38,7 +38,13 @@ export default function HydroApp() {
   }, [])
 
   const currentChild = children[childIndex]
-  const greeting = time.getHours() < 12 ? '早安' : time.getHours() < 18 ? '午后好' : '晚安'
+  
+  // 🧠 精力条色彩逻辑：根据综合数据自动映射
+  const getEnergyColor = (val: number) => {
+    if (val > 70) return '#4ADE80' // 绿
+    if (val > 40) return '#FACC15' // 黄
+    return '#FB7185' // 红
+  }
 
   return (
     <main style={{ 
@@ -46,7 +52,7 @@ export default function HydroApp() {
       background: 'linear-gradient(180deg, #A7D7D9 0%, #D9A7B4 100%)', fontFamily: 'sans-serif'
     }}>
       
-      {/* 1. 空间重组：背景巨型水印 [UI 纠偏] */}
+      {/* 1. 背景水印 */}
       <div style={{
         position: 'absolute', top: '15%', right: '-5%', fontSize: '18vw', fontWeight: 'bold',
         color: '#2C3E50', opacity: 0.1, pointerEvents: 'none', fontStyle: 'italic', whiteSpace: 'nowrap'
@@ -54,77 +60,101 @@ export default function HydroApp() {
         根·陪伴
       </div>
 
-      {/* 2. 左上角：头像与金色呼吸圈 [修订①] */}
-      <motion.div 
-        onClick={() => setChildIndex(i => (i + 1) % children.length)}
-        style={{ position: 'absolute', top: '6%', left: '6%', zIndex: 50, cursor: 'pointer' }}
-      >
-        <motion.div 
-          animate={{ boxShadow: ['0 0 15px rgba(212,169,106,0.2)', '0 0 40px rgba(212,169,106,0.5)', '0 0 15px rgba(212,169,106,0.2)'] }}
-          transition={{ duration: 4, repeat: Infinity }}
-          style={{ 
-            width: '64px', height: '64px', borderRadius: '50%', background: 'rgba(255,255,255,0.8)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid rgba(255,255,255,0.5)'
-          }}
-        >
-          <span style={{ fontSize: '32px' }}>{currentChild?.emoji}</span>
-        </motion.div>
-        <p style={{ marginTop: '8px', fontSize: '10px', color: '#2C3E50', opacity: 0.4, fontWeight: 'bold', textAlign: 'center', letterSpacing: '0.4em' }}>
-          {currentChild?.name}
-        </p>
-      </motion.div>
+      {/* 2. 左上角：多孩指挥部 (头像 + 增减按钮 + 精力条) */}
+      <div style={{ position: 'absolute', top: '6%', left: '6%', zIndex: 100, display: 'flex', alignItems: 'flex-start', gap: '15px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+          <motion.div 
+            onClick={() => setChildIndex(i => (i + 1) % children.length)}
+            animate={{ boxShadow: [`0 0 15px ${getEnergyColor(currentChild?.energy)}40`, `0 0 35px ${getEnergyColor(currentChild?.energy)}80`, `0 0 15px ${getEnergyColor(currentChild?.energy)}40`] }}
+            transition={{ duration: 4, repeat: Infinity }}
+            style={{ 
+              width: '72px', height: '72px', borderRadius: '50%', background: 'rgba(255,255,255,0.8)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid white', cursor: 'pointer'
+            }}
+          >
+            <span style={{ fontSize: '36px' }}>{currentChild?.emoji}</span>
+          </motion.div>
+          
+          <p style={{ marginTop: '8px', fontSize: '11px', color: '#2C3E50', fontWeight: 'bold', letterSpacing: '0.2em' }}>
+            {currentChild?.name}
+          </p>
 
-      {/* 3. 右上角：大字号时间 [UI 纠偏] */}
+          {/* 🔋 动态精力条 (Bio-Gauge) */}
+          <div style={{ width: '60px', height: '4px', background: 'rgba(255,255,255,0.3)', borderRadius: '2px', marginTop: '4px', overflow: 'hidden' }}>
+            <motion.div 
+              initial={{ width: 0 }}
+              animate={{ width: `${currentChild?.energy}%`, backgroundColor: getEnergyColor(currentChild?.energy) }}
+              style={{ height: '100%' }}
+            />
+          </div>
+        </div>
+
+        {/* 增减孩子快捷键 */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', paddingTop: '10px' }}>
+          <button style={{ width: '28px', height: '28px', borderRadius: '50%', background: 'rgba(255,255,255,0.4)', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#2C3E50', cursor: 'pointer' }}>
+            <Plus size={14} />
+          </button>
+          <button style={{ width: '28px', height: '28px', borderRadius: '50%', background: 'rgba(255,255,255,0.4)', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#2C3E50', cursor: 'pointer' }}>
+            <Minus size={14} />
+          </button>
+        </div>
+      </div>
+
+      {/* 3. 右上角：时间 */}
       <header style={{ position: 'absolute', top: '6%', right: '8%', zIndex: 50, textAlign: 'right' }}>
         <h1 style={{ fontSize: '72px', fontWeight: 100, color: '#2C3E50', opacity: 0.9, lineHeight: 1, margin: 0 }}>
           {time.getHours()}:{time.getMinutes() < 10 ? `0${time.getMinutes()}` : time.getMinutes()}
         </h1>
-        <div style={{ marginTop: '8px', color: '#2C3E50', opacity: 0.3, fontSize: '12px', letterSpacing: '0.2em' }}>
-          {greeting}
+        <div style={{ marginTop: '4px', color: '#2C3E50', opacity: 0.3, fontSize: '12px', letterSpacing: '0.2em' }}>
+          {time.getHours() < 12 ? '早安' : '晚安'}
         </div>
       </header>
 
-      {/* 4. 液态水珠：S型散落分布 [UI 纠偏] [WF-08 预警] */}
+      {/* 4. 液态水珠：S型分布 */}
       <LiquidDrop icon={<Bell size={18}/>} label="任务感应" value={tasks.length > 0 ? `${tasks.length} 条` : '静默'} top="28%" right="15%" color="rgba(141, 160, 138, 0.4)" alert={tasks.length > 0} delay={0} />
-      <LiquidDrop icon={<Zap size={18}/>} label="精力状态" value="85%" top="45%" right="28%" color="rgba(212, 169, 106, 0.4)" delay={1.5} />
-      <LiquidDrop icon={<Heart size={18}/>} label="当前状态" value="活跃" top="60%" right="12%" color="rgba(232, 168, 154, 0.4)" delay={3} />
-      <LiquidDrop icon={<Trees size={18}/>} label="清迈天气" value="28°" top="75%" right="24%" color="rgba(154, 183, 232, 0.4)" delay={4.5} />
+      <LiquidDrop icon={<Zap size={18}/>} label="精力状态" value={`${currentChild?.energy}%`} top="45%" right="28%" color={getEnergyColor(currentChild?.energy)} delay={1.5} />
+      <LiquidDrop icon={<Heart size={18}/>} label="心率健康" value="72 bpm" top="60%" right="12%" color="rgba(232, 168, 154, 0.4)" delay={3} />
+      <LiquidDrop icon={<Trees size={18}/>} label="环境" value="28°C" top="75%" right="24%" color="rgba(154, 183, 232, 0.4)" delay={4.5} />
 
-      {/* 5. 底部交互：基地弹出菜单 [修订②] */}
-      <footer style={{ position: 'fixed', bottom: '48px', left: 0, right: 0, zIndex: 60, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+      {/* 5. 底部交互：多模态“日安”面板 [修订升级] */}
+      <footer style={{ position: 'fixed', bottom: '48px', left: 0, right: 0, zIndex: 110, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
         <AnimatePresence>
           {showBaseMenu && (
             <motion.div 
               initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 20 }}
-              style={{ marginBottom: '24px', background: 'rgba(255,255,255,0.2)', backdropFilter: 'blur(30px)', borderRadius: '40px', padding: '12px', border: '1px solid rgba(255,255,255,0.3)', display: 'flex', gap: '16px' }}
+              style={{ marginBottom: '24px', background: 'rgba(255,255,255,0.2)', backdropFilter: 'blur(40px)', borderRadius: '40px', padding: '15px', border: '1px solid rgba(255,255,255,0.3)', display: 'flex', flexDirection: 'column', gap: '15px', width: '320px shadow-2xl' }}
             >
-              {['日安', '根', '日栖'].map(item => (
-                <button key={item} style={{ 
-                  width: '64px', height: '64px', borderRadius: '50%', background: 'rgba(255,255,255,0.3)', 
-                  border: '1px solid rgba(255,255,255,0.5)', color: '#2C3E50', fontSize: '11px', 
-                  fontWeight: 'bold', letterSpacing: '0.2em', cursor: 'pointer' 
-                }}>{item}</button>
-              ))}
+              {/* 日安 - 多模态输入区 */}
+              <div style={{ background: 'rgba(255,255,255,0.3)', borderRadius: '25px', padding: '15px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px', alignItems: 'center' }}>
+                  <span style={{ fontSize: '12px', fontWeight: 'bold', color: '#2C3E50', opacity: 0.7 }}>多模态输入: 日安</span>
+                  <div style={{ display: 'flex', gap: '10px' }}>
+                    <Mic size={16} style={{ color: '#2C3E50', opacity: 0.5, cursor: 'pointer' }} />
+                    <Camera size={16} style={{ color: '#2C3E50', opacity: 0.5, cursor: 'pointer' }} />
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: '8px', background: 'rgba(255,255,255,0.5)', borderRadius: '15px', padding: '8px 12px' }}>
+                  <input placeholder="输入指令或采集信息..." style={{ background: 'none', border: 'none', outline: 'none', fontSize: '12px', flex: 1, color: '#2C3E50' }} />
+                  <Send size={16} style={{ color: '#B08D57', cursor: 'pointer' }} />
+                </div>
+              </div>
+              
+              <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
+                {['根', '日栖'].map(item => (
+                  <button key={item} style={{ padding: '12px 25px', borderRadius: '20px', background: 'rgba(255,255,255,0.3)', border: '1px solid rgba(255,255,255,0.5)', color: '#2C3E50', fontSize: '11px', fontWeight: 'bold' }}>{item}</button>
+                ))}
+              </div>
             </motion.div>
           )}
         </AnimatePresence>
 
-        <div style={{ 
-          width: '320px', height: '64px', background: 'rgba(255,255,255,0.1)', backdropFilter: 'blur(30px)', 
-          border: '1px solid rgba(255,255,255,0.2)', borderRadius: '32px', display: 'flex', 
-          alignItems: 'center', justifyContent: 'space-between', padding: '0 32px' 
-        }}>
-          <button onClick={() => setShowBaseMenu(!showBaseMenu)} style={{ 
-            display: 'flex', alignItems: 'center', gap: '12px', color: showBaseMenu ? '#B08D57' : '#2C3E50', 
-            opacity: showBaseMenu ? 1 : 0.5, border: 'none', background: 'none', cursor: 'pointer' 
-          }}>
+        {/* 基地主按钮 */}
+        <div style={{ width: '320px', height: '64px', background: 'rgba(255,255,255,0.1)', backdropFilter: 'blur(30px)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '32px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 32px' }}>
+          <button onClick={() => setShowBaseMenu(!showBaseMenu)} style={{ display: 'flex', alignItems: 'center', gap: '12px', color: showBaseMenu ? '#B08D57' : '#2C3E50', opacity: showBaseMenu ? 1 : 0.5, border: 'none', background: 'none', cursor: 'pointer' }}>
             <HomeIcon size={20} /> <span style={{ fontSize: '12px', fontWeight: 'bold', letterSpacing: '0.3em' }}>基地</span>
           </button>
           <div style={{ height: '16px', width: '1px', background: 'rgba(44,62,80,0.1)' }} />
-          <button style={{ 
-            display: 'flex', alignItems: 'center', gap: '12px', color: '#2C3E50', 
-            opacity: 0.2, border: 'none', background: 'none', cursor: 'default' 
-          }}>
+          <button style={{ display: 'flex', alignItems: 'center', gap: '12px', color: '#2C3E50', opacity: 0.2, border: 'none', background: 'none' }}>
             <Settings size={20} /> <span style={{ fontSize: '12px', fontWeight: 'bold', letterSpacing: '0.3em' }}>目安</span>
           </button>
         </div>
