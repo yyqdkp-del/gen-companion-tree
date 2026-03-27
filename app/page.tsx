@@ -398,7 +398,7 @@ export default function HydroApp() {
           )}
         </AnimatePresence>
 
-        <div style={{ width: '340px', height: '64px', background: 'rgba(255,255,255,0.1)', backdropFilter: 'blur(30px)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '32px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 10px' }}>
+        <div style={{ width: '380px', height: '64px', background: 'rgba(255,255,255,0.1)', backdropFilter: 'blur(30px)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '32px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 10px' }}>
           <button onClick={() => setInputMode(inputMode === 'audio_text' ? 'none' : 'audio_text')}
             style={{ width: '54px', height: '48px', borderRadius: '24px', background: inputMode === 'audio_text' ? 'rgba(255,255,255,0.5)' : 'rgba(255,255,255,0.2)', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: '0.3s' }}>
             <Mic size={22} color={inputMode === 'audio_text' ? '#B08D57' : '#2C3E50'} />
@@ -422,10 +422,11 @@ export default function HydroApp() {
               style={{ position: 'absolute', bottom: '80px', display: 'flex', gap: '10px' }}
             >
               {[
-                { label: '基地', path: '/' },
-                { label: '日安', path: '/rian' },
-                { label: '树洞', path: '/treehouse' },
-              ].map(item => (
+  { label: '基地', path: '/' },
+  { label: '日安', path: '/rian' },
+  { label: '根', path: '/growth' },
+  { label: '树洞', path: '/treehouse' },
+].map(item => (
                 <button key={item.label} onClick={() => router.push(item.path)}
                   style={{ padding: '8px 20px', borderRadius: '15px', background: item.path === '/' ? 'rgba(255,255,255,0.6)' : 'rgba(255,255,255,0.3)', border: 'none', fontSize: '11px', fontWeight: 'bold', color: '#2C3E50', backdropFilter: 'blur(10px)', cursor: 'pointer' }}>
                   {item.label}
