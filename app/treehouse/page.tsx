@@ -12,16 +12,18 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
 )
 
-// ── 深海色系 ──
+// ── 深夜色系 ──
 const THEME = {
-  bg: '#050d1a',
-  deep: '#071428',
-  glow: '#1a3a6a',
-  gold: '#c8a96e',
-  goldDim: '#8a6a3a',
-  text: '#e8dcc8',
-  textDim: '#6a7a8a',
-  star: '#a0b8d0',
+  bg1: '#020617',
+  bg2: '#0A1F18',
+  glow: '#1a4a3a',
+  gold: '#E8D5B8',
+  goldDim: '#8a7a6a',
+  aiText: '#A8C4B8',
+  aiBubble: 'rgba(20,50,40,0.6)',
+  userBubble: 'rgba(80,60,30,0.5)',
+  textDim: '#4a5a52',
+  star: '#6a9a8a',
 }
 
 type Message = {
@@ -29,10 +31,11 @@ type Message = {
   role: 'user' | 'assistant'
   content: string
   timestamp: number
-  fading?: boolean
 }
 
-export default function RiqiPage() {
+type LightFlash = { id: string; x: number; y: number }
+
+export default function TreehousePage() {
   const router = useRouter()
 
   // ── 密码验证 ──
@@ -46,63 +49,76 @@ export default function RiqiPage() {
   const [inputText, setInputText] = useState('')
   const [thinking, setThinking] = useState(false)
   const [inputFocused, setInputFocused] = useState(false)
-  const [watermarkGlow, setWatermarkGlow] = useState(false)
+  const [lightFlashes, setLightFlashes] = useState<LightFlash[]>([])
   const [longPressing, setLongPressing] = useState(false)
+  const [greetingDone, setGreetingDone] = useState(false)
+  const [greetingText, setGreetingText] = useState('')
+  const [contextData, setContextData] = useState('')
 
-  // ── 孩子数据（喂给 Claude） ──
-  const [contextData, setContextData] = useState<string>('')
+  // ── 深夜模式 ──
+  const hour = new Date().getHours()
+  const isLateNight = hour >= 22 || hour < 6
+  const bgOpacityRange = isLateNight ? [0.03, 0.08] : [0.05, 0.15]
+  const glowDuration = isLateNight ? 12 : 8
 
-  const inputRef = useRef<HTMLInputElement>(null)
+  const messagesEndRef = useRef<HTMLDivElement>(null)
   const messagesRef = useRef<Message[]>([])
   const longPressTimer = useRef<NodeJS.Timeout | null>(null)
   const sessionId = useRef(crypto.randomUUID())
+  const inputRef = useRef<HTMLInputElement>(null)
 
-  // 加载孩子和任务数据作为 Claude 上下文
+  // ── 自动滚动到底部 ──
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [messages, thinking])
+
+  // ── 加载孩子上下文 ──
   const loadContext = useCallback(async () => {
     const { data: children } = await supabase.from('children').select('*')
     const { data: tasks } = await supabase.from('tasks').select('*').eq('status', 'pending').limit(5)
     const { data: reminders } = await supabase.from('reminders').select('*').eq('status', 'pending').limit(5)
     const { data: habits } = await supabase.from('user_habits').select('*').order('created_at', { ascending: false }).limit(10)
 
-    const hour = new Date().getHours()
-    const timeOfDay = hour < 5 ? '深夜' : hour < 12 ? '清晨' : hour < 18 ? '午后' : '夜晚'
-
+    const timeOfDay = isLateNight ? '深夜' : hour < 12 ? '清晨' : '午后'
     const ctx = `
 【当前时间】${new Date().toLocaleString('zh-CN')}（${timeOfDay}）
-
-【孩子状态】
-${(children || []).map(c => `- ${c.name}: 精力${c.energy ?? 85}%, 进度${c.progress ?? 0}字`).join('\n')}
-
-【待处理任务】
-${(tasks || []).map(t => `- [${t.urgency}级] ${t.title}`).join('\n') || '暂无'}
-
-【近期提醒】
-${(reminders || []).map(r => `- ${r.title}（${r.category}）`).join('\n') || '暂无'}
-
-【妈妈近期行为】
-${(habits || []).map(h => `- ${h.action_type}: ${h.target_category}`).join('\n') || '暂无记录'}
+【孩子状态】${(children || []).map(c => `${c.name}: 精力${c.energy ?? 85}%`).join('、')}
+【待处理任务】${(tasks || []).map(t => t.title).join('、') || '暂无'}
+【近期提醒】${(reminders || []).map(r => `${r.title}(${r.category})`).join('、') || '暂无'}
+【妈妈近期习惯】${(habits || []).map(h => `${h.action_type}:${h.target_category}`).join('、') || '暂无'}
 `
     setContextData(ctx)
-  }, [])
+  }, [isLateNight, hour])
+
+  // ── 逐字显示开场问候 ──
+  const showGreeting = useCallback(async () => {
+    const greet = isLateNight
+      ? '夜深了。孩子睡了吗？我在这里，想说什么都行。'
+      : '妈妈，今天怎么样？我听着呢。'
+
+    let i = 0
+    const timer = setInterval(() => {
+      setGreetingText(greet.slice(0, i + 1))
+      i++
+      if (i >= greet.length) {
+        clearInterval(timer)
+        setTimeout(() => {
+          setGreetingDone(true)
+          addMessage('assistant', greet)
+          setGreetingText('')
+        }, 800)
+      }
+    }, 80)
+  }, [isLateNight])
 
   useEffect(() => {
     if (unlocked) {
       loadContext()
-      // 入场问候
-      setTimeout(() => {
-        const hour = new Date().getHours()
-        const greeting = hour < 5
-          ? '夜深了。你还没睡，有什么放不下的？'
-          : hour < 12
-          ? '早。我已经看过今天的安排了，先说说你现在的状态。'
-          : hour < 18
-          ? '下午好。今天怎么样？'
-          : '夜里了。说说今天，或者什么都不说，我在。'
-        addMessage('assistant', greeting)
-      }, 1800)
+      setTimeout(showGreeting, 1800)
     }
-  }, [unlocked, loadContext])
-// ── 密码验证 ──
+  }, [unlocked, loadContext, showGreeting])
+
+  // ── 密码验证 ──
   const verifyPin = async (currentPin?: string) => {
     const checkPin = currentPin ?? pin
     const { data } = await supabase.from('riqi_access').select('password_hash').single()
@@ -126,37 +142,32 @@ ${(habits || []).map(h => `- ${h.action_type}: ${h.target_category}`).join('\n')
     }
   }
 
-  // ── 消息管理 ──
+  // ── 添加消息 ──
   const addMessage = (role: 'user' | 'assistant', content: string) => {
-    const msg: Message = {
-      id: crypto.randomUUID(),
-      role,
-      content,
-      timestamp: Date.now(),
-    }
-    setMessages(prev => {
-      const updated = [...prev, msg]
-      messagesRef.current = updated
-      return updated
-    })
+    const msg: Message = { id: crypto.randomUUID(), role, content, timestamp: Date.now() }
+    setMessages(prev => { const u = [...prev, msg]; messagesRef.current = u; return u })
+    supabase.from('conversation_log').insert({ session_id: sessionId.current, role, content }).then(() => {})
 
-    // 存到数据库
-    supabase.from('conversation_log').insert({
-      session_id: sessionId.current,
-      role,
-      content,
-    }).then(() => {})
-
-    // 助手消息提到孩子时水印微亮
+    // 提到孩子时触发光点闪烁
     if (role === 'assistant' && (content.includes('William') || content.includes('Noah') || content.includes('孩子'))) {
-      setWatermarkGlow(true)
-      setTimeout(() => setWatermarkGlow(false), 3000)
+      triggerLightFlash()
     }
 
-    // 消息5秒后开始淡出（但保留在列表，只改样式）
-    setTimeout(() => {
-      setMessages(prev => prev.map(m => m.id === msg.id ? { ...m, fading: true } : m))
-    }, 6000)
+    // 触感反馈
+    if (role === 'assistant' && typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+      navigator.vibrate([15, 80, 10])
+    }
+  }
+
+  // ── 背景光点 ──
+  const triggerLightFlash = () => {
+    const flash: LightFlash = {
+      id: crypto.randomUUID(),
+      x: 20 + Math.random() * 60,
+      y: 20 + Math.random() * 60,
+    }
+    setLightFlashes(prev => [...prev, flash])
+    setTimeout(() => setLightFlashes(prev => prev.filter(f => f.id !== flash.id)), 2000)
   }
 
   // ── 发送给 Claude ──
@@ -166,11 +177,7 @@ ${(habits || []).map(h => `- ${h.action_type}: ${h.target_category}`).join('\n')
     setInputText('')
     setThinking(true)
 
-    // 构建对话历史
-    const history = messagesRef.current
-      .filter(m => !m.fading)
-      .slice(-8)
-      .map(m => ({ role: m.role, content: m.content }))
+    const history = messagesRef.current.slice(-10).map(m => ({ role: m.role, content: m.content }))
 
     try {
       const response = await fetch('https://api.anthropic.com/v1/messages', {
@@ -179,101 +186,102 @@ ${(habits || []).map(h => `- ${h.action_type}: ${h.target_category}`).join('\n')
         body: JSON.stringify({
           model: 'claude-sonnet-4-20250514',
           max_tokens: 300,
-          system: `你是"根"，这个家庭的全知守护者。你了解这个家庭的一切数据。
+          system: `你是"根"，这个家庭的全知守护者和深夜树洞。
 
-性格：温柔、睿智、有时幽默，像一个深夜还在守候的大叔。说话简短有力，不超过3句话。不用"您"，用"你"。不啰嗦，不给建议清单，只说最重要的那一句。
+性格：温柔、沉稳、有时带一点点幽默，像深夜还在守候的长辈。说话简短有力，不超过4句。不用"您"，用"你"。先共情，再给建议。不啰嗦，不给清单。
 
 ${contextData}
 
 规则：
-- 深夜（22点-6点）说话更轻柔，像低语
-- 提到孩子时要结合数据库里他们的真实状态
-- 可以主动关心妈妈的状态
-- 有时可以说"我来处理"表达全知感
-- 情感陪伴优先于信息输出`,
-          messages: [
-            ...history,
-            { role: 'user', content: text }
-          ],
+- 深夜（22点-6点）语气更轻柔，像低语
+- 提到孩子时结合数据库里的真实状态
+- 主动关心妈妈的状态和情绪
+- 有时说"我看过"或"我知道"表达全知感
+- 情感陪伴优先于信息输出
+- 可以用清迈的自然意象（雨季、素帖山、榕树）营造氛围`,
+          messages: [...history, { role: 'user', content: text }],
         }),
       })
 
       const data = await response.json()
       const reply = data.content?.[0]?.text || '我在。'
-      setTimeout(() => {
-        setThinking(false)
-        addMessage('assistant', reply)
-      }, 800)
+      setTimeout(() => { setThinking(false); addMessage('assistant', reply) }, 600 + Math.random() * 800)
     } catch {
       setThinking(false)
       addMessage('assistant', '我在，只是信号不太好。再说一次？')
     }
   }
 
-  // ── 长按录音（预留） ──
-  const handleLongPressStart = () => {
-    longPressTimer.current = setTimeout(() => setLongPressing(true), 500)
+  // ── 长按录音预留 ──
+  const handleLongPressStart = (e: React.TouchEvent | React.MouseEvent) => {
+    if (inputFocused) return
+    longPressTimer.current = setTimeout(() => setLongPressing(true), 600)
   }
   const handleLongPressEnd = () => {
     if (longPressTimer.current) clearTimeout(longPressTimer.current)
-    if (longPressing) setLongPressing(false)
+    if (longPressing) {
+      setLongPressing(false)
+      // TODO: 接入 ElevenLabs STT
+    }
   }
 
-  // ── 密码界面 ──
+  // ══════════════════════════════════════
+  // 密码界面
+  // ══════════════════════════════════════
   if (!unlocked) {
     return (
-      <main style={{ position: 'fixed', inset: 0, background: THEME.bg, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', fontFamily: "'Noto Serif SC', Georgia, serif" }}>
+      <main style={{
+        position: 'fixed', inset: 0,
+        background: `linear-gradient(160deg, ${THEME.bg1} 0%, ${THEME.bg2} 100%)`,
+        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+        fontFamily: "'Noto Serif SC', 'SimSun', Georgia, serif",
+      }}>
 
-        {/* 背景光晕 */}
+        {/* 呼吸光晕 */}
         <motion.div
-          animate={{ scale: [1, 1.3, 1], opacity: [0.03, 0.08, 0.03] }}
-          transition={{ duration: 8, repeat: Infinity }}
-          style={{ position: 'absolute', width: '60vw', height: '60vw', borderRadius: '50%', background: `radial-gradient(circle, ${THEME.glow} 0%, transparent 70%)`, pointerEvents: 'none' }}
+          animate={{ scale: [1, 1.4, 1], opacity: [bgOpacityRange[0], bgOpacityRange[1], bgOpacityRange[0]] }}
+          transition={{ duration: glowDuration, repeat: Infinity, ease: 'easeInOut' }}
+          style={{ position: 'absolute', width: '70vw', height: '70vw', borderRadius: '50%', background: `radial-gradient(circle, ${THEME.glow} 0%, transparent 70%)`, pointerEvents: 'none' }}
         />
 
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 1.2 }}
-          style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '40px', zIndex: 10 }}>
+        <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 1.6, ease: 'easeOut' }}
+          style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '44px', zIndex: 10 }}>
 
-          {/* 标题 */}
           <div style={{ textAlign: 'center' }}>
-            <p style={{ fontSize: '11px', letterSpacing: '0.5em', color: THEME.textDim, textTransform: 'uppercase', marginBottom: '8px' }}>私密空间</p>
-            <h1 style={{ fontSize: '32px', fontWeight: 300, color: THEME.gold, letterSpacing: '0.3em', margin: 0 }}>日栖</h1>
+            <p style={{ fontSize: '10px', letterSpacing: '0.6em', color: THEME.textDim, textTransform: 'uppercase', marginBottom: '10px', margin: '0 0 10px' }}>私密空间</p>
+            <h1 style={{ fontSize: '36px', fontWeight: 300, color: THEME.gold, letterSpacing: '0.4em', margin: 0, opacity: 0.9 }}>日栖</h1>
           </div>
 
-          {/* PIN 显示 */}
-          <motion.div
-            animate={pinShaking ? { x: [-8, 8, -8, 8, 0] } : {}}
-            transition={{ duration: 0.4 }}
-            style={{ display: 'flex', gap: '16px' }}
-          >
-            {[0, 1, 2, 3, 4, 5].map(i => (
+          {/* PIN 圆点 */}
+          <motion.div animate={pinShaking ? { x: [-10, 10, -10, 10, 0] } : {}} transition={{ duration: 0.4 }}
+            style={{ display: 'flex', gap: '18px' }}>
+            {[0,1,2,3,4,5].map(i => (
               <div key={i} style={{
-                width: '12px', height: '12px', borderRadius: '50%',
-                background: i < pin.length ? (pinError ? '#E87A6A' : THEME.gold) : 'transparent',
-                border: `1px solid ${pinError ? '#E87A6A' : THEME.goldDim}`,
+                width: '11px', height: '11px', borderRadius: '50%',
+                background: i < pin.length ? (pinError ? '#c87a6a' : THEME.gold) : 'transparent',
+                border: `1px solid ${pinError ? '#c87a6a' : THEME.goldDim}`,
                 transition: 'all 0.2s',
+                opacity: 0.8,
               }} />
             ))}
           </motion.div>
 
           {/* 数字键盘 */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '14px' }}>
             {['1','2','3','4','5','6','7','8','9','','0','del'].map((key, i) => (
-              <motion.button
-                key={i}
-                whileTap={key ? { scale: 0.88 } : {}}
+              <motion.button key={i} whileTap={key ? { scale: 0.85, opacity: 0.7 } : {}}
                 onClick={() => key && handlePinKey(key)}
                 style={{
-                  width: '72px', height: '72px', borderRadius: '50%',
-                  background: key === 'del' ? 'transparent' : 'rgba(255,255,255,0.04)',
-                  border: key === '' ? 'none' : `1px solid rgba(255,255,255,0.08)`,
-                  color: key === 'del' ? THEME.textDim : THEME.text,
-                  fontSize: key === 'del' ? '13px' : '22px',
+                  width: '74px', height: '74px', borderRadius: '50%',
+                  background: key && key !== 'del' ? 'rgba(255,255,255,0.03)' : 'transparent',
+                  border: key && key !== 'del' ? '1px solid rgba(255,255,255,0.07)' : 'none',
+                  color: key === 'del' ? THEME.textDim : THEME.gold,
+                  fontSize: key === 'del' ? '14px' : '24px',
                   fontWeight: 300,
                   cursor: key ? 'pointer' : 'default',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   fontFamily: "'Noto Serif SC', serif",
-                  letterSpacing: key === 'del' ? '0.05em' : 0,
+                  opacity: key ? 0.85 : 0,
                 }}
               >
                 {key === 'del' ? '⌫' : key}
@@ -281,7 +289,7 @@ ${contextData}
             ))}
           </div>
 
-          <p style={{ fontSize: '10px', color: THEME.textDim, letterSpacing: '0.2em', opacity: 0.5 }}>
+          <p style={{ fontSize: '10px', color: THEME.textDim, letterSpacing: '0.25em', opacity: 0.4, margin: 0 }}>
             输入密码进入
           </p>
         </motion.div>
@@ -291,153 +299,243 @@ ${contextData}
     )
   }
 
-  // ── 主界面 ──
+  // ══════════════════════════════════════
+  // 主界面
+  // ══════════════════════════════════════
   return (
     <main
       onTouchStart={handleLongPressStart}
       onTouchEnd={handleLongPressEnd}
       onMouseDown={handleLongPressStart}
       onMouseUp={handleLongPressEnd}
-      style={{ position: 'fixed', inset: 0, background: THEME.bg, overflow: 'hidden', fontFamily: "'Noto Serif SC', Georgia, serif" }}
+      style={{
+        position: 'fixed', inset: 0,
+        background: `linear-gradient(160deg, ${THEME.bg1} 0%, ${THEME.bg2} 100%)`,
+        overflow: 'hidden',
+        fontFamily: "'Noto Serif SC', 'SimSun', Georgia, serif",
+        display: 'flex', flexDirection: 'column',
+      }}
     >
 
-      {/* 心跳背景光晕 */}
+      {/* ── 呼吸背景光晕 ── */}
       <motion.div
         animate={{
-          scale: thinking ? [1, 1.4, 1, 1.2, 1] : [1, 1.08, 1],
-          opacity: thinking ? [0.06, 0.18, 0.06, 0.14, 0.06] : [0.04, 0.1, 0.04],
+          scale: thinking ? [1, 1.5, 1.2, 1.5, 1] : [1, 1.3, 1],
+          opacity: thinking
+            ? [bgOpacityRange[0], bgOpacityRange[1] * 2, bgOpacityRange[0], bgOpacityRange[1] * 1.5, bgOpacityRange[0]]
+            : [bgOpacityRange[0], bgOpacityRange[1], bgOpacityRange[0]],
         }}
-        transition={{ duration: thinking ? 2 : 8, repeat: Infinity, ease: 'easeInOut' }}
-        style={{ position: 'absolute', top: '30%', left: '50%', transform: 'translateX(-50%)', width: '80vw', height: '80vw', borderRadius: '50%', background: `radial-gradient(circle, ${THEME.glow} 0%, transparent 70%)`, pointerEvents: 'none' }}
+        transition={{ duration: thinking ? 3 : glowDuration, repeat: Infinity, ease: 'easeInOut' }}
+        style={{
+          position: 'absolute', top: '25%', left: '50%', transform: 'translateX(-50%)',
+          width: '90vw', height: '90vw', borderRadius: '50%',
+          background: `radial-gradient(circle, ${THEME.glow} 0%, transparent 70%)`,
+          pointerEvents: 'none', zIndex: 0,
+        }}
       />
 
-      {/* 水印 — 提到孩子时微亮 */}
-      <motion.div
-        animate={{ opacity: watermarkGlow ? 0.15 : 0.04 }}
-        transition={{ duration: 1.5 }}
-        style={{ position: 'absolute', top: '8%', right: '-2%', fontSize: 'clamp(50px, 14vw, 90px)', fontWeight: 'bold', color: THEME.gold, pointerEvents: 'none', fontStyle: 'italic', whiteSpace: 'nowrap', lineHeight: 1, letterSpacing: '-0.02em' }}
-      >
-        日栖·/riqi
-      </motion.div>
-
-      {/* 长按漩涡 */}
+      {/* ── 背景光点（提到孩子时闪现） ── */}
       <AnimatePresence>
-        {longPressing && (
-          <motion.div initial={{ opacity: 0, scale: 0 }} animate={{ opacity: 1, scale: 1, rotate: 360 }} exit={{ opacity: 0, scale: 0 }}
-            transition={{ rotate: { duration: 3, repeat: Infinity, ease: 'linear' }, opacity: { duration: 0.4 }, scale: { duration: 0.4 } }}
-            style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', width: '120px', height: '120px', borderRadius: '50%', border: `1px solid ${THEME.goldDim}`, pointerEvents: 'none', zIndex: 30 }}
+        {lightFlashes.map(flash => (
+          <motion.div key={flash.id}
+            initial={{ opacity: 0, scale: 0 }}
+            animate={{ opacity: [0, 0.6, 0], scale: [0, 1.5, 0] }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 2, ease: 'easeOut' }}
+            style={{
+              position: 'absolute',
+              left: `${flash.x}%`, top: `${flash.y}%`,
+              width: '4px', height: '4px', borderRadius: '50%',
+              background: THEME.star, pointerEvents: 'none', zIndex: 1,
+            }}
           />
-        )}
+        ))}
       </AnimatePresence>
 
-      {/* 思考星星 */}
+      {/* ── 水印 ── */}
+      <div style={{
+        position: 'absolute', top: '5%', right: '-2%',
+        fontSize: 'clamp(60px, 20vw, 120px)', fontWeight: 300,
+        color: THEME.gold, opacity: 0.03,
+        pointerEvents: 'none', fontStyle: 'normal',
+        whiteSpace: 'nowrap', lineHeight: 1,
+        letterSpacing: '0.1em', zIndex: 0,
+      }}>
+        日栖
+      </div>
+
+      {/* ── 顶部栏 ── */}
+      <div style={{ position: 'relative', zIndex: 10, padding: '52px 24px 8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
+        <span style={{ fontSize: '11px', color: THEME.textDim, letterSpacing: '0.35em', opacity: 0.5 }}>日栖</span>
+        <motion.button whileTap={{ scale: 0.85 }} onClick={() => router.push('/')}
+          style={{ background: 'none', border: 'none', color: THEME.textDim, fontSize: '18px', cursor: 'pointer', opacity: 0.35, padding: '4px 8px' }}>
+          ×
+        </motion.button>
+      </div>
+
+      {/* ── 消息列表 ── */}
+      <div style={{
+        flex: 1, overflowY: 'auto', padding: '16px 20px 24px',
+        position: 'relative', zIndex: 10,
+        scrollbarWidth: 'none',
+      }}>
+
+        {/* 逐字开场问候 */}
+        <AnimatePresence>
+          {greetingText && (
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              style={{ textAlign: 'left', marginBottom: '20px' }}>
+              <div style={{
+                display: 'inline-block',
+                background: THEME.aiBubble,
+                backdropFilter: 'blur(20px)',
+                borderRadius: '20px 20px 20px 4px',
+                padding: '14px 18px',
+                maxWidth: '82%',
+                border: '1px solid rgba(168,196,184,0.1)',
+              }}>
+                <p style={{ color: THEME.aiText, fontSize: '16px', fontWeight: 300, lineHeight: 1.8, margin: 0, letterSpacing: '0.05em' }}>
+                  {greetingText}
+                  <motion.span animate={{ opacity: [1, 0, 1] }} transition={{ duration: 0.8, repeat: Infinity }}
+                    style={{ color: THEME.gold, marginLeft: '2px' }}>|</motion.span>
+                </p>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* 消息 */}
+        <AnimatePresence initial={false}>
+          {messages.map((msg, idx) => (
+            <motion.div
+              key={msg.id}
+              initial={{ opacity: 0, scale: 0.94, y: 12, filter: 'blur(4px)' }}
+              animate={{ opacity: 1, scale: 1, y: 0, filter: 'blur(0px)' }}
+              transition={{ duration: 0.7, ease: [0.23, 1, 0.32, 1] }}
+              style={{
+                display: 'flex',
+                justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start',
+                marginBottom: idx < messages.length - 1 ? '16px' : '8px',
+              }}
+            >
+              <div style={{
+                maxWidth: '80%',
+                background: msg.role === 'user' ? THEME.userBubble : THEME.aiBubble,
+                backdropFilter: 'blur(20px)',
+                borderRadius: msg.role === 'user' ? '20px 20px 4px 20px' : '20px 20px 20px 4px',
+                padding: '13px 17px',
+                border: msg.role === 'user'
+                  ? '1px solid rgba(232,213,184,0.12)'
+                  : '1px solid rgba(168,196,184,0.1)',
+              }}>
+                <p style={{
+                  color: msg.role === 'user' ? THEME.gold : THEME.aiText,
+                  fontSize: msg.role === 'assistant' ? '16px' : '15px',
+                  fontWeight: 300,
+                  lineHeight: 1.85,
+                  margin: 0,
+                  letterSpacing: '0.04em',
+                }}>
+                  {msg.content}
+                </p>
+              </div>
+            </motion.div>
+          ))}
+        </AnimatePresence>
+
+        {/* 思考状态 */}
+        <AnimatePresence>
+          {thinking && (
+            <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+              style={{ display: 'flex', justifyContent: 'flex-start', marginBottom: '16px' }}>
+              <div style={{
+                background: THEME.aiBubble, backdropFilter: 'blur(20px)',
+                borderRadius: '20px 20px 20px 4px', padding: '14px 20px',
+                border: '1px solid rgba(168,196,184,0.1)',
+                display: 'flex', gap: '8px', alignItems: 'center',
+              }}>
+                {[0,1,2].map(i => (
+                  <motion.div key={i}
+                    animate={{ opacity: [0.2, 0.8, 0.2], scale: [0.8, 1.1, 0.8] }}
+                    transition={{ duration: 1.4, repeat: Infinity, delay: i * 0.35 }}
+                    style={{ width: '5px', height: '5px', borderRadius: '50%', background: THEME.star }}
+                  />
+                ))}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        <div ref={messagesEndRef} />
+      </div>
+
+      {/* ── 长按漩涡 ── */}
       <AnimatePresence>
-        {thinking && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            style={{ position: 'absolute', top: '42%', left: '50%', transform: 'translateX(-50%)', display: 'flex', gap: '12px', zIndex: 20 }}>
-            {[0, 1, 2].map(i => (
-              <motion.div key={i}
-                animate={{ opacity: [0.2, 1, 0.2], scale: [0.8, 1.2, 0.8] }}
-                transition={{ duration: 1.2, repeat: Infinity, delay: i * 0.4 }}
-                style={{ width: '6px', height: '6px', borderRadius: '50%', background: THEME.star }}
-              />
-            ))}
+        {longPressing && (
+          <motion.div initial={{ opacity: 0, scale: 0 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0 }}
+            style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', zIndex: 50, pointerEvents: 'none' }}>
+            <motion.div animate={{ rotate: 360 }} transition={{ duration: 4, repeat: Infinity, ease: 'linear' }}
+              style={{ width: '100px', height: '100px', borderRadius: '50%', border: `1px solid ${THEME.goldDim}`, opacity: 0.4 }} />
+            <motion.div animate={{ rotate: -360 }} transition={{ duration: 6, repeat: Infinity, ease: 'linear' }}
+              style={{ position: 'absolute', inset: '12px', borderRadius: '50%', border: `1px solid ${THEME.goldDim}`, opacity: 0.2 }} />
+            <p style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', color: THEME.goldDim, fontSize: '10px', letterSpacing: '0.2em', whiteSpace: 'nowrap', opacity: 0.6 }}>松手发送</p>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* 浮现消息 — 写在水面上 */}
-      <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '0 28px 160px', gap: '28px', zIndex: 10, pointerEvents: 'none' }}>
-        <AnimatePresence>
-          {messages.slice(-4).map(msg => (
-            <motion.div
-              key={msg.id}
-              initial={{ opacity: 0, y: 16 }}
-              animate={{ opacity: msg.fading ? 0 : msg.role === 'user' ? 0.5 : 0.85, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              transition={{ duration: msg.fading ? 2.5 : 0.8, ease: 'easeOut' }}
-              style={{
-                textAlign: msg.role === 'user' ? 'right' : 'left',
-                maxWidth: '80%',
-                alignSelf: msg.role === 'user' ? 'flex-end' : 'flex-start',
-              }}
-            >
-              <p style={{
-                fontSize: msg.role === 'assistant' ? '17px' : '14px',
-                fontWeight: msg.role === 'assistant' ? 300 : 400,
-                color: msg.role === 'assistant' ? THEME.text : THEME.textDim,
-                lineHeight: 1.8,
-                margin: 0,
-                letterSpacing: '0.05em',
-              }}>
-                {msg.content}
-              </p>
-            </motion.div>
-          ))}
-        </AnimatePresence>
-      </div>
-
-      {/* 底部输入区 */}
-      <motion.div
-        animate={{ opacity: inputFocused ? 1 : 0.6 }}
-        style={{ position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 50, padding: '20px 24px 40px' }}
-      >
-        {/* 全屏变暗遮罩（输入时） */}
+      {/* ── 底部输入区 ── */}
+      <div style={{
+        position: 'relative', zIndex: 10,
+        padding: '12px 16px 40px',
+        background: 'linear-gradient(to top, rgba(2,6,23,0.95) 0%, transparent 100%)',
+        flexShrink: 0,
+      }}>
         <AnimatePresence>
           {inputFocused && (
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              style={{ position: 'fixed', inset: 0, background: 'rgba(5,13,26,0.6)', zIndex: -1, pointerEvents: 'none' }} />
+              style={{ position: 'fixed', inset: 0, background: 'rgba(2,6,23,0.5)', zIndex: -1, pointerEvents: 'none' }} />
           )}
         </AnimatePresence>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', background: 'rgba(255,255,255,0.04)', borderRadius: '28px', padding: '12px 16px', border: `1px solid ${inputFocused ? 'rgba(232,213,184,0.15)' : 'rgba(255,255,255,0.06)'}`, transition: 'border-color 0.4s' }}>
           <input
             ref={inputRef}
             value={inputText}
             onChange={e => setInputText(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && sendMessage(inputText)}
+            onKeyDown={e => e.key === 'Enter' && !e.shiftKey && sendMessage(inputText)}
             onFocus={() => setInputFocused(true)}
             onBlur={() => setInputFocused(false)}
-            placeholder="说吧，我在听…"
+            placeholder={isLateNight ? '夜深了，说说吧…' : '说吧，我在听…'}
             style={{
-              flex: 1,
-              background: 'transparent',
-              border: 'none',
-              borderBottom: `1px solid ${inputFocused ? THEME.goldDim : 'rgba(255,255,255,0.08)'}`,
-              color: THEME.text,
-              fontSize: '16px',
-              fontWeight: 300,
-              padding: '10px 0',
-              outline: 'none',
-              fontFamily: "'Noto Serif SC', serif",
-              letterSpacing: '0.05em',
-              caretColor: THEME.gold,
-              transition: 'border-color 0.4s',
+              flex: 1, background: 'transparent', border: 'none',
+              color: THEME.gold, fontSize: '16px', fontWeight: 300,
+              outline: 'none', fontFamily: "'Noto Serif SC', serif",
+              letterSpacing: '0.04em', caretColor: THEME.gold,
             }}
           />
           <motion.button
-            whileTap={{ scale: 0.85 }}
+            whileTap={{ scale: 0.8 }}
             onClick={() => sendMessage(inputText)}
-            style={{ background: 'none', border: 'none', cursor: 'pointer', color: THEME.goldDim, fontSize: '20px', padding: '8px', opacity: inputText.trim() ? 1 : 0.3, transition: 'opacity 0.3s' }}
-          >
-            ↑
-          </motion.button>
+            style={{
+              background: 'none', border: 'none', cursor: 'pointer',
+              color: inputText.trim() ? THEME.gold : THEME.textDim,
+              fontSize: '20px', padding: '2px 6px',
+              opacity: inputText.trim() ? 0.8 : 0.25,
+              transition: 'all 0.3s', flexShrink: 0,
+            }}
+          >↑</motion.button>
         </div>
-      </motion.div>
 
-      {/* 返回按钮 */}
-      <motion.button
-        whileTap={{ scale: 0.9 }}
-        onClick={() => router.push('/')}
-        style={{ position: 'fixed', top: '5%', left: '5%', background: 'none', border: 'none', color: THEME.textDim, fontSize: '12px', letterSpacing: '0.3em', cursor: 'pointer', zIndex: 50, opacity: 0.4 }}
-      >
-        ← 基地
-      </motion.button>
+        <p style={{ textAlign: 'center', fontSize: '9px', color: THEME.textDim, opacity: 0.25, letterSpacing: '0.2em', margin: '10px 0 0' }}>
+          长按屏幕说话（即将开放）
+        </p>
+      </div>
 
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@300;400&display=swap');
-        * { -webkit-tap-highlight-color: transparent; }
-        input::placeholder { color: rgba(106,122,138,0.6); }
+        * { -webkit-tap-highlight-color: transparent; box-sizing: border-box; }
+        ::-webkit-scrollbar { display: none; }
+        input::placeholder { color: rgba(74,90,82,0.7); }
       `}</style>
     </main>
   )
