@@ -102,11 +102,11 @@ ${(habits || []).map(h => `- ${h.action_type}: ${h.target_category}`).join('\n')
       }, 1800)
     }
   }, [unlocked, loadContext])
-
-  // ── 密码验证 ──
-  const verifyPin = async () => {
+// ── 密码验证 ──
+  const verifyPin = async (currentPin?: string) => {
+    const checkPin = currentPin ?? pin
     const { data } = await supabase.from('riqi_access').select('password_hash').single()
-    if (data?.password_hash === pin) {
+    if (data?.password_hash === checkPin) {
       setUnlocked(true)
     } else {
       setPinError(true)
@@ -122,7 +122,7 @@ ${(habits || []).map(h => `- ${h.action_type}: ${h.target_category}`).join('\n')
     } else if (pin.length < 6) {
       const next = pin + key
       setPin(next)
-      if (next.length === 6) setTimeout(() => verifyPin(), 200)
+      if (next.length === 6) setTimeout(() => verifyPin(next), 200)
     }
   }
 
