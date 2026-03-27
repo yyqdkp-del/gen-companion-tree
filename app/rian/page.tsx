@@ -156,8 +156,7 @@ setAllDone((remData || []).length === 0)
     <main style={{
       position: 'fixed', inset: 0, width: '100vw', height: '100vh',
       overflow: 'hidden', background: THEME.bg, fontFamily: 'sans-serif',
-    }}>
-
+    }}><div style={{position:'fixed',top:0,left:0,zIndex:999,background:'white',padding:'8px',fontSize:'12px'}}>提醒数量: {reminders.length} | 已完成: {String(allDone)}</div>
       {/* 背景水印 */}
       <div style={{
         position: 'absolute', top: '12%', right: '-3%',
