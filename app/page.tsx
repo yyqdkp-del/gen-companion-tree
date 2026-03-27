@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { createClient } from '@supabase/supabase-js'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Bell, Heart, Trees, Zap, Home as HomeIcon, Sprout, Mic, Camera, Send, AlertTriangle, BookOpen, Clock, Upload, X } from 'lucide-react'
@@ -12,7 +13,12 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
 )
 
+// ⑤ Make.com Webhook
+const MAKE_WEBHOOK_URL = process.env.NEXT_PUBLIC_MAKE_WEBHOOK_URL || ''
+
 export default function HydroApp() {
+  const router = useRouter()
+
   const [tasks, setTasks] = useState<any[]>([])
   const [children, setChildren] = useState<any[]>([
     { name: 'William', emoji: '👦🏻', energy: 85, progress: 12 },
@@ -24,13 +30,45 @@ export default function HydroApp() {
   const [showFamilyTree, setShowFamilyTree] = useState(false)
   const [inputMode, setInputMode] = useState<'none' | 'audio_text' | 'vision_file'>('none')
 
+  // ⑤ 指令发送状态
+  const [inputText, setInputText] = useState('')
+  const [sending, setSending] = useState(false)
+
+  // ① app_config 动态水珠配置
+  const [dropConfigs, setDropConfigs] = useState<any[]>([])
+
+  // ③ Grok 热点
+  const [localEvents, setLocalEvents] = useState<any[]>([])
+
   useEffect(() => {
     const syncData = async () => {
+      // 任务
       const { data: taskData } = await supabase.from('tasks').select('*').eq('status', 'pending')
       setTasks(taskData || [])
-      const { data: childData } = await supabase.from('children_status').select('*')
+
+      // ① 孩子 — 改从 children 表读（有 energy/progress 字段）
+      const { data: childData } = await supabase.from('children').select('*')
       if (childData?.length) setChildren(childData)
+
+      // ① ② app_config — is_visible 控制水珠
+      const { data: configData } = await supabase
+        .from('app_config')
+        .select('*')
+        .eq('page', 'dashboard')
+        .eq('is_visible', true)
+        .order('sort_order', { ascending: true })
+      setDropConfigs(configData || [])
+
+      // ③ local_events — Grok 热点真实数据
+      const { data: eventData } = await supabase
+        .from('local_events')
+        .select('*')
+        .eq('is_active', true)
+        .order('created_at', { ascending: false })
+        .limit(1)
+      setLocalEvents(eventData || [])
     }
+
     syncData()
     const channel = supabase.channel('realtime_sync').on('postgres_changes', { event: '*', schema: 'public' }, syncData).subscribe()
     const ticker = setInterval(() => setTime(new Date()), 1000)
@@ -40,13 +78,75 @@ export default function HydroApp() {
   const currentChild = children[childIndex]
   const getEnergyColor = (val: number) => val > 70 ? '#4ADE80' : val > 40 ? '#FACC15' : '#FB7185'
 
+  // ⑤ 发送指令到 Make.com
+  const sendCommand = async () => {
+    if (!inputText.trim() || sending) return
+    setSending(true)
+    try {
+      await fetch(MAKE_WEBHOOK_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          command: inputText.trim(),
+          child: currentChild?.name,
+          timestamp: new Date().toISOString(),
+          source: 'app_text_input',
+        }),
+      })
+      setInputText('')
+      setInputMode('none')
+    } catch (e) {
+      console.error('Webhook error', e)
+    } finally {
+      setSending(false)
+    }
+  }
+
+  // ① 动态水珠内容
+  const iconMap: Record<string, React.ReactNode> = {
+    TaskCard:    <Bell size={18} />,
+    EnergyCard:  <Zap size={18} />,
+    ChildCard:   <Heart size={18} />,
+    WeatherCard: <Trees size={18} />,
+    AlertCard:   <AlertTriangle size={18} />,
+    ClockCard:   <Clock size={18} />,
+    BookCard:    <BookOpen size={18} />,
+  }
+  const colorMap: Record<string, string> = {
+    TaskCard:    'rgba(141, 160, 138, 0.4)',
+    EnergyCard:  'rgba(212, 169, 106, 0.4)',
+    ChildCard:   'rgba(232, 168, 154, 0.4)',
+    WeatherCard: 'rgba(154, 183, 232, 0.4)',
+    AlertCard:   '#FB7185',
+    ClockCard:   'rgba(154, 183, 232, 0.4)',
+    BookCard:    'rgba(212, 169, 106, 0.4)',
+  }
+  const positions = [
+    { top: '25%', right: '15%' },
+    { top: '42%', right: '28%' },
+    { top: '59%', right: '12%' },
+    { top: '76%', right: '24%' },
+    { top: '33%', right: '35%' },
+    { top: '65%', right: '38%' },
+  ]
+  const getDropValue = (component: string, config: any) => {
+    if (component === 'TaskCard') return tasks.length > 0 ? `${tasks.length} 条` : '静默'
+    if (component === 'ChildCard') {
+      const sm: Record<string, string> = { sleeping: '睡眠中', active: '活跃', school: '上学中', eating: '用餐中' }
+      return sm[currentChild?.status] || '活跃'
+    }
+    if (component === 'AlertCard') return localEvents[0]?.title_cn?.slice(0, 4) || 'Grok 侦察'
+    if (component === 'BookCard') return `${currentChild?.progress ?? 0} 字`
+    return config.config_value?.value ?? '—'
+  }
+
   return (
     <main style={{ 
       position: 'fixed', inset: 0, width: '100vw', height: '100vh', overflow: 'hidden',
       background: 'linear-gradient(180deg, #A7D7D9 0%, #D9A7B4 100%)', fontFamily: 'sans-serif'
     }}>
       
-      {/* 1. 背景水印：恢复“根·陪伴” [纠偏重点] */}
+      {/* 1. 背景水印 */}
       <div style={{ position: 'absolute', top: '15%', right: '-5%', fontSize: '18vw', fontWeight: 'bold', color: '#2C3E50', opacity: 0.1, pointerEvents: 'none', fontStyle: 'italic', whiteSpace: 'nowrap' }}>
         根·陪伴
       </div>
@@ -104,16 +204,30 @@ export default function HydroApp() {
         </h1>
       </header>
 
-      {/* 4. 四个悬浮水珠 [功能重新对齐] */}
-      <LiquidDrop icon={<Bell size={18}/>} label="任务感应" value={`${tasks.length} 条`} top="25%" right="15%" color="rgba(141, 160, 138, 0.4)" alert={tasks.length > 0} delay={0} />
-      <LiquidDrop icon={<Clock size={18}/>} label="事务提醒" value="下午游泳" top="42%" right="28%" color="rgba(154, 183, 232, 0.4)" delay={1.5} />
-      <LiquidDrop icon={<BookOpen size={18}/>} label="中文学习" value={`${currentChild?.progress} 字`} top="59%" right="12%" color="rgba(212, 169, 106, 0.4)" delay={3} />
-      <LiquidDrop icon={<AlertTriangle size={18}/>} label="紧急提醒" value="Grok 侦察" top="76%" right="24%" color="#FB7185" alert={true} delay={4.5} />
+      {/* ① ② 水珠区 — 由 app_config 动态驱动 */}
+      {dropConfigs.map((config, i) => {
+        const pos = positions[i] || positions[0]
+        const value = getDropValue(config.component, config)
+        const label = config.config_value?.title ?? config.component
+        const alert = config.component === 'TaskCard' ? tasks.length > 0 : config.component === 'AlertCard' ? localEvents.length > 0 : false
+        return (
+          <LiquidDrop
+            key={config.id}
+            icon={iconMap[config.component] ?? <Bell size={18} />}
+            label={label}
+            value={value}
+            top={pos.top}
+            right={pos.right}
+            color={colorMap[config.component] ?? 'rgba(141,160,138,0.4)'}
+            alert={alert}
+            delay={i * 1.5}
+          />
+        )
+      })}
 
-      {/* 5. 底部指挥仓 [感官化纠偏] */}
+      {/* 5. 底部指挥仓 */}
       <footer style={{ position: 'fixed', bottom: '48px', left: 0, right: 0, zIndex: 110, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
         
-        {/* 感知面板：根据点击的按钮显示不同功能 */}
         <AnimatePresence>
           {inputMode !== 'none' && (
             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 20 }}
@@ -124,9 +238,19 @@ export default function HydroApp() {
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px', opacity: 0.6 }}>
                     <Mic size={18} /> <span style={{ fontSize: '12px', fontWeight: 'bold' }}>语音与指令采集</span>
                   </div>
+                  {/* ⑤ 输入框接 Make.com */}
                   <div style={{ display: 'flex', gap: '10px', background: 'rgba(255,255,255,0.4)', borderRadius: '15px', padding: '10px 15px' }}>
-                    <input autoFocus placeholder="输入文字指令..." style={{ flex: 1, background: 'none', border: 'none', fontSize: '14px', color: '#2C3E50', outline: 'none' }} />
-                    <Send size={18} style={{ color: '#B08D57', cursor: 'pointer' }} />
+                    <input
+                      autoFocus
+                      value={inputText}
+                      onChange={e => setInputText(e.target.value)}
+                      onKeyDown={e => e.key === 'Enter' && sendCommand()}
+                      placeholder="输入文字指令..."
+                      style={{ flex: 1, background: 'none', border: 'none', fontSize: '14px', color: '#2C3E50', outline: 'none' }}
+                    />
+                    <motion.div whileTap={{ scale: 0.85 }} onClick={sendCommand} style={{ cursor: 'pointer', opacity: sending ? 0.4 : 1 }}>
+                      <Send size={18} style={{ color: '#B08D57' }} />
+                    </motion.div>
                   </div>
                 </div>
               ) : (
@@ -150,9 +274,8 @@ export default function HydroApp() {
           )}
         </AnimatePresence>
 
-        <div style={{ width: '340px', height: '64px', background: 'rgba(255,255,255,0.1)', backdropFilter: 'blur(30px)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '32px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 10px shadow-lg' }}>
+        <div style={{ width: '340px', height: '64px', background: 'rgba(255,255,255,0.1)', backdropFilter: 'blur(30px)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '32px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 10px' }}>
           
-          {/* 左侧：麦克风（语音 + 文字） [功能重组] */}
           <button 
             onClick={() => setInputMode(inputMode === 'audio_text' ? 'none' : 'audio_text')} 
             style={{ width: '54px', height: '48px', borderRadius: '24px', background: inputMode === 'audio_text' ? 'rgba(255,255,255,0.5)' : 'rgba(255,255,255,0.2)', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: '0.3s' }}
@@ -165,7 +288,6 @@ export default function HydroApp() {
             <span style={{ fontSize: '12px', fontWeight: 'bold', letterSpacing: '0.3em', color: showBaseMenu ? "#B08D57" : "#2C3E50" }}>基地</span>
           </button>
 
-          {/* 右侧：相机（拍照 + 文件上传） [功能重组] */}
           <button 
             onClick={() => setInputMode(inputMode === 'vision_file' ? 'none' : 'vision_file')} 
             style={{ width: '54px', height: '48px', borderRadius: '24px', background: inputMode === 'vision_file' ? 'rgba(255,255,255,0.5)' : 'rgba(255,255,255,0.2)', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: '0.3s' }}
@@ -174,14 +296,24 @@ export default function HydroApp() {
           </button>
         </div>
 
-        {/* 基地二级菜单 */}
+        {/* ④ 基地菜单 — 点击跳转页面 */}
         <AnimatePresence>
           {showBaseMenu && (
             <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }}
               style={{ position: 'absolute', bottom: '80px', display: 'flex', gap: '10px' }}
             >
-              {['日安', '根', '日栖'].map(item => (
-                <button key={item} style={{ padding: '8px 20px', borderRadius: '15px', background: 'rgba(255,255,255,0.4)', border: 'none', fontSize: '11px', fontWeight: 'bold', color: '#2C3E50', backdropFilter: 'blur(10px)' }}>{item}</button>
+              {[
+                { label: '日安', path: '/rian' },
+                { label: '根', path: '/' },
+                { label: '树洞', path: '/treehouse' },
+              ].map(item => (
+                <button
+                  key={item.label}
+                  onClick={() => router.push(item.path)}
+                  style={{ padding: '8px 20px', borderRadius: '15px', background: 'rgba(255,255,255,0.4)', border: 'none', fontSize: '11px', fontWeight: 'bold', color: '#2C3E50', backdropFilter: 'blur(10px)', cursor: 'pointer' }}
+                >
+                  {item.label}
+                </button>
               ))}
             </motion.div>
           )}
