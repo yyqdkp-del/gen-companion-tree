@@ -98,15 +98,12 @@ export default function RianPage() {
     const tomorrow = new Date(now)
     tomorrow.setDate(tomorrow.getDate() + 2)
     const { data: remData } = await supabase
-      .from('reminders')
-      .select('*')
-      .eq('status', 'pending')
-      .lte('due_date', tomorrow.toISOString())
-      .order('urgency_level', { ascending: false })
-      .order('due_date', { ascending: true })
-    setReminders(remData || [])
-    setAllDone((remData || []).length === 0)
-  }, [])
+  .from('reminders')
+  .select('*')
+  .eq('status', 'pending')
+setReminders(remData || [])
+setAllDone((remData || []).length === 0)
+}, [])
 
   useEffect(() => {
     syncData()
