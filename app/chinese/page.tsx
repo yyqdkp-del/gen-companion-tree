@@ -64,6 +64,8 @@ const QUESTIONS = [
 
 const FALLBACK = {
   level: 'R3', level_desc: '句子理解期',
+  standard_level: '初等三级',
+  standard_desc: '能读简单句，理解基本语义，开始出现抗拒',
   insight: '孩子正处于中文学习的关键突破期，已经有了基础，只差一把钥匙。',
   blockpoint: '汉字对孩子来说还是符号，还没变成有意义的画面和故事。',
   action: '今晚用「休」字和孩子玩一个游戏：让他猜这个字在说什么故事。',
@@ -71,7 +73,6 @@ const FALLBACK = {
   feature_rec: '从汉字拆解器开始，每天一个字，让汉字从符号变成故事。',
   cta: '领取你的专属学习路线图，开启第一个汉字故事 🌿'
 }
-
 type Report = typeof FALLBACK
 
 export default function ChinesePage() {
