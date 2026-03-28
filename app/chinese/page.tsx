@@ -17,6 +17,10 @@ const THEME = {
 
 const QUESTIONS = [
   {
+  id: 0, label: 'Q0 · 认识一下', text: '孩子叫什么名字？', type: 'text',
+  placeholder: '输入孩子的名字或昵称',
+},
+  {
     id: 1, label: 'Q1 · 基本信息', text: '孩子现在几年级？', type: 'options',
     options: ['K1-K2','K3','G1','G2','G3','G4','G5','G6及以上'],
   },
