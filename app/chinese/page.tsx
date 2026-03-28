@@ -290,12 +290,11 @@ export default function ChinesePage() {
       <div style={{ fontSize:'10px', fontWeight: lv === r.level ? 500 : 400, color: lv === r.level ? THEME.orange : THEME.muted }}>{lv === r.level ? `${lv} ←` : lv}</div>
     </div>
   ))}
-</div>          </div>
-
+</div>
           {[
-            { title:'📍 现状洞察', content: r.insight },
-            { title:'🔍 核心卡点', content: r.blockpoint },
-            { title:'✅ 本周行动', content: r.action },
+          { title:'📍 现状洞察', content: r.insight },
+            { title:'🔍 核心卡点', content: r.blockpoint },           
+  { title:'✅ 本周行动', content: r.action },
           ].map((s, i) => (
             <motion.div key={i} initial={{ opacity:0, y:10 }} animate={{ opacity:1, y:0 }} transition={{ delay: i * 0.15 }}
               style={{ background: THEME.bg, borderRadius:'12px', padding:'16px', marginBottom:'12px' }}>
