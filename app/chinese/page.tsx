@@ -326,8 +326,7 @@ export default function ChinesePage() {
           <div style={{ background: THEME.navy, borderRadius:'12px', padding:'22px', textAlign:'center' }}>
             <div style={{ fontSize:'14px', lineHeight:1.7, color:'rgba(255,255,255,0.88)', marginBottom:'14px' }}>{r.cta}</div>
             <motion.button whileTap={{ scale:0.96 }}
-              onClick={() => router.push('/')}
-              style={{ background: THEME.orange, color:'#fff', border:'none', borderRadius:'8px', padding:'12px 28px', fontSize:'15px', fontWeight:700, cursor:'pointer', fontFamily:"'Noto Sans SC', sans-serif", width:'100%' }}>
+              onClick={() => router.push('/auth')}              style={{ background: THEME.orange, color:'#fff', border:'none', borderRadius:'8px', padding:'12px 28px', fontSize:'15px', fontWeight:700, cursor:'pointer', fontFamily:"'Noto Sans SC', sans-serif", width:'100%' }}>
               进入根·Companion，开启专属陪伴 →
             </motion.button>
           </div>
