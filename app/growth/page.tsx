@@ -192,8 +192,7 @@ export default function GrowthPage() {
         transition={{ delay: 1.5 }}
         whileHover={{ scale: 1.1 }}
         whileTap={{ scale: 0.93 }}
-        onClick={() => router.push('/chinese')}
-        style={{
+        onClick={() => router.push('/chinese/decode')}        style={{
           position: 'absolute',
           right: '14%',
           bottom: '12%',
