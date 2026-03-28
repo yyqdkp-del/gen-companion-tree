@@ -120,8 +120,14 @@ export default function ChinesePage() {
   }
 
   const submit = async (finalAnswers: Record<string, string>) => {
-    setPhase('loading')
-    setLoadStep(0)
+  // 把孩子信息存入localStorage
+  localStorage.setItem('child_assessment', JSON.stringify({
+    name: finalAnswers['q0'] || '',
+    grade: finalAnswers['q1'] || '',
+    school: finalAnswers['q2'] || '',
+    answers: finalAnswers,
+  }))
+  setPhase('loading')    setLoadStep(0)
     const steps = [600, 1200, 1800, 2400]
     steps.forEach((ms, i) => setTimeout(() => setLoadStep(i + 1), ms))
 
