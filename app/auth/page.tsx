@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@supabase/supabase-js'
 import { motion } from 'framer-motion'
@@ -28,8 +28,7 @@ export default function AuthPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [done, setDone] = useState(false)
-
-  const saveChildData = async (userId: string) => {
+const saveChildData = async (userId: string) => {
     try {
       const raw = localStorage.getItem('child_assessment')
       if (!raw) return
@@ -45,6 +44,16 @@ export default function AuthPage() {
     } catch {}
   }
 
+useEffect(() => {
+  const checkSession = async () => {
+    const { data: { session } } = await supabase.auth.getSession()
+    if (session?.user) {
+      await saveChildData(session.user.id)
+      router.push('/')
+    }
+  }
+  checkSession()
+}, []) 
   const handleSubmit = async () => {
     setError('')
     setLoading(true)
