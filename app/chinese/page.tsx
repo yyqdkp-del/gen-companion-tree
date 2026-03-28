@@ -270,13 +270,27 @@ export default function ChinesePage() {
         <motion.div initial={{ opacity:0, y:20 }} animate={{ opacity:1, y:0 }}
           style={{ background: THEME.white, borderRadius:'16px', padding:'28px 22px', boxShadow:'0 4px 24px rgba(26,60,94,0.10)', marginBottom:'14px' }}>
 
-          <div style={{ textAlign:'center', paddingBottom:'20px', borderBottom:`1px solid ${THEME.border}`, marginBottom:'20px' }}>
-            <div style={{ display:'inline-block', background: THEME.navy, color:'#fff', fontSize:'13px', fontWeight:700, padding:'5px 16px', borderRadius:'20px', marginBottom:'10px', letterSpacing:'1px' }}>
-              {r.level} · {r.level_desc}
-            </div>
-            <div style={{ fontFamily:"'Noto Serif SC', serif", fontSize:'26px', fontWeight:900, color: THEME.navy, marginBottom:'6px' }}>{r.level_desc}</div>
-            <div style={{ fontSize:'12px', color: THEME.muted }}>根·中文生成 · {new Date().toLocaleDateString('zh-CN')}</div>
-          </div>
+          <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between', marginBottom:'20px' }}>
+  <div>
+    <div style={{ fontSize:'12px', color: THEME.muted, marginBottom:'6px' }}>根·中文 专属报告 · {new Date().toLocaleDateString('zh-CN')}</div>
+    <div style={{ fontFamily:"'Noto Serif SC', serif", fontSize:'22px', fontWeight:500, color: THEME.navy }}>{r.level_desc}</div>
+  </div>
+  <div style={{ background: THEME.navy, color:'#fff', fontSize:'13px', padding:'5px 14px', borderRadius:'20px' }}>{r.level}</div>
+</div>
+
+<div style={{ background:'#FFF3E0', borderRadius:'8px', padding:'12px 16px', marginBottom:'16px', borderLeft:'3px solid #E8892A' }}>
+  <div style={{ fontSize:'11px', fontWeight:500, color:'#BA7517', letterSpacing:'0.1em', marginBottom:'4px' }}>《国际中文教育标准》{r.standard_level}</div>
+  <div style={{ fontSize:'13px', color:'#633806', lineHeight:1.6 }}>{r.standard_desc}</div>
+</div>
+
+<div style={{ display:'grid', gridTemplateColumns:'repeat(5, 1fr)', gap:'6px', marginBottom:'20px', paddingBottom:'20px', borderBottom:`1px solid ${THEME.border}` }}>
+  {['R1','R2','R3','R4','R5'].map((lv) => (
+    <div key={lv} style={{ textAlign:'center' }}>
+      <div style={{ height:'4px', background: lv === r.level ? THEME.orange : lv < r.level ? THEME.navy : THEME.border, borderRadius:'2px', marginBottom:'5px' }} />
+      <div style={{ fontSize:'10px', fontWeight: lv === r.level ? 500 : 400, color: lv === r.level ? THEME.orange : THEME.muted }}>{lv === r.level ? `${lv} ←` : lv}</div>
+    </div>
+  ))}
+</div>          </div>
 
           {[
             { title:'📍 现状洞察', content: r.insight },
