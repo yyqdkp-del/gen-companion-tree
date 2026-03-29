@@ -155,16 +155,37 @@ export default function RianPage() {
   }
 
   const sendCommand = async () => {
-    if (!inputText.trim() || sending) return
-    setSending(true)
-    try {
-      const { data: { user } } = await supabase.auth.getUser()
-      const res = await fetch('/api/rian/process', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          content: inputText.trim(),
-          input_type: 'text',
+  if (!inputText.trim() || sending) return
+  setSending(true)
+  setUploadStatus('uploading') // 调试
+  try {
+    const { data: { user } } = await supabase.auth.getUser()
+    const res = await fetch('/api/rian/process', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        content: inputText.trim(),
+        input_type: 'text',
+        user_id: user?.id || null,
+      }),
+    })
+    const result = await res.json()
+    if (result.ok) {
+      setUploadStatus('done')
+      setInputText('')
+      setInputMode('none')
+      syncData()
+    } else {
+      setUploadStatus('error')
+    }
+  } catch (e) {
+    console.error(e)
+    setUploadStatus('error')
+  } finally {
+    setSending(false)
+    setTimeout(() => setUploadStatus('idle'), 2000)
+  }
+}          input_type: 'text',
           user_id: user?.id || null,
         }),
       })
