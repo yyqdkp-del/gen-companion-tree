@@ -138,10 +138,11 @@ export default function ChinesePage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ answers: finalAnswers }),
       })
-      const data = await res.json()
+     const data = await res.json()
+      console.log('API返回:', JSON.stringify(data))
       setTimeout(() => {
-        setReport(data.level ? data : FALLBACK)
-        setPhase('report')
+      setReport(data.level ? data : FALLBACK)        
+      setPhase('report')
       }, 2800)
     } catch {
       setTimeout(() => {
