@@ -17,8 +17,6 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
 )
 
-const MAKE_WEBHOOK_URL = process.env.NEXT_PUBLIC_MAKE_WEBHOOK_URL || ''
-
 const THEME = {
   bg: 'linear-gradient(180deg, #A7D7D9 0%, #D9A7B4 100%)',
   text: '#2C3E50',
@@ -36,7 +34,6 @@ const URGENCY_BORDER: Record<number, string> = {
   3: 'rgba(255,180,100,0.7)',
 }
 
-// 交错动画参数 — 每个水珠独立节奏
 const DROP_ANIM = [
   { duration: 6.5, delay: 0,   yRange: 14, xRange: 5,  rotate: 1.5 },
   { duration: 8.2, delay: 1.5, yRange: 10, xRange: 7,  rotate: 2   },
@@ -47,7 +44,6 @@ const DROP_ANIM = [
   { duration: 7.8, delay: 1.9, yRange: 11, xRange: 5,  rotate: 1.8 },
 ]
 
-// 全屏散落，避开头像/时间/底部导航
 const POSITIONS = [
   { top: '25%', left: '8%'   },
   { top: '22%', right: '8%'  },
@@ -162,16 +158,23 @@ export default function RianPage() {
     if (!inputText.trim() || sending) return
     setSending(true)
     try {
-      await fetch(MAKE_WEBHOOK_URL, {
+      const { data: { user } } = await supabase.auth.getUser()
+      const res = await fetch('/api/rian/process', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          type: 'text_command', command: inputText.trim(),
-          child: currentChild?.name, timestamp: new Date().toISOString(), source: 'rian_text',
+          content: inputText.trim(),
+          input_type: 'text',
+          user_id: user?.id || null,
         }),
       })
-      setInputText('')
-      setInputMode('none')
+      const result = await res.json()
+      console.log('rian/process返回:', JSON.stringify(result))
+      if (result.ok) {
+        setInputText('')
+        setInputMode('none')
+        syncData()
+      }
     } catch (e) { console.error(e) }
     finally { setSending(false) }
   }
@@ -212,17 +215,34 @@ export default function RianPage() {
       const { error } = await supabase.storage.from('companion-files').upload(path, file, { upsert: true })
       if (error) throw error
       const { data: urlData } = supabase.storage.from('companion-files').getPublicUrl(path)
-      if (MAKE_WEBHOOK_URL) {
-        await fetch(MAKE_WEBHOOK_URL, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ type: 'file_upload', file_url: urlData.publicUrl, category, child: currentChild?.name, timestamp: new Date().toISOString() }),
-        })
+      const { data: { user } } = await supabase.auth.getUser()
+      const isImage = file.type.startsWith('image/')
+      const res = await fetch('/api/rian/process', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          content: isImage ? '请分析这张图片，提取所有需要跟进的事件' : `文件已上传：${name}，请提取关键事件`,
+          input_type: isImage ? 'image' : category,
+          file_url: urlData.publicUrl,
+          user_id: user?.id || null,
+        }),
+      })
+      const result = await res.json()
+      console.log('uploadFile返回:', JSON.stringify(result))
+      if (result.ok) {
+        setUploadStatus('done')
+        syncData()
+        setTimeout(() => { setUploadStatus('idle'); setInputMode('none') }, 1500)
+      } else {
+        throw new Error(result.error)
       }
-      setUploadStatus('done')
-      setTimeout(() => { setUploadStatus('idle'); setInputMode('none') }, 1500)
-    } catch { setUploadStatus('error'); setTimeout(() => setUploadStatus('idle'), 2000) }
-    finally { setUploading(false) }
+    } catch (e) {
+      console.error(e)
+      setUploadStatus('error')
+      setTimeout(() => setUploadStatus('idle'), 2000)
+    } finally {
+      setUploading(false)
+    }
   }
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -237,7 +257,7 @@ export default function RianPage() {
     shopping: <ShoppingCart size={16} />, utility: <Building2 size={16} />, default: <Clock size={16} />,
   }
 
-  const uploadStatusText = { idle: '', uploading: '上传中…', done: '✓ 已上传', error: '上传失败' }
+  const uploadStatusText = { idle: '', uploading: '处理中…', done: '✓ 已添加', error: '处理失败' }
 
   return (
     <main style={{
@@ -245,7 +265,6 @@ export default function RianPage() {
       overflow: 'hidden', background: THEME.bg, fontFamily: 'sans-serif',
     }}>
 
-      {/* 隐藏文件输入 */}
       <input ref={fileInputRef} type="file" accept="image/*,application/pdf,audio/*,.doc,.docx" style={{ display: 'none' }} onChange={handleFileChange} />
       <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" style={{ display: 'none' }} onChange={handleFileChange} />
 
@@ -307,7 +326,7 @@ export default function RianPage() {
         )}
       </AnimatePresence>
 
-      {/* 三级提醒水珠 — 交错呼吸动画 */}
+      {/* 水珠 */}
       {!allDone && reminders.map((r, i) => {
         const pos = POSITIONS[i % POSITIONS.length]
         const anim = DROP_ANIM[i % DROP_ANIM.length]
@@ -332,7 +351,7 @@ export default function RianPage() {
               x: { duration: anim.duration * 1.3, repeat: Infinity, delay: anim.delay + 0.5, ease: 'easeInOut' },
               rotate: { duration: anim.duration * 0.8, repeat: Infinity, delay: anim.delay, ease: 'easeInOut' },
             }}
-            style={{ position: 'absolute', top: pos.top, right: pos.right, zIndex: 20 }}
+            style={{ position: 'absolute', top: pos.top, left: (pos as any).left, right: (pos as any).right, zIndex: 20 }}
             onClick={() => setSelectedReminder(r)}
           >
             <div style={{
@@ -413,7 +432,7 @@ export default function RianPage() {
         )}
       </AnimatePresence>
 
-      {/* 底部指挥仓 — 麦克风 / 日安 / 相机 */}
+      {/* 底部导航 */}
       <footer style={{ position: 'fixed', bottom: '36px', left: 0, right: 0, zIndex: 110, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '0 16px' }}>
 
         {/* 输入面板 */}
@@ -446,11 +465,19 @@ export default function RianPage() {
                   <div style={{ display: 'flex', gap: '10px', background: 'rgba(255,255,255,0.4)', borderRadius: '14px', padding: '10px 14px' }}>
                     <input value={inputText} onChange={e => setInputText(e.target.value)} onKeyDown={e => e.key === 'Enter' && sendCommand()}
                       placeholder="或输入文字指令..." style={{ flex: 1, background: 'none', border: 'none', fontSize: '14px', color: THEME.text, outline: 'none' }} />
-                    <motion.div whileTap={{ scale: 0.85 }} onClick={sendCommand} style={{ cursor: 'pointer', opacity: sending ? 0.4 : 1 }}>
-                      <Send size={17} style={{ color: THEME.gold }} />
-                    </motion.div>
+                    {sending ? (
+                      <Loader size={17} style={{ color: THEME.gold, animation: 'spin 1s linear infinite' }} />
+                    ) : (
+                      <motion.div whileTap={{ scale: 0.85 }} onClick={sendCommand} style={{ cursor: 'pointer', opacity: inputText.trim() ? 1 : 0.3 }}>
+                        <Send size={17} style={{ color: THEME.gold }} />
+                      </motion.div>
+                    )}
                   </div>
-                  {uploadStatus !== 'idle' && <p style={{ fontSize: '11px', textAlign: 'center', color: uploadStatus === 'done' ? '#4ADE80' : '#FB7185' }}>{uploadStatusText[uploadStatus]}</p>}
+                  {uploadStatus !== 'idle' && (
+                    <p style={{ fontSize: '11px', textAlign: 'center', color: uploadStatus === 'done' ? '#4ADE80' : uploadStatus === 'error' ? '#FB7185' : THEME.gold }}>
+                      {uploadStatusText[uploadStatus]}
+                    </p>
+                  )}
                 </div>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
@@ -473,7 +500,11 @@ export default function RianPage() {
                       <span style={{ fontSize: '10px', opacity: 0.6, color: THEME.text }}>上传文件</span>
                     </div>
                   </div>
-                  {uploadStatus !== 'idle' && <p style={{ fontSize: '11px', textAlign: 'center', color: uploadStatus === 'done' ? '#4ADE80' : '#FB7185' }}>{uploadStatusText[uploadStatus]}</p>}
+                  {uploadStatus !== 'idle' && (
+                    <p style={{ fontSize: '11px', textAlign: 'center', color: uploadStatus === 'done' ? '#4ADE80' : uploadStatus === 'error' ? '#FB7185' : THEME.gold }}>
+                      {uploadStatusText[uploadStatus]}
+                    </p>
+                  )}
                 </div>
               )}
             </motion.div>
@@ -495,23 +526,17 @@ export default function RianPage() {
           )}
         </AnimatePresence>
 
-        {/* 底部导航条 — 麦克风 / 日安 / 相机 */}
+        {/* 底部导航条 */}
         <div style={{ width: '100%', maxWidth: '360px', height: '62px', background: 'rgba(255,255,255,0.1)', backdropFilter: 'blur(30px)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '31px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 10px' }}>
-
-          {/* 左：麦克风 */}
           <button onClick={() => setInputMode(inputMode === 'audio_text' ? 'none' : 'audio_text')}
             style={{ width: '52px', height: '46px', borderRadius: '23px', background: inputMode === 'audio_text' ? 'rgba(255,255,255,0.5)' : 'rgba(255,255,255,0.2)', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: '0.3s' }}>
             <Mic size={21} color={inputMode === 'audio_text' ? THEME.gold : THEME.text} />
           </button>
-
-          {/* 中：日安（点击弹出基地菜单） */}
           <button onClick={() => setShowBaseMenu(!showBaseMenu)}
             style={{ display: 'flex', alignItems: 'center', gap: '7px', border: 'none', background: 'none', cursor: 'pointer' }}>
             <HomeIcon size={19} color={showBaseMenu ? THEME.gold : THEME.text} />
             <span style={{ fontSize: '12px', fontWeight: 'bold', letterSpacing: '0.3em', color: showBaseMenu ? THEME.gold : THEME.text }}>日安</span>
           </button>
-
-          {/* 右：相机 */}
           <button onClick={() => setInputMode(inputMode === 'vision_file' ? 'none' : 'vision_file')}
             style={{ width: '52px', height: '46px', borderRadius: '23px', background: inputMode === 'vision_file' ? 'rgba(255,255,255,0.5)' : 'rgba(255,255,255,0.2)', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: '0.3s' }}>
             <Camera size={21} color={inputMode === 'vision_file' ? THEME.gold : THEME.text} />
