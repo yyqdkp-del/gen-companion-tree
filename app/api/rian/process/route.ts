@@ -4,7 +4,6 @@ import { createClient } from '@supabase/supabase-js'
 const SYSTEM_PROMPT = `你是日安，一个全能人生管家AI。
 用户会向你扔来各种生活碎片：语音转文字、照片描述、文件内容、随手记录。
 你的任务是从中提取所有需要跟进的事件，结构化输出。
-
 严格只输出JSON数组，不加任何其他文字：
 [
   {
@@ -18,12 +17,10 @@ const SYSTEM_PROMPT = `你是日安，一个全能人生管家AI。
     "claude_advice": "日安给的一句建议或提醒"
   }
 ]
-
 优先级规则：
 1=普通（生活琐事）
 2=重要（需要安排时间处理）
 3=紧急（有截止日期或影响较大）
-
 今天日期：${new Date().toLocaleDateString('zh-CN')}`
 
 export async function POST(req: NextRequest) {
@@ -46,7 +43,6 @@ export async function POST(req: NextRequest) {
 
     // 2. Claude处理
     const messages: any[] = []
-
     if (input_type === 'image' && file_url) {
       messages.push({
         role: 'user',
@@ -56,10 +52,7 @@ export async function POST(req: NextRequest) {
         ]
       })
     } else {
-      messages.push({
-        role: 'user',
-        content: content
-      })
+      messages.push({ role: 'user', content })
     }
 
     const response = await fetch('https://api.anthropic.com/v1/messages', {
@@ -82,7 +75,7 @@ export async function POST(req: NextRequest) {
     const cleaned = raw.replace(/```json|```/g, '').trim()
     const extracted = JSON.parse(cleaned.match(/\[[\s\S]*\]/)?.[0] || '[]')
 
-    // 3. 存入events表
+    // 3. 存入events表 + 生成reminders水珠
     if (extracted.length > 0) {
       await supabase.from('events').insert(
         extracted.map((e: any) => ({
@@ -97,6 +90,18 @@ export async function POST(req: NextRequest) {
           notes: e.notes,
           claude_advice: e.claude_advice,
           source: input_type,
+        }))
+      )
+
+      await supabase.from('reminders').insert(
+        extracted.map((e: any) => ({
+          user_id: user_id || null,
+          title: e.title,
+          description: e.claude_advice || e.notes || null,
+          category: e.category,
+          urgency_level: e.priority || 2,
+          due_date: e.due_date || null,
+          status: 'pending',
         }))
       )
     }
