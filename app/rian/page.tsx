@@ -516,7 +516,7 @@ export default function RianPage() {
           {showBaseMenu && (
             <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }}
               style={{ marginBottom: '12px', display: 'flex', gap: '10px' }}>
-              {[{ label: '基地', path: '/' }, { label: '根·中文', path: '/chinese/decode' }, { label: '日栖', path: '/treehouse' }].map(item => (
+              {[{ label: '基地', path: '/' }, { label: '根·中文', path: '/growth' }, { label: '日栖', path: '/treehouse' }].map(item => (
                 <button key={item.label} onClick={() => { router.push(item.path); setShowBaseMenu(false) }}
                   style={{ padding: '8px 18px', borderRadius: '14px', background: 'rgba(255,255,255,0.4)', border: 'none', fontSize: '11px', fontWeight: 'bold', color: THEME.text, backdropFilter: 'blur(10px)', cursor: 'pointer' }}>
                   {item.label}
