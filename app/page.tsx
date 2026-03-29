@@ -185,21 +185,7 @@ export default function RianPage() {
     setSending(false)
     setTimeout(() => setUploadStatus('idle'), 2000)
   }
-}          input_type: 'text',
-          user_id: user?.id || null,
-        }),
-      })
-      const result = await res.json()
-      console.log('rian/process返回:', JSON.stringify(result))
-      if (result.ok) {
-        setInputText('')
-        setInputMode('none')
-        syncData()
-      }
-    } catch (e) { console.error(e) }
-    finally { setSending(false) }
-  }
-
+}
   const startRecording = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
