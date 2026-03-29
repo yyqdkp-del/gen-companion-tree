@@ -47,15 +47,18 @@ const DROP_ANIM = [
   { duration: 7.8, delay: 1.9, yRange: 11, xRange: 5,  rotate: 1.8 },
 ]
 
-// 手机友好的散落位置 — 全部在右侧，避开左上头像和右上时间
+// 全屏散落，避开头像/时间/底部导航
 const POSITIONS = [
-  { top: '24%', right: '8%'  },
-  { top: '38%', right: '30%' },
-  { top: '52%', right: '6%'  },
-  { top: '64%', right: '26%' },
-  { top: '74%', right: '5%'  },
-  { top: '31%', right: '48%' },
-  { top: '58%', right: '46%' },
+  { top: '25%', left: '8%'   },
+  { top: '22%', right: '8%'  },
+  { top: '38%', left: '55%'  },
+  { top: '45%', left: '15%'  },
+  { top: '52%', right: '12%' },
+  { top: '60%', left: '40%'  },
+  { top: '65%', right: '45%' },
+  { top: '35%', left: '30%'  },
+  { top: '70%', left: '10%'  },
+  { top: '58%', right: '55%' },
 ]
 
 type Reminder = {
@@ -248,7 +251,7 @@ export default function RianPage() {
 
       {/* 背景水印 */}
       <div style={{ position: 'absolute', top: '12%', right: '-3%', fontSize: 'clamp(60px, 16vw, 120px)', fontWeight: 'bold', color: THEME.text, opacity: 0.07, pointerEvents: 'none', fontStyle: 'italic', whiteSpace: 'nowrap', lineHeight: 1 }}>
-        日安·/rian
+        日安
       </div>
 
       {/* 左上角：孩子头像 */}
@@ -482,7 +485,7 @@ export default function RianPage() {
           {showBaseMenu && (
             <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }}
               style={{ marginBottom: '12px', display: 'flex', gap: '10px' }}>
-              {[{ label: '基地', path: '/' }, { label: '根', path: '/' }, { label: '日栖', path: '/treehouse' }].map(item => (
+              {[{ label: '基地', path: '/' }, { label: '根·中文', path: '/chinese/decode' }, { label: '日栖', path: '/treehouse' }].map(item => (
                 <button key={item.label} onClick={() => { router.push(item.path); setShowBaseMenu(false) }}
                   style={{ padding: '8px 18px', borderRadius: '14px', background: 'rgba(255,255,255,0.4)', border: 'none', fontSize: '11px', fontWeight: 'bold', color: THEME.text, backdropFilter: 'blur(10px)', cursor: 'pointer' }}>
                   {item.label}
