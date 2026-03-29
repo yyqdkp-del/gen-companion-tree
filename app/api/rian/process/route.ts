@@ -23,6 +23,42 @@ const SYSTEM_PROMPT = `你是日安，一个全能人生管家AI。
 3=紧急（有截止日期或影响较大）
 今天日期：${new Date().toLocaleDateString('zh-CN')}`
 
+// Gemini语音转文字
+async function transcribeAudio(fileUrl: string): Promise<string> {
+  try {
+    // 下载音频文件
+    const audioRes = await fetch(fileUrl)
+    const audioBuffer = await audioRes.arrayBuffer()
+    const base64Audio = Buffer.from(audioBuffer).toString('base64')
+
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${process.env.GOOGLE_AI_API_KEY}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{
+            parts: [
+              { text: '请把这段音频转成文字，原文输出，不要添加任何解释：' },
+              {
+                inline_data: {
+                  mime_type: 'audio/webm',
+                  data: base64Audio,
+                }
+              }
+            ]
+          }]
+        }),
+      }
+    )
+    const data = await response.json()
+    return data.candidates?.[0]?.content?.parts?.[0]?.text || ''
+  } catch (e) {
+    console.error('Gemini转文字失败:', e)
+    return ''
+  }
+}
+
 export async function POST(req: NextRequest) {
   try {
     const { content, input_type, file_url, user_id } = await req.json()
@@ -41,18 +77,31 @@ export async function POST(req: NextRequest) {
       processed: false,
     }).select().single()
 
-    // 2. Claude处理
+    // 2. 如果是音频，先用Gemini转文字
+    let processedContent = content
+    if (input_type === 'audio' && file_url) {
+      const transcribed = await transcribeAudio(file_url)
+      if (transcribed) {
+        processedContent = transcribed
+        // 更新raw_inputs里的内容
+        await supabase.from('raw_inputs').update({
+          raw_content: transcribed,
+        }).eq('id', rawInput?.id)
+      }
+    }
+
+    // 3. Claude处理
     const messages: any[] = []
     if (input_type === 'image' && file_url) {
       messages.push({
         role: 'user',
         content: [
           { type: 'image', source: { type: 'url', url: file_url } },
-          { type: 'text', text: content || '请分析这张图片，提取所有需要跟进的事件' }
+          { type: 'text', text: processedContent || '请分析这张图片，提取所有需要跟进的事件' }
         ]
       })
     } else {
-      messages.push({ role: 'user', content })
+      messages.push({ role: 'user', content: processedContent })
     }
 
     const response = await fetch('https://api.anthropic.com/v1/messages', {
@@ -75,7 +124,7 @@ export async function POST(req: NextRequest) {
     const cleaned = raw.replace(/```json|```/g, '').trim()
     const extracted = JSON.parse(cleaned.match(/\[[\s\S]*\]/)?.[0] || '[]')
 
-    // 3. 存入events表 + 生成reminders水珠
+    // 4. 存入events表 + 生成reminders水珠
     if (extracted.length > 0) {
       await supabase.from('events').insert(
         extracted.map((e: any) => ({
@@ -106,7 +155,7 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // 4. 标记已处理
+    // 5. 标记已处理
     await supabase.from('raw_inputs').update({
       processed: true,
       extracted_events: extracted,
