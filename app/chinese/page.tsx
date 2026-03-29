@@ -127,7 +127,8 @@ export default function ChinesePage() {
     school: finalAnswers['q2'] || '',
     answers: finalAnswers,
   }))
-  setPhase('loading')    setLoadStep(0)
+  setPhase('loading')    
+  setLoadStep(0)
     const steps = [600, 1200, 1800, 2400]
     steps.forEach((ms, i) => setTimeout(() => setLoadStep(i + 1), ms))
 
