@@ -23,13 +23,13 @@ const SYSTEM_PROMPT = `你是日安，一个全能人生管家AI。
 3=紧急（有截止日期或影响较大）
 今天日期：${new Date().toLocaleDateString('zh-CN')}`
 
-// Gemini语音转文字
 async function transcribeAudio(fileUrl: string): Promise<string> {
   try {
-    // 下载音频文件
+    console.log('开始下载音频:', fileUrl)
     const audioRes = await fetch(fileUrl)
     const audioBuffer = await audioRes.arrayBuffer()
     const base64Audio = Buffer.from(audioBuffer).toString('base64')
+    console.log('音频下载完成，大小:', audioBuffer.byteLength)
 
     const response = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${process.env.GOOGLE_AI_API_KEY}`,
@@ -40,21 +40,19 @@ async function transcribeAudio(fileUrl: string): Promise<string> {
           contents: [{
             parts: [
               { text: '请把这段音频转成文字，原文输出，不要添加任何解释：' },
-              {
-                inline_data: {
-                  mime_type: 'audio/webm',
-                  data: base64Audio,
-                }
-              }
+              { inline_data: { mime_type: 'audio/webm', data: base64Audio } }
             ]
           }]
         }),
       }
     )
     const data = await response.json()
-    return data.candidates?.[0]?.content?.parts?.[0]?.text || ''
-  } catch (e) {
-    console.error('Gemini转文字失败:', e)
+    console.log('Gemini原始响应:', JSON.stringify(data))
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || ''
+    console.log('Gemini转文字结果:', text)
+    return text
+  } catch (e: any) {
+    console.error('Gemini转文字失败:', e?.message || e)
     return ''
   }
 }
@@ -62,6 +60,7 @@ async function transcribeAudio(fileUrl: string): Promise<string> {
 export async function POST(req: NextRequest) {
   try {
     const { content, input_type, file_url, user_id } = await req.json()
+    console.log('收到请求:', { input_type, file_url: file_url ? '有' : '无' })
 
     const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL || '',
@@ -77,16 +76,14 @@ export async function POST(req: NextRequest) {
       processed: false,
     }).select().single()
 
-    // 2. 如果是音频，先用Gemini转文字
+    // 2. 音频→Gemini转文字
     let processedContent = content
     if (input_type === 'audio' && file_url) {
+      console.log('检测到音频，开始转文字')
       const transcribed = await transcribeAudio(file_url)
       if (transcribed) {
         processedContent = transcribed
-        // 更新raw_inputs里的内容
-        await supabase.from('raw_inputs').update({
-          raw_content: transcribed,
-        }).eq('id', rawInput?.id)
+        await supabase.from('raw_inputs').update({ raw_content: transcribed }).eq('id', rawInput?.id)
       }
     }
 
@@ -123,8 +120,9 @@ export async function POST(req: NextRequest) {
     const raw = data.content?.[0]?.text || '[]'
     const cleaned = raw.replace(/```json|```/g, '').trim()
     const extracted = JSON.parse(cleaned.match(/\[[\s\S]*\]/)?.[0] || '[]')
+    console.log('Claude提取事件数:', extracted.length)
 
-    // 4. 存入events表 + 生成reminders水珠
+    // 4. 存入events + reminders
     if (extracted.length > 0) {
       await supabase.from('events').insert(
         extracted.map((e: any) => ({
@@ -141,7 +139,6 @@ export async function POST(req: NextRequest) {
           source: input_type,
         }))
       )
-
       await supabase.from('reminders').insert(
         extracted.map((e: any) => ({
           user_id: user_id || null,
