@@ -138,13 +138,29 @@ export default function ChinesePage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ answers: finalAnswers }),
       })
-     const data = await res.json()
+    const data = await res.json()
       console.log('API返回:', JSON.stringify(data))
+      const reportData = data.level ? data : FALLBACK
+      try {
+        const childRaw = localStorage.getItem('child_assessment')
+        const childInfo = childRaw ? JSON.parse(childRaw) : {}
+        await fetch('/api/chinese/save-assessment', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            child_name: childInfo.name || '',
+            child_age: childInfo.grade || '',
+            level: reportData.level,
+            standard_level: reportData.standard_level,
+            answers: finalAnswers,
+            report: JSON.stringify(reportData),
+          }),
+        })
+      } catch {}
       setTimeout(() => {
-      setReport(data.level ? data : FALLBACK)        
-      setPhase('report')
-      }, 2800)
-    } catch {
+        setReport(reportData)
+        setPhase('report')
+      }, 2800)    } catch {
       setTimeout(() => {
         setReport(FALLBACK)
         setPhase('report')
