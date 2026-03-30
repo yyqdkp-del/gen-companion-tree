@@ -156,29 +156,30 @@ export default function RianPage() {
     setSelectedReminder(null)
     syncData()
   }
-const askReminderQuestion = async (question: string) => {
-  if (!question.trim() || reminderLoading) return
-  setReminderChat(prev => [...prev, { role: 'user', text: question }])
-  setReminderInput('')
-  setReminderLoading(true)
-  try {
-    const res = await fetch('/api/rian/chat', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        question,
-        context: `事件：${selectedReminder?.title}\n详情：${selectedReminder?.description}`,
-        history: reminderChat,
-      }),
-    })
-    const data = await res.json()
-    setReminderChat(prev => [...prev, { role: 'assistant', text: data.reply || '抱歉，无法获取建议' }])
-  } catch {
-    setReminderChat(prev => [...prev, { role: 'assistant', text: '网络异常，请稍后再试' }])
-  } finally {
-    setReminderLoading(false)
+
+  const askReminderQuestion = async (question: string) => {
+    if (!question.trim() || reminderLoading) return
+    setReminderChat(prev => [...prev, { role: 'user', text: question }])
+    setReminderInput('')
+    setReminderLoading(true)
+    try {
+      const res = await fetch('/api/rian/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          question,
+          context: `事件：${selectedReminder?.title}\n详情：${selectedReminder?.description}`,
+          history: reminderChat,
+        }),
+      })
+      const data = await res.json()
+      setReminderChat(prev => [...prev, { role: 'assistant', text: data.reply || '抱歉，无法获取建议' }])
+    } catch {
+      setReminderChat(prev => [...prev, { role: 'assistant', text: '网络异常，请稍后再试' }])
+    } finally {
+      setReminderLoading(false)
+    }
   }
-}
   const sendCommand = async () => {
     if (!inputText.trim() || sending) return
     setSending(true)
