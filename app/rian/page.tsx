@@ -381,57 +381,167 @@ export default function RianPage() {
 
       {/* 详情弹窗 */}
       <AnimatePresence>
-        {selectedReminder && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            style={{ position: 'fixed', inset: 0, zIndex: 200, display: 'flex', alignItems: 'flex-end', justifyContent: 'center', padding: '0 12px 110px' }}
-            onClick={() => setSelectedReminder(null)}
-          >
-            <motion.div initial={{ y: 60, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 60, opacity: 0 }}
-              onClick={e => e.stopPropagation()}
-              style={{ width: '100%', maxWidth: '400px', background: 'rgba(255,255,255,0.35)', backdropFilter: 'blur(40px)', borderRadius: '28px', padding: '22px', border: '1px solid rgba(255,255,255,0.5)', boxShadow: '0 20px 60px rgba(0,0,0,0.1)' }}
-            >
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '14px' }}>
-                <div>
-                  <p style={{ fontSize: '10px', color: THEME.text, opacity: 0.4, letterSpacing: '0.2em', marginBottom: '4px', textTransform: 'uppercase' }}>{selectedReminder.category || '提醒'}</p>
-                  <h2 style={{ fontSize: '19px', fontWeight: 500, color: THEME.text, margin: 0 }}>{selectedReminder.title}</h2>
-                </div>
-                <X size={18} onClick={() => setSelectedReminder(null)} style={{ cursor: 'pointer', opacity: 0.4 }} />
-              </div>
-              {selectedReminder.description && (
-                <p style={{ fontSize: '13px', color: THEME.text, opacity: 0.6, lineHeight: 1.6, marginBottom: '18px' }}>{selectedReminder.description}</p>
-              )}
-              {selectedReminder.due_date && (
-                <p style={{ fontSize: '11px', color: THEME.text, opacity: 0.4, marginBottom: '18px' }}>
-                  截止：{new Date(selectedReminder.due_date).toLocaleDateString('zh-CN', { month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                </p>
-              )}
-              {selectedReminder.action_url && (
-                <a href={selectedReminder.action_url} target="_blank" rel="noreferrer"
-                  style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '11px 14px', background: 'rgba(176,141,87,0.2)', borderRadius: '14px', marginBottom: '10px', textDecoration: 'none', border: '1px solid rgba(176,141,87,0.3)' }}>
-                  <ChevronRight size={15} color={THEME.gold} />
-                  <span style={{ fontSize: '13px', color: THEME.gold, fontWeight: 600 }}>{selectedReminder.action_label || '立即处理'}</span>
-                </a>
-              )}
-              <div style={{ display: 'flex', gap: '10px' }}>
-                <button onClick={() => markDone(selectedReminder.id)}
-                  style={{ flex: 1, padding: '12px', borderRadius: '14px', background: 'rgba(141,200,160,0.4)', border: '1px solid rgba(141,200,160,0.5)', fontSize: '13px', fontWeight: 600, color: THEME.text, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
-                  <CheckCircle2 size={14} /> 已处理
-                </button>
-                <button onClick={() => snooze(selectedReminder.id)}
-                  style={{ flex: 1, padding: '12px', borderRadius: '14px', background: 'rgba(255,255,255,0.3)', border: '1px solid rgba(255,255,255,0.4)', fontSize: '13px', color: THEME.text, opacity: 0.7, cursor: 'pointer' }}>
-                  明天再说
-                </button>
-              </div>
-              {['visa', 'medical', 'school', 'utility'].includes(selectedReminder.category || '') && (
-                <button style={{ width: '100%', marginTop: '10px', padding: '10px', borderRadius: '14px', background: 'rgba(176,141,87,0.1)', border: '1px dashed rgba(176,141,87,0.4)', fontSize: '11px', color: THEME.gold, cursor: 'pointer', letterSpacing: '0.1em' }}>
-                  📄 自动生成相关文件（即将开放）
-                </button>
-              )}
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {selectedReminder && (
+  <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+    style={{ position: 'fixed', inset: 0, zIndex: 200, display: 'flex', alignItems: 'flex-end', justifyContent: 'center', padding: '0 12px 110px', background: 'rgba(0,0,0,0.3)', backdropFilter: 'blur(4px)' }}
+    onClick={() => { setSelectedReminder(null); setReminderChat([]); setReminderInput('') }}
+  >
+    <motion.div initial={{ y: 80, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 80, opacity: 0 }}
+      onClick={e => e.stopPropagation()}
+      style={{ width: '100%', maxWidth: '420px', background: 'rgba(255,255,255,0.92)', backdropFilter: 'blur(40px)', borderRadius: '28px', overflow: 'hidden', boxShadow: '0 20px 60px rgba(0,0,0,0.15)' }}
+    >
+      {/* 顶部色条 */}
+      <div style={{ height: '4px', background: selectedReminder.urgency_level === 3 ? 'linear-gradient(90deg, #FF6B6B, #FF8E53)' : selectedReminder.urgency_level === 2 ? 'linear-gradient(90deg, #F0A500, #F0C040)' : 'linear-gradient(90deg, #4A9EFF, #7BC4FF)' }} />
 
+      <div style={{ padding: '20px 20px 0' }}>
+        {/* 标题行 */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '6px' }}>
+          <div style={{ flex: 1 }}>
+            <span style={{ fontSize: '10px', color: THEME.gold, fontWeight: 600, letterSpacing: '0.15em', textTransform: 'uppercase' }}>
+              {selectedReminder.category || '提醒'}
+              {selectedReminder.due_date && ` · ${new Date(selectedReminder.due_date).toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' })}`}
+            </span>
+            <h2 style={{ fontSize: '20px', fontWeight: 600, color: THEME.text, margin: '4px 0 0', lineHeight: 1.3 }}>{selectedReminder.title}</h2>
+          </div>
+          <X size={18} onClick={() => { setSelectedReminder(null); setReminderChat([]); setReminderInput('') }} style={{ cursor: 'pointer', opacity: 0.3, marginLeft: '12px', flexShrink: 0 }} />
+        </div>
+
+        {/* 智能摘要——只显示最关键一句 */}
+        {selectedReminder.description && (() => {
+          const lines = selectedReminder.description.split('\n')
+          const advice = lines[0]
+          const actionLine = lines.find((l: string) => l.startsWith('行动清单：'))
+          const carryLine = lines.find((l: string) => l.startsWith('携带物品：'))
+          const departLine = lines.find((l: string) => l.startsWith('建议出发：'))
+          const warnLine = lines.find((l: string) => l.startsWith('注意：'))
+          const relatedLine = lines.find((l: string) => l.startsWith('顺路：'))
+
+          return (
+            <div style={{ marginTop: '12px' }}>
+              {/* 核心建议 */}
+              <div style={{ background: 'rgba(176,141,87,0.08)', borderLeft: '3px solid #B08D57', borderRadius: '0 10px 10px 0', padding: '10px 12px', marginBottom: '10px' }}>
+                <p style={{ fontSize: '13px', color: THEME.text, lineHeight: 1.7, margin: 0 }}>{advice}</p>
+              </div>
+
+              {/* 关键信息卡片 */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '10px' }}>
+                {departLine && (
+                  <div style={{ background: 'rgba(74,158,255,0.08)', borderRadius: '12px', padding: '10px 12px' }}>
+                    <div style={{ fontSize: '10px', color: '#4A9EFF', fontWeight: 600, marginBottom: '3px' }}>🕗 出发时间</div>
+                    <div style={{ fontSize: '14px', fontWeight: 600, color: THEME.text }}>{departLine.replace('建议出发：', '')}</div>
+                  </div>
+                )}
+                {carryLine && (
+                  <div style={{ background: 'rgba(141,200,160,0.1)', borderRadius: '12px', padding: '10px 12px' }}>
+                    <div style={{ fontSize: '10px', color: '#3A7A2A', fontWeight: 600, marginBottom: '3px' }}>🎒 携带</div>
+                    <div style={{ fontSize: '12px', color: THEME.text, lineHeight: 1.5 }}>
+                      {carryLine.replace('携带物品：', '').split('、').slice(0, 2).join('、')}
+                      {carryLine.replace('携带物品：', '').split('、').length > 2 ? '...' : ''}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* 行动清单 */}
+              {actionLine && (
+                <div style={{ background: 'rgba(255,255,255,0.6)', borderRadius: '12px', padding: '10px 12px', marginBottom: '8px', border: '1px solid rgba(0,0,0,0.06)' }}>
+                  <div style={{ fontSize: '10px', color: THEME.muted, fontWeight: 600, marginBottom: '6px', letterSpacing: '0.1em' }}>✅ 行动清单</div>
+                  {actionLine.replace('行动清单：', '').split('、').map((item: string, i: number) => (
+                    <div key={i} style={{ fontSize: '12px', color: THEME.text, padding: '3px 0', display: 'flex', alignItems: 'flex-start', gap: '6px' }}>
+                      <span style={{ color: THEME.gold, flexShrink: 0 }}>·</span>{item}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* 警告 */}
+              {warnLine && (
+                <div style={{ background: 'rgba(255,107,107,0.06)', borderRadius: '10px', padding: '8px 12px', marginBottom: '8px', border: '1px solid rgba(255,107,107,0.15)' }}>
+                  <div style={{ fontSize: '11px', color: '#FF6B6B', lineHeight: 1.6 }}>
+                    ⚠️ {warnLine.replace('注意：', '')}
+                  </div>
+                </div>
+              )}
+
+              {/* 顺路 */}
+              {relatedLine && (
+                <div style={{ background: 'rgba(176,141,87,0.06)', borderRadius: '10px', padding: '8px 12px', marginBottom: '8px' }}>
+                  <div style={{ fontSize: '11px', color: THEME.gold, lineHeight: 1.6 }}>
+                    🔀 {relatedLine.replace('顺路：', '')}
+                  </div>
+                </div>
+              )}
+            </div>
+          )
+        })()}
+      </div>
+
+      {/* 对话区 */}
+      {reminderChat.length > 0 && (
+        <div style={{ maxHeight: '160px', overflowY: 'auto', padding: '0 20px', marginTop: '8px' }}>
+          {reminderChat.map((msg: {role: string, text: string}, i: number) => (
+            <div key={i} style={{ marginBottom: '8px', display: 'flex', justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start' }}>
+              <div style={{
+                maxWidth: '80%', padding: '8px 12px', borderRadius: msg.role === 'user' ? '14px 14px 4px 14px' : '14px 14px 14px 4px',
+                background: msg.role === 'user' ? THEME.navy : 'rgba(255,255,255,0.8)',
+                fontSize: '12px', color: msg.role === 'user' ? '#fff' : THEME.text, lineHeight: 1.6,
+              }}>
+                {msg.text}
+              </div>
+            </div>
+          ))}
+          {reminderLoading && (
+            <div style={{ display: 'flex', gap: '4px', padding: '8px 0' }}>
+              {[0,1,2].map(i => (
+                <motion.div key={i} animate={{ opacity: [0.3, 1, 0.3] }} transition={{ duration: 1, repeat: Infinity, delay: i * 0.2 }}
+                  style={{ width: '6px', height: '6px', borderRadius: '50%', background: THEME.gold }} />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* 快捷问题 */}
+      {reminderChat.length === 0 && (
+        <div style={{ padding: '8px 20px', display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+          {['还需要准备什么？', '帮我加入日历', '有什么风险？'].map(q => (
+            <button key={q} onClick={() => askReminderQuestion(q)}
+              style={{ padding: '6px 12px', borderRadius: '20px', background: 'rgba(176,141,87,0.1)', border: '1px solid rgba(176,141,87,0.2)', fontSize: '11px', color: THEME.gold, cursor: 'pointer' }}>
+              {q}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* 输入框 */}
+      <div style={{ padding: '8px 20px 16px', display: 'flex', gap: '8px', alignItems: 'center' }}>
+        <input
+          value={reminderInput}
+          onChange={e => setReminderInput(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && askReminderQuestion(reminderInput)}
+          placeholder="问日安..."
+          style={{ flex: 1, padding: '10px 14px', borderRadius: '20px', border: '1px solid rgba(0,0,0,0.08)', background: 'rgba(255,255,255,0.6)', fontSize: '13px', color: THEME.text, outline: 'none' }}
+        />
+        <motion.button whileTap={{ scale: 0.9 }} onClick={() => askReminderQuestion(reminderInput)}
+          style={{ width: '36px', height: '36px', borderRadius: '50%', background: THEME.navy, border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}>
+          <Send size={14} color="#fff" />
+        </motion.button>
+      </div>
+
+      {/* 操作按钮 */}
+      <div style={{ padding: '0 20px 20px', display: 'flex', gap: '10px' }}>
+        <button onClick={() => markDone(selectedReminder.id)}
+          style={{ flex: 1, padding: '12px', borderRadius: '14px', background: 'rgba(141,200,160,0.4)', border: '1px solid rgba(141,200,160,0.5)', fontSize: '13px', fontWeight: 600, color: THEME.text, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+          <CheckCircle2 size={14} /> 已处理
+        </button>
+        <button onClick={() => snooze(selectedReminder.id)}
+          style={{ flex: 1, padding: '12px', borderRadius: '14px', background: 'rgba(255,255,255,0.3)', border: '1px solid rgba(255,255,255,0.4)', fontSize: '13px', color: THEME.text, opacity: 0.7, cursor: 'pointer' }}>
+          明天再说
+        </button>
+      </div>
+    </motion.div>
+  </motion.div>
+)}
       {/* 底部导航 */}
       <footer style={{ position: 'fixed', bottom: '36px', left: 0, right: 0, zIndex: 110, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '0 16px' }}>
 
