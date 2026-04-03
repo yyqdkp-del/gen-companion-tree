@@ -23,85 +23,106 @@ function detectDimension(text: string): string {
   return 'other'
 }
 
-// ══ 自动触发Make.com（非阻塞）══
-function triggerMake(extracted: any[], input_type: string) {
+// ══ 自动触发Make.com（await版，确保不被中断）══
+async function triggerMake(extracted: any[], input_type: string) {
   if (!MAKE_WEBHOOK_URL) return
   for (const e of extracted) {
     const dimension = detectDimension(
       (e.title || '') + (e.notes || '') + (e.claude_advice || '')
     )
     console.log('due_date检查:', e.due_date, '维度:', dimension)
+
     // 所有有due_date的事件自动写入Google Calendar
     if (e.due_date) {
       const startTime = new Date(e.due_date)
       const endTime = new Date(startTime)
       endTime.setHours(endTime.getHours() + 2)
-        fetch(MAKE_WEBHOOK_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          type: 'calendar',
-          title: e.title,
-          start_time: startTime.toISOString(),
-          end_time: endTime.toISOString(),
-          description: [
-            e.claude_advice,
-            e.action_items?.length ? `行动清单：${e.action_items.join('、')}` : null,
-            e.carry_items?.length ? `携带：${e.carry_items.join('、')}` : null,
-            e.warnings?.length ? `注意：${e.warnings.join('、')}` : null,
-          ].filter(Boolean).join('\n'),
-          location: '清迈',
-          dimension,
-          who: e.who,
-          priority: e.priority,
-        }),
-      }).catch(err => console.error('Make calendar error:', err))
+      try {
+        await fetch(MAKE_WEBHOOK_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            type: 'calendar',
+            title: e.title,
+            start_time: startTime.toISOString(),
+            end_time: endTime.toISOString(),
+            description: [
+              e.claude_advice,
+              e.action_items?.length ? `行动清单：${e.action_items.join('、')}` : null,
+              e.carry_items?.length ? `携带：${e.carry_items.join('、')}` : null,
+              e.warnings?.length ? `注意：${e.warnings.join('、')}` : null,
+            ].filter(Boolean).join('\n'),
+            location: '清迈',
+            dimension,
+            who: e.who,
+            priority: e.priority,
+          }),
+        })
+        console.log('Make calendar触发成功:', e.title)
+      } catch (err) {
+        console.error('Make calendar error:', err)
+      }
     }
 
     // 紧急事件额外发预警
     if (e.priority === 3) {
-      fetch(MAKE_WEBHOOK_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          type: 'urgent_alert',
-          title: e.title,
-          message: e.claude_advice || e.notes,
-          dimension,
-          who: e.who,
-          due_date: e.due_date,
-        }),
-      }).catch(err => console.error('Make urgent error:', err))
+      try {
+        await fetch(MAKE_WEBHOOK_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            type: 'urgent_alert',
+            title: e.title,
+            message: e.claude_advice || e.notes,
+            dimension,
+            who: e.who,
+            due_date: e.due_date,
+          }),
+        })
+        console.log('Make urgent触发成功:', e.title)
+      } catch (err) {
+        console.error('Make urgent error:', err)
+      }
     }
 
     // 证件类触发合规检查
     if (dimension === 'compliance') {
-      fetch(MAKE_WEBHOOK_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          type: 'compliance_check',
-          title: e.title,
-          due_date: e.due_date,
-          who: e.who,
-          notes: e.notes,
-        }),
-      }).catch(err => console.error('Make compliance error:', err))
+      try {
+        await fetch(MAKE_WEBHOOK_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            type: 'compliance_check',
+            title: e.title,
+            due_date: e.due_date,
+            who: e.who,
+            notes: e.notes,
+          }),
+        })
+        console.log('Make compliance触发成功:', e.title)
+      } catch (err) {
+        console.error('Make compliance error:', err)
+      }
     }
 
     // 教育类自动同步课表
     if (dimension === 'education') {
-      fetch(MAKE_WEBHOOK_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          type: 'education_sync',
-          title: e.title,
-          who: e.who,
-          due_date: e.due_date,
-          notes: e.notes,
-        }),
-      }).catch(err => console.error('Make education error:', err))
+      try {
+        await fetch(MAKE_WEBHOOK_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            type: 'education_sync',
+            title: e.title,
+            who: e.who,
+            due_date: e.due_date,
+            notes: e.notes,
+          }),
+        })
+        console.log('Make education触发成功:', e.title)
+      } catch (err) {
+        console.error('Make education error:', err)
+      }
     }
   }
 }
@@ -400,9 +421,9 @@ export async function POST(req: NextRequest) {
         )
       }
 
-      // 6. 自动触发Make.com（非阻塞）
+      // 6. 自动触发Make.com（await，确保完成）
       console.log('触发Make.com, 事件数:', extracted.length)
-      triggerMake(extracted, input_type)
+      await triggerMake(extracted, input_type)
     }
 
     // 7. 标记已处理
