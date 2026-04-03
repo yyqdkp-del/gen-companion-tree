@@ -26,19 +26,17 @@ function detectDimension(text: string): string {
 // ══ 自动触发Make.com（非阻塞）══
 function triggerMake(extracted: any[], input_type: string) {
   if (!MAKE_WEBHOOK_URL) return
-
   for (const e of extracted) {
     const dimension = detectDimension(
       (e.title || '') + (e.notes || '') + (e.claude_advice || '')
     )
-
+    console.log('due_date检查:', e.due_date, '维度:', dimension)
     // 所有有due_date的事件自动写入Google Calendar
     if (e.due_date) {
       const startTime = new Date(e.due_date)
       const endTime = new Date(startTime)
       endTime.setHours(endTime.getHours() + 2)
-
-      fetch(MAKE_WEBHOOK_URL, {
+        fetch(MAKE_WEBHOOK_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
