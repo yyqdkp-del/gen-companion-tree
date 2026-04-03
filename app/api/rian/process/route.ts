@@ -1,6 +1,113 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
+const MAKE_WEBHOOK_URL = process.env.NEXT_PUBLIC_MAKE_WEBHOOK_URL || ''
+
+// ══ 9维度分类 ══
+const DIMENSION_MAP: Record<string, string[]> = {
+  compliance: ['签证', '护照', '驾照', '税务', '合同', '保险', '移民', '公证', '报到', '续签'],
+  estate: ['房产', '物业', '水电', '保养', '维修', '家政', '搬家', '装修', '安防'],
+  logistics: ['购物', '采购', '快递', '包裹', '食谱', '库存', '药品', '消耗'],
+  education: ['学校', '课表', '成绩', '作业', '考试', '兴趣班', '留学', '奖学金', '中文'],
+  social: ['生日', '婚礼', '葬礼', '礼物', '聚会', '派对', '亲友', '配偶', '纪念'],
+  wealth: ['账单', '银行', '贷款', '投资', '保险', '退订', '理财', '信用卡', '财务'],
+  medical: ['看病', '医院', '复诊', '体检', '药', '疫苗', '手术', '诊断', '处方'],
+  mobility: ['机票', '酒店', '旅行', '签证', '出行', '路书', '行程', '导航'],
+  selfcare: ['睡眠', '冥想', '运动', '学习', '书单', '影单', '自我', '成长'],
+}
+
+function detectDimension(text: string): string {
+  for (const [dim, keywords] of Object.entries(DIMENSION_MAP)) {
+    if (keywords.some(k => text.includes(k))) return dim
+  }
+  return 'other'
+}
+
+// ══ 自动触发Make.com（非阻塞）══
+function triggerMake(extracted: any[], input_type: string) {
+  if (!MAKE_WEBHOOK_URL) return
+
+  for (const e of extracted) {
+    const dimension = detectDimension(
+      (e.title || '') + (e.notes || '') + (e.claude_advice || '')
+    )
+
+    // 所有有due_date的事件自动写入Google Calendar
+    if (e.due_date) {
+      const startTime = new Date(e.due_date)
+      const endTime = new Date(startTime)
+      endTime.setHours(endTime.getHours() + 2)
+
+      fetch(MAKE_WEBHOOK_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'calendar',
+          title: e.title,
+          start_time: startTime.toISOString(),
+          end_time: endTime.toISOString(),
+          description: [
+            e.claude_advice,
+            e.action_items?.length ? `行动清单：${e.action_items.join('、')}` : null,
+            e.carry_items?.length ? `携带：${e.carry_items.join('、')}` : null,
+            e.warnings?.length ? `注意：${e.warnings.join('、')}` : null,
+          ].filter(Boolean).join('\n'),
+          location: '清迈',
+          dimension,
+          who: e.who,
+          priority: e.priority,
+        }),
+      }).catch(err => console.error('Make calendar error:', err))
+    }
+
+    // 紧急事件额外发预警
+    if (e.priority === 3) {
+      fetch(MAKE_WEBHOOK_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'urgent_alert',
+          title: e.title,
+          message: e.claude_advice || e.notes,
+          dimension,
+          who: e.who,
+          due_date: e.due_date,
+        }),
+      }).catch(err => console.error('Make urgent error:', err))
+    }
+
+    // 证件类触发合规检查
+    if (dimension === 'compliance') {
+      fetch(MAKE_WEBHOOK_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'compliance_check',
+          title: e.title,
+          due_date: e.due_date,
+          who: e.who,
+          notes: e.notes,
+        }),
+      }).catch(err => console.error('Make compliance error:', err))
+    }
+
+    // 教育类自动同步课表
+    if (dimension === 'education') {
+      fetch(MAKE_WEBHOOK_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'education_sync',
+          title: e.title,
+          who: e.who,
+          due_date: e.due_date,
+          notes: e.notes,
+        }),
+      }).catch(err => console.error('Make education error:', err))
+    }
+  }
+}
+
 // ══ Gemini语音转文字 ══
 async function transcribeAudio(fileUrl: string): Promise<string> {
   try {
@@ -70,13 +177,11 @@ async function getFamilyContext(supabase: any, user_id: string | null): Promise<
       supabase.from('family_places').select('*'),
       supabase.from('family_habits').select('*'),
     ])
-    
     const recentEvents = await supabase
       .from('events')
       .select('title, category, due_date, notes')
       .order('created_at', { ascending: false })
       .limit(20)
-
     return JSON.stringify({
       members: profiles.data || [],
       places: places.data || [],
@@ -90,7 +195,7 @@ async function getFamilyContext(supabase: any, user_id: string | null): Promise<
 
 // ══ 判断需要搜索的关键词 ══
 function buildGrokQuery(content: string): string | null {
-  const keywords = {
+  const keywords: Record<string, string[]> = {
     medical: ['看病', '医院', '复诊', '体检', '生病', '发烧', '药', '诊所'],
     weather: ['出门', '外出', '天气', '下雨', '台风', '雾霾', '空气'],
     traffic: ['开车', '堵车', '路况', '接送', '出发'],
@@ -105,10 +210,9 @@ function buildGrokQuery(content: string): string | null {
   for (const [type, words] of Object.entries(keywords)) {
     if (words.some(w => content.includes(w))) matched.push(type)
   }
-
   if (matched.length === 0) return null
 
-  const queryParts: string[] = [`今天清迈最新情况：`]
+  const queryParts: string[] = ['今天清迈最新情况：']
   if (matched.includes('medical')) queryParts.push('各大医院排队等待时间、是否有传染病流行')
   if (matched.includes('weather')) queryParts.push('今明两天天气预报、空气质量指数')
   if (matched.includes('traffic')) queryParts.push('清迈市区主要道路交通状况')
@@ -154,8 +258,8 @@ ${grokInfo || '暂无实时信息'}
     "related_tasks": ["顺路可以做的事1", "顺路可以做的事2"],
     "learn_pattern": {
       "type": "消费|医疗|出行|社交|其他",
-      "cycle_days": 周期天数或null,
-      "last_occurrence": "上次发生时间或null",
+      "cycle_days": null,
+      "last_occurrence": null,
       "pattern_note": "规律描述"
     }
   }
@@ -295,11 +399,15 @@ export async function POST(req: NextRequest) {
             last_done: e.learn_pattern.last_occurrence || null,
             notes: e.learn_pattern.pattern_note || e.title,
           }))
-        ).select()
+        )
       }
+
+      // 6. 自动触发Make.com（非阻塞）
+      console.log('触发Make.com, 事件数:', extracted.length)
+      triggerMake(extracted, input_type)
     }
 
-    // 6. 标记已处理
+    // 7. 标记已处理
     await supabase.from('raw_inputs').update({
       processed: true,
       extracted_events: extracted,
