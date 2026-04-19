@@ -231,13 +231,13 @@ export async function POST(req: NextRequest) {
   }
   
   const existingData = todo.ai_action_data || {}
-  await supabase.from('todo_items').update({
-    ai_action_data: {
-      ...existingData,
-      execution_pack: finalObject,
-      prepared_at: new Date().toISOString(),
-    }
-  }).eq('id', todo_id).eq('user_id', user_id)
+ await supabase.from('todo_items').update({
+  ai_action_data: {
+    ...existingData,
+    execution_pack: finalObject,
+    prepared_at: new Date().toISOString(),
+  }
+}).eq('id', todo_id).eq('user_id', user_id)
   console.log('存库完成:', todo_id)
 }
 
