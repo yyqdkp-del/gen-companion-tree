@@ -214,28 +214,32 @@ export async function POST(req: NextRequest) {
       schema: ExecutionPackSchema,
       maxTokens: 8000,
       prompt: buildPrompt(todo, brainInstruction, familyData, grokResult),
-      onFinish: async ({ object }) => {
-        if (!object) return
-        // PDF 数据填充
-        if (object.actions) {
-          object.actions = object.actions.map((action: any) => {
-            if (action.type === 'download_pdf' && action.data?.pdf_type) {
-              action.data.pdf_data = buildPDFData(action.data.pdf_type, familyData)
-            }
-            return action
-          })
-        }
-        const existingData = todo.ai_action_data || {}
-        await supabase.from('todo_items').update({
-          ai_action_data: {
-            ...existingData,
-            execution_pack: object,
-            prepared_at: new Date().toISOString(),
-          }
-        }).eq('id', todo_id).eq('user_id', user_id)
-        console.log('存库完成:', todo_id)
+    onFinish: async ({ object }) => {
+  if (!object) return
+  
+  // 深拷贝，避免直接修改只读对象
+  const finalObject: any = JSON.parse(JSON.stringify(object))
+  
+  // PDF 数据填充
+  if (finalObject.actions) {
+    finalObject.actions = finalObject.actions.map((action: any) => {
+      if (action.type === 'download_pdf' && action.data?.pdf_type) {
+        action.data.pdf_data = buildPDFData(action.data.pdf_type, familyData)
       }
+      return action
     })
+  }
+  
+  const existingData = todo.ai_action_data || {}
+  await supabase.from('todo_items').update({
+    ai_action_data: {
+      ...existingData,
+      execution_pack: finalObject,
+      prepared_at: new Date().toISOString(),
+    }
+  }).eq('id', todo_id).eq('user_id', user_id)
+  console.log('存库完成:', todo_id)
+}
 
     return result.toTextStreamResponse()
 
