@@ -7,6 +7,5 @@ const nextConfig: NextConfig = {
     ignoreDuringBuilds: true,
   },
   productionBrowserSourceMaps: false,
-  output: 'standalone',
 };
 export default nextConfig;
