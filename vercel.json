@@ -1,0 +1,58 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/reminders",
+      "schedule": "30 23 * * *"
+    },
+    {
+      "path": "/api/cron/patrol",
+      "schedule": "30 23 * * *"
+    },
+    {
+      "path": "/api/cron/patrol",
+      "schedule": "30 5 * * *"
+    },
+    {
+      "path": "/api/cron/patrol",
+      "schedule": "30 8 * * *"
+    },
+    {
+      "path": "/api/cron/patrol",
+      "schedule": "30 13 * * *"
+    },
+    {
+      "path": "/api/cron/gmail-scan",
+      "schedule": "0 0 * * *"
+    },
+    {
+      "path": "/api/cron/gmail-scan",
+      "schedule": "0 6 * * *"
+    },
+    {
+      "path": "/api/cron/gmail-scan",
+      "schedule": "0 9 * * *"
+    },
+    {
+      "path": "/api/cron/gmail-scan",
+      "schedule": "0 12 * * *"
+    },
+    {
+      "path": "/api/cron/prepare-actions",
+      "schedule": "0 2 * * *"
+    }
+  ],
+  "functions": {
+    "app/api/todo/smart-action/route.ts": {
+      "maxDuration": 300
+    },
+    "app/api/rian/process/route.ts": {
+      "maxDuration": 300
+    },
+    "app/api/base/patrol/route.ts": {
+      "maxDuration": 300
+    },
+    "app/api/cron/prepare-actions/route.ts": {
+      "maxDuration": 60
+    }
+  }
+}

@@ -1,12 +1,9 @@
 'use client'
 import InstallPWA from '@/app/components/InstallPWA'
-import { experimental_useObject as useObject } from 'ai/react'
-import { ExecutionPackSchema } from '@/app/lib/schemas'
 import React, { useEffect, useState, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@supabase/supabase-js'
 import { motion, AnimatePresence } from 'framer-motion'
-import { experimental_useObject as useObject } from 'ai/react'
 import {
   X, Plus, ChevronRight, CheckCircle2, Bell,
   Zap, Heart, AlertTriangle, Clock, Home as HomeIcon,
@@ -864,18 +861,11 @@ export default function BasePage() {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const cameraInputRef = useRef<HTMLInputElement>(null)
   const [actionFeedback, setActionFeedback] = useState<string | null>(null)
-  const {
-  object: executionPack,
-  submit: submitSmartAction,
-  isLoading: smartLoading,
-  stop: stopSmartAction,
-} = useObject({
-  api: '/api/todo/smart-action',
-  schema: ExecutionPackSchema,
-})
-const [actionStates, setActionStates] = useState<ActionState[]>([])
-const [executeAllRunning, setExecuteAllRunning] = useState(false)
-const [executeAllDone, setExecuteAllDone] = useState(false)
+  const [executionPack, setExecutionPack] = useState<any>(null)
+  const [smartLoading, setSmartLoading] = useState(false)
+  const [actionStates, setActionStates] = useState<ActionState[]>([])
+  const [executeAllRunning, setExecuteAllRunning] = useState(false)
+  const [executeAllDone, setExecuteAllDone] = useState(false)
   const [showInstall, setShowInstall] = useState(false)
   const [mounted, setMounted] = useState(false)
 
@@ -1141,15 +1131,66 @@ const [executeAllDone, setExecuteAllDone] = useState(false)
   }
 
 const handleOneTap = async (todo: TodoItem) => {
+  // 有有效缓存直接秒出
   const existingPack = todo.ai_action_data?.execution_pack
   if (existingPack && existingPack.actions?.length > 0) {
-    setActionStates((existingPack.actions || []).map(() => ({ status: 'idle' as ActionStatus })))
+    setExecutionPack(existingPack)
+    setActionStates(existingPack.actions.map(() => ({ status: 'idle' as ActionStatus })))
     return
   }
-  setActionStates([])
-  setExecuteAllRunning(false)
-  setExecuteAllDone(false)
-  submitSmartAction({ todo_id: todo.id, user_id: userId })
+
+  setSmartLoading(true)
+  setExecutionPack(null)
+
+  try {
+    const res = await fetch('/api/todo/smart-action', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ todo_id: todo.id, user_id: userId })
+    })
+
+    // ★ 读取 stream
+    const reader = res.body!.getReader()
+    const decoder = new TextDecoder()
+    let fullText = ''
+
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      fullText += decoder.decode(value)
+
+      // 每收到一块就尝试解析，能解析出来就更新UI
+      try {
+        const cleaned = fullText.replace(/```json|```/g, '').trim()
+        const match = cleaned.match(/\{[\s\S]*\}/)
+        if (match) {
+          const partial = JSON.parse(match[0])
+          // 只要有 summary 就先显示
+          if (partial.summary) {
+            setExecutionPack(partial)
+            setSmartLoading(false)
+          }
+        }
+      } catch {}
+    }
+
+    // stream 结束，最终解析完整内容
+    try {
+      const cleaned = fullText.replace(/```json|```/g, '').trim()
+      const final = JSON.parse(cleaned.match(/\{[\s\S]*\}/)?.[0] || '{}')
+      if (final.actions?.length > 0) {
+        setExecutionPack(final)
+        setActionStates(final.actions.map(() => ({ status: 'idle' as ActionStatus })))
+      }
+    } catch {}
+
+  } catch (e) {
+    console.error(e)
+    setActionFeedback('❌ 网络错误')
+    setTimeout(() => setActionFeedback(null), 3000)
+  }
+
+  setSmartLoading(false)
 }
 
   const handlePatrol = async () => {
