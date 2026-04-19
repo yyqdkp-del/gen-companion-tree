@@ -242,4 +242,5 @@ export async function POST(req: NextRequest) {
   } catch (e: any) {
     console.error('Smart action error:', e?.message)
     return NextResponse.json({ ok: false, error: e?.message }, { status: 500 })
-  }
+    }
+}
