@@ -1,17 +1,14 @@
 'use client'
-
 import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
-import { createClient } from '@supabase/supabase-js'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
-  Home as HomeIcon, FileText, ShoppingCart, Pill, Building2,
-  Plane, CheckCircle2, Clock, ChevronRight,
+  FileText, ShoppingCart, Pill, Building2,
+  Plane, CheckCircle2, Clock,
   X, Mic, Camera, Send, Square, Loader, Upload
 } from 'lucide-react'
-
+import TodoDetailModal from './components/TodoDetailModal'
 export const dynamic = 'force-dynamic'
-
 import { createBrowserClient } from '@supabase/ssr'
 import { useApp } from '@/app/context/AppContext'
 const supabase = createBrowserClient(
@@ -488,167 +485,13 @@ const startRecording = async () => {
       })}
 
       {/* 详情弹窗 */}
-      <AnimatePresence>
-        {selectedReminder && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            style={{ position: 'fixed', inset: 0, zIndex: 200, display: 'flex', alignItems: 'flex-end', justifyContent: 'center', padding: `0 12px max(calc(env(safe-area-inset-bottom) + 80px), 110px)`, background: 'rgba(0,0,0,0.3)', backdropFilter: 'blur(4px)' }}
-            onClick={() => { setSelectedReminder(null); setReminderChat([]); setReminderInput('') }}
-          >
-            <motion.div initial={{ y: 80, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 80, opacity: 0 }}
-              onClick={e => e.stopPropagation()}
-              style={{ width: '100%', maxWidth: 420, background: 'rgba(255,255,255,0.92)', backdropFilter: 'blur(40px)', borderRadius: 28, overflow: 'hidden', boxShadow: '0 20px 60px rgba(0,0,0,0.15)', maxHeight: '80vh', overflowY: 'auto' }}
-            >
-              <div style={{ height: 4, background: selectedReminder.urgency_level === 3 ? 'linear-gradient(90deg, #FF6B6B, #FF8E53)' : selectedReminder.urgency_level === 2 ? 'linear-gradient(90deg, #F0A500, #F0C040)' : 'linear-gradient(90deg, #4A9EFF, #7BC4FF)' }} />
-
-              <div style={{ padding: '20px 20px 0' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 }}>
-                  <div style={{ flex: 1 }}>
-                    <span style={{ fontSize: 10, color: THEME.gold, fontWeight: 600, letterSpacing: '0.15em', textTransform: 'uppercase' }}>
-                      {selectedReminder.category || '提醒'}
-                      {selectedReminder.due_date && ` · ${new Date(selectedReminder.due_date).toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' })}`}
-                    </span>
-                    <h2 style={{ fontSize: 20, fontWeight: 600, color: THEME.text, margin: '4px 0 0', lineHeight: 1.3 }}>{selectedReminder.title}</h2>
-                  </div>
-                  <X size={18} onClick={() => { setSelectedReminder(null); setReminderChat([]); setReminderInput('') }} style={{ cursor: 'pointer', opacity: 0.3, marginLeft: 12, flexShrink: 0 }} />
-                </div>
-
-                {selectedReminder.description && (() => {
-                  const lines = selectedReminder.description.split('\n')
-                  const advice = lines[0]
-                  const actionLine = lines.find((l: string) => l.startsWith('行动清单：'))
-                  const carryLine = lines.find((l: string) => l.startsWith('携带物品：'))
-                  const departLine = lines.find((l: string) => l.startsWith('建议出发：'))
-                  const warnLine = lines.find((l: string) => l.startsWith('注意：'))
-                  const relatedLine = lines.find((l: string) => l.startsWith('顺路：'))
-
-                  return (
-                    <div style={{ marginTop: 12 }}>
-                      <div style={{ background: 'rgba(176,141,87,0.08)', borderLeft: '3px solid #B08D57', borderRadius: '0 10px 10px 0', padding: '10px 12px', marginBottom: 10 }}>
-                        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
-  <p style={{ fontSize: 13, color: THEME.text, lineHeight: 1.7, margin: 0, flex: 1 }}>{advice}</p>
-  <button
-    onClick={() => {
-      if (window.speechSynthesis) {
-        window.speechSynthesis.cancel()
-        const u = new SpeechSynthesisUtterance(advice)
-        u.lang = 'zh-CN'
-        u.rate = 0.9
-        window.speechSynthesis.speak(u)
-      }
-    }}
-    style={{ flexShrink: 0, background: 'none', border: 'none', cursor: 'pointer', opacity: 0.4, padding: 4 }}
-  >
-    🔊
-  </button>
-</div>
-                      </div>
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 10 }}>
-                        {departLine && (
-                          <div style={{ background: 'rgba(74,158,255,0.08)', borderRadius: 12, padding: '10px 12px' }}>
-                            <div style={{ fontSize: 10, color: '#4A9EFF', fontWeight: 600, marginBottom: 3 }}>🕗 出发时间</div>
-                            <div style={{ fontSize: 14, fontWeight: 600, color: THEME.text }}>{departLine.replace('建议出发：', '')}</div>
-                          </div>
-                        )}
-                        {carryLine && (
-                          <div style={{ background: 'rgba(141,200,160,0.1)', borderRadius: 12, padding: '10px 12px' }}>
-                            <div style={{ fontSize: 10, color: '#3A7A2A', fontWeight: 600, marginBottom: 3 }}>🎒 携带</div>
-                            <div style={{ fontSize: 12, color: THEME.text, lineHeight: 1.5 }}>
-                              {carryLine.replace('携带物品：', '').split('、').slice(0, 2).join('、')}
-                              {carryLine.replace('携带物品：', '').split('、').length > 2 ? '...' : ''}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                      {actionLine && (
-                        <div style={{ background: 'rgba(255,255,255,0.6)', borderRadius: 12, padding: '10px 12px', marginBottom: 8, border: '1px solid rgba(0,0,0,0.06)' }}>
-                          <div style={{ fontSize: 10, color: THEME.muted, fontWeight: 600, marginBottom: 6, letterSpacing: '0.1em' }}>✅ 行动清单</div>
-                          {actionLine.replace('行动清单：', '').split('、').map((item: string, i: number) => (
-                            <div key={i} style={{ fontSize: 12, color: THEME.text, padding: '3px 0', display: 'flex', alignItems: 'flex-start', gap: 6 }}>
-                              <span style={{ color: THEME.gold, flexShrink: 0 }}>·</span>{item}
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                      {warnLine && (
-                        <div style={{ background: 'rgba(255,107,107,0.06)', borderRadius: 10, padding: '8px 12px', marginBottom: 8, border: '1px solid rgba(255,107,107,0.15)' }}>
-                          <div style={{ fontSize: 11, color: '#FF6B6B', lineHeight: 1.6 }}>⚠️ {warnLine.replace('注意：', '')}</div>
-                        </div>
-                      )}
-                      {relatedLine && (
-                        <div style={{ background: 'rgba(176,141,87,0.06)', borderRadius: 10, padding: '8px 12px', marginBottom: 8 }}>
-                          <div style={{ fontSize: 11, color: THEME.gold, lineHeight: 1.6 }}>🔀 {relatedLine.replace('顺路：', '')}</div>
-                        </div>
-                      )}
-                    </div>
-                  )
-                })()}
-              </div>
-
-              {reminderChat.length > 0 && (
-                <div style={{ maxHeight: 160, overflowY: 'auto', padding: '0 20px', marginTop: 8 }}>
-                  {reminderChat.map((msg: {role: string, text: string}, i: number) => (
-                    <div key={i} style={{ marginBottom: 8, display: 'flex', justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start' }}>
-                      <div style={{
-                        maxWidth: '80%', padding: '8px 12px',
-                        borderRadius: msg.role === 'user' ? '14px 14px 4px 14px' : '14px 14px 14px 4px',
-                        background: msg.role === 'user' ? THEME.navy : 'rgba(255,255,255,0.8)',
-                        fontSize: 12, color: msg.role === 'user' ? '#fff' : THEME.text, lineHeight: 1.6,
-                      }}>
-                        {msg.text}
-                      </div>
-                    </div>
-                  ))}
-                  {reminderLoading && (
-                    <div style={{ display: 'flex', gap: 4, padding: '8px 0' }}>
-                      {[0,1,2].map(i => (
-                        <motion.div key={i} animate={{ opacity: [0.3, 1, 0.3] }} transition={{ duration: 1, repeat: Infinity, delay: i * 0.2 }}
-                          style={{ width: 6, height: 6, borderRadius: '50%', background: THEME.gold }} />
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {reminderChat.length === 0 && (
-                <div style={{ padding: '8px 20px', display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                  {['还需要准备什么？', '帮我加入日历', '有什么风险？'].map(q => (
-                    <button key={q} onClick={() => askReminderQuestion(q)}
-                      style={{ padding: '6px 12px', borderRadius: 20, background: 'rgba(176,141,87,0.1)', border: '1px solid rgba(176,141,87,0.2)', fontSize: 11, color: THEME.gold, cursor: 'pointer' }}>
-                      {q}
-                    </button>
-                  ))}
-                </div>
-              )}
-
-              <div style={{ padding: '8px 20px 16px', display: 'flex', gap: 8, alignItems: 'center' }}>
-                <input
-                  value={reminderInput}
-                  onChange={e => setReminderInput(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && askReminderQuestion(reminderInput)}
-                  placeholder="问日安..."
-                  style={{ flex: 1, padding: '10px 14px', borderRadius: 20, border: '1px solid rgba(0,0,0,0.08)', background: 'rgba(255,255,255,0.6)', fontSize: 13, color: THEME.text, outline: 'none' }}
-                />
-                <motion.button whileTap={{ scale: 0.9 }} onClick={() => askReminderQuestion(reminderInput)}
-                  style={{ width: 36, height: 36, borderRadius: '50%', background: THEME.navy, border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}>
-                  <Send size={14} color="#fff" />
-                </motion.button>
-              </div>
-
-              <div style={{ padding: '0 20px 20px', display: 'flex', gap: 10 }}>
-                <button onClick={() => markDone(selectedReminder.id)}
-                  style={{ flex: 1, padding: 12, borderRadius: 14, background: 'rgba(141,200,160,0.4)', border: '1px solid rgba(141,200,160,0.5)', fontSize: 13, fontWeight: 600, color: THEME.text, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-                  <CheckCircle2 size={14} /> 已处理
-                </button>
-                <button onClick={() => snooze(selectedReminder.id)}
-                  style={{ flex: 1, padding: 12, borderRadius: 14, background: 'rgba(255,255,255,0.3)', border: '1px solid rgba(255,255,255,0.4)', fontSize: 13, color: THEME.text, opacity: 0.7, cursor: 'pointer' }}>
-                  明天再说
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
+     <TodoDetailModal
+  reminder={selectedReminder}
+  userId={userId || ''}
+  onClose={() => setSelectedReminder(null)}
+  onDone={markDone}
+  onSnooze={snooze}
+/>
     </main>
   )
 }
