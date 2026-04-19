@@ -2,7 +2,7 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, CheckCircle2, Send, Navigation, Phone, Mail, Calendar, Download, ExternalLink, CreditCard, ShoppingBag, Loader, ChevronRight } from 'lucide-react'
-import { experimental_useObject as useObject } from 'ai/react'
+import { useObject } from 'ai/react'
 import { z } from 'zod'
 
 const THEME = {
