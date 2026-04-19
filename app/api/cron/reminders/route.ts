@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic'
 // app/api/cron/reminders/route.ts
 // 每天早上检查三级提醒链，推送到热点水珠
 

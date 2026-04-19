@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic'
 // app/api/email/parse/route.ts
 // 统一邮件解析入口：Make.com webhook + Gmail MCP定时扫描 都走这里
 

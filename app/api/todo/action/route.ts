@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic'
 // app/api/todo/action/route.ts
 // 一键办理执行：根据ai_action_type执行对应操作
 

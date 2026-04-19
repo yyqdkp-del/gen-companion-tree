@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic'
 // app/api/cron/gmail-scan/route.ts
 // Vercel Cron Job：每天4次自动扫描Gmail，兜底Make.com
 // 使用fetch调用Anthropic API，无需额外安装SDK
