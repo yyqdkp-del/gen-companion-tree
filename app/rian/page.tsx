@@ -7,7 +7,7 @@ import {
   Plane, CheckCircle2, Clock,
   X, Mic, Camera, Send, Square, Loader, Upload
 } from 'lucide-react'
-import TodoDetailModal from './components/TodoDetailModal'
+import TodoDetailModal from './TodoDetailModal'
 export const dynamic = 'force-dynamic'
 import { createBrowserClient } from '@supabase/ssr'
 import { useApp } from '@/app/context/AppContext'
