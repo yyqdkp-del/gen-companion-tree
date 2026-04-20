@@ -561,11 +561,7 @@ function AddChildSheet({ onClose, onSave }: { onClose: () => void; onSave: (d: a
                 ? <><CheckCircle2 size={16} /> 已全部完成</>
                 : <><Zap size={16} /> 全部执行</>
               }
-            </motion.button>
-          </div>
-        </>
-      )}
-
+           
       {/* 没有执行包时的fallback */}
       {!smartLoading && !executionPack && (
         <div style={{ textAlign: 'center', padding: '20px 0', opacity: 0.5, fontSize: 13, color: THEME.text }}>
