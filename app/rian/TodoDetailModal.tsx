@@ -1,8 +1,13 @@
 'use client'
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, CheckCircle2, Send, Navigation, Phone, Mail, Calendar, Download, ExternalLink, CreditCard, ShoppingBag, Loader, ChevronRight } from 'lucide-react'
+import {
+  X, CheckCircle2, Navigation, Phone, Mail, Calendar,
+  Download, ExternalLink, CreditCard, ShoppingBag, Loader,
+  ClipboardList, ShoppingCart, FileText, Volume2, ChevronDown,
+} from 'lucide-react'
 
+// ── 主题色（与原版一致）──
 const THEME = {
   text: '#2C3E50',
   gold: '#B08D57',
@@ -10,6 +15,17 @@ const THEME = {
   navy: '#1A3C5E',
 }
 
+// ── 绿色系常量 ──
+const G = {
+  bg: '#E1F5EE',
+  border: '#9FE1CB',
+  mid: '#5DCAA5',
+  deep: '#1D9E75',
+  dark: '#0F6E56',
+  darkest: '#085041',
+}
+
+// ── 类型 ──
 type ExecutionPack = {
   summary?: string
   checklist?: { item: string; status: string; note?: string }[]
@@ -31,6 +47,7 @@ type ExecutionPack = {
       note?: string
       item?: string
       channel?: string
+      official_url?: string
     }
   }[]
   draft?: string
@@ -69,32 +86,27 @@ function executeAction(action: any, userId: string) {
   const data = action.data || {}
   switch (action.type) {
     case 'navigate':
-      window.open(data.url, '_blank')
-      break
+      window.open(data.url, '_blank'); break
     case 'call':
-      window.open(`tel:${data.phone}`)
-      break
+      window.open(`tel:${data.phone}`); break
     case 'whatsapp':
-      window.open(`https://wa.me/${data.phone?.replace(/\D/g, '')}?text=${encodeURIComponent(data.message || '')}`, '_blank')
-      break
+      window.open(`https://wa.me/${data.phone?.replace(/\D/g, '')}?text=${encodeURIComponent(data.message || '')}`, '_blank'); break
     case 'email':
-      window.open(`mailto:${data.email_to}?subject=${encodeURIComponent(data.email_subject || '')}&body=${encodeURIComponent(data.email_body || '')}`)
-      break
-    case 'calendar':
+      window.open(`mailto:${data.email_to}?subject=${encodeURIComponent(data.email_subject || '')}&body=${encodeURIComponent(data.email_body || '')}`); break
+    case 'calendar': {
       const start = `${data.calendar_date}T${data.calendar_time || '09:00'}:00`
       const end = `${data.calendar_date}T${data.calendar_time || '10:00'}:00`
       window.open(`https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(data.calendar_title || '')}&dates=${start.replace(/[-:]/g, '')}/${end.replace(/[-:]/g, '')}&location=${encodeURIComponent(data.calendar_location || '')}`, '_blank')
       break
+    }
     case 'open_url':
     case 'download_pdf':
-      window.open(data.url || data.official_url, '_blank')
-      break
-    case 'buy':
-      const channel = data.channel === 'shopee' ? 'https://shopee.co.th/search?keyword=' : 'https://www.lazada.co.th/catalog/?q='
-      window.open(channel + encodeURIComponent(data.item || ''), '_blank')
-      break
-    default:
-      break
+      window.open(data.url || data.official_url, '_blank'); break
+    case 'buy': {
+      const ch = data.channel === 'shopee' ? 'https://shopee.co.th/search?keyword=' : 'https://www.lazada.co.th/catalog/?q='
+      window.open(ch + encodeURIComponent(data.item || ''), '_blank'); break
+    }
+    default: break
   }
   if (action.type === 'email' || action.type === 'calendar') {
     fetch('/api/todo/smart-action', {
@@ -105,115 +117,379 @@ function executeAction(action: any, userId: string) {
   }
 }
 
+// ── 动作图标 ──
 const ACTION_ICON: Record<string, React.ReactNode> = {
-  navigate: <Navigation size={14} />,
-  call: <Phone size={14} />,
-  email: <Mail size={14} />,
-  whatsapp: <Phone size={14} />,
-  calendar: <Calendar size={14} />,
-  download_pdf: <Download size={14} />,
-  open_url: <ExternalLink size={14} />,
-  pay: <CreditCard size={14} />,
-  buy: <ShoppingBag size={14} />,
+  navigate:     <Navigation size={15} />,
+  call:         <Phone size={15} />,
+  email:        <Mail size={15} />,
+  whatsapp:     <Phone size={15} />,
+  calendar:     <Calendar size={15} />,
+  download_pdf: <Download size={15} />,
+  open_url:     <ExternalLink size={15} />,
+  pay:          <CreditCard size={15} />,
+  buy:          <ShoppingBag size={15} />,
 }
 
-// ── 执行包展示 ──
-function ExecutionPackView({ pack, isLoading }: { pack: ExecutionPack, isLoading: boolean }) {
-  return (
-    <div style={{ padding: '0 20px 16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+// ── 动作按钮颜色 ──
+const ACTION_COLOR: Record<string, { bg: string; icon: string }> = {
+  email:        { bg: '#E1F5EE', icon: G.dark },
+  navigate:     { bg: '#E6F1FB', icon: '#185FA5' },
+  call:         { bg: '#EAF3DE', icon: '#3B6D11' },
+  download_pdf: { bg: '#EEEDFE', icon: '#534AB7' },
+  open_url:     { bg: '#EEEDFE', icon: '#534AB7' },
+  calendar:     { bg: '#FAEEDA', icon: '#854F0B' },
+  buy:          { bg: '#FBEAF0', icon: '#993556' },
+  pay:          { bg: '#FBEAF0', icon: '#993556' },
+  whatsapp:     { bg: '#EAF3DE', icon: '#3B6D11' },
+}
 
-      {pack.summary && (
-        <div style={{ background: 'rgba(176,141,87,0.08)', borderLeft: '3px solid #B08D57', borderRadius: '0 10px 10px 0', padding: '10px 12px' }}>
-          <div style={{ fontSize: 10, color: THEME.gold, fontWeight: 600, marginBottom: 4, letterSpacing: '0.1em' }}>根帮你查了</div>
-          <p style={{ fontSize: 13, color: THEME.text, lineHeight: 1.7, margin: 0 }}>{pack.summary}</p>
+// ── 语音播报 ──
+function speak(text: string) {
+  if (typeof window === 'undefined' || !window.speechSynthesis) return
+  window.speechSynthesis.cancel()
+  const u = new SpeechSynthesisUtterance(text)
+  u.lang = 'zh-CN'
+  u.rate = 0.95
+  window.speechSynthesis.speak(u)
+}
+
+// ── 小型语音按钮 ──
+function VoiceBtn({ text }: { text: string }) {
+  const [active, setActive] = useState(false)
+  const handle = () => {
+    speak(text)
+    setActive(true)
+    setTimeout(() => setActive(false), 1200)
+  }
+  return (
+    <motion.button
+      whileTap={{ scale: 0.88 }}
+      onClick={handle}
+      style={{
+        display: 'flex', alignItems: 'center', gap: 3,
+        padding: '4px 8px', borderRadius: 20,
+        border: `0.5px solid ${G.border}`,
+        background: active ? G.mid : 'rgba(255,255,255,0.55)',
+        cursor: 'pointer', flexShrink: 0,
+      }}
+    >
+      <Volume2 size={11} color={active ? '#fff' : G.dark} />
+      <span style={{ fontSize: 10, color: active ? '#fff' : G.dark, fontWeight: 500 }}>播报</span>
+    </motion.button>
+  )
+}
+
+// ── 携带物品 tag ──
+function CarryTag({ label }: { label: string }) {
+  const [done, setDone] = useState(false)
+  return (
+    <motion.div
+      whileTap={{ scale: 0.88 }}
+      onClick={() => setDone(p => !p)}
+      style={{
+        display: 'flex', alignItems: 'center', gap: 4,
+        fontSize: 11, padding: '5px 10px', borderRadius: 20,
+        background: done ? G.bg : 'rgba(255,255,255,0.5)',
+        color: done ? G.darkest : THEME.text,
+        border: `0.5px solid ${done ? G.mid : 'rgba(0,0,0,0.08)'}`,
+        cursor: 'pointer', userSelect: 'none',
+        transition: 'background 0.15s, color 0.15s, border-color 0.15s',
+      }}
+    >
+      {done && (
+        <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+          <polyline points="1.5,5 4,7.5 8.5,2.5" stroke={G.deep} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      )}
+      {label}
+    </motion.div>
+  )
+}
+
+// ── 材料清单 item ──
+function CheckItem({ item, note }: { item: string; note?: string }) {
+  const [done, setDone] = useState(false)
+  return (
+    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 9, padding: '7px 0', borderBottom: '0.5px solid rgba(0,0,0,0.05)' }}>
+      <motion.div
+        whileTap={{ scale: 0.82 }}
+        onClick={() => setDone(p => !p)}
+        style={{
+          width: 18, height: 18, borderRadius: '50%',
+          border: done ? 'none' : `1.5px solid ${THEME.muted}`,
+          background: done ? G.deep : 'transparent',
+          flexShrink: 0, marginTop: 1, cursor: 'pointer',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          transition: 'background 0.15s',
+        }}
+      >
+        {done && (
+          <svg width="9" height="9" viewBox="0 0 9 9" fill="none">
+            <polyline points="1,4.5 3.5,7 8,2" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        )}
+      </motion.div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{
+          fontSize: 12, color: done ? THEME.muted : THEME.text, lineHeight: 1.4,
+          textDecoration: done ? 'line-through' : 'none',
+          transition: 'color 0.15s',
+        }}>{item}</div>
+        {note && <div style={{ fontSize: 10, color: THEME.muted, marginTop: 2, lineHeight: 1.4 }}>{note}</div>}
+      </div>
+    </div>
+  )
+}
+
+// ── 帮你查了卡片 ──
+function AiSummaryCard({ pack }: { pack: ExecutionPack }) {
+  const [warnOpen, setWarnOpen] = useState(false)
+
+  const summaryText = [
+    pack.summary,
+    pack.depart_suggestion && `出发时间：${pack.depart_suggestion}`,
+    pack.cost_estimate && `预估费用：${pack.cost_estimate}`,
+    ...(pack.risk_warnings || []),
+  ].filter(Boolean).join('。')
+
+  return (
+    <div style={{
+      margin: '10px 12px 0',
+      padding: '11px 12px',
+      background: G.bg,
+      borderRadius: 10,
+    }}>
+      {/* 标题行 */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 7 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+          <div style={{ width: 5, height: 5, borderRadius: '50%', background: G.deep, flexShrink: 0 }} />
+          <span style={{ fontSize: 11, fontWeight: 500, color: G.darkest }}>帮你查了</span>
         </div>
+        <VoiceBtn text={summaryText} />
+      </div>
+
+      {/* 摘要文字 */}
+      {pack.summary && (
+        <p style={{ fontSize: 12, color: G.darkest, lineHeight: 1.6, margin: 0 }}>{pack.summary}</p>
       )}
 
+      {/* 出发时间 + 费用 */}
       {(pack.depart_suggestion || pack.cost_estimate) && (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+        <div style={{ display: 'flex', gap: 12, marginTop: 8, paddingTop: 8, borderTop: `0.5px solid ${G.border}` }}>
           {pack.depart_suggestion && (
-            <div style={{ background: 'rgba(74,158,255,0.08)', borderRadius: 12, padding: '10px 12px' }}>
-              <div style={{ fontSize: 10, color: '#4A9EFF', fontWeight: 600, marginBottom: 3 }}>🕗 出发时间</div>
-              <div style={{ fontSize: 13, fontWeight: 600, color: THEME.text }}>{pack.depart_suggestion}</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              <svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke={G.dark} strokeWidth="1.5" strokeLinecap="round">
+                <circle cx="7" cy="7" r="5.5" /><path d="M7 4.5V7l1.5 1.5" />
+              </svg>
+              <span style={{ fontSize: 11, color: G.dark }}>{pack.depart_suggestion}</span>
             </div>
           )}
           {pack.cost_estimate && (
-            <div style={{ background: 'rgba(141,200,160,0.1)', borderRadius: 12, padding: '10px 12px' }}>
-              <div style={{ fontSize: 10, color: '#3A7A2A', fontWeight: 600, marginBottom: 3 }}>💰 预估费用</div>
-              <div style={{ fontSize: 13, fontWeight: 600, color: THEME.text }}>{pack.cost_estimate}</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              <svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke={G.dark} strokeWidth="1.5" strokeLinecap="round">
+                <path d="M2 10l2-5 3 3 2-4 3 6" />
+              </svg>
+              <span style={{ fontSize: 11, color: G.dark }}>{pack.cost_estimate}</span>
             </div>
           )}
         </div>
       )}
 
-      {!!pack.checklist?.length && (
-        <div style={{ background: 'rgba(255,255,255,0.6)', borderRadius: 12, padding: '10px 12px', border: '1px solid rgba(0,0,0,0.06)' }}>
-          <div style={{ fontSize: 10, color: THEME.muted, fontWeight: 600, marginBottom: 8, letterSpacing: '0.1em' }}>✅ 准备清单</div>
-          {pack.checklist.map((item, i) => (
-            <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '4px 0', borderBottom: i < (pack.checklist?.length || 0) - 1 ? '1px solid rgba(0,0,0,0.04)' : 'none' }}>
-              <span style={{ fontSize: 14, flexShrink: 0, marginTop: 1 }}>
-                {item.status === 'ready' ? '✅' : item.status === 'missing' ? '❌' : '⚪️'}
-              </span>
-              <div style={{ flex: 1 }}>
-                <span style={{ fontSize: 12, color: THEME.text, fontWeight: item.status === 'missing' ? 600 : 400 }}>{item.item}</span>
-                {item.note && <div style={{ fontSize: 11, color: THEME.muted, marginTop: 2 }}>{item.note}</div>}
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {!!pack.carry_items?.length && (
-        <div style={{ background: 'rgba(141,200,160,0.08)', borderRadius: 12, padding: '10px 12px' }}>
-          <div style={{ fontSize: 10, color: '#3A7A2A', fontWeight: 600, marginBottom: 6 }}>🎒 携带物品</div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-            {pack.carry_items.map((item, i) => (
-              <span key={i} style={{ fontSize: 11, padding: '3px 10px', background: 'rgba(255,255,255,0.6)', borderRadius: 20, color: THEME.text }}>{item}</span>
-            ))}
-          </div>
-        </div>
-      )}
-
+      {/* 注意事项 */}
       {!!pack.risk_warnings?.length && (
-        <div style={{ background: 'rgba(255,107,107,0.06)', borderRadius: 10, padding: '10px 12px', border: '1px solid rgba(255,107,107,0.15)' }}>
-          <div style={{ fontSize: 10, color: '#FF6B6B', fontWeight: 600, marginBottom: 4 }}>⚠️ 注意</div>
-          {pack.risk_warnings.map((w, i) => (
-            <div key={i} style={{ fontSize: 11, color: THEME.text, lineHeight: 1.6 }}>· {w}</div>
-          ))}
-        </div>
-      )}
-
-      {pack.draft && (
-        <div style={{ background: 'rgba(255,255,255,0.5)', borderRadius: 12, padding: '10px 12px', border: '1px solid rgba(0,0,0,0.06)' }}>
-          <div style={{ fontSize: 10, color: THEME.muted, fontWeight: 600, marginBottom: 6 }}>📝 草稿</div>
-          <p style={{ fontSize: 12, color: THEME.text, lineHeight: 1.7, margin: 0, whiteSpace: 'pre-wrap' }}>{pack.draft}</p>
-        </div>
-      )}
-
-      {!!pack.actions?.length && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <div style={{ fontSize: 10, color: THEME.muted, fontWeight: 600, letterSpacing: '0.1em' }}>⚡ 一键执行</div>
-          {pack.actions.map((action, i) => (
-            <motion.button key={i} whileTap={{ scale: 0.97 }}
-              onClick={() => executeAction(action, '')}
-              style={{ width: '100%', padding: '12px 16px', borderRadius: 14, background: i === 0 ? THEME.navy : 'rgba(255,255,255,0.6)', border: i === 0 ? 'none' : '1px solid rgba(0,0,0,0.08)', display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', textAlign: 'left' }}>
-              <span style={{ color: i === 0 ? '#fff' : THEME.text, opacity: 0.7 }}>{ACTION_ICON[action.type] || <ExternalLink size={14} />}</span>
-              <span style={{ fontSize: 13, fontWeight: 600, color: i === 0 ? '#fff' : THEME.text, flex: 1 }}>{action.label}</span>
-              <ChevronRight size={14} style={{ color: i === 0 ? 'rgba(255,255,255,0.5)' : THEME.muted }} />
-            </motion.button>
-          ))}
-        </div>
+        <>
+          <div
+            style={{ display: 'flex', alignItems: 'center', gap: 3, marginTop: 8, cursor: 'pointer' }}
+            onClick={() => setWarnOpen(p => !p)}
+          >
+            <motion.div animate={{ rotate: warnOpen ? 180 : 0 }} transition={{ duration: 0.2 }}>
+              <ChevronDown size={12} color={G.dark} />
+            </motion.div>
+            <span style={{ fontSize: 11, color: G.dark }}>
+              {warnOpen ? '收起' : `还有 ${pack.risk_warnings.length} 条注意事项`}
+            </span>
+          </div>
+          <AnimatePresence>
+            {warnOpen && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: 'auto', opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={{ duration: 0.2 }}
+                style={{ overflow: 'hidden' }}
+              >
+                <div style={{ marginTop: 7, paddingTop: 7, borderTop: `0.5px solid ${G.border}` }}>
+                  {pack.risk_warnings.map((w, i) => (
+                    <div key={i} style={{
+                      fontSize: 11, color: G.darkest, lineHeight: 1.55,
+                      padding: '3px 0',
+                      borderBottom: i < (pack.risk_warnings?.length || 0) - 1 ? `0.5px solid ${G.border}` : 'none',
+                    }}>· {w}</div>
+                  ))}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </>
       )}
     </div>
   )
 }
 
+// ── 标签内容区 ──
+type TabKey = 'checklist' | 'carry' | 'draft'
+
+function TabContent({ activeTab, pack }: { activeTab: TabKey; pack: ExecutionPack }) {
+  const [copied, setCopied] = useState(false)
+
+  const checklistText = pack.checklist?.map(c => c.item + (c.note ? `（${c.note}）` : '')).join('、') || ''
+  const carryText = pack.carry_items?.join('、') || ''
+  const draftText = pack.draft || ''
+
+  const copyDraft = () => {
+    if (!draftText) return
+    navigator.clipboard.writeText(draftText).catch(() => {})
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
+
+  if (activeTab === 'checklist') {
+    return (
+      <div style={{ padding: '8px 12px 10px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+          <span style={{ fontSize: 10, color: THEME.muted, fontWeight: 500 }}>材料清单 · 点击勾选</span>
+          <VoiceBtn text={`材料清单：${checklistText}`} />
+        </div>
+        {pack.checklist?.map((c, i) => (
+          <CheckItem key={i} item={c.item} note={c.note} />
+        ))}
+      </div>
+    )
+  }
+
+  if (activeTab === 'carry') {
+    return (
+      <div style={{ padding: '8px 12px 10px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+          <span style={{ fontSize: 10, color: THEME.muted, fontWeight: 500 }}>携带物品 · 点击确认</span>
+          <VoiceBtn text={`携带物品：${carryText}`} />
+        </div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+          {pack.carry_items?.map((item, i) => <CarryTag key={i} label={item} />)}
+        </div>
+      </div>
+    )
+  }
+
+  // draft
+  return (
+    <div style={{ padding: '8px 12px 10px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+        <span style={{ fontSize: 10, color: THEME.muted, fontWeight: 500 }}>草稿邮件</span>
+        <VoiceBtn text={draftText} />
+      </div>
+      <p style={{
+        fontSize: 12, color: THEME.text, lineHeight: 1.7,
+        margin: '0 0 8px', fontStyle: 'italic',
+        whiteSpace: 'pre-wrap',
+      }}>{draftText}</p>
+      <motion.button
+        whileTap={{ scale: 0.95 }}
+        onClick={copyDraft}
+        style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          gap: 5, width: '100%', padding: '8px',
+          borderRadius: 8, border: 'none',
+          background: copied ? G.mid : G.bg,
+          color: copied ? '#fff' : G.darkest,
+          fontSize: 12, fontWeight: 500, cursor: 'pointer',
+          transition: 'background 0.15s, color 0.15s',
+        }}
+      >
+        <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke={copied ? '#fff' : G.dark} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+          <rect x="4" y="4" width="8" height="8" rx="1.5" />
+          <path d="M2 10V3a1 1 0 011-1h7" />
+        </svg>
+        {copied ? '已复制 ✓' : '复制邮件内容'}
+      </motion.button>
+    </div>
+  )
+}
+
+// ── 执行动作区 ──
+function ActionsArea({ actions, userId }: { actions: ExecutionPack['actions']; userId: string }) {
+  if (!actions?.length) return null
+
+  // 第一个动作全宽主按钮，其余 3 列网格
+  const [primary, ...rest] = actions
+
+  const renderBtn = (action: any, index: number, fullWidth = false) => {
+    const col = ACTION_COLOR[action.type] || { bg: 'rgba(0,0,0,0.04)', icon: THEME.text }
+    const isPrimary = fullWidth
+
+    // 简化 label
+    const shortLabel: Record<string, string> = {
+      email: '邮件', navigate: '导航', call: '致电',
+      download_pdf: '下载', open_url: '打开', calendar: '提醒',
+      buy: '购买', pay: '支付', whatsapp: '消息',
+    }
+    const label = shortLabel[action.type] || action.label?.slice(0, 4) || action.type
+
+    return (
+      <motion.button
+        key={index}
+        whileTap={{ scale: 0.90 }}
+        onClick={() => executeAction(action, userId)}
+        style={{
+          display: 'flex',
+          flexDirection: isPrimary ? 'row' : 'column',
+          alignItems: 'center',
+          justifyContent: isPrimary ? 'center' : 'center',
+          gap: isPrimary ? 8 : 4,
+          padding: isPrimary ? '11px 16px' : '10px 6px',
+          borderRadius: 10,
+          border: isPrimary ? 'none' : '0.5px solid rgba(0,0,0,0.07)',
+          background: isPrimary ? G.dark : 'rgba(255,255,255,0.7)',
+          cursor: 'pointer',
+          gridColumn: isPrimary ? 'span 3' : undefined,
+        }}
+      >
+        <div style={{
+          width: isPrimary ? 26 : 28, height: isPrimary ? 26 : 28,
+          borderRadius: 7, flexShrink: 0,
+          background: isPrimary ? 'rgba(255,255,255,0.15)' : col.bg,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}>
+          <span style={{ color: isPrimary ? '#fff' : col.icon, display: 'flex' }}>
+            {ACTION_ICON[action.type] || <ExternalLink size={15} />}
+          </span>
+        </div>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ fontSize: isPrimary ? 13 : 11, fontWeight: 500, color: isPrimary ? '#fff' : THEME.text }}>{label}</div>
+          {isPrimary && (
+            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)', marginTop: 1 }}>{action.label}</div>
+          )}
+        </div>
+      </motion.button>
+    )
+  }
+
+  return (
+    <div style={{ padding: '0 12px 14px' }}>
+      <div style={{ fontSize: 10, fontWeight: 500, color: THEME.muted, letterSpacing: '0.05em', marginBottom: 6 }}>
+        执行动作
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 5 }}>
+        {renderBtn(primary, 0, true)}
+        {rest.map((a, i) => renderBtn(a, i + 1, false))}
+      </div>
+    </div>
+  )
+}
+
 // ── 主组件 ──
-export default function TodoDetailModal({ reminder, userId, onClose, onDone, onSnooze }: Props) {
-  const [reminderChat, setReminderChat] = useState<{ role: string, text: string }[]>([])
-  const [reminderInput, setReminderInput] = useState('')
-  const [reminderLoading, setReminderLoading] = useState(false)
-  const [tab, setTab] = useState<'pack' | 'chat'>('pack')
+export default function TodoDetailModal({ reminder, userId, onClose, onDone, onSnooze, onSync }: Props) {
+  const [activeTab, setActiveTab] = useState<TabKey>('checklist')
   const [fetchedPack, setFetchedPack] = useState<ExecutionPack | null>(null)
   const [isLoading, setIsLoading] = useState(false)
 
@@ -222,11 +498,8 @@ export default function TodoDetailModal({ reminder, userId, onClose, onDone, onS
 
   useEffect(() => {
     if (!reminder?.id) return
-    setTab('pack')
-    setReminderChat([])
-    setReminderInput('')
+    setActiveTab('checklist')
     setFetchedPack(null)
-
     if (!cachedPack && !reminder.id.startsWith('temp_')) {
       setIsLoading(true)
       fetch('/api/todo/smart-action', {
@@ -237,175 +510,183 @@ export default function TodoDetailModal({ reminder, userId, onClose, onDone, onS
         .then(r => r.json())
         .then(data => {
           if (data.ok && data.execution_pack) {
-  setFetchedPack(data.execution_pack)
-  onSync?.()
-}
+            setFetchedPack(data.execution_pack)
+            onSync?.()
+          }
         })
         .catch(e => console.error('smart action error', e))
         .finally(() => setIsLoading(false))
     }
   }, [reminder?.id])
 
-  const askReminderQuestion = async (question: string) => {
-    if (!question.trim() || reminderLoading) return
-    setReminderChat(prev => [...prev, { role: 'user', text: question }])
-    setReminderInput('')
-    setReminderLoading(true)
-    try {
-      const res = await fetch('/api/rian/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          question,
-          context: `事件：${reminder?.title}\n详情：${reminder?.description}`,
-          history: reminderChat,
-        }),
-      })
-      const data = await res.json()
-      const replyText = data.reply || '抱歉，无法获取建议'
-      setReminderChat(prev => [...prev, { role: 'assistant', text: replyText }])
-      if (typeof window !== 'undefined' && window.speechSynthesis) {
-        const u = new SpeechSynthesisUtterance(replyText.slice(0, 80))
-        u.lang = 'zh-CN'; u.rate = 0.95
-        window.speechSynthesis.speak(u)
-      }
-    } catch {
-      setReminderChat(prev => [...prev, { role: 'assistant', text: '网络异常，请稍后再试' }])
-    } finally {
-      setReminderLoading(false)
-    }
-  }
-
   if (!reminder) return null
 
-  const urgencyGradient = reminder.urgency_level === 3
-    ? 'linear-gradient(90deg, #FF6B6B, #FF8E53)'
-    : reminder.urgency_level === 2
-    ? 'linear-gradient(90deg, #F0A500, #F0C040)'
+  const urgencyGradient =
+    reminder.urgency_level === 3 ? 'linear-gradient(90deg, #FF6B6B, #FF8E53)'
+    : reminder.urgency_level === 2 ? 'linear-gradient(90deg, #F0A500, #F0C040)'
     : 'linear-gradient(90deg, #4A9EFF, #7BC4FF)'
+
+  const tabs: { key: TabKey; icon: React.ReactNode; label: string }[] = [
+    { key: 'checklist', icon: <ClipboardList size={15} />, label: '材料' },
+    { key: 'carry',     icon: <ShoppingCart size={15} />,  label: '携带' },
+    { key: 'draft',     icon: <FileText size={15} />,      label: '草稿' },
+  ]
 
   return (
     <AnimatePresence>
+      {/* 遮罩：半透明浅色，非黑色 */}
       <motion.div
-        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-        style={{ position: 'fixed', inset: 0, zIndex: 200, display: 'flex', alignItems: 'flex-end', justifyContent: 'center', padding: `0 12px max(calc(env(safe-area-inset-bottom) + 80px), 110px)`, background: 'rgba(0,0,0,0.3)', backdropFilter: 'blur(4px)' }}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        style={{
+          position: 'fixed', inset: 0, zIndex: 200,
+          display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
+          padding: `0 0 max(calc(env(safe-area-inset-bottom) + 80px), 90px)`,
+          background: 'rgba(180,200,210,0.35)',
+          backdropFilter: 'blur(6px)',
+        }}
         onClick={onClose}
       >
         <motion.div
-          initial={{ y: 80, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 80, opacity: 0 }}
+          initial={{ y: 100, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          exit={{ y: 100, opacity: 0 }}
+          transition={{ type: 'spring', damping: 28, stiffness: 320 }}
           onClick={e => e.stopPropagation()}
-          style={{ width: '100%', maxWidth: 420, background: 'rgba(255,255,255,0.92)', backdropFilter: 'blur(40px)', borderRadius: 28, overflow: 'hidden', boxShadow: '0 20px 60px rgba(0,0,0,0.15)', maxHeight: '80vh', display: 'flex', flexDirection: 'column' }}
+          style={{
+            width: '100%',
+            maxWidth: 430,
+            background: 'rgba(255,255,255,0.94)',
+            backdropFilter: 'blur(40px)',
+            borderRadius: 22,
+            overflow: 'hidden',
+            maxHeight: '82vh',
+            display: 'flex',
+            flexDirection: 'column',
+            margin: '0 10px',
+          }}
         >
+          {/* 顶部紧急色条 */}
           <div style={{ height: 4, background: urgencyGradient, flexShrink: 0 }} />
 
-          <div style={{ padding: '20px 20px 12px', flexShrink: 0 }}>
+          {/* 拖动把手 */}
+          <div style={{ width: 32, height: 4, background: 'rgba(0,0,0,0.1)', borderRadius: 2, margin: '10px auto 0' }} />
+
+          {/* 标题行 */}
+          <div style={{ padding: '10px 14px 0', flexShrink: 0 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
               <div style={{ flex: 1 }}>
-                <span style={{ fontSize: 10, color: THEME.gold, fontWeight: 600, letterSpacing: '0.15em', textTransform: 'uppercase' }}>
+                <span style={{ fontSize: 10, color: THEME.gold, fontWeight: 600, letterSpacing: '0.12em' }}>
                   {reminder.category || '提醒'}
                   {reminder.due_date && ` · ${new Date(reminder.due_date).toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' })}`}
                 </span>
-                <h2 style={{ fontSize: 20, fontWeight: 600, color: THEME.text, margin: '4px 0 0', lineHeight: 1.3 }}>{reminder.title}</h2>
+                <h2 style={{ fontSize: 18, fontWeight: 600, color: THEME.text, margin: '3px 0 0', lineHeight: 1.3 }}>
+                  {reminder.title}
+                </h2>
               </div>
-              <X size={18} onClick={onClose} style={{ cursor: 'pointer', opacity: 0.3, marginLeft: 12, flexShrink: 0 }} />
-            </div>
-
-            <div style={{ display: 'flex', gap: 8, marginTop: 14, alignItems: 'center' }}>
-              {(['pack', 'chat'] as const).map(t => (
-                <button key={t} onClick={() => setTab(t)}
-                  style={{ padding: '6px 16px', borderRadius: 20, border: 'none', fontSize: 12, fontWeight: 600, cursor: 'pointer', background: tab === t ? THEME.navy : 'rgba(0,0,0,0.06)', color: tab === t ? '#fff' : THEME.muted }}>
-                  {t === 'pack' ? '⚡ 一键办' : '💬 问日安'}
-                </button>
-              ))}
-              {isLoading && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                  <Loader size={12} style={{ color: THEME.gold }} />
-                  <span style={{ fontSize: 11, color: THEME.gold }}>准备中…</span>
-                </div>
-              )}
+              <motion.div whileTap={{ scale: 0.88 }} onClick={onClose} style={{ cursor: 'pointer', padding: 4, marginLeft: 8 }}>
+                <X size={18} color={THEME.muted} />
+              </motion.div>
             </div>
           </div>
 
-          <div style={{ overflowY: 'auto', flex: 1 }}>
-            {tab === 'pack' && (
+          {/* 可滚动内容区 */}
+          <div style={{ overflowY: 'auto', flex: 1, WebkitOverflowScrolling: 'touch' }}>
+
+            {/* 加载中 */}
+            {isLoading && !displayPack && (
+              <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  {[0, 1, 2].map(i => (
+                    <motion.div key={i}
+                      animate={{ opacity: [0.3, 1, 0.3], y: [0, -4, 0] }}
+                      transition={{ duration: 1, repeat: Infinity, delay: i * 0.2 }}
+                      style={{ width: 7, height: 7, borderRadius: '50%', background: THEME.gold }}
+                    />
+                  ))}
+                </div>
+                <span style={{ fontSize: 12, color: THEME.muted }}>正在为你查询准备…</span>
+              </div>
+            )}
+
+            {/* 帮你查了 */}
+            {displayPack && <AiSummaryCard pack={displayPack} />}
+
+            {/* 标签页 */}
+            {displayPack && (
               <>
-                {!displayPack && !isLoading && (
-                  <div style={{ padding: '40px 20px', textAlign: 'center' }}>
-                    <div style={{ fontSize: 13, color: THEME.muted }}>暂无执行包</div>
-                  </div>
-                )}
-                {isLoading && !displayPack && (
-                  <div style={{ padding: '30px 20px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
-                    <div style={{ display: 'flex', gap: 6 }}>
-                      {[0, 1, 2].map(i => (
-                        <motion.div key={i}
-                          animate={{ opacity: [0.3, 1, 0.3], y: [0, -4, 0] }}
-                          transition={{ duration: 1, repeat: Infinity, delay: i * 0.2 }}
-                          style={{ width: 8, height: 8, borderRadius: '50%', background: THEME.gold }} />
-                      ))}
-                    </div>
-                    <span style={{ fontSize: 12, color: THEME.muted }}>根正在为你查询准备…</span>
-                  </div>
-                )}
-                {displayPack && <ExecutionPackView pack={displayPack} isLoading={isLoading} />}
+                <div style={{ display: 'flex', gap: 5, padding: '10px 12px 0' }}>
+                  {tabs.map(tab => (
+                    <motion.button
+                      key={tab.key}
+                      whileTap={{ scale: 0.91 }}
+                      onClick={() => setActiveTab(tab.key)}
+                      style={{
+                        flex: 1, display: 'flex', flexDirection: 'column',
+                        alignItems: 'center', gap: 3, padding: '7px 4px',
+                        borderRadius: 9,
+                        border: `0.5px solid ${activeTab === tab.key ? G.mid : 'rgba(0,0,0,0.07)'}`,
+                        background: activeTab === tab.key ? G.bg : 'rgba(255,255,255,0.7)',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      <span style={{ color: activeTab === tab.key ? G.dark : THEME.muted, display: 'flex' }}>
+                        {tab.icon}
+                      </span>
+                      <span style={{
+                        fontSize: 10, fontWeight: activeTab === tab.key ? 500 : 400,
+                        color: activeTab === tab.key ? G.darkest : THEME.muted,
+                      }}>
+                        {tab.label}
+                      </span>
+                    </motion.button>
+                  ))}
+                </div>
+
+                <TabContent activeTab={activeTab} pack={displayPack} />
+
+                {/* 执行动作 */}
+                <div style={{ height: '0.5px', background: 'rgba(0,0,0,0.06)', margin: '0 12px' }} />
+                <ActionsArea actions={displayPack.actions} userId={userId} />
               </>
             )}
 
-            {tab === 'chat' && (
-              <div style={{ padding: '0 20px 16px' }}>
-                {reminderChat.length === 0 && (
-                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 12 }}>
-                    {['还需要准备什么？', '帮我加入日历', '有什么风险？'].map(q => (
-                      <button key={q} onClick={() => askReminderQuestion(q)}
-                        style={{ padding: '6px 12px', borderRadius: 20, background: 'rgba(176,141,87,0.1)', border: '1px solid rgba(176,141,87,0.2)', fontSize: 11, color: THEME.gold, cursor: 'pointer' }}>
-                        {q}
-                      </button>
-                    ))}
-                  </div>
-                )}
-                <div style={{ maxHeight: 220, overflowY: 'auto', marginBottom: 8 }}>
-                  {reminderChat.map((msg, i) => (
-                    <div key={i} style={{ marginBottom: 8, display: 'flex', justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start' }}>
-                      <div style={{ maxWidth: '80%', padding: '8px 12px', borderRadius: msg.role === 'user' ? '14px 14px 4px 14px' : '14px 14px 14px 4px', background: msg.role === 'user' ? THEME.navy : 'rgba(255,255,255,0.8)', fontSize: 12, color: msg.role === 'user' ? '#fff' : THEME.text, lineHeight: 1.6 }}>
-                        {msg.text}
-                      </div>
-                    </div>
-                  ))}
-                  {reminderLoading && (
-                    <div style={{ display: 'flex', gap: 4, padding: '8px 0' }}>
-                      {[0, 1, 2].map(i => (
-                        <motion.div key={i} animate={{ opacity: [0.3, 1, 0.3] }} transition={{ duration: 1, repeat: Infinity, delay: i * 0.2 }}
-                          style={{ width: 6, height: 6, borderRadius: '50%', background: THEME.gold }} />
-                      ))}
-                    </div>
-                  )}
-                </div>
+            {/* 无数据 */}
+            {!displayPack && !isLoading && (
+              <div style={{ padding: '32px 20px', textAlign: 'center' }}>
+                <div style={{ fontSize: 13, color: THEME.muted }}>暂无执行包</div>
               </div>
             )}
           </div>
 
-          <div style={{ flexShrink: 0, borderTop: '1px solid rgba(0,0,0,0.06)' }}>
-            {tab === 'chat' && (
-              <div style={{ padding: '10px 20px', display: 'flex', gap: 8, alignItems: 'center' }}>
-                <input value={reminderInput} onChange={e => setReminderInput(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && askReminderQuestion(reminderInput)}
-                  placeholder="问日安..." style={{ flex: 1, padding: '10px 14px', borderRadius: 20, border: '1px solid rgba(0,0,0,0.08)', background: 'rgba(255,255,255,0.6)', fontSize: 13, color: THEME.text, outline: 'none' }} />
-                <motion.button whileTap={{ scale: 0.9 }} onClick={() => askReminderQuestion(reminderInput)}
-                  style={{ width: 36, height: 36, borderRadius: '50%', background: THEME.navy, border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}>
-                  <Send size={14} color="#fff" />
-                </motion.button>
-              </div>
-            )}
-            <div style={{ padding: '10px 20px 16px', display: 'flex', gap: 10 }}>
-              <button onClick={() => onDone(reminder.id)}
-                style={{ flex: 1, padding: 12, borderRadius: 14, background: 'rgba(141,200,160,0.4)', border: '1px solid rgba(141,200,160,0.5)', fontSize: 13, fontWeight: 600, color: THEME.text, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-                <CheckCircle2 size={14} /> 已处理
-              </button>
-              <button onClick={() => onSnooze(reminder.id)}
-                style={{ flex: 1, padding: 12, borderRadius: 14, background: 'rgba(255,255,255,0.3)', border: '1px solid rgba(255,255,255,0.4)', fontSize: 13, color: THEME.text, opacity: 0.7, cursor: 'pointer' }}>
-                明天再说
-              </button>
-            </div>
+          {/* 底部操作 */}
+          <div style={{ flexShrink: 0, borderTop: '0.5px solid rgba(0,0,0,0.06)', padding: '10px 12px 16px', display: 'flex', gap: 8 }}>
+            <motion.button
+              whileTap={{ scale: 0.95 }}
+              onClick={() => onDone(reminder.id)}
+              style={{
+                flex: 1, padding: '11px', borderRadius: 12,
+                background: 'rgba(141,200,160,0.35)',
+                border: '0.5px solid rgba(141,200,160,0.5)',
+                fontSize: 13, fontWeight: 600, color: THEME.text,
+                cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
+              }}
+            >
+              <CheckCircle2 size={14} /> 已处理
+            </motion.button>
+            <motion.button
+              whileTap={{ scale: 0.95 }}
+              onClick={() => onSnooze(reminder.id)}
+              style={{
+                flex: 1, padding: '11px', borderRadius: 12,
+                background: 'rgba(255,255,255,0.4)',
+                border: '0.5px solid rgba(0,0,0,0.08)',
+                fontSize: 13, color: THEME.muted, cursor: 'pointer',
+              }}
+            >
+              明天再说
+            </motion.button>
           </div>
         </motion.div>
       </motion.div>
