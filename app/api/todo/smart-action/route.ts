@@ -23,7 +23,7 @@ const ExecutionPackSchema = z.object({
   actions: z.array(z.object({
     type: z.enum(['navigate', 'call', 'email', 'whatsapp', 'calendar', 'download_pdf', 'open_url', 'pay', 'buy']),
     label: z.string(),
-    data: z.record(z.string(), z.any()),
+   data: z.any(),
   })),
   draft: z.string().optional(),
   depart_suggestion: z.string().optional(),
