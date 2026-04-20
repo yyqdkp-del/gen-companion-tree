@@ -492,12 +492,13 @@ const startRecording = async () => {
       })}
 
       {/* 详情弹窗 */}
-     <TodoDetailModal
+    <TodoDetailModal
   reminder={selectedReminder}
   userId={userId || ''}
   onClose={() => setSelectedReminder(null)}
   onDone={markDone}
   onSnooze={snooze}
+  onSync={ctxSync}
 />
     </main>
   )
