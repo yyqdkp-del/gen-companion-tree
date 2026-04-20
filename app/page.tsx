@@ -537,32 +537,6 @@ function AddChildSheet({ onClose, onSave }: { onClose: () => void; onSave: (d: a
     </BottomSheet>
   )
 }
-          {/* 底部按钮 */}
-          <div style={{ display: 'flex', gap: 10 }}>
-            <motion.button whileTap={{ scale: 0.97 }} onClick={onClose}
-              style={{ flex: 1, padding: '13px', borderRadius: 14, border: '1px solid rgba(0,0,0,0.1)', background: 'transparent', fontSize: 14, color: THEME.muted, cursor: 'pointer' }}>
-              稍后再说
-            </motion.button>
-            <motion.button
-              whileTap={{ scale: 0.97 }}
-              onClick={executeAllDone ? onClose : onExecuteAll}
-              disabled={executeAllRunning}
-              style={{
-                flex: 2, padding: '13px', borderRadius: 14, border: 'none',
-                background: executeAllDone ? '#22C55E' : executeAllRunning ? 'rgba(0,0,0,0.08)' : THEME.navy,
-                color: executeAllRunning ? THEME.muted : '#fff',
-                fontSize: 14, fontWeight: 600, cursor: executeAllRunning ? 'default' : 'pointer',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                transition: 'all 0.3s',
-              }}>
-              {executeAllRunning
-                ? <><Loader size={16} /> 执行中…</>
-                : executeAllDone
-                ? <><CheckCircle2 size={16} /> 已全部完成</>
-                : <><Zap size={16} /> 全部执行</>
-              }
-           
-
 function InputSheet({ onClose, userId }: { onClose: () => void; userId: string }) {
   const [text, setText] = useState('')
   const [sending, setSending] = useState(false)
