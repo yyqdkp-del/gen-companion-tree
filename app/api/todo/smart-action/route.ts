@@ -1,6 +1,7 @@
+export const dynamic = 'force-dynamic'
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { streamObject } from 'ai'
+import { streamText, Output } from 'ai'
 import { anthropic } from '@ai-sdk/anthropic'
 import { z } from 'zod'
 
@@ -11,7 +12,7 @@ const supabase = createClient(
 
 const MAKE_WEBHOOK_URL = process.env.NEXT_PUBLIC_MAKE_WEBHOOK_URL || ''
 
-// ══ Zod Schema：物理约束 JSON 结构，不可能截断或格式错误 ══
+// ══ Zod Schema ══
 const ExecutionPackSchema = z.object({
   summary: z.string(),
   checklist: z.array(z.object({
@@ -209,43 +210,39 @@ export async function POST(req: NextRequest) {
       getFamilyData(user_id, brainInstruction.family_data_needed || []),
     ])
 
-   import { streamText, Output } from 'ai'
-import { anthropic } from '@ai-sdk/anthropic'
-
-// 主处理函数里改这段：
-const result = streamText({
-  model: anthropic('claude-sonnet-4-6'),
-  output: Output.object({ schema: ExecutionPackSchema }),
-  maxTokens: 8000,
-  prompt: buildPrompt(todo, brainInstruction, familyData, grokResult),
-  onFinish: async ({ experimental_output }) => {
-    const object = experimental_output
-    if (!object) return
-    const finalObject: any = JSON.parse(JSON.stringify(object))
-    if (finalObject.actions) {
-      finalObject.actions = finalObject.actions.map((action: any) => {
-        if (action.type === 'download_pdf' && action.data?.pdf_type) {
-          action.data.pdf_data = buildPDFData(action.data.pdf_type, familyData)
+    const result = streamText({
+      model: anthropic('claude-sonnet-4-6'),
+      output: Output.object({ schema: ExecutionPackSchema }),
+      maxTokens: 8000,
+      prompt: buildPrompt(todo, brainInstruction, familyData, grokResult),
+      onFinish: async ({ experimental_output }) => {
+        const object = experimental_output
+        if (!object) return
+        const finalObject: any = JSON.parse(JSON.stringify(object))
+        if (finalObject.actions) {
+          finalObject.actions = finalObject.actions.map((action: any) => {
+            if (action.type === 'download_pdf' && action.data?.pdf_type) {
+              action.data.pdf_data = buildPDFData(action.data.pdf_type, familyData)
+            }
+            return action
+          })
         }
-        return action
-      })
-    }
-    const existingData = todo.ai_action_data || {}
-    await supabase.from('todo_items').update({
-      ai_action_data: {
-        ...existingData,
-        execution_pack: finalObject,
-        prepared_at: new Date().toISOString(),
+        const existingData = todo.ai_action_data || {}
+        await supabase.from('todo_items').update({
+          ai_action_data: {
+            ...existingData,
+            execution_pack: finalObject,
+            prepared_at: new Date().toISOString(),
+          }
+        }).eq('id', todo_id).eq('user_id', user_id)
+        console.log('存库完成:', todo_id)
       }
-    }).eq('id', todo_id).eq('user_id', user_id)
-    console.log('存库完成:', todo_id)
-  }
-})
+    })
 
-return result.toTextStreamResponse()
+    return result.toTextStreamResponse()
 
   } catch (e: any) {
     console.error('Smart action error:', e?.message)
     return NextResponse.json({ ok: false, error: e?.message }, { status: 500 })
-    }
+  }
 }
