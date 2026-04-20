@@ -114,7 +114,7 @@ const { userId, kids: ctxKids, todos: ctxTodos, sync: ctxSync } = useApp()
 // ── 从 Context 筛选今日水珠 ──
 const todayStr = useMemo(() => new Date().toISOString().split('T')[0], [])
 const reminders = useMemo<Reminder[]>(() => ctxTodos
-  .filter((t: any) => t._isTemp || (t.status === 'pending' && (t.priority === 'red' || t.due_date === todayStr)))
+  .filter((t: any) => t._isTemp || (t.status === 'pending' && t.due_date === todayStr))
   .sort((a: any, b: any) => {
     const o: Record<string, number> = { red: 0, orange: 1, yellow: 2 }
     return (o[a.priority] ?? 2) - (o[b.priority] ?? 2)
