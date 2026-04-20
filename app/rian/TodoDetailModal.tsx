@@ -3,8 +3,8 @@ import React, { useEffect, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   X, CheckCircle2, Navigation, Phone, Mail, Calendar,
-  Download, ExternalLink, CreditCard, ShoppingBag,
-  ClipboardList, ShoppingCart, FileText, Volume2, ChevronDown,
+  Download, ExternalLink, CreditCard, ShoppingBag, Loader,
+  ClipboardList, ShoppingCart, FileText, Volume2, ChevronDown, Zap,
 } from 'lucide-react'
 
 const THEME = {
@@ -22,6 +22,9 @@ const G = {
   dark: '#0F6E56',
   darkest: '#085041',
 }
+
+type ActionStatus = 'idle' | 'running' | 'done' | 'error'
+type ActionState = { status: ActionStatus; message?: string }
 
 type ExecutionPack = {
   summary?: string
@@ -45,6 +48,11 @@ type ExecutionPack = {
       item?: string
       channel?: string
       official_url?: string
+      pdf_type?: string
+      pdf_data?: {
+        official_url?: string
+        download_url?: string
+      }
     }
   }[]
   draft?: string
@@ -53,7 +61,7 @@ type ExecutionPack = {
   risk_warnings?: string[]
   carry_items?: string[]
   primary_action_index?: number
-primary_action_reason?: string
+  primary_action_reason?: string
 }
 
 type Reminder = {
@@ -81,82 +89,6 @@ type Props = {
 }
 
 type TabKey = 'checklist' | 'carry' | 'draft'
-
-// ── 动作执行 ──
-function executeAction(action: any, userId: string) {
-  const data = action.data || {}
-  switch (action.type) {
-    case 'navigate':
-      window.open(data.url, '_blank'); break
-    case 'call':
-      window.open(`tel:${data.phone}`); break
-    case 'whatsapp':
-      window.open(`https://wa.me/${data.phone?.replace(/\D/g, '')}?text=${encodeURIComponent(data.message || '')}`, '_blank'); break
-    case 'email':
-  if (data.email_to) {
-    window.open(`mailto:${data.email_to}?subject=${encodeURIComponent(data.email_subject || '')}&body=${encodeURIComponent(data.email_body || '')}`)
-  } else {
-    alert('收件人地址未设置，请检查任务数据')
-  }
-  break
-    case 'calendar': {
-      const start = `${data.calendar_date}T${data.calendar_time || '09:00'}:00`
-      const end = `${data.calendar_date}T${data.calendar_time || '10:00'}:00`
-      window.open(`https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(data.calendar_title || '')}&dates=${start.replace(/[-:]/g, '')}/${end.replace(/[-:]/g, '')}&location=${encodeURIComponent(data.calendar_location || '')}`, '_blank')
-      break
-    }
-    case 'open_url':
-    case 'download_pdf':
-      window.open(data.url || data.official_url, '_blank'); break
-    case 'buy': {
-      const ch = data.channel === 'shopee'
-        ? 'https://shopee.co.th/search?keyword='
-        : 'https://www.lazada.co.th/catalog/?q='
-      window.open(ch + encodeURIComponent(data.item || ''), '_blank'); break
-    }
-      case 'pay':
-  if (data.url) window.open(data.url, '_blank')
-  break
-    default: break
-  }
-  if (action.type === 'email' || action.type === 'calendar') {
-    fetch('/api/todo/smart-action', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ execute_action: action, user_id: userId }),
-    }).catch(() => {})
-  }
-}
-
-const ACTION_ICON: Record<string, React.ReactNode> = {
-  navigate:     <Navigation size={15} />,
-  call:         <Phone size={15} />,
-  email:        <Mail size={15} />,
-  whatsapp:     <Phone size={15} />,
-  calendar:     <Calendar size={15} />,
-  download_pdf: <Download size={15} />,
-  open_url:     <ExternalLink size={15} />,
-  pay:          <CreditCard size={15} />,
-  buy:          <ShoppingBag size={15} />,
-}
-
-const ACTION_COLOR: Record<string, { bg: string; icon: string }> = {
-  email:        { bg: '#E1F5EE', icon: G.dark },
-  navigate:     { bg: '#E6F1FB', icon: '#185FA5' },
-  call:         { bg: '#EAF3DE', icon: '#3B6D11' },
-  download_pdf: { bg: '#EEEDFE', icon: '#534AB7' },
-  open_url:     { bg: '#EEEDFE', icon: '#534AB7' },
-  calendar:     { bg: '#FAEEDA', icon: '#854F0B' },
-  buy:          { bg: '#FBEAF0', icon: '#993556' },
-  pay:          { bg: '#FBEAF0', icon: '#993556' },
-  whatsapp:     { bg: '#EAF3DE', icon: '#3B6D11' },
-}
-
-const SHORT_LABEL: Record<string, string> = {
-  email: '邮件', navigate: '导航', call: '致电',
-  download_pdf: '下载', open_url: '打开', calendar: '提醒',
-  buy: '购买', pay: '支付', whatsapp: '消息',
-}
 
 // ── 语音播报 ──
 function speak(text: string) {
@@ -199,35 +131,24 @@ function VoiceBtn({ text }: { text: string }) {
 function CheckItem({ item, note }: { item: string; note?: string }) {
   const [done, setDone] = useState(false)
   return (
-    <div
-      onClick={() => setDone(p => !p)}
-      style={{
-        display: 'flex', alignItems: 'flex-start', gap: 9,
-        padding: '8px 0',
-        borderBottom: '0.5px solid rgba(0,0,0,0.05)',
-        cursor: 'pointer',
-      }}
-    >
-      <motion.div
-        whileTap={{ scale: 0.80 }}
-        style={{
-          width: 19, height: 19, borderRadius: '50%',
-          border: done ? 'none' : `1.5px solid ${THEME.muted}`,
-          background: done ? G.deep : 'transparent',
-          flexShrink: 0, marginTop: 1,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          transition: 'background 0.15s',
-        }}
-      >
+    <div onClick={() => setDone(p => !p)} style={{
+      display: 'flex', alignItems: 'flex-start', gap: 9,
+      padding: '8px 0', borderBottom: '0.5px solid rgba(0,0,0,0.05)', cursor: 'pointer',
+    }}>
+      <motion.div whileTap={{ scale: 0.80 }} style={{
+        width: 19, height: 19, borderRadius: '50%',
+        border: done ? 'none' : `1.5px solid ${THEME.muted}`,
+        background: done ? G.deep : 'transparent',
+        flexShrink: 0, marginTop: 1,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        transition: 'background 0.15s',
+      }}>
         <AnimatePresence>
           {done && (
-            <motion.svg
-              initial={{ scale: 0 }} animate={{ scale: 1 }} exit={{ scale: 0 }}
-              transition={{ duration: 0.15 }}
-              width="9" height="9" viewBox="0 0 9 9" fill="none"
-            >
-              <polyline points="1,4.5 3.5,7 8,2" stroke="white"
-                strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+            <motion.svg initial={{ scale: 0 }} animate={{ scale: 1 }} exit={{ scale: 0 }}
+              transition={{ duration: 0.15 }} width="9" height="9" viewBox="0 0 9 9" fill="none">
+              <polyline points="1,4.5 3.5,7 8,2" stroke="white" strokeWidth="1.6"
+                strokeLinecap="round" strokeLinejoin="round" />
             </motion.svg>
           )}
         </AnimatePresence>
@@ -235,12 +156,9 @@ function CheckItem({ item, note }: { item: string; note?: string }) {
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{
           fontSize: 13, color: done ? THEME.muted : THEME.text, lineHeight: 1.4,
-          textDecoration: done ? 'line-through' : 'none',
-          transition: 'color 0.15s',
+          textDecoration: done ? 'line-through' : 'none', transition: 'color 0.15s',
         }}>{item}</div>
-        {note && (
-          <div style={{ fontSize: 11, color: THEME.muted, marginTop: 2, lineHeight: 1.4 }}>{note}</div>
-        )}
+        {note && <div style={{ fontSize: 11, color: THEME.muted, marginTop: 2, lineHeight: 1.4 }}>{note}</div>}
       </div>
     </div>
   )
@@ -250,31 +168,22 @@ function CheckItem({ item, note }: { item: string; note?: string }) {
 function CarryTag({ label }: { label: string }) {
   const [done, setDone] = useState(false)
   return (
-    <motion.div
-      whileTap={{ scale: 0.86 }}
-      onClick={() => setDone(p => !p)}
-      style={{
-        display: 'flex', alignItems: 'center', gap: 4,
-        fontSize: 12, padding: '6px 11px', borderRadius: 20,
-        background: done ? G.bg : 'rgba(255,255,255,0.6)',
-        color: done ? G.darkest : THEME.text,
-        border: `0.5px solid ${done ? G.mid : 'rgba(0,0,0,0.08)'}`,
-        cursor: 'pointer', userSelect: 'none',
-        transition: 'background 0.15s, color 0.15s, border-color 0.15s',
-      }}
-    >
+    <motion.div whileTap={{ scale: 0.86 }} onClick={() => setDone(p => !p)} style={{
+      display: 'flex', alignItems: 'center', gap: 4,
+      fontSize: 12, padding: '6px 11px', borderRadius: 20,
+      background: done ? G.bg : 'rgba(255,255,255,0.6)',
+      color: done ? G.darkest : THEME.text,
+      border: `0.5px solid ${done ? G.mid : 'rgba(0,0,0,0.08)'}`,
+      cursor: 'pointer', userSelect: 'none',
+      transition: 'background 0.15s, color 0.15s, border-color 0.15s',
+    }}>
       <AnimatePresence>
         {done && (
-          <motion.svg
-            initial={{ scale: 0, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            exit={{ scale: 0, opacity: 0 }}
-            transition={{ duration: 0.15 }}
-            width="11" height="11" viewBox="0 0 11 11" fill="none"
-          >
-            <polyline points="1.5,5.5 4.5,8.5 9.5,2.5"
-              stroke={G.deep} strokeWidth="1.8"
-              strokeLinecap="round" strokeLinejoin="round" />
+          <motion.svg initial={{ scale: 0, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0, opacity: 0 }} transition={{ duration: 0.15 }}
+            width="11" height="11" viewBox="0 0 11 11" fill="none">
+            <polyline points="1.5,5.5 4.5,8.5 9.5,2.5" stroke={G.deep}
+              strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
           </motion.svg>
         )}
       </AnimatePresence>
@@ -286,7 +195,6 @@ function CarryTag({ label }: { label: string }) {
 // ── 帮你查了卡片 ──
 function AiSummaryCard({ pack }: { pack: ExecutionPack }) {
   const [warnOpen, setWarnOpen] = useState(false)
-
   const summaryText = [
     pack.summary,
     pack.depart_suggestion && `出发时间：${pack.depart_suggestion}`,
@@ -303,17 +211,12 @@ function AiSummaryCard({ pack }: { pack: ExecutionPack }) {
         </div>
         <VoiceBtn text={summaryText} />
       </div>
-
-      {pack.summary && (
-        <p style={{ fontSize: 12, color: G.darkest, lineHeight: 1.65, margin: 0 }}>{pack.summary}</p>
-      )}
-
+      {pack.summary && <p style={{ fontSize: 12, color: G.darkest, lineHeight: 1.65, margin: 0 }}>{pack.summary}</p>}
       {(pack.depart_suggestion || pack.cost_estimate) && (
         <div style={{ display: 'flex', gap: 14, marginTop: 8, paddingTop: 8, borderTop: `0.5px solid ${G.border}` }}>
           {pack.depart_suggestion && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-              <svg width="12" height="12" viewBox="0 0 14 14" fill="none"
-                stroke={G.dark} strokeWidth="1.5" strokeLinecap="round">
+              <svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke={G.dark} strokeWidth="1.5" strokeLinecap="round">
                 <circle cx="7" cy="7" r="5.5" /><path d="M7 4.5V7l1.5 1.5" />
               </svg>
               <span style={{ fontSize: 11, color: G.dark }}>{pack.depart_suggestion}</span>
@@ -321,8 +224,7 @@ function AiSummaryCard({ pack }: { pack: ExecutionPack }) {
           )}
           {pack.cost_estimate && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-              <svg width="12" height="12" viewBox="0 0 14 14" fill="none"
-                stroke={G.dark} strokeWidth="1.5" strokeLinecap="round">
+              <svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke={G.dark} strokeWidth="1.5" strokeLinecap="round">
                 <path d="M2 10l2-5 3 3 2-4 3 6" />
               </svg>
               <span style={{ fontSize: 11, color: G.dark }}>{pack.cost_estimate}</span>
@@ -330,30 +232,21 @@ function AiSummaryCard({ pack }: { pack: ExecutionPack }) {
           )}
         </div>
       )}
-
       {!!pack.risk_warnings?.length && (
         <>
-          <motion.div
-            whileTap={{ scale: 0.97 }}
-            onClick={() => setWarnOpen(p => !p)}
-            style={{ display: 'flex', alignItems: 'center', gap: 3, marginTop: 8, cursor: 'pointer', width: 'fit-content' }}
-          >
+          <motion.div whileTap={{ scale: 0.97 }} onClick={() => setWarnOpen(p => !p)}
+            style={{ display: 'flex', alignItems: 'center', gap: 3, marginTop: 8, cursor: 'pointer', width: 'fit-content' }}>
             <motion.div animate={{ rotate: warnOpen ? 180 : 0 }} transition={{ duration: 0.2 }}>
               <ChevronDown size={12} color={G.dark} />
             </motion.div>
-            <span style={{ fontSize: 13, color: '#B08D57' }}>
+            <span style={{ fontSize: 11, color: G.dark }}>
               {warnOpen ? '收起' : `${pack.risk_warnings.length} 条注意事项`}
             </span>
           </motion.div>
           <AnimatePresence>
             {warnOpen && (
-              <motion.div
-                initial={{ height: 0, opacity: 0 }}
-                animate={{ height: 'auto', opacity: 1 }}
-                exit={{ height: 0, opacity: 0 }}
-                transition={{ duration: 0.22 }}
-                style={{ overflow: 'hidden' }}
-              >
+              <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.22 }} style={{ overflow: 'hidden' }}>
                 <div style={{ marginTop: 7, paddingTop: 7, borderTop: `0.5px solid ${G.border}` }}>
                   {pack.risk_warnings.map((w, i) => (
                     <div key={i} style={{
@@ -374,10 +267,7 @@ function AiSummaryCard({ pack }: { pack: ExecutionPack }) {
 // ── 标签内容 ──
 function TabContent({ tabKey, pack }: { tabKey: TabKey; pack: ExecutionPack }) {
   const [copied, setCopied] = useState(false)
-
-  const checklistText = pack.checklist?.map(c =>
-    c.item + (c.note ? `（${c.note}）` : '')
-  ).join('、') || ''
+  const checklistText = pack.checklist?.map(c => c.item + (c.note ? `（${c.note}）` : '')).join('、') || ''
   const carryText = pack.carry_items?.join('、') || ''
   const draftText = pack.draft || ''
 
@@ -396,26 +286,20 @@ function TabContent({ tabKey, pack }: { tabKey: TabKey; pack: ExecutionPack }) {
   }
 
   if (tabKey === 'checklist') {
-    if (!pack.checklist?.length) return (
-      <div style={{ padding: '12px 14px', fontSize: 12, color: THEME.muted }}>暂无材料清单</div>
-    )
+    if (!pack.checklist?.length) return <div style={{ padding: '12px 14px', fontSize: 12, color: THEME.muted }}>暂无材料清单</div>
     return (
       <div style={{ padding: '4px 14px 12px' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 0 2px' }}>
           <span style={{ fontSize: 10, color: THEME.muted }}>点击勾选</span>
           <VoiceBtn text={`材料清单：${checklistText}`} />
         </div>
-        {pack.checklist.map((c, i) => (
-          <CheckItem key={i} item={c.item} note={c.note} />
-        ))}
+        {pack.checklist.map((c, i) => <CheckItem key={i} item={c.item} note={c.note} />)}
       </div>
     )
   }
 
   if (tabKey === 'carry') {
-    if (!pack.carry_items?.length) return (
-      <div style={{ padding: '12px 14px', fontSize: 12, color: THEME.muted }}>暂无携带物品</div>
-    )
+    if (!pack.carry_items?.length) return <div style={{ padding: '12px 14px', fontSize: 12, color: THEME.muted }}>暂无携带物品</div>
     return (
       <div style={{ padding: '4px 14px 12px' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 0 8px' }}>
@@ -429,38 +313,23 @@ function TabContent({ tabKey, pack }: { tabKey: TabKey; pack: ExecutionPack }) {
     )
   }
 
-  // draft
-  if (!draftText) return (
-    <div style={{ padding: '12px 14px', fontSize: 12, color: THEME.muted }}>暂无草稿内容</div>
-  )
+  if (!draftText) return <div style={{ padding: '12px 14px', fontSize: 12, color: THEME.muted }}>暂无草稿内容</div>
   return (
     <div style={{ padding: '4px 14px 12px' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 0 6px' }}>
         <span style={{ fontSize: 10, color: THEME.muted }}>草稿邮件</span>
         <VoiceBtn text={draftText} />
       </div>
-      <p style={{
-        fontSize: 12, color: THEME.text, lineHeight: 1.75,
-        margin: '0 0 10px', fontStyle: 'italic', whiteSpace: 'pre-wrap',
-      }}>{draftText}</p>
-      <motion.button
-        whileTap={{ scale: 0.95 }}
-        onClick={copyDraft}
-        style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          gap: 5, width: '100%', padding: '9px',
-          borderRadius: 9, border: 'none',
-          background: copied ? G.mid : G.bg,
-          color: copied ? '#fff' : G.darkest,
-          fontSize: 13, fontWeight: 500, cursor: 'pointer',
-          transition: 'background 0.15s, color 0.15s',
-        }}
-      >
+      <p style={{ fontSize: 12, color: THEME.text, lineHeight: 1.75, margin: '0 0 10px', fontStyle: 'italic', whiteSpace: 'pre-wrap' }}>{draftText}</p>
+      <motion.button whileTap={{ scale: 0.95 }} onClick={copyDraft} style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        gap: 5, width: '100%', padding: '9px', borderRadius: 9, border: 'none',
+        background: copied ? G.mid : G.bg, color: copied ? '#fff' : G.darkest,
+        fontSize: 13, fontWeight: 500, cursor: 'pointer', transition: 'background 0.15s, color 0.15s',
+      }}>
         <svg width="13" height="13" viewBox="0 0 14 14" fill="none"
-          stroke={copied ? '#fff' : G.dark} strokeWidth="1.5"
-          strokeLinecap="round" strokeLinejoin="round">
-          <rect x="4" y="4" width="8" height="8" rx="1.5" />
-          <path d="M2 10V3a1 1 0 011-1h7" />
+          stroke={copied ? '#fff' : G.dark} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+          <rect x="4" y="4" width="8" height="8" rx="1.5" /><path d="M2 10V3a1 1 0 011-1h7" />
         </svg>
         {copied ? '已复制 ✓' : '复制邮件内容'}
       </motion.button>
@@ -468,127 +337,265 @@ function TabContent({ tabKey, pack }: { tabKey: TabKey; pack: ExecutionPack }) {
   )
 }
 
-// ── 执行动作区 ──
-function ActionsArea({ actions, userId, primaryIndex, primaryReason }: {
+// ── 执行动作区（含状态反馈 + 全部执行 + 进度条）──
+const ACTION_ICON: Record<string, React.ReactNode> = {
+  navigate: <Navigation size={15} />, call: <Phone size={15} />,
+  email: <Mail size={15} />, whatsapp: <Phone size={15} />,
+  calendar: <Calendar size={15} />, download_pdf: <Download size={15} />,
+  open_url: <ExternalLink size={15} />, pay: <CreditCard size={15} />,
+  buy: <ShoppingBag size={15} />,
+}
+
+const ACTION_COLOR: Record<string, { bg: string; icon: string }> = {
+  email: { bg: '#E1F5EE', icon: G.dark },
+  navigate: { bg: '#E6F1FB', icon: '#185FA5' },
+  call: { bg: '#EAF3DE', icon: '#3B6D11' },
+  download_pdf: { bg: '#EEEDFE', icon: '#534AB7' },
+  open_url: { bg: '#EEEDFE', icon: '#534AB7' },
+  calendar: { bg: '#FAEEDA', icon: '#854F0B' },
+  buy: { bg: '#FBEAF0', icon: '#993556' },
+  pay: { bg: '#FBEAF0', icon: '#993556' },
+  whatsapp: { bg: '#EAF3DE', icon: '#3B6D11' },
+}
+
+const SHORT_LABEL: Record<string, string> = {
+  email: '邮件', navigate: '导航', call: '致电',
+  download_pdf: '下载', open_url: '打开', calendar: '提醒',
+  buy: '购买', pay: '支付', whatsapp: '消息',
+}
+
+function ActionsArea({ actions, userId, primaryIndex, primaryReason, reminderId, onAllDone }: {
   actions: ExecutionPack['actions']
   userId: string
   primaryIndex?: number
   primaryReason?: string
+  reminderId: string
+  onAllDone: () => void
 }) {
-  const [open, setOpen] = useState(false)
+  const [states, setStates] = useState<ActionState[]>(() =>
+    (actions || []).map(() => ({ status: 'idle' as ActionStatus }))
+  )
+  const [allOpen, setAllOpen] = useState(false)
+  const [allRunning, setAllRunning] = useState(false)
+  const [allDone, setAllDone] = useState(false)
+
   if (!actions?.length) return null
 
   const idx = primaryIndex ?? 0
   const primary = actions[idx]
-  const rest = actions.filter((_, i) => i !== idx)
 
-  return (
-    <div style={{ padding: '0 12px 14px' }}>
-      <div style={{ fontSize: 10, fontWeight: 500, color: THEME.muted, letterSpacing: '0.05em', marginBottom: 6 }}>
-        执行动作
-      </div>
+  const execAction = async (action: any, i: number) => {
+    setStates(prev => { const n = [...prev]; n[i] = { status: 'running' }; return n })
+    try {
+      const data = action.data || {}
+      let msg = '已完成'
+      switch (action.type) {
+        case 'navigate': {
+          const url = data.url || (data.destination ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(data.destination)}` : null)
+          if (url) window.open(url, '_blank')
+          msg = '已打开导航'; break
+        }
+        case 'call':
+          if (data.phone) window.location.href = `tel:${data.phone.replace(/\s/g, '')}`
+          msg = `拨打 ${data.phone}`; break
+        case 'email':
+          window.open(`mailto:${data.email_to}?subject=${encodeURIComponent(data.email_subject || '')}&body=${encodeURIComponent(data.email_body || '')}`)
+          fetch('/api/todo/smart-action', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ execute_action: action, user_id: userId }) }).catch(() => {})
+          msg = '已打开邮件'; break
+        case 'whatsapp':
+          window.open(`https://wa.me/${(data.phone || '').replace(/\D/g, '')}?text=${encodeURIComponent(data.message || '')}`, '_blank')
+          msg = '已打开 WhatsApp'; break
+        case 'calendar': {
+          const title = encodeURIComponent(data.calendar_title || '')
+          const date = (data.calendar_date || '').replace(/-/g, '')
+          const time = (data.calendar_time || '09:00').replace(':', '')
+          const loc = encodeURIComponent(data.calendar_location || '')
+          window.open(`https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&dates=${date}T${time}00/${date}T${time}00&location=${loc}`, '_blank')
+          fetch('/api/todo/smart-action', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ execute_action: action, user_id: userId }) }).catch(() => {})
+          msg = '已加入日历'; break
+        }
+        case 'download_pdf': {
+          const pdfUrl = data.pdf_data?.official_url || data.pdf_data?.download_url || data.url || data.official_url
+          if (pdfUrl) window.open(pdfUrl, '_blank')
+          else window.open(`https://www.google.com/search?q=${encodeURIComponent(data.pdf_type || 'form')}+fillable+PDF`, '_blank')
+          msg = '已打开表格'; break
+        }
+        case 'open_url':
+          if (data.url) window.open(data.url, '_blank')
+          msg = '已打开'; break
+        case 'pay':
+          if (data.url) window.open(data.url, '_blank')
+          else alert(data.note || data.channel || '请按提示方式缴费')
+          msg = '已查看缴费方式'; break
+        case 'buy': {
+          const ch = data.channel === 'shopee' ? 'https://shopee.co.th/search?keyword=' : 'https://www.lazada.co.th/catalog/?q='
+          window.open(ch + encodeURIComponent(data.item || ''), '_blank')
+          msg = '已打开购物'; break
+        }
+        default: msg = '已完成'
+      }
+      setStates(prev => { const n = [...prev]; n[i] = { status: 'done', message: msg }; return n })
+    } catch (e: any) {
+      setStates(prev => { const n = [...prev]; n[i] = { status: 'error', message: '执行失败' }; return n })
+    }
+  }
 
-      {/* 主动作 */}
+  const execAll = async () => {
+    setAllRunning(true)
+    setAllDone(false)
+    for (let i = 0; i < actions.length; i++) {
+      if (states[i]?.status === 'done') continue
+      await execAction(actions[i], i)
+      await new Promise(r => setTimeout(r, 600))
+    }
+    // 全部执行完自动标 done
+    try {
+      await fetch('/api/todo/smart-action', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mark_done: true, todo_id: reminderId, user_id: userId }),
+      })
+    } catch {}
+    setAllRunning(false)
+    setAllDone(true)
+    onAllDone()
+  }
+
+  const doneCount = states.filter(s => s.status === 'done').length
+  const pct = Math.round((doneCount / actions.length) * 100)
+
+  const renderBtn = (action: any, i: number, fullWidth = false) => {
+    const st = states[i] || { status: 'idle' }
+    const col = ACTION_COLOR[action.type] || { bg: 'rgba(0,0,0,0.05)', icon: THEME.text }
+    const label = SHORT_LABEL[action.type] || action.label?.slice(0, 4) || action.type
+    const isDone = st.status === 'done'
+    const isRunning = st.status === 'running'
+    const isError = st.status === 'error'
+
+    return (
       <motion.button
-        whileTap={{ scale: 0.97 }}
-        onClick={() => executeAction(primary, userId)}
+        key={i}
+        whileTap={{ scale: isRunning ? 1 : fullWidth ? 0.97 : 0.88 }}
+        onClick={() => !isRunning && !isDone && execAction(action, i)}
         style={{
-          width: '100%', display: 'flex', alignItems: 'center',
-          gap: 8, padding: '11px 14px', borderRadius: 10,
-          border: 'none', background: G.dark, cursor: 'pointer', marginBottom: 6,
+          display: 'flex', flexDirection: fullWidth ? 'row' : 'column',
+          alignItems: 'center', justifyContent: 'center',
+          gap: fullWidth ? 8 : 4,
+          padding: fullWidth ? '11px 16px' : '10px 6px',
+          borderRadius: 10,
+          border: isDone ? `0.5px solid ${G.mid}` : isError ? '0.5px solid rgba(220,38,38,0.4)' : fullWidth ? 'none' : '0.5px solid rgba(0,0,0,0.07)',
+          background: isDone ? G.bg : isError ? 'rgba(220,38,38,0.06)' : fullWidth ? G.dark : 'rgba(255,255,255,0.7)',
+          cursor: isRunning || isDone ? 'default' : 'pointer',
+          gridColumn: fullWidth ? 'span 3' : undefined,
+          transition: 'all 0.2s',
         }}
       >
-        <div style={{ width: 26, height: 26, borderRadius: 7, background: 'rgba(255,255,255,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-          <span style={{ color: '#fff', display: 'flex' }}>{ACTION_ICON[primary.type] || <ExternalLink size={15} />}</span>
+        <div style={{
+          width: fullWidth ? 26 : 28, height: fullWidth ? 26 : 28, borderRadius: 7, flexShrink: 0,
+          background: isDone ? G.bg : isError ? 'rgba(220,38,38,0.1)' : fullWidth ? 'rgba(255,255,255,0.15)' : col.bg,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}>
+          {isRunning ? (
+            <motion.div animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}>
+              <Loader size={14} color={fullWidth ? '#fff' : THEME.muted} />
+            </motion.div>
+          ) : isDone ? (
+            <CheckCircle2 size={14} color={G.deep} />
+          ) : isError ? (
+            <span style={{ fontSize: 13 }}>!</span>
+          ) : (
+            <span style={{ color: fullWidth ? '#fff' : col.icon, display: 'flex' }}>
+              {ACTION_ICON[action.type] || <ExternalLink size={15} />}
+            </span>
+          )}
         </div>
-        <div style={{ flex: 1, textAlign: 'left' }}>
-          <div style={{ fontSize: 13, fontWeight: 500, color: '#fff' }}>{SHORT_LABEL[primary.type] || primary.label}</div>
-          {primaryReason && (
-            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.65)', marginTop: 1, lineHeight: 1.4 }}>{primaryReason}</div>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{
+            fontSize: fullWidth ? 13 : 11, fontWeight: 500,
+            color: isDone ? G.dark : isError ? '#DC2626' : fullWidth ? '#fff' : THEME.text,
+          }}>
+            {isDone ? (st.message || '已完成') : isError ? '失败' : label}
+          </div>
+          {fullWidth && !isDone && !isError && (
+            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)', marginTop: 1 }}>{action.label}</div>
+          )}
+          {fullWidth && primaryReason && !isDone && !isError && (
+            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.6)', marginTop: 2, lineHeight: 1.4 }}>{primaryReason}</div>
           )}
         </div>
       </motion.button>
+    )
+  }
+
+  return (
+    <div style={{ padding: '0 12px 14px' }}>
+      <div style={{ fontSize: 10, fontWeight: 500, color: THEME.muted, letterSpacing: '0.05em', marginBottom: 6 }}>执行动作</div>
+
+      {/* 主动作 */}
+      {renderBtn(primary, idx, true)}
+
+      {/* 进度条（执行中或全部完成时显示）*/}
+      {(allRunning || allDone) && (
+        <div style={{ margin: '8px 0' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: THEME.muted, marginBottom: 4 }}>
+            <span>{allRunning ? '逐项执行中…' : '全部完成 🎉'}</span>
+            <span>{pct}%</span>
+          </div>
+          <div style={{ height: 3, background: 'rgba(0,0,0,0.07)', borderRadius: 2, overflow: 'hidden' }}>
+            <motion.div animate={{ width: `${pct}%` }} transition={{ duration: 0.4 }}
+              style={{ height: '100%', background: allDone ? G.deep : THEME.gold, borderRadius: 2 }} />
+          </div>
+        </div>
+      )}
 
       {/* 全部动作手风琴 */}
-      {rest.length > 0 && (
-        <>
-          <motion.div
-            whileTap={{ scale: 0.97 }}
-            onClick={() => setOpen(p => !p)}
-            style={{
-              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-              padding: '8px 10px', borderRadius: 8,
-              border: '0.5px solid rgba(0,0,0,0.07)',
-              background: 'rgba(255,255,255,0.6)',
-              cursor: 'pointer', marginBottom: open ? 6 : 0,
-            }}
-          >
-            <span style={{ fontSize: 13, color: G.dark }}>
-             {open ? '收起' : `全部 ${actions.length} 执行`}
-            </span>
-            <motion.div animate={{ rotate: open ? 180 : 0 }} transition={{ duration: 0.18 }}>
-              <ChevronDown size={13} color={THEME.muted} />
-            </motion.div>
-          </motion.div>
+      <motion.div whileTap={{ scale: 0.97 }} onClick={() => setAllOpen(p => !p)}
+        style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: '8px 10px', marginTop: 6, borderRadius: 8,
+          border: '0.5px solid rgba(0,0,0,0.07)',
+          background: 'rgba(255,255,255,0.6)', cursor: 'pointer',
+        }}>
+        <span style={{ fontSize: 12, color: allDone ? G.dark : THEME.muted, fontWeight: allDone ? 500 : 400 }}>
+          {allDone ? '全部执行完成 ✓' : allOpen ? '收起' : `全部 ${actions.length} 个动作`}
+        </span>
+        <motion.div animate={{ rotate: allOpen ? 180 : 0 }} transition={{ duration: 0.18 }}>
+          <ChevronDown size={13} color={THEME.muted} />
+        </motion.div>
+      </motion.div>
 
-          <AnimatePresence>
-            {open && (
-              <motion.div
-                initial={{ height: 0, opacity: 0 }}
-                animate={{ height: 'auto', opacity: 1 }}
-                exit={{ height: 0, opacity: 0 }}
-                transition={{ duration: 0.22, ease: 'easeInOut' }}
-                style={{ overflow: 'hidden' }}
-              >
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-                  {actions.map((action, i) => {
-                    const isPrimary = i === idx
-                    const col = ACTION_COLOR[action.type] || { bg: 'rgba(0,0,0,0.05)', icon: THEME.text }
-                    return (
-                      <motion.button
-                        key={i}
-                        whileTap={{ scale: 0.94 }}
-                        onClick={() => executeAction(action, userId)}
-                        style={{
-                          display: 'flex', alignItems: 'center', gap: 10,
-                          padding: '9px 12px', borderRadius: 9,
-                          border: isPrimary ? `0.5px solid ${G.mid}` : '0.5px solid rgba(0,0,0,0.06)',
-                          background: isPrimary ? G.bg : 'rgba(255,255,255,0.7)',
-                          cursor: 'pointer', textAlign: 'left',
-                        }}
-                      >
-                        <div style={{
-                          width: 28, height: 28, borderRadius: 7, flexShrink: 0,
-                          background: isPrimary ? G.bg : col.bg,
-                          display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        }}>
-                          <span style={{ color: isPrimary ? G.dark : col.icon, display: 'flex' }}>
-                            {ACTION_ICON[action.type] || <ExternalLink size={15} />}
-                          </span>
-                        </div>
-                        <div style={{ flex: 1 }}>
-                          <div style={{ fontSize: 12, fontWeight: 500, color: isPrimary ? G.darkest : THEME.text }}>
-                            {SHORT_LABEL[action.type] || action.label}
-                            {isPrimary && <span style={{ fontSize: 10, color: G.dark, marginLeft: 6 }}>推荐现在做</span>}
-                          </div>
-                          <div style={{ fontSize: 10, color: THEME.muted, marginTop: 1 }}>{action.label}</div>
-                        </div>
-                        <ExternalLink size={12} color={THEME.muted} />
-                      </motion.button>
-                    )
-                  })}
-                </div>
-              </motion.div>
+      <AnimatePresence>
+        {allOpen && (
+          <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.22, ease: 'easeInOut' }}
+            style={{ overflow: 'hidden' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0,1fr))', gap: 5, marginTop: 6 }}>
+              {actions.map((a, i) => renderBtn(a, i, false))}
+            </div>
+            {/* 全部执行按钮 */}
+            {!allDone && (
+              <motion.button whileTap={{ scale: 0.97 }} onClick={execAll} disabled={allRunning}
+                style={{
+                  width: '100%', marginTop: 8, padding: '10px',
+                  borderRadius: 10, border: 'none',
+                  background: allRunning ? 'rgba(0,0,0,0.06)' : THEME.navy,
+                  color: allRunning ? THEME.muted : '#fff',
+                  fontSize: 13, fontWeight: 500, cursor: allRunning ? 'default' : 'pointer',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                }}>
+                {allRunning ? <><Loader size={14} /> 执行中…</> : <><Zap size={14} /> 全部执行</>}
+              </motion.button>
             )}
-          </AnimatePresence>
-        </>
-      )}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }
+
 // ── 主组件 ──
 export default function TodoDetailModal({ reminder, userId, onClose, onDone, onSnooze, onSync }: Props) {
-  const [activeTab, setActiveTab] = useState<TabKey | null>(null)   // null = 全部收起
+  const [activeTab, setActiveTab] = useState<TabKey | null>(null)
   const [fetchedPack, setFetchedPack] = useState<ExecutionPack | null>(null)
   const [isLoading, setIsLoading] = useState(false)
 
@@ -627,39 +634,31 @@ export default function TodoDetailModal({ reminder, userId, onClose, onDone, onS
 
   const tabs: { key: TabKey; icon: React.ReactNode; label: string }[] = [
     { key: 'checklist', icon: <ClipboardList size={15} />, label: '材料' },
-    { key: 'carry',     icon: <ShoppingCart size={15} />,  label: '携带' },
-    { key: 'draft',     icon: <FileText size={15} />,      label: '草稿' },
+    { key: 'carry', icon: <ShoppingCart size={15} />, label: '携带' },
+    { key: 'draft', icon: <FileText size={15} />, label: '草稿' },
   ]
 
-  const handleTab = (key: TabKey) => {
-    setActiveTab(prev => prev === key ? null : key)
-  }
+  const handleTab = (key: TabKey) => setActiveTab(prev => prev === key ? null : key)
 
   return (
     <AnimatePresence>
       <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
+        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
         style={{
           position: 'fixed', inset: 0, zIndex: 200,
           display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
           padding: `0 0 max(calc(env(safe-area-inset-bottom) + 80px), 90px)`,
-          background: 'rgba(180,200,210,0.35)',
-          backdropFilter: 'blur(6px)',
+          background: 'rgba(180,200,210,0.35)', backdropFilter: 'blur(6px)',
         }}
         onClick={onClose}
       >
         <motion.div
-          initial={{ y: 100, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          exit={{ y: 100, opacity: 0 }}
+          initial={{ y: 100, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 100, opacity: 0 }}
           transition={{ type: 'spring', damping: 28, stiffness: 320 }}
           onClick={e => e.stopPropagation()}
           style={{
             width: '100%', maxWidth: 430,
-            background: 'rgba(255,255,255,0.94)',
-            backdropFilter: 'blur(40px)',
+            background: 'rgba(255,255,255,0.94)', backdropFilter: 'blur(40px)',
             borderRadius: 22, overflow: 'hidden',
             maxHeight: '82vh', display: 'flex', flexDirection: 'column',
             margin: '0 10px',
@@ -680,8 +679,7 @@ export default function TodoDetailModal({ reminder, userId, onClose, onDone, onS
                   {reminder.title}
                 </h2>
               </div>
-              <motion.div whileTap={{ scale: 0.86 }} onClick={onClose}
-                style={{ cursor: 'pointer', padding: 4, marginLeft: 8 }}>
+              <motion.div whileTap={{ scale: 0.86 }} onClick={onClose} style={{ cursor: 'pointer', padding: 4, marginLeft: 8 }}>
                 <X size={18} color={THEME.muted} />
               </motion.div>
             </div>
@@ -707,26 +705,20 @@ export default function TodoDetailModal({ reminder, userId, onClose, onDone, onS
 
             {displayPack && <AiSummaryCard pack={displayPack} />}
 
-            {/* 三个标签按钮 */}
+            {/* 标签页 */}
             {displayPack && (
               <div style={{ display: 'flex', gap: 5, padding: '10px 12px 0' }}>
                 {tabs.map(tab => {
                   const isOpen = activeTab === tab.key
                   return (
-                    <motion.button
-                      key={tab.key}
-                      whileTap={{ scale: 0.88 }}
-                      onClick={() => handleTab(tab.key)}
+                    <motion.button key={tab.key} whileTap={{ scale: 0.88 }} onClick={() => handleTab(tab.key)}
                       style={{
                         flex: 1, display: 'flex', flexDirection: 'column',
-                        alignItems: 'center', gap: 3, padding: '7px 4px',
-                        borderRadius: 9,
+                        alignItems: 'center', gap: 3, padding: '7px 4px', borderRadius: 9,
                         border: `0.5px solid ${isOpen ? G.mid : 'rgba(0,0,0,0.07)'}`,
-                        background: isOpen ? G.bg : 'rgba(255,255,255,0.7)',
-                        cursor: 'pointer',
+                        background: isOpen ? G.bg : 'rgba(255,255,255,0.7)', cursor: 'pointer',
                         transition: 'background 0.15s, border-color 0.15s',
-                      }}
-                    >
+                      }}>
                       <span style={{ color: isOpen ? G.dark : THEME.muted, display: 'flex' }}>{tab.icon}</span>
                       <span style={{ fontSize: 10, fontWeight: isOpen ? 500 : 400, color: isOpen ? G.darkest : THEME.muted }}>
                         {tab.label}
@@ -740,33 +732,31 @@ export default function TodoDetailModal({ reminder, userId, onClose, onDone, onS
               </div>
             )}
 
-            {/* 标签内容展开收起 */}
             <AnimatePresence>
               {displayPack && activeTab && (
-                <motion.div
-                  key={activeTab}
-                  initial={{ height: 0, opacity: 0 }}
-                  animate={{ height: 'auto', opacity: 1 }}
-                  exit={{ height: 0, opacity: 0 }}
-                  transition={{ duration: 0.22, ease: 'easeInOut' }}
+                <motion.div key={activeTab}
+                  initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.22, ease: 'easeInOut' }}
                   style={{
-                    overflow: 'hidden',
-                    margin: '6px 12px 0',
-                    borderRadius: 10,
-                    border: `0.5px solid ${G.border}`,
-                    background: 'rgba(255,255,255,0.7)',
-                  }}
-                >
+                    overflow: 'hidden', margin: '6px 12px 0', borderRadius: 10,
+                    border: `0.5px solid ${G.border}`, background: 'rgba(255,255,255,0.7)',
+                  }}>
                   <TabContent tabKey={activeTab} pack={displayPack} />
                 </motion.div>
               )}
             </AnimatePresence>
 
-            {/* 执行动作 */}
             {displayPack && (
               <>
                 <div style={{ height: '0.5px', background: 'rgba(0,0,0,0.06)', margin: '10px 12px 0' }} />
-                <ActionsArea actions={displayPack.actions} userId={userId} primaryIndex={displayPack.primary_action_index} primaryReason={displayPack.primary_action_reason} />
+                <ActionsArea
+                  actions={displayPack.actions}
+                  userId={userId}
+                  primaryIndex={displayPack.primary_action_index}
+                  primaryReason={displayPack.primary_action_reason}
+                  reminderId={reminder.id}
+                  onAllDone={() => onDone(reminder.id)}
+                />
               </>
             )}
 
@@ -782,29 +772,21 @@ export default function TodoDetailModal({ reminder, userId, onClose, onDone, onS
             flexShrink: 0, borderTop: '0.5px solid rgba(0,0,0,0.06)',
             padding: '10px 12px 16px', display: 'flex', gap: 8,
           }}>
-            <motion.button
-              whileTap={{ scale: 0.95 }}
-              onClick={() => onDone(reminder.id)}
+            <motion.button whileTap={{ scale: 0.95 }} onClick={() => onDone(reminder.id)}
               style={{
                 flex: 1, padding: '11px', borderRadius: 12,
-                background: 'rgba(141,200,160,0.35)',
-                border: '0.5px solid rgba(141,200,160,0.5)',
+                background: 'rgba(141,200,160,0.35)', border: '0.5px solid rgba(141,200,160,0.5)',
                 fontSize: 13, fontWeight: 600, color: THEME.text, cursor: 'pointer',
                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
-              }}
-            >
+              }}>
               <CheckCircle2 size={14} /> 已处理
             </motion.button>
-            <motion.button
-              whileTap={{ scale: 0.95 }}
-              onClick={() => onSnooze(reminder.id)}
+            <motion.button whileTap={{ scale: 0.95 }} onClick={() => onSnooze(reminder.id)}
               style={{
                 flex: 1, padding: '11px', borderRadius: 12,
-                background: 'rgba(255,255,255,0.4)',
-                border: '0.5px solid rgba(0,0,0,0.08)',
+                background: 'rgba(255,255,255,0.4)', border: '0.5px solid rgba(0,0,0,0.08)',
                 fontSize: 13, color: THEME.muted, cursor: 'pointer',
-              }}
-            >
+              }}>
               明天再说
             </motion.button>
           </div>
