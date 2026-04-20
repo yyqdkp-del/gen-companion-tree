@@ -1,9 +1,7 @@
 'use client'
-import React, { useEffect, useState, useRef, useCallback } from 'react'
+import React, { useEffect, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, CheckCircle2, Send, Navigation, Phone, Mail, Calendar, Download, ExternalLink, CreditCard, ShoppingBag, Loader, ChevronRight } from 'lucide-react'
-import { experimental_useObject as useObject } from '@ai-sdk/react'
-import { z } from 'zod'
 
 const THEME = {
   text: '#2C3E50',
@@ -12,28 +10,35 @@ const THEME = {
   navy: '#1A3C5E',
 }
 
-// ── Schema（与 route.ts 保持一致）──
-const ExecutionPackSchema = z.object({
-  summary: z.string(),
-  checklist: z.array(z.object({
-    item: z.string(),
-    status: z.enum(['ready', 'missing', 'optional']),
-    note: z.string().optional(),
-    action: z.enum(['buy', 'print', 'prepare', 'download']).nullable().optional(),
-  })),
-  actions: z.array(z.object({
-    type: z.enum(['navigate', 'call', 'email', 'whatsapp', 'calendar', 'download_pdf', 'open_url', 'pay', 'buy']),
-    label: z.string(),
-    data: z.record(z.string(), z.any()),
-  })).max(5),
-  draft: z.string().optional(),
-  depart_suggestion: z.string().optional(),
-  cost_estimate: z.string().optional(),
-  risk_warnings: z.array(z.string()),
-  carry_items: z.array(z.string()),
-})
-
-type ExecutionPack = z.infer<typeof ExecutionPackSchema>
+type ExecutionPack = {
+  summary?: string
+  checklist?: { item: string; status: string; note?: string }[]
+  actions?: {
+    type: string
+    label: string
+    data?: {
+      url?: string
+      destination?: string
+      phone?: string
+      email_to?: string
+      email_subject?: string
+      email_body?: string
+      calendar_title?: string
+      calendar_date?: string
+      calendar_time?: string
+      calendar_location?: string
+      message?: string
+      note?: string
+      item?: string
+      channel?: string
+    }
+  }[]
+  draft?: string
+  depart_suggestion?: string
+  cost_estimate?: string
+  risk_warnings?: string[]
+  carry_items?: string[]
+}
 
 type Reminder = {
   id: string
@@ -58,38 +63,38 @@ type Props = {
   onSnooze: (id: string) => void
 }
 
-// ── 动作按钮执行器 ──
+// ── 动作执行 ──
 function executeAction(action: any, userId: string) {
+  const data = action.data || {}
   switch (action.type) {
     case 'navigate':
-      window.open(action.data.url, '_blank')
+      window.open(data.url, '_blank')
       break
     case 'call':
-      window.open(`tel:${action.data.phone}`)
+      window.open(`tel:${data.phone}`)
       break
     case 'whatsapp':
-      window.open(`https://wa.me/${action.data.phone?.replace(/\D/g, '')}?text=${encodeURIComponent(action.data.message || '')}`, '_blank')
+      window.open(`https://wa.me/${data.phone?.replace(/\D/g, '')}?text=${encodeURIComponent(data.message || '')}`, '_blank')
       break
     case 'email':
-      window.open(`mailto:${action.data.email_to}?subject=${encodeURIComponent(action.data.email_subject || '')}&body=${encodeURIComponent(action.data.email_body || '')}`)
+      window.open(`mailto:${data.email_to}?subject=${encodeURIComponent(data.email_subject || '')}&body=${encodeURIComponent(data.email_body || '')}`)
       break
     case 'calendar':
-      const start = `${action.data.calendar_date}T${action.data.calendar_time || '09:00'}:00`
-      const end = `${action.data.calendar_date}T${action.data.calendar_time || '10:00'}:00`
-      window.open(`https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(action.data.calendar_title || '')}&dates=${start.replace(/[-:]/g, '')}/${end.replace(/[-:]/g, '')}&location=${encodeURIComponent(action.data.calendar_location || '')}`, '_blank')
+      const start = `${data.calendar_date}T${data.calendar_time || '09:00'}:00`
+      const end = `${data.calendar_date}T${data.calendar_time || '10:00'}:00`
+      window.open(`https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(data.calendar_title || '')}&dates=${start.replace(/[-:]/g, '')}/${end.replace(/[-:]/g, '')}&location=${encodeURIComponent(data.calendar_location || '')}`, '_blank')
       break
     case 'open_url':
     case 'download_pdf':
-      window.open(action.data.url || action.data.official_url, '_blank')
+      window.open(data.url || data.official_url, '_blank')
       break
     case 'buy':
-      const channel = action.data.channel === 'shopee' ? 'https://shopee.co.th/search?keyword=' : 'https://www.lazada.co.th/catalog/?q='
-      window.open(channel + encodeURIComponent(action.data.item || ''), '_blank')
+      const channel = data.channel === 'shopee' ? 'https://shopee.co.th/search?keyword=' : 'https://www.lazada.co.th/catalog/?q='
+      window.open(channel + encodeURIComponent(data.item || ''), '_blank')
       break
     default:
       break
   }
-  // 后台执行 Make.com webhook（email/calendar）
   if (action.type === 'email' || action.type === 'calendar') {
     fetch('/api/todo/smart-action', {
       method: 'POST',
@@ -99,7 +104,6 @@ function executeAction(action: any, userId: string) {
   }
 }
 
-// ── 动作图标 ──
 const ACTION_ICON: Record<string, React.ReactNode> = {
   navigate: <Navigation size={14} />,
   call: <Phone size={14} />,
@@ -113,23 +117,17 @@ const ACTION_ICON: Record<string, React.ReactNode> = {
 }
 
 // ── 执行包展示 ──
-function ExecutionPackView({ pack, isStreaming }: { pack: Partial<ExecutionPack>, isStreaming: boolean }) {
+function ExecutionPackView({ pack, isLoading }: { pack: ExecutionPack, isLoading: boolean }) {
   return (
     <div style={{ padding: '0 20px 16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
 
-      {/* Summary */}
       {pack.summary && (
         <div style={{ background: 'rgba(176,141,87,0.08)', borderLeft: '3px solid #B08D57', borderRadius: '0 10px 10px 0', padding: '10px 12px' }}>
           <div style={{ fontSize: 10, color: THEME.gold, fontWeight: 600, marginBottom: 4, letterSpacing: '0.1em' }}>根帮你查了</div>
           <p style={{ fontSize: 13, color: THEME.text, lineHeight: 1.7, margin: 0 }}>{pack.summary}</p>
-          {isStreaming && !pack.checklist?.length && (
-            <motion.span animate={{ opacity: [1, 0] }} transition={{ repeat: Infinity, duration: 0.6 }}
-              style={{ display: 'inline-block', width: 8, height: 14, background: THEME.gold, marginLeft: 4, verticalAlign: 'middle' }} />
-          )}
         </div>
       )}
 
-      {/* 出发时间 + 费用 */}
       {(pack.depart_suggestion || pack.cost_estimate) && (
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
           {pack.depart_suggestion && (
@@ -147,12 +145,11 @@ function ExecutionPackView({ pack, isStreaming }: { pack: Partial<ExecutionPack>
         </div>
       )}
 
-      {/* Checklist */}
       {!!pack.checklist?.length && (
         <div style={{ background: 'rgba(255,255,255,0.6)', borderRadius: 12, padding: '10px 12px', border: '1px solid rgba(0,0,0,0.06)' }}>
           <div style={{ fontSize: 10, color: THEME.muted, fontWeight: 600, marginBottom: 8, letterSpacing: '0.1em' }}>✅ 准备清单</div>
           {pack.checklist.map((item, i) => (
-            <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '4px 0', borderBottom: i < pack.checklist!.length - 1 ? '1px solid rgba(0,0,0,0.04)' : 'none' }}>
+            <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '4px 0', borderBottom: i < (pack.checklist?.length || 0) - 1 ? '1px solid rgba(0,0,0,0.04)' : 'none' }}>
               <span style={{ fontSize: 14, flexShrink: 0, marginTop: 1 }}>
                 {item.status === 'ready' ? '✅' : item.status === 'missing' ? '❌' : '⚪️'}
               </span>
@@ -165,7 +162,6 @@ function ExecutionPackView({ pack, isStreaming }: { pack: Partial<ExecutionPack>
         </div>
       )}
 
-      {/* 携带物品 */}
       {!!pack.carry_items?.length && (
         <div style={{ background: 'rgba(141,200,160,0.08)', borderRadius: 12, padding: '10px 12px' }}>
           <div style={{ fontSize: 10, color: '#3A7A2A', fontWeight: 600, marginBottom: 6 }}>🎒 携带物品</div>
@@ -177,7 +173,6 @@ function ExecutionPackView({ pack, isStreaming }: { pack: Partial<ExecutionPack>
         </div>
       )}
 
-      {/* 风险提示 */}
       {!!pack.risk_warnings?.length && (
         <div style={{ background: 'rgba(255,107,107,0.06)', borderRadius: 10, padding: '10px 12px', border: '1px solid rgba(255,107,107,0.15)' }}>
           <div style={{ fontSize: 10, color: '#FF6B6B', fontWeight: 600, marginBottom: 4 }}>⚠️ 注意</div>
@@ -187,7 +182,6 @@ function ExecutionPackView({ pack, isStreaming }: { pack: Partial<ExecutionPack>
         </div>
       )}
 
-      {/* 草稿 */}
       {pack.draft && (
         <div style={{ background: 'rgba(255,255,255,0.5)', borderRadius: 12, padding: '10px 12px', border: '1px solid rgba(0,0,0,0.06)' }}>
           <div style={{ fontSize: 10, color: THEME.muted, fontWeight: 600, marginBottom: 6 }}>📝 草稿</div>
@@ -195,7 +189,6 @@ function ExecutionPackView({ pack, isStreaming }: { pack: Partial<ExecutionPack>
         </div>
       )}
 
-      {/* 一键动作按钮 */}
       {!!pack.actions?.length && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           <div style={{ fontSize: 10, color: THEME.muted, fontWeight: 600, letterSpacing: '0.1em' }}>⚡ 一键执行</div>
@@ -203,7 +196,7 @@ function ExecutionPackView({ pack, isStreaming }: { pack: Partial<ExecutionPack>
             <motion.button key={i} whileTap={{ scale: 0.97 }}
               onClick={() => executeAction(action, '')}
               style={{ width: '100%', padding: '12px 16px', borderRadius: 14, background: i === 0 ? THEME.navy : 'rgba(255,255,255,0.6)', border: i === 0 ? 'none' : '1px solid rgba(0,0,0,0.08)', display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', textAlign: 'left' }}>
-              <span style={{ color: i === 0 ? '#fff' : THEME.text, opacity: 0.7 }}>{ACTION_ICON[action.type]}</span>
+              <span style={{ color: i === 0 ? '#fff' : THEME.text, opacity: 0.7 }}>{ACTION_ICON[action.type] || <ExternalLink size={14} />}</span>
               <span style={{ fontSize: 13, fontWeight: 600, color: i === 0 ? '#fff' : THEME.text, flex: 1 }}>{action.label}</span>
               <ChevronRight size={14} style={{ color: i === 0 ? 'rgba(255,255,255,0.5)' : THEME.muted }} />
             </motion.button>
@@ -220,30 +213,36 @@ export default function TodoDetailModal({ reminder, userId, onClose, onDone, onS
   const [reminderInput, setReminderInput] = useState('')
   const [reminderLoading, setReminderLoading] = useState(false)
   const [tab, setTab] = useState<'pack' | 'chat'>('pack')
+  const [fetchedPack, setFetchedPack] = useState<ExecutionPack | null>(null)
+  const [isLoading, setIsLoading] = useState(false)
 
-  // 缓存的执行包
   const cachedPack = reminder?.ai_action_data?.execution_pack
+  const displayPack = cachedPack || fetchedPack
 
-  // Stream hook（只在没有缓存时使用）
-  const { object: streamedPack, submit, isLoading: isStreaming } = useObject({
-    api: '/api/todo/smart-action',
-    schema: ExecutionPackSchema,
-  })
-
-  // 点开弹窗时：有缓存直接用，没有就触发 stream
   useEffect(() => {
-    if (!reminder) return
+    if (!reminder?.id) return
     setTab('pack')
     setReminderChat([])
     setReminderInput('')
+    setFetchedPack(null)
 
-    if (!cachedPack) {
-      submit({ todo_id: reminder.id, user_id: userId })
+    if (!cachedPack && !reminder.id.startsWith('temp_')) {
+      setIsLoading(true)
+      fetch('/api/todo/smart-action', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ todo_id: reminder.id, user_id: userId }),
+      })
+        .then(r => r.json())
+        .then(data => {
+          if (data.ok && data.execution_pack) {
+            setFetchedPack(data.execution_pack)
+          }
+        })
+        .catch(e => console.error('smart action error', e))
+        .finally(() => setIsLoading(false))
     }
   }, [reminder?.id])
-
-  // 当前展示的执行包：优先缓存，其次 stream
-  const displayPack: Partial<ExecutionPack> | null = cachedPack || streamedPack || null
 
   const askReminderQuestion = async (question: string) => {
     if (!question.trim() || reminderLoading) return
@@ -295,10 +294,8 @@ export default function TodoDetailModal({ reminder, userId, onClose, onDone, onS
           onClick={e => e.stopPropagation()}
           style={{ width: '100%', maxWidth: 420, background: 'rgba(255,255,255,0.92)', backdropFilter: 'blur(40px)', borderRadius: 28, overflow: 'hidden', boxShadow: '0 20px 60px rgba(0,0,0,0.15)', maxHeight: '80vh', display: 'flex', flexDirection: 'column' }}
         >
-          {/* 顶部色条 */}
           <div style={{ height: 4, background: urgencyGradient, flexShrink: 0 }} />
 
-          {/* 标题区 */}
           <div style={{ padding: '20px 20px 12px', flexShrink: 0 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
               <div style={{ flex: 1 }}>
@@ -311,38 +308,31 @@ export default function TodoDetailModal({ reminder, userId, onClose, onDone, onS
               <X size={18} onClick={onClose} style={{ cursor: 'pointer', opacity: 0.3, marginLeft: 12, flexShrink: 0 }} />
             </div>
 
-            {/* Tab 切换 */}
-            <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
+            <div style={{ display: 'flex', gap: 8, marginTop: 14, alignItems: 'center' }}>
               {(['pack', 'chat'] as const).map(t => (
                 <button key={t} onClick={() => setTab(t)}
                   style={{ padding: '6px 16px', borderRadius: 20, border: 'none', fontSize: 12, fontWeight: 600, cursor: 'pointer', background: tab === t ? THEME.navy : 'rgba(0,0,0,0.06)', color: tab === t ? '#fff' : THEME.muted }}>
                   {t === 'pack' ? '⚡ 一键办' : '💬 问日安'}
                 </button>
               ))}
-              {isStreaming && tab === 'pack' && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginLeft: 4 }}>
+              {isLoading && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                   <Loader size={12} style={{ color: THEME.gold }} />
-                  <span style={{ fontSize: 11, color: THEME.gold }}>生成中…</span>
+                  <span style={{ fontSize: 11, color: THEME.gold }}>准备中…</span>
                 </div>
               )}
             </div>
           </div>
 
-          {/* 内容区（可滚动）*/}
           <div style={{ overflowY: 'auto', flex: 1 }}>
-
-            {/* 执行包 Tab */}
             {tab === 'pack' && (
               <>
-                {/* 没有任何数据且不在 streaming */}
-                {!displayPack && !isStreaming && (
+                {!displayPack && !isLoading && (
                   <div style={{ padding: '40px 20px', textAlign: 'center' }}>
                     <div style={{ fontSize: 13, color: THEME.muted }}>暂无执行包</div>
                   </div>
                 )}
-
-                {/* streaming 中但还没有 summary */}
-                {isStreaming && !displayPack?.summary && (
+                {isLoading && !displayPack && (
                   <div style={{ padding: '30px 20px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
                     <div style={{ display: 'flex', gap: 6 }}>
                       {[0, 1, 2].map(i => (
@@ -355,13 +345,10 @@ export default function TodoDetailModal({ reminder, userId, onClose, onDone, onS
                     <span style={{ fontSize: 12, color: THEME.muted }}>根正在为你查询准备…</span>
                   </div>
                 )}
-
-                {/* 有数据就展示 */}
-                {displayPack && <ExecutionPackView pack={displayPack} isStreaming={isStreaming} />}
+                {displayPack && <ExecutionPackView pack={displayPack} isLoading={isLoading} />}
               </>
             )}
 
-            {/* 聊天 Tab */}
             {tab === 'chat' && (
               <div style={{ padding: '0 20px 16px' }}>
                 {reminderChat.length === 0 && (
@@ -395,7 +382,6 @@ export default function TodoDetailModal({ reminder, userId, onClose, onDone, onS
             )}
           </div>
 
-          {/* 底部操作栏 */}
           <div style={{ flexShrink: 0, borderTop: '1px solid rgba(0,0,0,0.06)' }}>
             {tab === 'chat' && (
               <div style={{ padding: '10px 20px', display: 'flex', gap: 8, alignItems: 'center' }}>
