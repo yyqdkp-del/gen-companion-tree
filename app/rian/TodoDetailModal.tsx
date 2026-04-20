@@ -52,6 +52,8 @@ type ExecutionPack = {
   cost_estimate?: string
   risk_warnings?: string[]
   carry_items?: string[]
+  primary_action_index?: number
+primary_action_reason?: string
 }
 
 type Reminder = {
@@ -467,68 +469,123 @@ function TabContent({ tabKey, pack }: { tabKey: TabKey; pack: ExecutionPack }) {
 }
 
 // ── 执行动作区 ──
-function ActionsArea({ actions, userId }: { actions: ExecutionPack['actions']; userId: string }) {
+function ActionsArea({ actions, userId, primaryIndex, primaryReason }: {
+  actions: ExecutionPack['actions']
+  userId: string
+  primaryIndex?: number
+  primaryReason?: string
+}) {
+  const [open, setOpen] = useState(false)
   if (!actions?.length) return null
-  const [primary, ...rest] = actions
 
-  const renderBtn = (action: any, index: number, fullWidth = false) => {
-    const col = ACTION_COLOR[action.type] || { bg: 'rgba(0,0,0,0.05)', icon: THEME.text }
-    const label = SHORT_LABEL[action.type] || action.label?.slice(0, 4) || action.type
-    return (
-      <motion.button
-        key={index}
-        whileTap={{ scale: fullWidth ? 0.97 : 0.88 }}
-        onClick={() => executeAction(action, userId)}
-        style={{
-          display: 'flex',
-          flexDirection: fullWidth ? 'row' : 'column',
-          alignItems: 'center', justifyContent: 'center',
-          gap: fullWidth ? 8 : 4,
-          padding: fullWidth ? '11px 16px' : '10px 6px',
-          borderRadius: 10,
-          border: fullWidth ? 'none' : '0.5px solid rgba(0,0,0,0.07)',
-          background: fullWidth ? G.dark : 'rgba(255,255,255,0.7)',
-          cursor: 'pointer',
-          gridColumn: fullWidth ? 'span 3' : undefined,
-        }}
-      >
-        <div style={{
-          width: fullWidth ? 26 : 28, height: fullWidth ? 26 : 28,
-          borderRadius: 7, flexShrink: 0,
-          background: fullWidth ? 'rgba(255,255,255,0.15)' : col.bg,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-        }}>
-          <span style={{ color: fullWidth ? '#fff' : col.icon, display: 'flex' }}>
-            {ACTION_ICON[action.type] || <ExternalLink size={15} />}
-          </span>
-        </div>
-        <div style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: fullWidth ? 13 : 11, fontWeight: 500, color: fullWidth ? '#fff' : THEME.text }}>
-            {label}
-          </div>
-          {fullWidth && (
-            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)', marginTop: 1 }}>
-              {action.label}
-            </div>
-          )}
-        </div>
-      </motion.button>
-    )
-  }
+  const idx = primaryIndex ?? 0
+  const primary = actions[idx]
+  const rest = actions.filter((_, i) => i !== idx)
 
   return (
     <div style={{ padding: '0 12px 14px' }}>
       <div style={{ fontSize: 10, fontWeight: 500, color: THEME.muted, letterSpacing: '0.05em', marginBottom: 6 }}>
         执行动作
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0,1fr))', gap: 5 }}>
-        {renderBtn(primary, 0, true)}
-        {rest.map((a, i) => renderBtn(a, i + 1, false))}
-      </div>
+
+      {/* 主动作 */}
+      <motion.button
+        whileTap={{ scale: 0.97 }}
+        onClick={() => executeAction(primary, userId)}
+        style={{
+          width: '100%', display: 'flex', alignItems: 'center',
+          gap: 8, padding: '11px 14px', borderRadius: 10,
+          border: 'none', background: G.dark, cursor: 'pointer', marginBottom: 6,
+        }}
+      >
+        <div style={{ width: 26, height: 26, borderRadius: 7, background: 'rgba(255,255,255,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+          <span style={{ color: '#fff', display: 'flex' }}>{ACTION_ICON[primary.type] || <ExternalLink size={15} />}</span>
+        </div>
+        <div style={{ flex: 1, textAlign: 'left' }}>
+          <div style={{ fontSize: 13, fontWeight: 500, color: '#fff' }}>{SHORT_LABEL[primary.type] || primary.label}</div>
+          {primaryReason && (
+            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.65)', marginTop: 1, lineHeight: 1.4 }}>{primaryReason}</div>
+          )}
+        </div>
+      </motion.button>
+
+      {/* 全部动作手风琴 */}
+      {rest.length > 0 && (
+        <>
+          <motion.div
+            whileTap={{ scale: 0.97 }}
+            onClick={() => setOpen(p => !p)}
+            style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              padding: '8px 10px', borderRadius: 8,
+              border: '0.5px solid rgba(0,0,0,0.07)',
+              background: 'rgba(255,255,255,0.6)',
+              cursor: 'pointer', marginBottom: open ? 6 : 0,
+            }}
+          >
+            <span style={{ fontSize: 11, color: THEME.muted }}>
+              {open ? '收起全部动作' : `查看全部 ${actions.length} 个动作`}
+            </span>
+            <motion.div animate={{ rotate: open ? 180 : 0 }} transition={{ duration: 0.18 }}>
+              <ChevronDown size={13} color={THEME.muted} />
+            </motion.div>
+          </motion.div>
+
+          <AnimatePresence>
+            {open && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: 'auto', opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={{ duration: 0.22, ease: 'easeInOut' }}
+                style={{ overflow: 'hidden' }}
+              >
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                  {actions.map((action, i) => {
+                    const isPrimary = i === idx
+                    const col = ACTION_COLOR[action.type] || { bg: 'rgba(0,0,0,0.05)', icon: THEME.text }
+                    return (
+                      <motion.button
+                        key={i}
+                        whileTap={{ scale: 0.94 }}
+                        onClick={() => executeAction(action, userId)}
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: 10,
+                          padding: '9px 12px', borderRadius: 9,
+                          border: isPrimary ? `0.5px solid ${G.mid}` : '0.5px solid rgba(0,0,0,0.06)',
+                          background: isPrimary ? G.bg : 'rgba(255,255,255,0.7)',
+                          cursor: 'pointer', textAlign: 'left',
+                        }}
+                      >
+                        <div style={{
+                          width: 28, height: 28, borderRadius: 7, flexShrink: 0,
+                          background: isPrimary ? G.bg : col.bg,
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        }}>
+                          <span style={{ color: isPrimary ? G.dark : col.icon, display: 'flex' }}>
+                            {ACTION_ICON[action.type] || <ExternalLink size={15} />}
+                          </span>
+                        </div>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontSize: 12, fontWeight: 500, color: isPrimary ? G.darkest : THEME.text }}>
+                            {SHORT_LABEL[action.type] || action.label}
+                            {isPrimary && <span style={{ fontSize: 10, color: G.dark, marginLeft: 6 }}>推荐现在做</span>}
+                          </div>
+                          <div style={{ fontSize: 10, color: THEME.muted, marginTop: 1 }}>{action.label}</div>
+                        </div>
+                        <ExternalLink size={12} color={THEME.muted} />
+                      </motion.button>
+                    )
+                  })}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </>
+      )}
     </div>
   )
 }
-
 // ── 主组件 ──
 export default function TodoDetailModal({ reminder, userId, onClose, onDone, onSnooze, onSync }: Props) {
   const [activeTab, setActiveTab] = useState<TabKey | null>(null)   // null = 全部收起
@@ -709,7 +766,7 @@ export default function TodoDetailModal({ reminder, userId, onClose, onDone, onS
             {displayPack && (
               <>
                 <div style={{ height: '0.5px', background: 'rgba(0,0,0,0.06)', margin: '10px 12px 0' }} />
-                <ActionsArea actions={displayPack.actions} userId={userId} />
+                <ActionsArea actions={displayPack.actions} userId={userId} primaryIndex={displayPack.primary_action_index} primaryReason={displayPack.primary_action_reason} />
               </>
             )}
 
