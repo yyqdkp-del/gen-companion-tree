@@ -132,8 +132,10 @@ Grok实时信息：${grokResult || '暂无'}
 处理指南：${dimensionGuides[dimension] || '提供全面行动建议'}
 
 严格只输出JSON，不加任何其他文字：
-{
+{ 
   "summary": "2-3句话总结最重要的实时信息",
+  "primary_action_index": 0,
+  "primary_action_reason": "根据截止时间和任务进度，说明为什么现在最该做这一步，一句话，面向妈妈说话",
   "checklist": [{"item": "名称", "status": "ready|missing|optional", "note": "说明"}],
   "actions": [
     {
@@ -165,7 +167,9 @@ Grok实时信息：${grokResult || '暂无'}
 }
 
 今天日期：${new Date().toLocaleDateString('zh-CN')}
-actions最多5个，选最重要的。`
+actions最多5个，选最重要的。
+primary_action_index 是 actions 数组里现在最该执行的那个的下标，根据截止时间和任务紧迫程度判断。
+primary_action_reason 解释为什么现在先做这个，一句话，用"你"称呼妈妈，口语化。`
 }
 
 // ══ 主处理函数 ══
