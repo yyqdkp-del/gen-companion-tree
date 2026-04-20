@@ -91,7 +91,12 @@ function executeAction(action: any, userId: string) {
     case 'whatsapp':
       window.open(`https://wa.me/${data.phone?.replace(/\D/g, '')}?text=${encodeURIComponent(data.message || '')}`, '_blank'); break
     case 'email':
-      window.open(`mailto:${data.email_to}?subject=${encodeURIComponent(data.email_subject || '')}&body=${encodeURIComponent(data.email_body || '')}`); break
+  if (data.email_to) {
+    window.open(`mailto:${data.email_to}?subject=${encodeURIComponent(data.email_subject || '')}&body=${encodeURIComponent(data.email_body || '')}`)
+  } else {
+    alert('收件人地址未设置，请检查任务数据')
+  }
+  break
     case 'calendar': {
       const start = `${data.calendar_date}T${data.calendar_time || '09:00'}:00`
       const end = `${data.calendar_date}T${data.calendar_time || '10:00'}:00`
@@ -107,6 +112,9 @@ function executeAction(action: any, userId: string) {
         : 'https://www.lazada.co.th/catalog/?q='
       window.open(ch + encodeURIComponent(data.item || ''), '_blank'); break
     }
+      case 'pay':
+  if (data.url) window.open(data.url, '_blank')
+  break
     default: break
   }
   if (action.type === 'email' || action.type === 'calendar') {
