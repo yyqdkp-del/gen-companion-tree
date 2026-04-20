@@ -1,7 +1,7 @@
 export const dynamic = 'force-dynamic'
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { streamText, Output } from 'ai'
+import { streamObject } from 'ai'
 import { anthropic } from '@ai-sdk/anthropic'
 import { z } from 'zod'
 
@@ -12,7 +12,6 @@ const supabase = createClient(
 
 const MAKE_WEBHOOK_URL = process.env.NEXT_PUBLIC_MAKE_WEBHOOK_URL || ''
 
-// ══ Zod Schema ══
 const ExecutionPackSchema = z.object({
   summary: z.string(),
   checklist: z.array(z.object({
@@ -33,7 +32,6 @@ const ExecutionPackSchema = z.object({
   carry_items: z.array(z.string()),
 })
 
-// ══ 读取家庭档案 ══
 async function getFamilyData(userId: string, needed: string[]) {
   const result: any = {}
   await Promise.all(needed.map(async (field) => {
@@ -63,7 +61,6 @@ async function getFamilyData(userId: string, needed: string[]) {
   return result
 }
 
-// ══ Grok 实时搜索 ══
 async function grokSearch(keywords: string[]): Promise<string> {
   if (!keywords.length) return ''
   try {
@@ -87,7 +84,6 @@ async function grokSearch(keywords: string[]): Promise<string> {
   }
 }
 
-// ══ PDF 预填数据 ══
 function buildPDFData(pdfType: string, familyData: any): any {
   const profile = familyData.profile?.[0] || {}
   switch (pdfType) {
@@ -120,7 +116,6 @@ function buildPDFData(pdfType: string, familyData: any): any {
   }
 }
 
-// ══ 执行动作 Make.com ══
 async function executeAction(action: any, userId: string) {
   if (!MAKE_WEBHOOK_URL) return { ok: false, error: 'No webhook' }
   try {
@@ -147,7 +142,6 @@ async function executeAction(action: any, userId: string) {
   }
 }
 
-// ══ Prompt ══
 function buildPrompt(todo: any, brainInstruction: any, familyData: any, grokResult: string): string {
   const dimensionGuides: Record<string, string> = {
     compliance: '签证/证件：核对护照有效期、签证类型到期日、材料清单、移民局地址导航、排队时间、携带清单、费用缴费方式、机构电话',
@@ -185,7 +179,6 @@ Grok实时信息：${grokResult || '暂无'}
 - 今天日期：${new Date().toLocaleDateString('zh-CN')}`
 }
 
-// ══ 主处理函数 ══
 export async function POST(req: NextRequest) {
   try {
     const { todo_id, user_id, execute_action } = await req.json()
@@ -210,13 +203,12 @@ export async function POST(req: NextRequest) {
       getFamilyData(user_id, brainInstruction.family_data_needed || []),
     ])
 
-    const result = streamText({
+    const result = streamObject({
       model: anthropic('claude-sonnet-4-6'),
-      output: Output.object({ schema: ExecutionPackSchema }),
+      schema: ExecutionPackSchema,
       maxTokens: 8000,
       prompt: buildPrompt(todo, brainInstruction, familyData, grokResult),
-      onFinish: async ({ experimental_output }) => {
-        const object = experimental_output
+      onFinish: async ({ object }) => {
         if (!object) return
         const finalObject: any = JSON.parse(JSON.stringify(object))
         if (finalObject.actions) {
