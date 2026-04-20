@@ -56,6 +56,7 @@ type Reminder = {
 }
 
 type Props = {
+  onSync?: () => void
   reminder: Reminder | null
   userId: string
   onClose: () => void
@@ -236,8 +237,9 @@ export default function TodoDetailModal({ reminder, userId, onClose, onDone, onS
         .then(r => r.json())
         .then(data => {
           if (data.ok && data.execution_pack) {
-            setFetchedPack(data.execution_pack)
-          }
+  setFetchedPack(data.execution_pack)
+  onSync?.()
+}
         })
         .catch(e => console.error('smart action error', e))
         .finally(() => setIsLoading(false))
