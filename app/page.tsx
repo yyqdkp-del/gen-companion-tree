@@ -12,6 +12,7 @@ import {
   Mic, Camera, MessageSquare, Phone, Send, Square, Upload,
 } from 'lucide-react'
 export const dynamic = 'force-dynamic'
+import TodoDetailModal from '@/app/rian/TodoDetailModal'
 
 import { createBrowserClient } from '@supabase/ssr'
 import { useApp } from '@/app/context/AppContext'
@@ -1382,29 +1383,32 @@ const uploadStatusText: Record<string, string> = { idle: '', uploading: '处理�
         </div>
       )}
 
-      <AnimatePresence>
-        {modal === 'child' && <ChildSheet key="child" children={kids} sel={selKid} onSel={c => setSelKid(c)} onClose={() => setModal(null)} onAdd={() => setModal('addChild')} />}
-        {modal === 'todo' && <TodoSheet key="todo" todos={todos} onClose={() => setModal(null)} onAction={async t => {
-          setOneTapTodo(t)
-          setModal('oneTap')
-          await handleOneTap(t)
-        }} />}
+     <AnimatePresence>
+  {modal === 'child' && <ChildSheet key="child" children={kids} sel={selKid} onSel={c => setSelKid(c)} onClose={() => setModal(null)} onAdd={() => setModal('addChild')} />}
+  {modal === 'todo' && <TodoSheet key="todo" todos={todos} onClose={() => setModal(null)} onAction={t => {
+    setOneTapTodo(t)
+    setModal('oneTap')
+  }} />}
         {modal === 'hotspot' && <HotspotSheet key="hotspot" hotspots={hotspots} onClose={() => setModal(null)} onPatrol={handlePatrol} patrolling={patrolling} onHotspotAction={handleHotspotAction} />}
         {modal === 'addChild' && <AddChildSheet key="add" onClose={() => setModal(null)} onSave={handleAddChild} />}
-        {modal === 'oneTap' && oneTapTodo && (
-          <OneTapSheet
-            key="onetap"
-            todo={oneTapTodo}
-            onClose={() => { setOneTapTodo(null); setModal('todo'); setExecutionPack(null) }}
-            executionPack={executionPack}
-            smartLoading={smartLoading}
-            onExecuteAction={handleExecuteAction}
-            onExecuteAll={handleExecuteAll}
-            actionStates={actionStates}
-            executeAllRunning={executeAllRunning}
-            executeAllDone={executeAllDone}
-          />
-        )}
+       {modal === 'oneTap' && oneTapTodo && (
+  <TodoDetailModal
+    reminder={{
+      id: oneTapTodo.id,
+      title: oneTapTodo.title,
+      description: oneTapTodo.description,
+      category: oneTapTodo.category,
+      urgency_level: oneTapTodo.priority === 'red' ? 3 : oneTapTodo.priority === 'orange' ? 2 : 1,
+      due_date: oneTapTodo.due_date,
+      status: oneTapTodo.status,
+      ai_action_data: oneTapTodo.ai_action_data,
+    }}
+    userId={userId}
+    onClose={() => { setOneTapTodo(null); setModal('todo') }}
+    onDone={async (id) => { await markDone(id); setModal(null) }}
+    onSnooze={async (id) => { await snooze(id); setModal(null) }}
+  />
+)}
         {modal === 'input' && <InputSheet key="input" onClose={() => setModal(null)} userId={userId} />}
       </AnimatePresence>
     <InstallPWA />
