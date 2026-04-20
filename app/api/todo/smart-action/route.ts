@@ -210,10 +210,11 @@ export async function POST(req: NextRequest) {
     }
 
     const brainInstruction = todo.ai_action_data?.brain_instruction || {}
-    const [grokResult, familyData] = await Promise.all([
-      grokSearch(brainInstruction.search_keywords || []),
-      getFamilyData(user_id, brainInstruction.family_data_needed || []),
-    ])
+    const [, familyData] = await Promise.all([
+  Promise.resolve(),
+  getFamilyData(user_id, brainInstruction.family_data_needed || []),
+])
+const grokResult = todo.ai_action_data?.grok_result || ''
 
     const result = streamObject({
       model: anthropic('claude-sonnet-4-6'),
