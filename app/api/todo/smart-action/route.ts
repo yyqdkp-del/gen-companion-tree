@@ -220,14 +220,18 @@ export async function POST(req: NextRequest) {
     }
 
     // PDF 数据填充
-    if (executionPack.actions) {
-      executionPack.actions = executionPack.actions.map((action: any) => {
-        if (action.type === 'download_pdf' && action.data?.pdf_type) {
-          action.data.pdf_data = buildPDFData(action.data.pdf_type, familyData)
-        }
-        return action
-      })
+   if (executionPack.actions) {
+  executionPack.actions = executionPack.actions.map((action: any) => {
+    if (action.type === 'download_pdf' && action.data?.pdf_type) {
+      action.data.pdf_data = buildPDFData(action.data.pdf_type, familyData)
     }
+    // 补全 navigate url
+    if (action.type === 'navigate' && action.data?.destination && !action.data?.url) {
+      action.data.url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(action.data.destination)}`
+    }
+    return action
+  })
+}
 
     // 存库
     const existingData = todo.ai_action_data || {}
