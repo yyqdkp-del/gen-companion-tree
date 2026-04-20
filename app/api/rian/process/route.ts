@@ -549,7 +549,29 @@ if (extracted.length > 0) {
   await triggerMake(extracted, input_type)
   todoIds = await syncToThreeDrops(supabase, extracted, rawInput?.id || null, activeUserId)
 }
-
+// 异步预热 Grok 结果存库（不阻塞返回）
+;(async () => {
+  for (const e of extracted) {
+    const keywords = e.search_keywords
+    if (!keywords?.length) continue
+    const idx = extracted.indexOf(e)
+    const todoId = todoIds[idx]
+    if (!todoId) continue
+    try {
+      const grokResult = await grokSearch(keywords.join('，') + '，清迈本地最新情况')
+      if (!grokResult) continue
+      const { data: todo } = await supabase.from('todo_items').select('ai_action_data').eq('id', todoId).single()
+      await supabase.from('todo_items').update({
+        ai_action_data: {
+          ...(todo?.ai_action_data || {}),
+          grok_result: grokResult,
+        }
+      }).eq('id', todoId)
+    } catch (e) {
+      console.error('Grok预热失败:', e)
+    }
+  }
+})()
 // 8. 标记已处理
 await supabase.from('raw_inputs').update({ processed: true, extracted_events: extracted }).eq('id', rawInput?.id).eq('user_id', activeUserId)
 
