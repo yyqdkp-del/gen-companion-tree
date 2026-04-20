@@ -68,6 +68,11 @@ type Reminder = {
   status: string
   action_url?: string
   action_label?: string
+  ai_action_data?: {
+  execution_pack?: any
+  brain_instruction?: any
+  prepared_at?: string
+}
 }
 
 type Child = {
@@ -115,14 +120,15 @@ const reminders = useMemo<Reminder[]>(() => ctxTodos
     return (o[a.priority] ?? 2) - (o[b.priority] ?? 2)
   })
   .map((t: any) => ({
-    id: t.id,
-    title: t.title,
-    description: t.description,
-    category: t.category,
-    urgency_level: t.priority === 'red' ? 3 : t.priority === 'orange' ? 2 : 1,
-    due_date: t.due_date,
-    status: t.status,
-  })), [ctxTodos, todayStr])
+  id: t.id,
+  title: t.title,
+  description: t.description,
+  category: t.category,
+  urgency_level: t.priority === 'red' ? 3 : t.priority === 'orange' ? 2 : 1,
+  due_date: t.due_date,
+  status: t.status,
+  ai_action_data: t.ai_action_data,
+})), [ctxTodos, todayStr])
  // ── 时钟 ──
   useEffect(() => {
     setMounted(true)
