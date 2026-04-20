@@ -341,8 +341,8 @@ function AiSummaryCard({ pack }: { pack: ExecutionPack }) {
             <motion.div animate={{ rotate: warnOpen ? 180 : 0 }} transition={{ duration: 0.2 }}>
               <ChevronDown size={12} color={G.dark} />
             </motion.div>
-            <span style={{ fontSize: 11, color: G.dark }}>
-              {warnOpen ? '收起' : `还有 ${pack.risk_warnings.length} 条注意事项`}
+            <span style={{ fontSize: 13, color: '#B08D57' }}>
+              {warnOpen ? '收起' : `${pack.risk_warnings.length} 条注意事项`}
             </span>
           </motion.div>
           <AnimatePresence>
@@ -523,8 +523,8 @@ function ActionsArea({ actions, userId, primaryIndex, primaryReason }: {
               cursor: 'pointer', marginBottom: open ? 6 : 0,
             }}
           >
-            <span style={{ fontSize: 11, color: THEME.muted }}>
-              {open ? '收起全部动作' : `查看全部 ${actions.length} 个动作`}
+            <span style={{ fontSize: 13, color: G.dark }}>
+             {open ? '收起' : `全部 ${actions.length} 执行`}
             </span>
             <motion.div animate={{ rotate: open ? 180 : 0 }} transition={{ duration: 0.18 }}>
               <ChevronDown size={13} color={THEME.muted} />
