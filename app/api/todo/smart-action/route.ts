@@ -1,9 +1,8 @@
 export const dynamic = 'force-dynamic'
+export const maxDuration = 60
+
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { streamObject } from 'ai'
-import { anthropic } from '@ai-sdk/anthropic'
-import { z } from 'zod'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || '',
@@ -12,38 +11,7 @@ const supabase = createClient(
 
 const MAKE_WEBHOOK_URL = process.env.NEXT_PUBLIC_MAKE_WEBHOOK_URL || ''
 
-const ExecutionPackSchema = z.object({
-  summary: z.string(),
-  checklist: z.array(z.object({
-    item: z.string(),
-    status: z.string(),
-    note: z.string().optional(),
-  })),
-  actions: z.array(z.object({
-    type: z.string(),
-    label: z.string(),
-    url: z.string().optional(),
-    destination: z.string().optional(),
-    phone: z.string().optional(),
-    email_to: z.string().optional(),
-    email_subject: z.string().optional(),
-    email_body: z.string().optional(),
-    calendar_title: z.string().optional(),
-    calendar_date: z.string().optional(),
-    calendar_time: z.string().optional(),
-    calendar_location: z.string().optional(),
-    message: z.string().optional(),
-    note: z.string().optional(),
-    item: z.string().optional(),
-    channel: z.string().optional(),
-  })),
-  draft: z.string().optional(),
-  depart_suggestion: z.string().optional(),
-  cost_estimate: z.string().optional(),
-  risk_warnings: z.array(z.string()),
-  carry_items: z.array(z.string()),
-})
-
+// ══ 读取家庭档案 ══
 async function getFamilyData(userId: string, needed: string[]) {
   const result: any = {}
   await Promise.all(needed.map(async (field) => {
@@ -73,29 +41,7 @@ async function getFamilyData(userId: string, needed: string[]) {
   return result
 }
 
-async function grokSearch(keywords: string[]): Promise<string> {
-  if (!keywords.length) return ''
-  try {
-    const response = await fetch('https://api.x.ai/v1/chat/completions', {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${process.env.XAI_API_KEY}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'grok-3-fast',
-        search_enabled: true,
-        messages: [
-          { role: 'system', content: '你是清迈本地情报员。用中文简洁回答，提供实时准确信息，包括地址、电话、营业时间、最新政策、价格等具体数据。' },
-          { role: 'user', content: keywords.join('、') + '，请提供最新实时信息，重点关注清迈本地情况' }
-        ],
-      }),
-    })
-    const data = await response.json()
-    return data.choices?.[0]?.message?.content || ''
-  } catch (e: any) {
-    console.error('Grok搜索失败:', e?.message)
-    return ''
-  }
-}
-
+// ══ PDF 预填数据 ══
 function buildPDFData(pdfType: string, familyData: any): any {
   const profile = familyData.profile?.[0] || {}
   switch (pdfType) {
@@ -128,6 +74,7 @@ function buildPDFData(pdfType: string, familyData: any): any {
   }
 }
 
+// ══ 执行动作 Make.com ══
 async function executeAction(action: any, userId: string) {
   if (!MAKE_WEBHOOK_URL) return { ok: false, error: 'No webhook' }
   try {
@@ -136,14 +83,14 @@ async function executeAction(action: any, userId: string) {
         await fetch(MAKE_WEBHOOK_URL, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ type: 'email', to: action.data.email_to, subject: action.data.email_subject, body: action.data.email_body, user_id: userId }),
+          body: JSON.stringify({ type: 'email', to: action.data?.email_to, subject: action.data?.email_subject, body: action.data?.email_body, user_id: userId }),
         })
         return { ok: true, message: '邮件已发送' }
       case 'calendar':
         await fetch(MAKE_WEBHOOK_URL, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ type: 'calendar', title: action.data.calendar_title, start_time: `${action.data.calendar_date}T${action.data.calendar_time || '09:00'}:00`, end_time: `${action.data.calendar_date}T${action.data.calendar_time || '11:00'}:00`, location: action.data.calendar_location, user_id: userId }),
+          body: JSON.stringify({ type: 'calendar', title: action.data?.calendar_title, start_time: `${action.data?.calendar_date}T${action.data?.calendar_time || '09:00'}:00`, end_time: `${action.data?.calendar_date}T${action.data?.calendar_time || '11:00'}:00`, location: action.data?.calendar_location, user_id: userId }),
         })
         return { ok: true, message: '已加入日历' }
       default:
@@ -154,6 +101,7 @@ async function executeAction(action: any, userId: string) {
   }
 }
 
+// ══ Prompt ══
 function buildPrompt(todo: any, brainInstruction: any, familyData: any, grokResult: string): string {
   const dimensionGuides: Record<string, string> = {
     compliance: '签证/证件：核对护照有效期、签证类型到期日、材料清单、移民局地址导航、排队时间、携带清单、费用缴费方式、机构电话',
@@ -167,6 +115,7 @@ function buildPrompt(todo: any, brainInstruction: any, familyData: any, grokResu
     selfcare: '自我：课程社群推荐、计划表、习惯提醒',
   }
   const dimension = brainInstruction?.dimension || 'other'
+
   return `你是日安执行引擎，为清迈陪读家庭生成一键执行包。
 
 待办：${todo.title}
@@ -182,15 +131,44 @@ Grok实时信息：${grokResult || '暂无'}
 
 处理指南：${dimensionGuides[dimension] || '提供全面行动建议'}
 
-规则：
-- actions 最多5个，选最重要的
-- navigate 必须包含 destination 和完整 Google Maps url
-- call 必须包含完整国际电话号码
-- email 必须包含 email_to、email_subject、email_body
-- calendar 必须包含 calendar_title、calendar_date(YYYY-MM-DD)、calendar_time(HH:MM)
-- 今天日期：${new Date().toLocaleDateString('zh-CN')}`
+严格只输出JSON，不加任何其他文字：
+{
+  "summary": "2-3句话总结最重要的实时信息",
+  "checklist": [{"item": "名称", "status": "ready|missing|optional", "note": "说明"}],
+  "actions": [
+    {
+      "type": "navigate|call|email|whatsapp|calendar|download_pdf|open_url|pay|buy",
+      "label": "按钮文字",
+      "data": {
+        "url": "链接",
+        "destination": "目的地",
+        "phone": "电话含国家代码",
+        "email_to": "收件人",
+        "email_subject": "主题",
+        "email_body": "正文",
+        "calendar_title": "日历标题",
+        "calendar_date": "YYYY-MM-DD",
+        "calendar_time": "HH:MM",
+        "calendar_location": "地点",
+        "message": "消息内容",
+        "note": "说明",
+        "item": "商品名",
+        "channel": "lazada|shopee"
+      }
+    }
+  ],
+  "draft": "草稿文字",
+  "depart_suggestion": "建议出发时间",
+  "cost_estimate": "预估费用",
+  "risk_warnings": ["风险1"],
+  "carry_items": ["携带物品1"]
 }
 
+今天日期：${new Date().toLocaleDateString('zh-CN')}
+actions最多5个，选最重要的。`
+}
+
+// ══ 主处理函数 ══
 export async function POST(req: NextRequest) {
   try {
     const { todo_id, user_id, execute_action } = await req.json()
@@ -210,41 +188,59 @@ export async function POST(req: NextRequest) {
     }
 
     const brainInstruction = todo.ai_action_data?.brain_instruction || {}
-    const [, familyData] = await Promise.all([
-  Promise.resolve(),
-  getFamilyData(user_id, brainInstruction.family_data_needed || []),
-])
-const grokResult = todo.ai_action_data?.grok_result || ''
+    const grokResult = todo.ai_action_data?.grok_result || ''
 
-    const result = streamObject({
-      model: anthropic('claude-sonnet-4-6'),
-      schema: ExecutionPackSchema,
-      maxTokens: 8000,
-      prompt: buildPrompt(todo, brainInstruction, familyData, grokResult),
-      onFinish: async ({ object }) => {
-        if (!object) return
-        const finalObject: any = JSON.parse(JSON.stringify(object))
-        if (finalObject.actions) {
-          finalObject.actions = finalObject.actions.map((action: any) => {
-            if (action.type === 'download_pdf' && action.data?.pdf_type) {
-              action.data.pdf_data = buildPDFData(action.data.pdf_type, familyData)
-            }
-            return action
-          })
-        }
-        const existingData = todo.ai_action_data || {}
-        await supabase.from('todo_items').update({
-          ai_action_data: {
-            ...existingData,
-            execution_pack: finalObject,
-            prepared_at: new Date().toISOString(),
-          }
-        }).eq('id', todo_id).eq('user_id', user_id)
-        console.log('存库完成:', todo_id)
-      }
+    const familyData = await getFamilyData(user_id, brainInstruction.family_data_needed || [])
+
+    // 直接调用 Anthropic API，不用 streamObject
+    const claudeRes = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': process.env.ANTHROPIC_API_KEY || '',
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 4000,
+        messages: [{ role: 'user', content: buildPrompt(todo, brainInstruction, familyData, grokResult) }],
+      }),
     })
 
-    return result.toTextStreamResponse()
+    const claudeData = await claudeRes.json()
+    const rawText = claudeData.content?.[0]?.text || '{}'
+
+    let executionPack: any = {}
+    try {
+      const cleaned = rawText.replace(/```json|```/g, '').trim()
+      const match = cleaned.match(/\{[\s\S]*\}/)
+      if (match) executionPack = JSON.parse(match[0])
+    } catch (e) {
+      console.error('JSON parse failed:', e)
+    }
+
+    // PDF 数据填充
+    if (executionPack.actions) {
+      executionPack.actions = executionPack.actions.map((action: any) => {
+        if (action.type === 'download_pdf' && action.data?.pdf_type) {
+          action.data.pdf_data = buildPDFData(action.data.pdf_type, familyData)
+        }
+        return action
+      })
+    }
+
+    // 存库
+    const existingData = todo.ai_action_data || {}
+    await supabase.from('todo_items').update({
+      ai_action_data: {
+        ...existingData,
+        execution_pack: executionPack,
+        prepared_at: new Date().toISOString(),
+      }
+    }).eq('id', todo_id).eq('user_id', user_id)
+
+    console.log('存库完成:', todo_id)
+    return NextResponse.json({ ok: true, execution_pack: executionPack })
 
   } catch (e: any) {
     console.error('Smart action error:', e?.message)
