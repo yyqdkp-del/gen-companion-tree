@@ -449,7 +449,8 @@ const startRecording = async () => {
         return (
           <motion.div
             key={r.id}
-            initial={{ opacity: 0, scale: 0.6 }}
+            layout
+initial={false}
             animate={{
               opacity: 1, scale: 1,
               y: [0, -anim.yRange, 0],
