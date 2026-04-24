@@ -514,29 +514,66 @@ export async function POST(req: NextRequest) {
       messages.push({ role: 'user', content: processedContent })
     }
 
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-api-key': process.env.ANTHROPIC_API_KEY || '', 'anthropic-version': '2023-06-01' },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-6',
-        max_tokens: 4000,
-        system: buildSystemPrompt(familyContext, grokInfo),
-        messages,
-      }),
-    })
+const response = await fetch('https://api.anthropic.com/v1/messages', {
+  method: 'POST',
+  headers: { ... },
+  body: JSON.stringify({
+    model: 'claude-sonnet-4-6',
+    max_tokens: 4000,
+    system: buildSystemPrompt(familyContext, grokInfo),
+    messages,
+    tools: [{
+      name: 'extract_events',
+      description: '提取用户输入中的所有生活事件',
+      input_schema: {
+        type: 'object',
+        properties: {
+          events: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                title: { type: 'string' },
+                category: { type: 'string' },
+                dimension: { type: 'string' },
+                who: { type: 'string' },
+                due_date: { type: 'string' },
+                recur: { type: 'string' },
+                priority: { type: 'number' },
+                notes: { type: 'string' },
+                claude_advice: { type: 'string' },
+                action_items: { type: 'array', items: { type: 'string' } },
+                carry_items: { type: 'array', items: { type: 'string' } },
+                depart_time: { type: 'string' },
+                warnings: { type: 'array', items: { type: 'string' } },
+                related_tasks: { type: 'array', items: { type: 'string' } },
+                search_keywords: { type: 'array', items: { type: 'string' } },
+                family_data_needed: { type: 'array', items: { type: 'string' } },
+                is_child_related: { type: 'boolean' },
+                child_health_update: { type: 'object' },
+                child_mood_update: { type: 'object' },
+                child_sleep_update: { type: 'object' },
+                child_medication: { type: 'boolean' },
+                child_notable: { type: 'string' },
+                child_schedule_add: { type: 'object' },
+                child_packing_needs: { type: 'array', items: { type: 'object' } },
+                interest_signals: { type: 'array', items: { type: 'object' } },
+                learn_pattern: { type: 'object' },
+              },
+              required: ['title', 'priority']
+            }
+          }
+        },
+        required: ['events']
+      }
+    }],
+    tool_choice: { type: 'tool', name: 'extract_events' },
+  }),
+})
 
-    const data = await response.json()
-    const raw = data.content?.[0]?.text || '[]'
-    const cleaned = raw.replace(/```json|```/g, '').trim()
-    console.log('CLAUDE_RAW:', raw.slice(0, 500))
-    let extracted: any[] = []
-    try {
-      const match = cleaned.match(/\[[\s\S]*\]/)
-      if (match) extracted = JSON.parse(match[0])
-    } catch (e) {
-      console.error('JSON parse failed:', e)
-      extracted = []
-    }
+const data = await response.json()
+const toolUse = data.content?.find((c: any) => c.type === 'tool_use')
+const extracted: any[] = toolUse?.input?.events || []
     // 5. 存入结果
 let todoIds: string[] = []
 if (extracted.length > 0) {
