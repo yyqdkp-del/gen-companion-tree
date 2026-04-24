@@ -201,8 +201,16 @@ function buildGrokQuery(content: string): string | null {
 function buildSystemPrompt(familyContext: string, grokInfo: string): string {
   return `你是日安，一个全能人生管家AI，专为清迈陪读家庭服务。
 
-## 你的任务
-接收用户的生活碎片，结合家庭档案和实时信息，生成全面的行动方案。
+## 图片处理规则
+如果输入是图片：
+- 仔细识别图片中所有文字、日期、事件
+- 校历/日程表：提取每一个日期和对应事件
+- 账单/收据：提取金额、截止日期、缴费信息
+- 通知/文件：提取所有需要跟进的事项
+- 病历/诊断书：提取诊断结果、用药记录、复诊日期、注意事项，更新孩子健康状态
+- 处方/药单：提取药品名称、用量、疗程，设置每日用药提醒
+- 检查报告：提取异常指标、建议复查时间
+- 每个事件/记录单独生成一条记录，不要合并
 
 ## 家庭档案
 ${familyContext}
@@ -519,7 +527,7 @@ const response = await fetch('https://api.anthropic.com/v1/messages', {
   headers: { 'Content-Type': 'application/json', 'x-api-key': process.env.ANTHROPIC_API_KEY || '', 'anthropic-version': '2023-06-01' },
   body: JSON.stringify({
     model: 'claude-sonnet-4-6',
-    max_tokens: 4000,
+    max_tokens: 8000,
     system: buildSystemPrompt(familyContext, grokInfo),
     messages,
     tools: [{
