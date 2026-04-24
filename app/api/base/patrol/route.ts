@@ -52,7 +52,8 @@ export async function POST(req: NextRequest) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         user_id: userId,
-        trigger: patrolTime,
+        type: 'patrol',
+trigger: patrolTime,
         location: primaryPlace?.city || primaryPlace?.name || 'Chiang Mai, Thailand',
         lat: primaryPlace?.lat,
         lng: primaryPlace?.lng,
