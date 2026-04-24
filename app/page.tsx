@@ -429,10 +429,9 @@ export default function BasePage() {
   }
 
   // ── 热点操作 ──
-  const handleRead = async (id: string) => {
-    await supabase.from('hotspot_items').update({ status: 'read' }).eq('id', id)
-    ctxSync()
-  }
+const handleRead = async (id: string) => {
+  await supabase.from('hotspot_items').update({ status: 'read' }).eq('id', id)
+}
 
   const handlePatrol = async () => {
     setPatrolling(true)
