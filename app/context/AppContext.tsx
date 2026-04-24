@@ -66,7 +66,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const [childRes, todoRes, hotRes] = await Promise.all([
         supabase.from('children').select('*').eq('user_id', uid),
         supabase.from('todo_items').select('*').eq('user_id', uid).neq('status', 'done').order('created_at', { ascending: false }).limit(50),
-        supabase.from('hotspot_items').select('*').eq('status', 'unread').eq('user_id', uid).order('created_at', { ascending: false }).limit(10),
+        supabase.from('hotspot_items').select('*').neq('status', 'dismissed').eq('user_id', uid).order('created_at', { ascending: false }).limit(20),
       ])
       if (childRes.data?.length) setKids(childRes.data)
       if (todoRes.data) setTodos(todoRes.data)
