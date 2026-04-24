@@ -10,11 +10,7 @@
     },
     {
       "path": "/api/cron/patrol",
-      "schedule": "30 5 * * *"
-    },
-    {
-      "path": "/api/cron/patrol",
-      "schedule": "30 8 * * *"
+      "schedule": "30 7 * * *"
     },
     {
       "path": "/api/cron/patrol",
@@ -49,6 +45,9 @@
       "maxDuration": 300
     },
     "app/api/base/patrol/route.ts": {
+      "maxDuration": 300
+    },
+    "app/api/cron/patrol/route.ts": {
       "maxDuration": 300
     },
     "app/api/cron/prepare-actions/route.ts": {
