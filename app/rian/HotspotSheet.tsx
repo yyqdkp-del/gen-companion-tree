@@ -114,10 +114,11 @@ function HotspotCard({ item, onRead }: { item: HotspotItem; onRead: () => void }
     onRead()
   }
 
-  const handleExpand = () => {
-    setExpanded(p => !p)
-    if (!isRead) onRead()
-  }
+const handleExpand = (e: React.MouseEvent) => {
+  e.stopPropagation()
+  setExpanded(p => !p)
+  if (!isRead) onRead()
+}
 
   return (
     <motion.div
