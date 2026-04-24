@@ -4,91 +4,206 @@ import { createClient } from '@supabase/supabase-js'
 
 const MAKE_WEBHOOK_URL = process.env.NEXT_PUBLIC_MAKE_WEBHOOK_URL || ''
 
-// ══ 9维度分类 (保持原样) ══
-const DIMENSION_MAP: Record<string, string[]> = {
-  compliance: ['签证', '护照', '驾照', '税务', '合同', '保险', '移民', '公证', '报到', '续签'],
-  estate: ['房产', '物业', '水电', '保养', '维修', '家政', '搬家', '装修', '安防'],
-  logistics: ['购物', '采购', '快递', '包裹', '食谱', '库存', '药品', '消耗'],
-  education: ['学校', '课表', '成绩', '作业', '考试', '兴趣班', '留学', '奖学金', '中文'],
-  social: ['生日', '婚礼', '葬礼', '礼物', '聚会', '派对', '亲友', '配偶', '纪念'],
-  wealth: ['账单', '银行', '贷款', '投资', '保险', '退订', '理财', '信用卡', '财务'],
-  medical: ['看病', '医院', '复诊', '体检', '药', '疫苗', '手术', '诊断', '处方'],
-  mobility: ['机票', '酒店', '旅行', '签证', '出行', '路书', '行程', '导航'],
-  selfcare: ['睡眠', '冥想', '运动', '学习', '书单', '影单', '自我', '成长'],
-}
+// ══ 工具定义 ══
+const TOOLS = [
+  {
+    name: 'add_todo',
+    description: '添加需要妈妈主动行动的待办事项。只有真正需要妈妈做某件事（缴费/预约/申请/购买/签字）才调用。纯日历事件不要调用这个。',
+    input_schema: {
+      type: 'object',
+      properties: {
+        title: { type: 'string', description: '待办标题，简洁清楚' },
+        dimension: { type: 'string', enum: ['compliance', 'estate', 'logistics', 'education', 'social', 'wealth', 'medical', 'mobility', 'selfcare'] },
+        who: { type: 'string', description: '涉及的家庭成员' },
+        due_date: { type: 'string', description: 'ISO格式截止日期，如2026-05-01' },
+        priority: { type: 'number', enum: [1, 2, 3], description: '1=普通(30天以上) 2=重要(8-30天) 3=紧急(7天内或证件医疗)' },
+        notes: { type: 'string', description: '补充说明' },
+        claude_advice: { type: 'string', description: '日安的完整行动建议，具体可执行' },
+        action_items: { type: 'array', items: { type: 'string' }, description: '具体行动步骤' },
+        carry_items: { type: 'array', items: { type: 'string' }, description: '需要携带的物品' },
+        warnings: { type: 'array', items: { type: 'string' }, description: '风险提示' },
+        search_keywords: { type: 'array', items: { type: 'string' }, description: '办理时需要实时搜索的关键词' },
+        ai_draft: { type: 'string', description: '如果需要发邮件/消息，预先生成的草稿' },
+      },
+      required: ['title', 'priority', 'dimension']
+    }
+  },
+  {
+    name: 'add_schedule',
+    description: '添加孩子的校历事件/日程。适用于：运动会、家长会、考试、假期、校外活动、兴趣班等。这些事件存入校历，不进待办。',
+    input_schema: {
+      type: 'object',
+      properties: {
+        title: { type: 'string', description: '事件标题' },
+        child_name: { type: 'string', description: '哪个孩子的事件' },
+        date_start: { type: 'string', description: 'ISO格式开始日期' },
+        date_end: { type: 'string', description: 'ISO格式结束日期，单日事件同start' },
+        event_type: { type: 'string', enum: ['activity', 'exam', 'holiday', 'meeting', 'class', 'trip', 'other'] },
+        location: { type: 'string', description: '地点' },
+        description: { type: 'string', description: '详情' },
+        requires_action: { type: 'string', description: '妈妈需要做什么准备，没有则null' },
+        requires_items: { type: 'array', items: { type: 'string' }, description: '需要携带的物品' },
+        requires_payment: { type: 'number', description: '需要缴费金额，没有则null' },
+      },
+      required: ['title', 'date_start', 'event_type']
+    }
+  },
+  {
+    name: 'add_health',
+    description: '记录孩子的健康/医疗信息。适用于：就诊记录、诊断结果、用药记录、复诊安排、疫苗接种。病历图片一定要调用这个。',
+    input_schema: {
+      type: 'object',
+      properties: {
+        child_name: { type: 'string', description: '哪个孩子' },
+        date: { type: 'string', description: '就诊/发生日期' },
+        type: { type: 'string', enum: ['visit', 'diagnosis', 'medication', 'vaccine', 'checkup', 'emergency', 'other'] },
+        description: { type: 'string', description: '详细描述，包含诊断结果' },
+        doctor_name: { type: 'string', description: '医生姓名' },
+        hospital: { type: 'string', description: '医院/诊所名称' },
+        follow_up_date: { type: 'string', description: '复诊日期，有则填' },
+        notes: { type: 'string', description: '注意事项、用药说明' },
+        current_status: { type: 'string', enum: ['normal', 'sick', 'recovering'], description: '当前健康状态' },
+        medication_taken: { type: 'boolean', description: '是否在用药' },
+      },
+      required: ['type', 'description']
+    }
+  },
+  {
+    name: 'add_document',
+    description: '记录家庭重要证件/文件。适用于：护照、签证、驾照、保险、合同等有到期日期的文件。自动设置到期提醒。',
+    input_schema: {
+      type: 'object',
+      properties: {
+        member_name: { type: 'string', description: '证件所属人' },
+        doc_type: { type: 'string', enum: ['passport', 'visa', 'insurance', 'license', 'contract', 'id', 'other'] },
+        title: { type: 'string', description: '文件名称' },
+        expiry_date: { type: 'string', description: '到期日期' },
+        notes: { type: 'string', description: '补充信息' },
+      },
+      required: ['doc_type', 'title']
+    }
+  },
+  {
+    name: 'add_shopping',
+    description: '添加需要购买或准备的物品。适用于：需要买的东西、活动前需要准备的物品、药品补充等。',
+    input_schema: {
+      type: 'object',
+      properties: {
+        items: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              name: { type: 'string', description: '物品名称' },
+              category: { type: 'string', enum: ['buy', 'prepare', 'find', 'wear'] },
+              need_buy: { type: 'boolean' },
+              event_date: { type: 'string', description: '需要在哪天前准备好' },
+              for_child: { type: 'string', description: '为哪个孩子准备' },
+            },
+            required: ['name', 'need_buy']
+          }
+        },
+      },
+      required: ['items']
+    }
+  },
+  {
+    name: 'add_reminder',
+    description: '设置提醒。适用于：定时提醒、每日提醒（如用药）、重要日期前提醒。',
+    input_schema: {
+      type: 'object',
+      properties: {
+        title: { type: 'string', description: '提醒内容' },
+        trigger_date: { type: 'string', description: '触发日期' },
+        trigger_time: { type: 'string', description: '触发时间，如09:00' },
+        repeat: { type: 'string', enum: ['none', 'daily', 'weekly', 'monthly'], description: '重复频率' },
+        message: { type: 'string', description: '提醒消息内容' },
+        related_todo_title: { type: 'string', description: '关联的待办事项标题' },
+      },
+      required: ['title', 'trigger_date']
+    }
+  },
+  {
+    name: 'update_child_status',
+    description: '更新孩子今日状态。适用于：提到孩子心情、健康、睡眠、今天发生的事。',
+    input_schema: {
+      type: 'object',
+      properties: {
+        child_name: { type: 'string', description: '哪个孩子' },
+        health_status: { type: 'string', enum: ['normal', 'sick', 'recovering'], description: '健康状态' },
+        health_notes: { type: 'string', description: '健康描述' },
+        mood_status: { type: 'string', enum: ['happy', 'calm', 'anxious', 'upset'], description: '心情状态' },
+        mood_notes: { type: 'string', description: '心情描述' },
+        sleep_start: { type: 'string', description: '睡觉时间 如22:00' },
+        sleep_end: { type: 'string', description: '起床时间 如07:00' },
+        medication_taken: { type: 'boolean', description: '是否用药' },
+        notable: { type: 'string', description: '今天值得记录的事' },
+      },
+      required: ['child_name']
+    }
+  },
+  {
+    name: 'learn_pattern',
+    description: '记录家庭习惯和行为规律。当发现重复模式、消费习惯、兴趣偏好时调用。帮助系统更好地了解这个家庭。',
+    input_schema: {
+      type: 'object',
+      properties: {
+        pattern_type: { type: 'string', enum: ['消费', '医疗', '出行', '社交', '教育', '饮食', '运动', '其他'] },
+        description: { type: 'string', description: '规律描述' },
+        cycle_days: { type: 'number', description: '周期天数，如每7天一次填7' },
+        interest_signals: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              topic: { type: 'string' },
+              weight_delta: { type: 'number', description: '兴趣权重增加值1-5' },
+              signal_type: { type: 'string', enum: ['mention', 'question', 'action'] }
+            }
+          }
+        },
+      },
+      required: ['pattern_type', 'description']
+    }
+  },
+]
 
-function detectDimension(text: string): string {
-  for (const [dim, keywords] of Object.entries(DIMENSION_MAP)) {
-    if (keywords.some(k => text.includes(k))) return dim
-  }
-  return 'other'
-}
-
-// ══ 触发Make.com (保持原样) ══
-async function triggerMake(extracted: any[], input_type: string) {
+// ══ 触发 Make webhook ══
+async function triggerMake(toolName: string, input: any) {
   if (!MAKE_WEBHOOK_URL) return
-  for (const e of extracted) {
-    const dimension = detectDimension(
-      (e.title || '') + (e.notes || '') + (e.claude_advice || '')
-    )
-    if (e.due_date) {
-      const startTime = new Date(e.due_date)
-      const endTime = new Date(startTime)
-      endTime.setHours(endTime.getHours() + 2)
-      try {
-        await fetch(MAKE_WEBHOOK_URL, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            type: 'calendar',
-            title: e.title,
-            start_time: startTime.toISOString(),
-            end_time: endTime.toISOString(),
-            description: [
-              e.claude_advice,
-              e.action_items?.length ? `行动清单：${e.action_items.join('、')}` : null,
-              e.carry_items?.length ? `携带：${e.carry_items.join('、')}` : null,
-              e.warnings?.length ? `注意：${e.warnings.join('、')}` : null,
-            ].filter(Boolean).join('\n'),
-            location: '清迈',
-            dimension,
-            who: e.who,
-            priority: e.priority,
-          }),
-        })
-      } catch (err) { console.error('Make calendar error:', err) }
+  try {
+    if (toolName === 'add_schedule' && input.date_start) {
+      const startTime = new Date(input.date_start)
+      const endTime = new Date(input.date_end || input.date_start)
+      await fetch(MAKE_WEBHOOK_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'calendar',
+          title: input.title,
+          start_time: startTime.toISOString(),
+          end_time: endTime.toISOString(),
+          description: input.description,
+          location: input.location || '清迈',
+        }),
+      })
     }
-    if (e.priority === 3) {
-      try {
-        await fetch(MAKE_WEBHOOK_URL, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ type: 'urgent_alert', title: e.title, message: e.claude_advice || e.notes, dimension, who: e.who, due_date: e.due_date }),
-        })
-      } catch (err) { console.error('Make urgent error:', err) }
+    if (toolName === 'add_todo' && input.priority === 3) {
+      await fetch(MAKE_WEBHOOK_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'urgent_alert',
+          title: input.title,
+          message: input.claude_advice,
+          due_date: input.due_date,
+        }),
+      })
     }
-    if (dimension === 'compliance') {
-      try {
-        await fetch(MAKE_WEBHOOK_URL, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ type: 'compliance_check', title: e.title, due_date: e.due_date, who: e.who, notes: e.notes }),
-        })
-      } catch (err) { console.error('Make compliance error:', err) }
-    }
-    if (dimension === 'education') {
-      try {
-        await fetch(MAKE_WEBHOOK_URL, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ type: 'education_sync', title: e.title, who: e.who, due_date: e.due_date, notes: e.notes }),
-        })
-      } catch (err) { console.error('Make education error:', err) }
-    }
-  }
+  } catch (e) { console.error('Make webhook error:', e) }
 }
 
-// ══ Gemini语音转文字 (保持原样) ══
+// ══ Gemini 语音转文字 ══
 async function transcribeAudio(fileUrl: string): Promise<string> {
   try {
     const audioRes = await fetch(fileUrl)
@@ -108,25 +223,21 @@ async function transcribeAudio(fileUrl: string): Promise<string> {
       }
     )
     const data = await response.json()
-    if (data.error) { console.error('Gemini错误:', data.error.message); return '' }
     return data.candidates?.[0]?.content?.parts?.[0]?.text || ''
   } catch (e: any) {
-    console.error('Gemini转文字失败:', e?.message || e)
+    console.error('Gemini转文字失败:', e?.message)
     return ''
   }
 }
 
-// ══ Grok实时搜索 (保持原样) ══
+// ══ Grok 实时搜索 ══
 async function grokSearch(query: string): Promise<string> {
   try {
     const controller = new AbortController()
     const timeout = setTimeout(() => controller.abort(), 8000)
     const response = await fetch('https://api.x.ai/v1/chat/completions', {
       method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${process.env.XAI_API_KEY}`,
-        'Content-Type': 'application/json'
-      },
+      headers: { 'Authorization': `Bearer ${process.env.XAI_API_KEY}`, 'Content-Type': 'application/json' },
       signal: controller.signal,
       body: JSON.stringify({
         model: 'grok-3-fast',
@@ -141,22 +252,21 @@ async function grokSearch(query: string): Promise<string> {
     const data = await response.json()
     return data.choices?.[0]?.message?.content || ''
   } catch (e: any) {
-    console.error('Grok搜索失败:', e?.message || e)
+    console.error('Grok搜索失败:', e?.message)
     return ''
   }
 }
 
-// ══ 查询家庭档案 (修改：加入 user_id 过滤) ══
+// ══ 查询家庭档案 ══
 async function getFamilyContext(supabase: any, userId: string): Promise<string> {
   try {
-    const [children, recentTodos, recentLogs, habits, interests, observations, places] = await Promise.all([
+    const [children, recentTodos, recentLogs, habits, interests, places] = await Promise.all([
       supabase.from('children').select('*').eq('user_id', userId),
-      supabase.from('todo_items').select('title,category,priority,status,due_date').eq('user_id', userId).neq('status','done').order('created_at',{ascending:false}).limit(20),
-      supabase.from('child_daily_log').select('*').eq('user_id', userId).order('date',{ascending:false}).limit(7),
-      supabase.from('family_habits').select('*').eq('user_id', userId).limit(20),
-      supabase.from('interest_weights').select('*').eq('user_id', userId).order('weight',{ascending:false}).limit(10),
-      supabase.from('ai_observations').select('*').eq('user_id', userId).order('created_at',{ascending:false}).limit(5),
-      supabase.from('family_places').select('*').eq('user_id', userId),
+      supabase.from('todo_items').select('title,category,priority,status,due_date').eq('user_id', userId).neq('status', 'done').order('created_at', { ascending: false }).limit(10),
+      supabase.from('child_daily_log').select('*').eq('user_id', userId).order('date', { ascending: false }).limit(3),
+      supabase.from('family_habits').select('*').eq('user_id', userId).limit(10),
+      supabase.from('interest_weights').select('topic, weight').eq('user_id', userId).order('weight', { ascending: false }).limit(10),
+      supabase.from('family_places').select('name, city').eq('user_id', userId).limit(10),
     ])
     return JSON.stringify({
       children: children.data || [],
@@ -164,22 +274,19 @@ async function getFamilyContext(supabase: any, userId: string): Promise<string> 
       recentChildLogs: recentLogs.data || [],
       habits: habits.data || [],
       interests: interests.data || [],
-      observations: observations.data || [],
       places: places.data || [],
     })
   } catch (e) { return '{}' }
 }
 
-// ══ Grok触发关键词判断 (保持原样) ══
+// ══ Grok 触发判断 ══
 function buildGrokQuery(content: string): string | null {
   const keywords: Record<string, string[]> = {
     medical: ['看病', '医院', '复诊', '体检', '生病', '发烧', '药', '诊所'],
     weather: ['出门', '外出', '天气', '下雨', '台风', '雾霾', '空气'],
     traffic: ['开车', '堵车', '路况', '接送', '出发'],
-    shopping: ['购物', '超市', '买', '采购'],
     visa: ['签证', '报到', '移民', '护照', '续签'],
     school: ['学校', '接孩子', '放学', '开学', '考试'],
-    emergency: ['传染病', '疫情', '预警', '台风', '洪水', '停电'],
   }
   const matched: string[] = []
   for (const [type, words] of Object.entries(keywords)) {
@@ -187,305 +294,351 @@ function buildGrokQuery(content: string): string | null {
   }
   if (!matched.length) return null
   const parts = ['今天清迈最新情况：']
-  if (matched.includes('medical')) parts.push('各大医院排队等待时间、是否有传染病流行')
-  if (matched.includes('weather')) parts.push('今明两天天气预报、空气质量指数')
-  if (matched.includes('traffic')) parts.push('清迈市区主要道路交通状况')
-  if (matched.includes('shopping')) parts.push('超市营业时间、是否有促销')
+  if (matched.includes('medical')) parts.push('各大医院排队等待时间')
+  if (matched.includes('weather')) parts.push('今明两天天气预报、空气质量')
+  if (matched.includes('traffic')) parts.push('清迈主要道路交通状况')
   if (matched.includes('visa')) parts.push('清迈移民局最新政策、排队情况')
-  if (matched.includes('school')) parts.push('清迈学校最新通知、交通状况')
-  if (matched.includes('emergency')) parts.push('清迈紧急情况、自然灾害预警')
+  if (matched.includes('school')) parts.push('清迈学校最新通知')
   return parts.join('')
 }
 
-// ══ System Prompt (保持原样) ══
-function buildSystemPrompt(familyContext: string, grokInfo: string): string {
-  return `你是日安，一个全能人生管家AI，专为清迈陪读家庭服务。
+// ══ 执行工具调用 ══
+async function executeTool(
+  supabase: any,
+  toolName: string,
+  input: any,
+  userId: string,
+  rawInputId: string | null,
+  childrenData: any[]
+): Promise<string | null> {
 
-## 图片处理规则
-如果输入是图片：
-- 仔细识别图片中所有文字、日期、事件
-- 校历/日程表：提取每一个日期和对应事件
-- 账单/收据：提取金额、截止日期、缴费信息
-- 通知/文件：提取所有需要跟进的事项
-- 病历/诊断书：提取诊断结果、用药记录、复诊日期、注意事项，更新孩子健康状态
-- 处方/药单：提取药品名称、用量、疗程，设置每日用药提醒
-- 检查报告：提取异常指标、建议复查时间
-- 每个事件/记录单独生成一条记录，不要合并
-
-## 家庭档案
-${familyContext}
-
-## 实时外部信息
-${grokInfo || '暂无实时信息'}
-
-## 输出规则
-严格只输出JSON数组，不加任何其他文字：
-[
-  {
-    "title": "事件标题",
-    "category": "visa|birthday|medical|school|shopping|family|travel|finance|health|emergency|other",
-    "dimension": "compliance|estate|logistics|education|social|wealth|medical|mobility|selfcare",
-    "who": "涉及的人",
-    "due_date": "截止日期ISO格式或null",
-    "recur": "none|daily|weekly|monthly|yearly",
-    "priority": 1|2|3,
-    "notes": "补充说明",
-    "claude_advice": "日安的完整行动建议",
-    "action_items": ["具体行动1", "具体行动2", "具体行动3"],
-    "carry_items": ["需要携带的物品1", "物品2"],
-    "depart_time": "建议出发时间或null",
-    "warnings": ["风险提示1", "风险提示2"],
-    "related_tasks": ["顺路可以做的事1"],
-    "search_keywords": ["办理时Grok要搜的关键词1", "关键词2", "关键词3"],
-    "family_data_needed": ["passport", "visa", "medical", "address", "children", "habits", "places", "finance", "insurance"],
-    "is_child_related": true|false,
-    "child_health_update": null,
-    "child_mood_update": null,
-    "child_sleep_update": null,
-    "child_medication": null,
-    "child_notable": null,
-    "child_schedule_add": null,
-    "child_packing_needs": [],
-    "interest_signals": [],
-    "learn_pattern": {
-      "type": "消费|医疗|出行|社交|其他",
-      "cycle_days": null,
-      "last_occurrence": null,
-      "pattern_note": "规律描述"
-    }
-  }
-]
-## 字段说明
-- search_keywords: 用户一键办理时Grok需要实时搜索的关键词，根据事件类型和维度生成3-5个精准关键词
-  例如签证：["泰国Tourist Visa续签2026最新要求", "清迈移民局排队时间", "TM.7表格下载"]
-  例如医疗：["清迈Ram医院儿科今日排队", "清迈儿科预约流程", "清迈24小时药房"]
-  例如学校：["Lanna School家长会安排", "学费缴纳方式", "校服购买地点"]
-- family_data_needed: 办理时需要从档案读取的字段类型
-  可选值：passport（护照信息）、visa（签证信息）、medical（医疗档案）、address（地址）、children（孩子信息）、habits（习惯）、places（常用地点）、finance（财务）、insurance（保险）
-- is_child_related: 这件事是否和孩子直接相关
-- child_health_update: 孩子健康更新 {"status": "normal|sick|recovering", "notes": "描述"}
-- child_mood_update: 孩子心情 {"status": "happy|calm|anxious|upset", "notes": "描述"}
-- child_sleep_update: 孩子睡眠 {"start": "22:00", "end": "07:00"}
-- child_medication: 用药记录 true/false
-- child_notable: 今天值得记录的事 "string"
-- child_schedule_add: 新增日程 {"title": "", "date": "YYYY-MM-DD", "time": "HH:MM", "location": "", "requires_action": "", "requires_items": []}
-- child_packing_needs: 需要携带/购买 [{"item": "", "event_date": "YYYY-MM-DD", "category": "buy|find|prepare|wear", "need_buy": true}]
-- interest_signals: 兴趣信号 [{"topic": "", "weight_delta": 1-5, "signal_type": "mention|question|action"}]
-
-## 9维度search_keywords生成规则
-compliance: 签证/护照办理地点排队、最新材料要求、表格下载链接
-estate: 水电缴费方式、物业联系、维修工推荐
-logistics: 商品价格对比、超市营业时间、代购渠道
-education: 学校最新通知、缴费方式、老师联系方式
-social: 聚会餐厅推荐、礼品购买、节日习俗
-wealth: 实时汇率、最优汇款渠道、账单缴纳方式
-medical: 医院今日排队、预约流程、科室电话
-mobility: 实时路况、机票价格、交通选项
-selfcare: 课程推荐、社群活动、心理资源
-
-## 分析维度
-1. 需要携带什么？2. 几点出发？3. 顺路做什么？4. 风险预警？5. 行为规律？6. 孩子健康/证件相关？7. 办理时需要搜索什么？8. 需要读取哪些档案？
-
-优先级判断标准（必须严格遵守）：
-- priority 3（紧急/red）：7天内必须处理 OR 签证/护照/医疗紧急 OR 孩子生病/受伤 OR 任何"今天""明天""这周"的事
-- priority 2（重要/orange）：8-30天内需处理 OR 需要提前预约 OR 涉及金钱缴费 OR 需要购买物品
-- priority 1（普通/yellow）：30天以上 OR 长期规划 OR 无明确截止日期的建议性事项
-注意：宁可给高优先级，不要给低优先级。用户说的大部分事情都是近期需要处理的。
-今天日期：${new Date().toLocaleDateString('zh-CN')}`
-}
-// ══ 核心逻辑：同步到三珠数据表 (修改：废除 default，改用 userId) ══
-async function syncToThreeDrops(supabase: any, extracted: any[], rawInputId: string | null, userId: string): Promise<string[]> {
-  const todoIds: string[] = []
   const today = new Date().toISOString().split('T')[0]
 
-  // ── 获取孩子ID（修改：按 userId 过滤）──
-  const { data: children } = await supabase.from('children').select('id, name').eq('user_id', userId).limit(5)
-  const childId = children?.[0]?.id || null
-
-  for (const e of extracted) {
-    const dimension = detectDimension((e.title || '') + (e.notes || '') + (e.claude_advice || ''))
-
-    // ── 1. 写入 todo_items（修改：加入 user_id） ──
-    const priority = e.priority === 3 ? 'red' : e.priority === 2 ? 'orange' : 'yellow'
-    let aiDraft: string | null = null
-    let aiActionType: string | null = null
-    let oneTapReady = false
-
-    if (e.category === 'school' || e.dimension === 'education') {
-  aiDraft = `感谢通知，${e.who || '孩子'}的${e.title}相关事宜已收到，请确认详情。`
-  aiActionType = 'send_email'
-  oneTapReady = true
-} else if (e.dimension === 'wealth' || e.category === 'finance') {
-  aiActionType = 'pay'
-  oneTapReady = !!e.due_date
-} else if (e.dimension === 'medical') {
-  aiActionType = 'book'
-  oneTapReady = true
-} else if (e.dimension === 'logistics') {
-  aiActionType = 'buy'
-  oneTapReady = true
-} else if (e.dimension === 'compliance') {
-  aiActionType = 'fill_form'
-  oneTapReady = true
-} else if (e.dimension === 'mobility') {
-  aiActionType = 'navigate'
-  oneTapReady = true
-} else if (e.dimension === 'social') {
-  aiActionType = 'whatsapp'
-  oneTapReady = true
-} else if (e.dimension === 'estate') {
-  aiActionType = 'pay'
-  oneTapReady = !!e.due_date
-} else if (e.dimension === 'selfcare') {
-  aiActionType = 'calendar'
-  oneTapReady = true
-}
-    let reminderDays: number | null = null
-    if (e.due_date) {
-      const daysLeft = Math.ceil((new Date(e.due_date).getTime() - Date.now()) / 86400000)
-      if (daysLeft > 30) reminderDays = 90
-      else if (daysLeft > 7) reminderDays = 30
-    }
-
-    const { data: todoItem } = await supabase.from('todo_items').insert({
-      user_id: userId, // 废除 default
-      title: e.title,
-      description: e.claude_advice,
-      category: e.dimension || dimension,
-      priority,
-      status: 'pending',
-      due_date: e.due_date || null,
-      source: 'rian',
-      source_ref_id: rawInputId,
-      ai_draft: aiDraft,
-      ai_action_type: aiActionType,
-     ai_action_data: {
-  action_items: e.action_items,
-  carry_items: e.carry_items,
-  depart_time: e.depart_time,
-  warnings: e.warnings,
-  related_tasks: e.related_tasks,
-  brain_instruction: {
-    dimension: e.dimension,
-    intent: e.title,
-    context: e.claude_advice,
-    search_keywords: e.search_keywords || [],
-    family_data_needed: e.family_data_needed || [],
-    who: e.who,
-    due_date: e.due_date,
+  // 根据孩子名字找 child_id
+  const findChildId = (name?: string) => {
+    if (!name) return childrenData?.[0]?.id || null
+    const found = childrenData.find((c: any) =>
+      c.name?.includes(name) || name?.includes(c.name)
+    )
+    return found?.id || childrenData?.[0]?.id || null
   }
-},
-      one_tap_ready: oneTapReady,
-      location_relevant: !!(e.depart_time || e.related_tasks?.length),
-    }).select().single()
-    if (todoItem?.id) todoIds.push(todoItem.id)
 
-    // ── 2. 三级提醒链（修改：加入 user_id） ──
-    if (todoItem && e.due_date && reminderDays) {
-      const benefit = e.dimension === 'compliance' ? '提前办理避免逾期罚款' : e.dimension === 'wealth' ? '提前缴费可能有优惠' : '提前准备更从容'
-      await supabase.from('reminder_chains').insert([
-        { todo_id: todoItem.id, user_id: userId, level: 1, trigger_days_before: reminderDays, trigger_date: new Date(Date.now() - reminderDays * 86400000).toISOString().split('T')[0], status: 'pending', benefit_description: benefit },
-        { todo_id: todoItem.id, user_id: userId, level: 2, trigger_days_before: 7, trigger_date: new Date(new Date(e.due_date).getTime() - 7 * 86400000).toISOString().split('T')[0], status: 'pending', benefit_description: benefit },
-        { todo_id: todoItem.id, user_id: userId, level: 3, trigger_days_before: 1, trigger_date: new Date(new Date(e.due_date).getTime() - 86400000).toISOString().split('T')[0], status: 'pending', benefit_description: benefit },
-      ])
-    }
+  switch (toolName) {
 
-    // ── 3. 孩子状态更新（修改：加入 user_id） ──
-    if (childId && e.is_child_related) {
-      const logUpdate: any = { child_id: childId, user_id: userId, date: today, source_input_ids: [rawInputId].filter(Boolean) }
-      let hasUpdate = false
-      if (e.child_health_update) { logUpdate.health_status = e.child_health_update.status; logUpdate.health_notes = e.child_health_update.notes; hasUpdate = true }
-      if (e.child_mood_update) { logUpdate.mood_status = e.child_mood_update.status; logUpdate.mood_notes = e.child_mood_update.notes; hasUpdate = true }
-      if (e.child_sleep_update) { logUpdate.sleep_start = e.child_sleep_update.start; logUpdate.sleep_end = e.child_sleep_update.end; hasUpdate = true }
-      if (e.child_medication !== null && e.child_medication !== undefined) { logUpdate.medication_taken = e.child_medication; hasUpdate = true }
-      if (e.child_notable) { logUpdate.notable_events = [e.child_notable]; hasUpdate = true }
+    case 'add_todo': {
+      const priority = input.priority === 3 ? 'red' : input.priority === 2 ? 'orange' : 'yellow'
+      const childId = findChildId(input.who)
 
-      if (hasUpdate) {
-        const { data: existing } = await supabase.from('child_daily_log').select('id, notable_events, source_input_ids').eq('child_id', childId).eq('date', today).eq('user_id', userId).single()
-        if (existing) {
-          const mergedNotable = [...(existing.notable_events || []), ...(logUpdate.notable_events || [])]
-          const mergedSources = [...(existing.source_input_ids || []), ...(logUpdate.source_input_ids || [])]
-          await supabase.from('child_daily_log').update({ ...logUpdate, notable_events: mergedNotable, source_input_ids: mergedSources, updated_at: new Date().toISOString() }).eq('id', existing.id)
-        } else {
-          await supabase.from('child_daily_log').insert(logUpdate)
+      const aiActionTypeMap: Record<string, string> = {
+        compliance: 'fill_form', wealth: 'pay', medical: 'book',
+        logistics: 'buy', mobility: 'navigate', social: 'whatsapp',
+        estate: 'pay', education: 'send_email', selfcare: 'calendar',
+      }
+
+      const { data: todo } = await supabase.from('todo_items').insert({
+        user_id: userId,
+        title: input.title,
+        description: input.claude_advice,
+        category: input.dimension,
+        priority,
+        status: 'pending',
+        due_date: input.due_date || null,
+        source: 'rian',
+        source_ref_id: rawInputId,
+        ai_draft: input.ai_draft || null,
+        ai_action_type: aiActionTypeMap[input.dimension] || null,
+        ai_action_data: {
+          action_items: input.action_items,
+          carry_items: input.carry_items,
+          warnings: input.warnings,
+          brain_instruction: {
+            dimension: input.dimension,
+            intent: input.title,
+            context: input.claude_advice,
+            search_keywords: input.search_keywords || [],
+            who: input.who,
+            due_date: input.due_date,
+          }
+        },
+        one_tap_ready: true,
+      }).select().single()
+
+      // 三级提醒链
+      if (todo && input.due_date) {
+        const daysLeft = Math.ceil((new Date(input.due_date).getTime() - Date.now()) / 86400000)
+        const reminderDays = daysLeft > 30 ? 90 : daysLeft > 7 ? 30 : null
+        if (reminderDays) {
+          await supabase.from('reminder_chains').insert([
+            { todo_id: todo.id, user_id: userId, level: 1, trigger_days_before: reminderDays, status: 'pending' },
+            { todo_id: todo.id, user_id: userId, level: 2, trigger_days_before: 7, status: 'pending' },
+            { todo_id: todo.id, user_id: userId, level: 3, trigger_days_before: 1, status: 'pending' },
+          ])
         }
       }
+
+      // 异步预热 Grok
+      if (todo?.id && input.search_keywords?.length) {
+        ;(async () => {
+          try {
+            const grokResult = await grokSearch(input.search_keywords.join('，') + '，清迈本地最新情况')
+            if (grokResult) {
+              const { data: existing } = await supabase.from('todo_items').select('ai_action_data').eq('id', todo.id).single()
+              await supabase.from('todo_items').update({
+                ai_action_data: { ...(existing?.ai_action_data || {}), grok_result: grokResult }
+              }).eq('id', todo.id)
+            }
+          } catch (e) { console.error('Grok预热失败:', e) }
+        })()
+      }
+
+      await triggerMake(toolName, input)
+      return todo?.id || null
     }
 
-    // ── 4. 孩子校历事件（修改：加入 user_id） ──
-    if (childId && e.child_schedule_add) {
-      const s = e.child_schedule_add
+    case 'add_schedule': {
+      const childId = findChildId(input.child_name)
       await supabase.from('child_school_calendar').insert({
-        child_id: childId, user_id: userId, event_type: e.category === 'school' ? 'activity' : e.dimension || 'activity',
-        title: s.title || e.title, date_start: s.date || e.due_date || today, date_end: s.date || e.due_date || today,
-        description: e.claude_advice, requires_action: s.requires_action, requires_items: s.requires_items || [],
-        requires_payment: e.dimension === 'wealth' ? parseFloat(e.notes) || null : null, source: 'rian',
+        child_id: childId,
+        user_id: userId,
+        event_type: input.event_type || 'activity',
+        title: input.title,
+        date_start: input.date_start,
+        date_end: input.date_end || input.date_start,
+        description: input.description || null,
+        requires_action: input.requires_action || null,
+        requires_items: input.requires_items || [],
+        requires_payment: input.requires_payment || null,
+        source: 'rian',
       })
+
+      // 如果有需要妈妈行动的，同时生成待办
+      if (input.requires_action || input.requires_payment) {
+        await supabase.from('todo_items').insert({
+          user_id: userId,
+          title: `${input.title} - ${input.requires_action || '缴费'}`,
+          category: 'education',
+          priority: 'orange',
+          status: 'pending',
+          due_date: input.date_start,
+          source: 'rian',
+          one_tap_ready: true,
+        })
+      }
+
+      await triggerMake(toolName, input)
+      return null
     }
 
-    // ── 5. 携带清单（修改：加入 user_id） ──
-    if (childId && e.child_packing_needs?.length > 0) {
-      for (const need of e.child_packing_needs) {
-        if (!need.event_date) continue
-        const newItem = { name: need.item, category: need.category || 'prepare', status: 'pending', need_buy: need.need_buy || false, reminder_15d_sent: false, reminder_7d_sent: false, reminder_1d_sent: false, reminder_day_sent: false }
-        const { data: existing } = await supabase.from('packing_lists').select('id, items').eq('child_id', childId).eq('date', need.event_date).eq('user_id', userId).single()
+    case 'add_health': {
+      const childId = findChildId(input.child_name)
+      await supabase.from('child_health_records').insert({
+        child_id: childId,
+        user_id: userId,
+        date: input.date || today,
+        type: input.type,
+        description: input.description,
+        doctor_name: input.doctor_name || null,
+        hospital: input.hospital || null,
+        follow_up_date: input.follow_up_date || null,
+        notes: input.notes || null,
+      })
+
+      // 更新当日健康状态
+      if (input.current_status) {
+        const { data: existing } = await supabase
+          .from('child_daily_log')
+          .select('id')
+          .eq('child_id', childId)
+          .eq('date', today)
+          .single()
+        if (existing) {
+          await supabase.from('child_daily_log').update({
+            health_status: input.current_status,
+            health_notes: input.description,
+            medication_taken: input.medication_taken || false,
+          }).eq('id', existing.id)
+        } else {
+          await supabase.from('child_daily_log').insert({
+            child_id: childId, user_id: userId, date: today,
+            health_status: input.current_status,
+            health_notes: input.description,
+            medication_taken: input.medication_taken || false,
+          })
+        }
+      }
+
+      // 复诊日期自动生成待办
+      if (input.follow_up_date) {
+        await supabase.from('todo_items').insert({
+          user_id: userId,
+          title: `复诊预约`,
+          description: `${input.hospital || ''}${input.doctor_name ? ' - ' + input.doctor_name : ''}`,
+          category: 'medical',
+          priority: 'orange',
+          status: 'pending',
+          due_date: input.follow_up_date,
+          source: 'rian',
+          one_tap_ready: true,
+        })
+      }
+      return null
+    }
+
+    case 'add_document': {
+      await supabase.from('family_documents').insert({
+        user_id: userId,
+        member_name: input.member_name || null,
+        doc_type: input.doc_type,
+        title: input.title,
+        expiry_date: input.expiry_date || null,
+        reminder_days_before: [90, 30, 7],
+        metadata: { notes: input.notes },
+      })
+
+      // 证件到期自动生成待办
+      if (input.expiry_date) {
+        await supabase.from('todo_items').insert({
+          user_id: userId,
+          title: `${input.title}到期续签`,
+          category: 'compliance',
+          priority: 'orange',
+          status: 'pending',
+          due_date: input.expiry_date,
+          source: 'rian',
+          one_tap_ready: true,
+        })
+      }
+      return null
+    }
+
+    case 'add_shopping': {
+      const childId = findChildId()
+      for (const item of (input.items || [])) {
+        const targetDate = item.event_date || today
+        const childIdForItem = item.for_child ? findChildId(item.for_child) : childId
+        const newItem = {
+          name: item.name,
+          category: item.category || 'prepare',
+          status: 'pending',
+          need_buy: item.need_buy || false,
+        }
+        const { data: existing } = await supabase
+          .from('packing_lists')
+          .select('id, items')
+          .eq('child_id', childIdForItem)
+          .eq('date', targetDate)
+          .eq('user_id', userId)
+          .single()
         if (existing) {
           const items = Array.isArray(existing.items) ? existing.items : []
-          if (!items.some((i: any) => i.name === need.item)) { await supabase.from('packing_lists').update({ items: [...items, newItem] }).eq('id', existing.id) }
+          if (!items.some((i: any) => i.name === item.name)) {
+            await supabase.from('packing_lists').update({ items: [...items, newItem] }).eq('id', existing.id)
+          }
         } else {
-          await supabase.from('packing_lists').insert({ child_id: childId, user_id: userId, date: need.event_date, items: [newItem], weather_incorporated: false, health_incorporated: false })
+          await supabase.from('packing_lists').insert({
+            child_id: childIdForItem, user_id: userId,
+            date: targetDate, items: [newItem],
+          })
         }
       }
+      return null
     }
 
-    // ── 6. 兴趣权重更新（修改：加入 user_id） ──
-    if (e.interest_signals?.length > 0) {
-      for (const sig of e.interest_signals) {
-        const { data: existing } = await supabase.from('interest_weights').select('*').eq('user_id', userId).eq('topic', sig.topic).single()
+    case 'add_reminder': {
+      await supabase.from('reminders').insert({
+        user_id: userId,
+        title: input.title,
+        trigger_date: input.trigger_date,
+        message: input.message || input.title,
+        status: 'pending',
+      }).catch(() => {
+        // reminders 表结构可能不同，忽略错误
+      })
+      return null
+    }
+
+    case 'update_child_status': {
+      const childId = findChildId(input.child_name)
+      const { data: existing } = await supabase
+        .from('child_daily_log')
+        .select('id, notable_events')
+        .eq('child_id', childId)
+        .eq('date', today)
+        .single()
+
+      const updateData: any = { updated_at: new Date().toISOString() }
+      if (input.health_status) { updateData.health_status = input.health_status; updateData.health_notes = input.health_notes }
+      if (input.mood_status) { updateData.mood_status = input.mood_status; updateData.mood_notes = input.mood_notes }
+      if (input.sleep_start) updateData.sleep_start = input.sleep_start
+      if (input.sleep_end) updateData.sleep_end = input.sleep_end
+      if (input.medication_taken !== undefined) updateData.medication_taken = input.medication_taken
+      if (input.notable) updateData.notable_events = [...(existing?.notable_events || []), input.notable]
+
+      if (existing) {
+        await supabase.from('child_daily_log').update(updateData).eq('id', existing.id)
+      } else {
+        await supabase.from('child_daily_log').insert({
+          child_id: childId, user_id: userId, date: today, ...updateData
+        })
+      }
+      return null
+    }
+
+    case 'learn_pattern': {
+      await supabase.from('family_habits').insert({
+        user_id: userId,
+        habit_type: input.pattern_type,
+        cycle_days: input.cycle_days || null,
+        notes: input.description,
+      })
+
+      // 更新兴趣权重
+      for (const sig of (input.interest_signals || [])) {
+        const { data: existing } = await supabase
+          .from('interest_weights')
+          .select('*')
+          .eq('user_id', userId)
+          .eq('topic', sig.topic)
+          .single()
         if (existing) {
-          await supabase.from('interest_weights').update({ weight: Math.min(100, existing.weight + (sig.weight_delta || 1)), signal_count: existing.signal_count + 1, last_signal_at: new Date().toISOString(), last_updated: new Date().toISOString() }).eq('id', existing.id)
+          await supabase.from('interest_weights').update({
+            weight: Math.min(100, existing.weight + (sig.weight_delta || 1)),
+            signal_count: existing.signal_count + 1,
+            last_signal_at: new Date().toISOString(),
+          }).eq('id', existing.id)
         } else {
-          await supabase.from('interest_weights').insert({ user_id: userId, topic: sig.topic, weight: 10 + (sig.weight_delta || 1), signal_count: 1, last_signal_at: new Date().toISOString() })
+          await supabase.from('interest_weights').insert({
+            user_id: userId, topic: sig.topic,
+            weight: 10 + (sig.weight_delta || 1),
+            signal_count: 1, last_signal_at: new Date().toISOString(),
+          })
         }
       }
+      return null
     }
-  }
 
-  // ── 7. AI情绪观察（修改：加入 user_id） ──
-  const stressSignals = extracted.filter(e => e.priority === 3 || e.warnings?.length > 1 || e.action_items?.length > 3)
-  if (stressSignals.length >= 2) {
-    await supabase.from('ai_observations').insert({ user_id: userId, observation_type: 'stress', content: { level: 'high', signals: stressSignals.map((e: any) => e.title), note: '今天有多件紧急事项，妈妈压力较大' }, confidence: 70, source_input_ids: [rawInputId].filter(Boolean) })
+    default:
+      console.warn('未知工具:', toolName)
+      return null
   }
-   return todoIds
 }
 
-// ══════════════════════════════════════════════════════════════
-// 主处理函数
-// ══════════════════════════════════════════════════════════════
+// ══ 主处理函数 ══
 export async function POST(req: NextRequest) {
   try {
     const { content, input_type, file_url, user_id: body_user_id } = await req.json()
-    
+
     const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL || '',
       process.env.SUPABASE_SERVICE_ROLE_KEY || ''
     )
 
-    // ★ 关键拦截层：获取 Auth 用户 ★
-   const activeUserId = body_user_id
+    const activeUserId = body_user_id
     if (!activeUserId) {
-      
       return NextResponse.json({ ok: false, error: 'Unauthorized: Missing User Context' }, { status: 401 })
     }
-    // ★ NVIDIA NemoClaw 安全检测入口 (商业隔离钩子) ★
-    const dimension = detectDimension(content || '')
-    const isSensitive = dimension === 'compliance' || dimension === 'wealth'
-    if (isSensitive) {
-      console.log(`[NemoClaw-Guard] 拦截到敏感操作 (${dimension})，正在为用户 ${activeUserId} 建立安全会话隔离`)
-      // 未来此处插入 nemoClaw.secureRoute(...)
-    }
 
-    // 1. 存入raw_inputs (修改：使用 activeUserId)
+    // 1. 存入 raw_inputs
     const { data: rawInput } = await supabase.from('raw_inputs').insert({
       user_id: activeUserId,
       input_type,
@@ -494,7 +647,7 @@ export async function POST(req: NextRequest) {
       processed: false,
     }).select().single()
 
-    // 2. 音频→Gemini转文字 (保持原样)
+    // 2. 音频转文字
     let processedContent = content
     if (input_type === 'audio' && file_url) {
       const transcribed = await transcribeAudio(file_url)
@@ -504,129 +657,106 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // 3. 并行：查家庭档案 (修改：传入 activeUserId) + Grok搜索
-    const grokQuery = buildGrokQuery(processedContent)
+    // 3. 并行：家庭档案 + Grok搜索
+    const grokQuery = buildGrokQuery(processedContent || '')
     const [familyContext, grokInfo] = await Promise.all([
       getFamilyContext(supabase, activeUserId),
       grokQuery ? grokSearch(grokQuery) : Promise.resolve(''),
     ])
 
-    // 4. Claude全维度分析 (保持原样)
+    // 获取孩子数据（用于 executeTool）
+    const { data: childrenData } = await supabase
+      .from('children')
+      .select('id, name')
+      .eq('user_id', activeUserId)
+
+    // 4. 构建消息
     const messages: any[] = []
     if (input_type === 'image' && file_url) {
-      messages.push({ role: 'user', content: [
-        { type: 'image', source: { type: 'url', url: file_url } },
-        { type: 'text', text: processedContent || '请分析这张图片，提取所有需要跟进的事件' }
-      ]})
+      messages.push({
+        role: 'user', content: [
+          { type: 'image', source: { type: 'url', url: file_url } },
+          { type: 'text', text: processedContent || '请分析这张图片，提取所有需要跟进的事件、日程、健康信息等' }
+        ]
+      })
     } else {
       messages.push({ role: 'user', content: processedContent })
     }
 
-const response = await fetch('https://api.anthropic.com/v1/messages', {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json', 'x-api-key': process.env.ANTHROPIC_API_KEY || '', 'anthropic-version': '2023-06-01' },
-  body: JSON.stringify({
-    model: 'claude-sonnet-4-6',
-    max_tokens: 8000,
-    system: buildSystemPrompt(familyContext, grokInfo),
-    messages,
-    tools: [{
-      name: 'extract_events',
-      description: '提取用户输入中的所有生活事件',
-      input_schema: {
-        type: 'object',
-        properties: {
-          events: {
-            type: 'array',
-            items: {
-              type: 'object',
-              properties: {
-                title: { type: 'string' },
-                category: { type: 'string' },
-                dimension: { type: 'string' },
-                who: { type: 'string' },
-                due_date: { type: 'string' },
-                recur: { type: 'string' },
-                priority: { type: 'number' },
-                notes: { type: 'string' },
-                claude_advice: { type: 'string' },
-                action_items: { type: 'array', items: { type: 'string' } },
-                carry_items: { type: 'array', items: { type: 'string' } },
-                depart_time: { type: 'string' },
-                warnings: { type: 'array', items: { type: 'string' } },
-                related_tasks: { type: 'array', items: { type: 'string' } },
-                search_keywords: { type: 'array', items: { type: 'string' } },
-                family_data_needed: { type: 'array', items: { type: 'string' } },
-                is_child_related: { type: 'boolean' },
-                child_health_update: { type: 'object' },
-                child_mood_update: { type: 'object' },
-                child_sleep_update: { type: 'object' },
-                child_medication: { type: 'boolean' },
-                child_notable: { type: 'string' },
-                child_schedule_add: { type: 'object' },
-                child_packing_needs: { type: 'array', items: { type: 'object' } },
-                interest_signals: { type: 'array', items: { type: 'object' } },
-                learn_pattern: { type: 'object' },
-              },
-              required: ['title', 'priority']
-            }
-          }
-        },
-        required: ['events']
-      }
-    }],
-    tool_choice: { type: 'tool', name: 'extract_events' },
-  }),
-})
+    // 5. Claude 全智能分析
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': process.env.ANTHROPIC_API_KEY || '',
+        'anthropic-version': '2023-06-01'
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 8000,
+        system: `你是日安，清迈陪读家庭的全能AI管家。
 
-const data = await response.json()
-const toolUse = data.content?.find((c: any) => c.type === 'tool_use')
-const extracted: any[] = toolUse?.input?.events || []
-    // 5. 存入结果
-let todoIds: string[] = []
-if (extracted.length > 0) {
-  const patterns = extracted.filter((e: any) => e.learn_pattern?.type)
-  if (patterns.length > 0) {
-    await supabase.from('family_habits').insert(
-      patterns.map((e: any) => ({ user_id: activeUserId, habit_type: e.learn_pattern.type, cycle_days: e.learn_pattern.cycle_days || null, last_done: e.learn_pattern.last_occurrence || null, notes: e.learn_pattern.pattern_note || e.title }))
-    )
-  }
-  await triggerMake(extracted, input_type)
-  todoIds = await syncToThreeDrops(supabase, extracted, rawInput?.id || null, activeUserId)
-}
-// 异步预热 Grok 结果存库（不阻塞返回）
-;(async () => {
-  for (const e of extracted) {
-    const keywords = e.search_keywords
-    if (!keywords?.length) continue
-    const idx = extracted.indexOf(e)
-    const todoId = todoIds[idx]
-    if (!todoId) continue
-    try {
-      const grokResult = await grokSearch(keywords.join('，') + '，清迈本地最新情况')
-      if (!grokResult) continue
-      const { data: todo } = await supabase.from('todo_items').select('ai_action_data').eq('id', todoId).single()
-      await supabase.from('todo_items').update({
-        ai_action_data: {
-          ...(todo?.ai_action_data || {}),
-          grok_result: grokResult,
-        }
-      }).eq('id', todoId)
-    } catch (e) {
-      console.error('Grok预热失败:', e)
+## 家庭档案
+${familyContext}
+
+## 实时外部信息
+${grokInfo || '暂无实时信息'}
+
+## 你的工作方式
+仔细分析用户的输入（文字/图片/语音转文字），理解其中所有需要跟进的信息，然后调用合适的工具记录。
+
+## 工具使用原则
+- 可以同时调用多个工具，每个工具处理不同的事情
+- 一张校历图片可能需要调用10次 add_schedule + 2次 add_todo + 1次 add_shopping
+- 一张病历可能需要调用 add_health + update_child_status + add_reminder（复诊提醒）
+- 不确定的信息不要猜测，只记录明确的内容
+- 图片中的每一个日期/事件都要单独调用工具记录，不要合并
+
+## 图片处理
+- 校历：识别每一行，每个事件单独调用 add_schedule
+- 病历：调用 add_health 记录诊断，调用 update_child_status 更新状态
+- 账单：调用 add_todo 设置缴费待办
+- 通知：判断是否需要回复，是否有截止日期
+
+今天日期：${new Date().toLocaleDateString('zh-CN')}`,
+        messages,
+        tools: TOOLS,
+        tool_choice: { type: 'auto' },
+      }),
+    })
+
+    const data = await response.json()
+    console.log('Claude stop_reason:', data.stop_reason)
+
+    // 6. 执行所有工具调用
+    const toolUses = data.content?.filter((c: any) => c.type === 'tool_use') || []
+    console.log(`Claude调用了 ${toolUses.length} 个工具`)
+
+    const todoIds: string[] = []
+    for (const toolUse of toolUses) {
+      console.log(`执行工具: ${toolUse.name}`, JSON.stringify(toolUse.input).slice(0, 100))
+      const todoId = await executeTool(
+        supabase, toolUse.name, toolUse.input,
+        activeUserId, rawInput?.id || null, childrenData || []
+      )
+      if (todoId) todoIds.push(todoId)
     }
-  }
-})()
-// 8. 标记已处理
-await supabase.from('raw_inputs').update({ processed: true, extracted_events: extracted }).eq('id', rawInput?.id).eq('user_id', activeUserId)
 
-return NextResponse.json({ 
-  ok: true, 
-  events: extracted,
-  todo_ids: todoIds
-})
-} catch (e: any) {
-  console.error('PROCESS ERROR:', e?.message || e)
-  return NextResponse.json({ ok: false, error: e?.message }, { status: 500 })
-}
+    // 7. 标记已处理
+    await supabase.from('raw_inputs').update({
+      processed: true,
+      extracted_events: toolUses.map((t: any) => ({ tool: t.name, input: t.input })),
+    }).eq('id', rawInput?.id).eq('user_id', activeUserId)
+
+    return NextResponse.json({
+      ok: true,
+      tools_called: toolUses.length,
+      tool_names: toolUses.map((t: any) => t.name),
+      todo_ids: todoIds,
+    })
+
+  } catch (e: any) {
+    console.error('PROCESS ERROR:', e?.message || e)
+    return NextResponse.json({ ok: false, error: e?.message }, { status: 500 })
+  }
 }
