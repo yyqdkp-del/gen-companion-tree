@@ -80,25 +80,16 @@ ${topInterests ? `6. 关注话题最新动态：${topInterests}` : ''}
 // ── Gemini 深度本地化 ──
 async function callGemini(snapshot: any, location: string): Promise<string> {
   const child = snapshot.children?.[0]
-
-  try {
+try {
     const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${process.env.GOOGLE_AI_API_KEY}
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${process.env.GOOGLE_AI_API_KEY}`,
+      {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           contents: [{
             parts: [{
-              text: `用Google Search搜索${location}本地信息：
-
-1. 本地官方媒体（Chiang Mai 108/CM108）今日停水停电行政通知
-2. 泰国移民局官网近期签证政策变化
-3. ${location}近30天新开亲子餐厅或活动场所（Google Maps 4星以上）
-4. ${location}登革热/流感等健康疾病官方最新数据
-5. ${child?.school_name || '清迈国际学校'}官方近期公告
-6. 泰国政府官网近期影响外籍家庭的政策
-
-每条必须注明来源网址和可信度（官方/社交/用户），用中文输出。无真实信息不输出。`
+              text: `用Google Search搜索${location}本地信息：\n1. 本地官方媒体（Chiang Mai 108/CM108）今日停水停电行政通知\n2. 泰国移民局官网近期签证政策变化\n3. ${location}近30天新开亲子餐厅或活动场所（Google Maps 4星以上）\n4. ${location}登革热/流感等健康疾病官方最新数据\n5. ${child?.school_name || '清迈国际学校'}官方近期公告\n6. 泰国政府官网近期影响外籍家庭的政策\n每条必须注明来源网址和可信度（官方/社交/用户），用中文输出。无真实信息不输出。`
             }]
           }],
           tools: [{ google_search: {} }],
