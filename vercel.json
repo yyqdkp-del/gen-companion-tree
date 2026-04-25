@@ -26,12 +26,12 @@
     },
     "app/api/cron/prepare-actions/route.ts": {
       "maxDuration": 60
-    }
+    },
     "app/api/cron/notify/route.ts": {
-  "maxDuration": 60
-},
-"app/api/push/send/route.ts": {
-  "maxDuration": 30
-}
+      "maxDuration": 60
+    },
+    "app/api/push/send/route.ts": {
+      "maxDuration": 30
+    }
   }
 }
