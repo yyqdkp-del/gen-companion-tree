@@ -324,19 +324,20 @@ function AddChildSheet({ onClose, onSave }: { onClose: () => void; onSave: (d: a
   )
 }
 
-function InputSheet({ onClose, userId }: { onClose: () => void; userId: string }) {
+function InputSheet({ onClose, userId, onProcessing }: { onClose: () => void; userId: string; onProcessing?: () => void }) {
   const [text, setText] = useState('')
   const [sending, setSending] = useState(false)
   const handleSend = async () => {
     if (!text.trim()) return
     setSending(true)
     try {
-      await fetch('/api/rian/process', {
+      fetch('/api/rian/process', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ content: text.trim(), input_type: 'text', user_id: userId })
       })
       onClose()
+      onProcessing?.()
     } catch (e) { console.error(e) }
     setSending(false)
   }
@@ -558,8 +559,13 @@ const handleRead = async (id: string) => {
           />
         )}
         {modal === 'input' && (
-          <InputSheet key="input" onClose={() => setModal(null)} userId={userId} />
-        )}
+  <InputSheet
+    key="input"
+    onClose={() => setModal(null)}
+    userId={userId}
+    onProcessing={() => setProcessStatus({ status: 'processing', message: '根正在整理中...' })}
+  />
+)}
       </AnimatePresence>
       <AnimatePresence>
   {processStatus && (
