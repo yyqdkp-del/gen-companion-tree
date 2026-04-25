@@ -120,7 +120,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
       .subscribe()
     return () => { supabase.removeChannel(channel) }
   }, [])
-
+  useEffect(() => {
+  if (!userId) return
+  const interval = setInterval(() => {
+    sync(userId)
+  }, 30000)
+  return () => clearInterval(interval)
+}, [userId])
   return (
     <AppContext.Provider value={{ userId, userIdRef, kids, todos, hotspots, loading, sync, setUserIdSafe, addTempTodo, removeTempTodo }}>
       {children}
