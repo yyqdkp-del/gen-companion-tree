@@ -127,6 +127,53 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, 30000)
   return () => clearInterval(interval)
 }, [userId])
+  useEffect(() => {
+  if (!userId) return
+
+  const channel = supabase
+    .channel('process_status')
+    .on('postgres_changes', {
+      event: 'UPDATE',
+      schema: 'public',
+      table: 'raw_inputs',
+      filter: `user_id=eq.${userId}`,
+    }, (payload) => {
+      const { status, extracted_events } = payload.new
+
+      if (status === 'processing') {
+        setProcessStatus({ status: 'processing', message: '根正在整理中...' })
+      }
+
+      if (status === 'done') {
+        const tools = extracted_events || []
+        const todoCount = tools.filter((t: any) => t.tool === 'add_todo').length
+        const scheduleCount = tools.filter((t: any) => t.tool === 'add_schedule').length
+        const healthCount = tools.filter((t: any) => t.tool === 'add_health').length
+
+        const parts = []
+        if (todoCount > 0) parts.push(`${todoCount}件待办`)
+        if (scheduleCount > 0) parts.push(`${scheduleCount}个日程`)
+        if (healthCount > 0) parts.push(`${healthCount}条健康记录`)
+
+        setProcessStatus({
+          status: 'done',
+          message: parts.length > 0 ? `整理完成 · 发现${parts.join('、')}` : '整理完成 ✓',
+          tools,
+        })
+
+        sync(userId)
+        setTimeout(() => setProcessStatus(null), 4000)
+      }
+
+      if (status === 'failed') {
+        setProcessStatus({ status: 'failed', message: '整理失败，根会重试' })
+        setTimeout(() => setProcessStatus(null), 3000)
+      }
+    })
+    .subscribe()
+
+  return () => { supabase.removeChannel(channel) }
+}, [userId])
   return (
     <AppContext.Provider value={{ userId, userIdRef, kids, todos, hotspots, loading, sync, setUserIdSafe, addTempTodo, removeTempTodo }}>
       {children}
