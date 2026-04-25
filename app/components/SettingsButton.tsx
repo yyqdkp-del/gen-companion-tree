@@ -1,7 +1,7 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Settings, Volume2, VolumeX, X } from 'lucide-react'
+import { Settings, Volume2, VolumeX, X, User } from 'lucide-react'
 
 const STORAGE_KEY = 'speech_enabled'
 const THEME = { text: '#2C3E50', gold: '#B08D57', navy: '#1A3C5E', muted: '#6B8BAA' }
@@ -46,7 +46,9 @@ export default function SettingsButton() {
                 <span style={{ fontSize: 13, fontWeight: 700, color: THEME.text, letterSpacing: '0.05em' }}>设置</span>
                 <motion.div whileTap={{ scale: 0.85 }} onClick={() => setOpen(false)} style={{ cursor: 'pointer', opacity: 0.3 }}><X size={16} /></motion.div>
               </div>
-              <div style={{ padding: '12px 16px' }}>
+              <div style={{ padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+
+                {/* 语音播报 */}
                 <motion.div whileTap={{ scale: 0.98 }} onClick={toggle}
                   style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 12px', borderRadius: 12, cursor: 'pointer', background: enabled ? 'rgba(176,141,87,0.08)' : 'rgba(0,0,0,0.03)', border: `1px solid ${enabled ? 'rgba(176,141,87,0.2)' : 'rgba(0,0,0,0.06)'}` }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -61,9 +63,17 @@ export default function SettingsButton() {
                       style={{ position: 'absolute', top: 2, width: 20, height: 20, borderRadius: '50%', background: 'white', boxShadow: '0 1px 4px rgba(0,0,0,0.2)' }} />
                   </div>
                 </motion.div>
-              </div>
-              <div style={{ padding: '0 16px 12px' }}>
-                <p style={{ fontSize: 10, color: THEME.muted, margin: 0, lineHeight: 1.5, textAlign: 'center' }}>更多设置即将上线</p>
+
+                {/* 个人资料 */}
+                <motion.div whileTap={{ scale: 0.98 }} onClick={() => { setOpen(false); window.location.href = '/profile' }}
+                  style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 12, cursor: 'pointer', background: 'rgba(0,0,0,0.03)', border: '1px solid rgba(0,0,0,0.06)' }}>
+                  <User size={16} color={THEME.muted} />
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: THEME.text }}>个人资料</div>
+                    <div style={{ fontSize: 11, color: THEME.muted, marginTop: 1 }}>查看或编辑档案</div>
+                  </div>
+                </motion.div>
+
               </div>
             </motion.div>
           </>
