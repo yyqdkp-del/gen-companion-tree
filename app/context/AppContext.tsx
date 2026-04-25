@@ -19,8 +19,9 @@ type AppContextType = {
   setUserIdSafe: (id: string) => void
   addTempTodo: (content: string) => string
   removeTempTodo: (id: string) => void
+  processStatus: { status: 'processing' | 'done' | 'failed' | null; message: string; tools?: any[] } | null
+  setProcessStatus: (status: { status: 'processing' | 'done' | 'failed' | null; message: string; tools?: any[] } | null) => void
 }
-
 const AppContext = createContext<AppContextType | null>(null)
 
 export function AppProvider({ children }: { children: ReactNode }) {
@@ -175,7 +176,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   return () => { supabase.removeChannel(channel) }
 }, [userId])
   return (
-    <AppContext.Provider value={{ userId, userIdRef, kids, todos, hotspots, loading, sync, setUserIdSafe, addTempTodo, removeTempTodo }}>
+   <AppContext.Provider value={{ userId, userIdRef, kids, todos, hotspots, loading, sync, setUserIdSafe, addTempTodo, removeTempTodo, processStatus, setProcessStatus }}>
       {children}
     </AppContext.Provider>
   )
