@@ -32,6 +32,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [todos, setTodos] = useState<any[]>([])
   const [hotspots, setHotspots] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [processStatus, setProcessStatus] = useState<{
+  status: 'processing' | 'done' | 'failed' | null
+  message: string
+  tools?: any[]
+} | null>(null)
 
   const setUserIdSafe = (id: string) => {
     userIdRef.current = id
