@@ -354,8 +354,7 @@ function InputSheet({ onClose, userId }: { onClose: () => void; userId: string }
 
 // ── 主页面 ──
 export default function BasePage() {
-  const { userId, kids, todos, hotspots, loading, sync: ctxSync } = useApp()
-
+ const { userId, kids, todos, hotspots, loading, sync: ctxSync, processStatus, setProcessStatus } = useApp()
   const [time, setTime] = useState(new Date())
   const [selKid, setSelKid] = useState<Child | null>(null)
   const [modal, setModal] = useState<'child' | 'todo' | 'hotspot' | 'addChild' | 'oneTap' | 'input' | null>(null)
@@ -562,7 +561,61 @@ const handleRead = async (id: string) => {
           <InputSheet key="input" onClose={() => setModal(null)} userId={userId} />
         )}
       </AnimatePresence>
-
+      <AnimatePresence>
+  {processStatus && (
+    <motion.div
+      initial={{ opacity: 0, y: 30 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: 30 }}
+      onClick={() => {
+        if (processStatus.status === 'done') {
+          setModal('todo')
+          setProcessStatus(null)
+        }
+      }}
+      style={{
+        position: 'fixed',
+        bottom: 90,
+        left: 16, right: 16,
+        zIndex: 500,
+        background: processStatus.status === 'done'
+          ? 'rgba(29,158,117,0.95)'
+          : processStatus.status === 'failed'
+          ? 'rgba(220,38,38,0.95)'
+          : 'rgba(26,60,94,0.95)',
+        backdropFilter: 'blur(20px)',
+        padding: '14px 20px',
+        borderRadius: 16,
+        display: 'flex',
+        alignItems: 'center',
+        gap: 10,
+        boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
+        cursor: processStatus.status === 'done' ? 'pointer' : 'default',
+      }}
+    >
+      {processStatus.status === 'processing' && (
+        <motion.div
+          animate={{ rotate: 360 }}
+          transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
+        >
+          🌱
+        </motion.div>
+      )}
+      {processStatus.status === 'done' && <span>✓</span>}
+      {processStatus.status === 'failed' && <span>⚠</span>}
+      <div style={{ flex: 1 }}>
+        <div style={{ fontSize: 13, fontWeight: 500, color: '#fff' }}>
+          {processStatus.message}
+        </div>
+        {processStatus.status === 'done' && (
+          <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)', marginTop: 2 }}>
+            点击查看待办
+          </div>
+        )}
+      </div>
+    </motion.div>
+  )}
+</AnimatePresence>
       <InstallPWA />
     </main>
   )
