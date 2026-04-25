@@ -36,6 +36,10 @@
       "path": "/api/cron/prepare-actions",
       "schedule": "0 2 * * *"
     }
+    {
+  "path": "/api/rian/worker",
+  "schedule": "* * * * *"
+}
   ],
   "functions": {
     "app/api/todo/smart-action/route.ts": {
@@ -53,5 +57,8 @@
     "app/api/cron/prepare-actions/route.ts": {
       "maxDuration": 60
     }
+    "app/api/rian/worker/route.ts": {
+  "maxDuration": 300
+}
   }
 }
