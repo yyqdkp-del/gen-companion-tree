@@ -6,12 +6,6 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY || ''
 )
 
-webpush.setVapidDetails(
-  process.env.VAPID_EMAIL || '',
-  process.env.VAPID_PUBLIC_KEY || '',
-  process.env.VAPID_PRIVATE_KEY || ''
-)
-
 export async function sendPushToUser(userId: string, payload: {
   title: string
   body: string
@@ -20,6 +14,12 @@ export async function sendPushToUser(userId: string, payload: {
   tag?: string
   actions?: { action: string; title: string }[]
 }) {
+  webpush.setVapidDetails(
+    process.env.VAPID_EMAIL || '',
+    process.env.VAPID_PUBLIC_KEY || '',
+    process.env.VAPID_PRIVATE_KEY || ''
+  )
+
   const { data: subs } = await supabase
     .from('push_subscriptions')
     .select('subscription')
@@ -33,6 +33,7 @@ export async function sendPushToUser(userId: string, payload: {
       await webpush.sendNotification(sub.subscription, JSON.stringify(payload))
       sent++
     } catch (e: any) {
+      console.error('推送失败:', e?.message)
       if (e.statusCode === 410) {
         await supabase
           .from('push_subscriptions')
