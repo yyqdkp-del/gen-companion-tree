@@ -87,6 +87,26 @@ export function AppProvider({ children }: { children: ReactNode }) {
       if (session?.user?.id) {
         setUserIdSafe(session.user.id)
         sync(session.user.id)
+        // 推送订阅
+if ('Notification' in window && 'serviceWorker' in navigator) {
+  try {
+    const permission = await Notification.requestPermission()
+    if (permission === 'granted') {
+      const reg = await navigator.serviceWorker.ready
+      const sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY,
+      })
+      await fetch('/api/push/subscribe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ subscription: sub, user_id: session.user.id })
+      })
+    }
+  } catch (e) {
+    console.error('推送订阅失败:', e)
+  }
+}
         return
       }
       if ('caches' in window) {
