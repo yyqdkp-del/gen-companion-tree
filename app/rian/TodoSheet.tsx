@@ -65,7 +65,7 @@ export default function TodoSheet({ todos, onClose, onAction }: {
   const redCount = todos.filter(t => t.priority === 'red').length
 
   const list = (
-    filter === 'today' ? todos.filter(t => t.priority === 'red')
+    filter === 'today' ? todos.filter(t => t.due_date === new Date().toISOString().split('T')[0])
     : filter === 'delegated' ? todos.filter(t => t.delegated_to)
     : todos
   ).sort((a, b) => {
