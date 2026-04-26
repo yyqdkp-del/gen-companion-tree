@@ -527,7 +527,7 @@ const handleRead = async (id: string) => {
             setModal('oneTap')
           }} />
         )}
-        {modal === 'hotspot' && (
+       {modal === 'hotspot' && (
           <HotspotSheet
             key="hotspot"
             hotspots={hotspots}
@@ -535,6 +535,8 @@ const handleRead = async (id: string) => {
             onPatrol={handlePatrol}
             patrolling={patrolling}
             onRead={handleRead}
+            userId={userId}
+            onSync={ctxSync}
           />
         )}
         {modal === 'addChild' && (
