@@ -310,6 +310,16 @@ async function executeAction(action: ActionData, userId: string): Promise<string
         body: JSON.stringify({ perform_action: action, user_id: userId }) }).catch(() => {})
       return '已加入日历'
     }
+      // 医疗卡
+if (data.form_type === 'medical_form') {
+  window.open(`/api/cards/medical?user_id=${userId}`, '_blank')
+  return '已打开就诊信息卡'
+}
+// 签证指引
+if (['TM7','TM47','TM8'].includes(data.form_type || '')) {
+  window.open(`/api/cards/visa?user_id=${userId}`, '_blank')
+  return '已打开签证填写指引'
+}
     case 'download_pdf': {
       // 有预填数据，调 perform API 生成 PDF
       if (data.prefilled_fields && data.form_type) {
