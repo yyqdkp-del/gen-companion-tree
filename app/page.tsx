@@ -510,18 +510,17 @@ const handleRead = async (id: string) => {
 
       {/* 弹窗 */}
       <AnimatePresence>
-        {modal === 'child' && (
-          <ChildSheet
-            key="child"
-            children={kids}
-            sel={selKid}
-            onSel={c => setSelKid(c)}
-            onClose={() => setModal(null)}
-            onAdd={() => setModal('addChild')}
-            todos={todos}
-            onOneTap={t => { setOneTapTodo(t); setModal('oneTap') }}
-          />
-        )}
+     {modal === 'child' && (
+  <ChildSheet
+    key="child"
+    children={kids}
+    sel={selKid}
+    onSel={c => setSelKid(c)}
+    onClose={() => setModal(null)}
+    onAdd={() => setModal('addChild')}
+    userId={userId}
+  />
+)}
         {modal === 'todo' && (
           <TodoSheet key="todo" todos={todos} onClose={() => setModal(null)} onAction={t => {
             setOneTapTodo(t)
