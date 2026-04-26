@@ -1,8 +1,8 @@
 export const dynamic = 'force-dynamic'
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-
-const supabase = createClient(
+import { getUserLocation } from '@/lib/geofence'
+  const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || '',
   process.env.SUPABASE_SERVICE_ROLE_KEY || ''
 )
@@ -224,6 +224,10 @@ async function archiveOldHotspots(userId: string) {
     .neq('status', 'dismissed')
 }
 
+// 替换 patrol/route.ts 里的 POST 函数
+// 在文件顶部加这行 import：
+// import { getUserLocation } from '@/lib/geofence'
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json().catch(() => ({}))
@@ -231,7 +235,7 @@ export async function POST(req: NextRequest) {
     const patrolTime = hour < 10 ? '早安巡逻' : hour < 14 ? '午间巡逻' : hour < 18 ? '放学巡逻' : '晚间巡逻'
     console.log(`根开始${patrolTime}:`, new Date().toISOString())
 
-    // 如果指定了 user_id 就只跑那个用户，否则跑所有用户
+    // 指定用户 or 所有用户
     let userIds: string[] = []
     if (body.user_id) {
       userIds = [body.user_id]
@@ -248,21 +252,27 @@ export async function POST(req: NextRequest) {
 
     for (const userId of userIds) {
       try {
+        // 获取用户位置（地理围栏）
+        const userLocation = await getUserLocation(userId)
+        const location = `${userLocation.city} ${userLocation.country}`
+        const patrolPrompt = userLocation.local_config.patrol_prompt
+
+        console.log(`用户${userId.slice(0,8)} 位置: ${location}`)
+
         await archiveOldHotspots(userId)
         const snapshot = await getFamilySnapshot(userId)
-        const primaryPlace = snapshot.places?.find((p: any) => p.is_primary) || snapshot.places?.[0]
-        const location = primaryPlace?.city || primaryPlace?.name || 'Chiang Mai Thailand'
 
+        // 用地理围栏的本地配置调用 AI
         const [grokData, geminiData] = await Promise.all([
-          callGrok(snapshot, location),
-          callGemini(snapshot, location),
+          callGrok(snapshot, location, patrolPrompt),
+          callGemini(snapshot, location, userLocation.local_config.official_sites),
         ])
 
         const hotspots = await callClaude(grokData, geminiData, snapshot, location)
         const saved = await saveHotspots(hotspots, userId)
 
-        console.log(`${patrolTime} 用户${userId.slice(0,8)} 写入${saved}条热点`)
-        results.push({ userId: userId.slice(0,8), generated: hotspots.length, saved })
+        console.log(`${patrolTime} 用户${userId.slice(0,8)} ${location} 写入${saved}条热点`)
+        results.push({ userId: userId.slice(0,8), location, generated: hotspots.length, saved })
       } catch (e: any) {
         console.error(`用户${userId.slice(0,8)}巡逻失败:`, e?.message)
         results.push({ userId: userId.slice(0,8), error: e?.message })
@@ -281,7 +291,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: e?.message }, { status: 500 })
   }
 }
-
 export async function GET() {
   const userId = await getDefaultUserId()
   if (!userId) return NextResponse.json({ error: 'no user' }, { status: 400 })
