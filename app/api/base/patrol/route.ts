@@ -28,15 +28,17 @@ async function getFamilySnapshot(userId: string) {
 }
 
 // ── Grok 实时快数据 ──
-async function callGrok(snapshot: any, location: string): Promise<string> {
+async function callGrok(snapshot: any, location: string, patrolPrompt?: string): Promise<string> {
   const child = snapshot.children?.[0]
   const topInterests = snapshot.interests?.map((i: any) => i.topic).slice(0, 5).join('、') || ''
   const frequentPlaces = snapshot.places
     ?.filter((p: any) => ['weekly', 'daily'].includes(p.visit_frequency))
     ?.map((p: any) => p.name).slice(0, 5).join('、') || ''
-
   const hour = new Date().getHours()
   const timeCtx = hour < 10 ? '早上出门前' : hour < 14 ? '午间' : hour < 17 ? '放学前' : '晚间'
+
+  // 用地理围栏的本地搜索提示，没有则用默认
+  const searchPrompt = patrolPrompt || `${location}今日本地情况：天气AQI、突发事件、汇率、路况、活动`
 
   try {
     const res = await fetch('https://api.x.ai/v1/chat/completions', {
@@ -56,14 +58,13 @@ async function callGrok(snapshot: any, location: string): Promise<string> {
           {
             role: 'user',
             content: `现在是${location} ${timeCtx}，搜索以下内容并返回真实数据：
-
 1. ${location}今日天气+明日预报（含降雨概率和AQI）
-2. X/Twitter #ChiangMai 过去6小时突发事件（封路/火灾/示威/事故）
-3. 泰铢兑人民币今日汇率+近7日走势
-4. ${child?.school_name || '清迈国际学校'}周边今日路况
-5. ${frequentPlaces ? `${frequentPlaces}近期活动/特卖预告` : 'Central Festival/Maya近期活动'}
+2. ${location}过去6小时突发事件（封路/火灾/示威/事故）
+3. 当地主要货币兑人民币今日汇率+近7日走势
+4. ${child?.school_name || location + '国际学校'}周边今日路况
+5. ${frequentPlaces ? `${frequentPlaces}近期活动/特卖预告` : location + '当地商场近期活动'}
 ${topInterests ? `6. 关注话题最新动态：${topInterests}` : ''}
-
+搜索重点：${searchPrompt}
 每条必须包含具体数据、时间、来源。无真实信息不输出。`
           }
         ],
@@ -78,9 +79,13 @@ ${topInterests ? `6. 关注话题最新动态：${topInterests}` : ''}
 }
 
 // ── Gemini 深度本地化 ──
-async function callGemini(snapshot: any, location: string): Promise<string> {
+async function callGemini(snapshot: any, location: string, officialSites: string[] = []): Promise<string> {
   const child = snapshot.children?.[0]
-try {
+  const sitesText = officialSites.length
+    ? `\n参考官方网站：${officialSites.join('、')}`
+    : ''
+
+  try {
     const res = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${process.env.GOOGLE_AI_API_KEY}`,
       {
@@ -89,7 +94,7 @@ try {
         body: JSON.stringify({
           contents: [{
             parts: [{
-              text: `用Google Search搜索${location}本地信息：\n1. 本地官方媒体（Chiang Mai 108/CM108）今日停水停电行政通知\n2. 泰国移民局官网近期签证政策变化\n3. ${location}近30天新开亲子餐厅或活动场所（Google Maps 4星以上）\n4. ${location}登革热/流感等健康疾病官方最新数据\n5. ${child?.school_name || '清迈国际学校'}官方近期公告\n6. 泰国政府官网近期影响外籍家庭的政策\n每条必须注明来源网址和可信度（官方/社交/用户），用中文输出。无真实信息不输出。`
+              text: `用Google Search搜索${location}本地信息：\n1. ${location}本地官方媒体今日停水停电行政通知\n2. 当地移民局官网近期签证政策变化\n3. ${location}近30天新开亲子餐厅或活动场所（Google Maps 4星以上）\n4. ${location}登革热/流感等健康疾病官方最新数据\n5. ${child?.school_name || location + '国际学校'}官方近期公告\n6. 当地政府官网近期影响外籍家庭的政策${sitesText}\n每条必须注明来源网址和可信度（官方/社交/用户），用中文输出。无真实信息不输出。`
             }]
           }],
           tools: [{ google_search: {} }],
