@@ -24,12 +24,11 @@ export async function POST(req: NextRequest) {
     location_scene,
   } = await req.json()
 
-  const scene = location_scene || '海外华人家庭'
+  const scene    = location_scene || '清迈华人陪读家庭'
   const childCtx = child_name
     ? `孩子叫${child_name}，${child_grade || ''}，当前中文水平${child_level || 'R2'}。`
     : `海外华人家庭孩子，当前中文水平${child_level || 'R2'}。`
 
-  // ══ 调用Claude ══
   const callClaude = async (prompt: string) => {
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
@@ -41,7 +40,7 @@ export async function POST(req: NextRequest) {
       body: JSON.stringify({
         model: 'claude-haiku-4-5-20251001',
         max_tokens: 2000,
-        system: `你是专业的海外华人中文教育专家。只输出JSON对象，不加任何其他文字，不用代码块包裹，直接{开头}结尾。所有内容必须完整填写，不能有空字符串或null。mom_script必须口语化温暖，像邻居大姐说话，不像教科书。`,
+        system: `你是专业的海外华人中文教育专家。只输出JSON对象，不加任何其他文字，不用代码块包裹，直接{开头}结尾。所有内容必须完整填写，不能有空字符串或null。mom_script必须口语化温暖，像邻居大姐说话，不像教科书。禁止出现「这个字的意思是」这类教科书句式。`,
         messages: [{ role: 'user', content: prompt }],
       }),
     })
@@ -55,13 +54,11 @@ export async function POST(req: NextRequest) {
 
   try {
 
-    // ══════════════════════════════════════════════
-    // 模式一：汉字拆解
-    // ══════════════════════════════════════════════
+    // ══ 模式一：汉字拆解 ══
     if (mode === 'hanzi') {
       if (!char) return NextResponse.json({ error: '请输入汉字' }, { status: 400, headers: CORS })
 
-      // 第一层：查共享库
+      // 第一层：查共享库缓存
       try {
         const { data: cached } = await supabase
           .from('hanzi_library')
@@ -77,7 +74,7 @@ export async function POST(req: NextRequest) {
         }
       } catch {}
 
-      // 第二层：Claude生成
+      // 第二层：Claude 生成
       const prompt = `
 你是台湾字理教学法专家和英文自然拼读（Phonics）教学顾问。
 ${childCtx}
@@ -86,9 +83,9 @@ ${childCtx}
 为汉字「${char}」生成完整教学数据。
 
 规则：
-1. mom_script必须口语化温暖，像妈妈跟6-10岁孩子说话，不像教科书
+1. mom_script必须口语化温暖，像妈妈睡前讲故事的语气，绝不出现「这个字的意思是」这类教科书句式
 2. english_link必须找到真实的英文Phonics规律或单词家族做类比
-3. scene必须结合「${scene}」的真实生活场景
+3. scene必须结合「${scene}」的真实生活场景，禁止套用其他城市
 4. 所有字段必须填写，不能为空
 5. family只选孩子最常用的词
 
@@ -125,29 +122,29 @@ ${childCtx}
       // 第三层：存入共享库
       try {
         await supabase.from('hanzi_library').insert({
-          char: result.char || char,
-          pinyin: result.pinyin,
-          traditional: result.traditional,
-          meaning_short: result.meaning,
-          parts: result.parts,
-          evolution: result.evolution,
-          phonics_bridge: result.phonics_bridge,
-          family: result.family,
-          mom_script: result.mom_script,
-          scene_universal: result.scene,
-          chengyu_connected: { chengyu: result.chengyu, story: result.cy_story },
-          level_tag: result.level,
-          result: result,
-          created_by: 'ai',
-          hit_count: 1,
+          char:               result.char || char,
+          pinyin:             result.pinyin,
+          traditional:        result.traditional,
+          meaning_short:      result.meaning,
+          parts:              result.parts,
+          evolution:          result.evolution,
+          phonics_bridge:     result.phonics_bridge,
+          family:             result.family,
+          mom_script:         result.mom_script,
+          scene_universal:    result.scene,
+          chengyu_connected:  { chengyu: result.chengyu, story: result.cy_story },
+          level_tag:          result.level,
+          result:             result,
+          created_by:         'ai',
+          hit_count:          1,
         })
-      } catch {}
+      } catch (e) {
+        console.warn('hanzi_library insert failed:', e)
+      }
 
       return NextResponse.json(result, { headers: CORS })
 
-    // ══════════════════════════════════════════════
-    // 模式二：成语解读
-    // ══════════════════════════════════════════════
+    // ══ 模式二：成语解读 ══
     } else if (mode === 'chengyu') {
       if (!sentence) return NextResponse.json({ error: '请输入内容' }, { status: 400, headers: CORS })
 
@@ -156,12 +153,10 @@ ${childCtx}
 ${childCtx}
 当前家庭所在地：${scene}。
 
-孩子说了：「${sentence}」
-
-任务：找到最贴切的中文成语，用中英对照方式教给孩子。
+孩子用中文或英文说了：「${sentence}」，帮我找到最贴切的成语并教给他。
 
 规则：
-1. mom_script必须口语化，像妈妈跟孩子聊天
+1. mom_script必须口语化，像妈妈跟孩子聊天，先连接孩子的英文习语经验，再引出成语
 2. english_idiom必须是孩子在英语学校真实会接触的习语
 3. 成语必须是孩子这个年龄段能用到的
 
@@ -186,7 +181,7 @@ ${childCtx}
 
       const result = await callClaude(prompt)
 
-      // 存入共享成语库（以成语为key）
+      // 存入共享成语库
       try {
         const { data: existing } = await supabase
           .from('chengyu_library')
@@ -200,26 +195,27 @@ ${childCtx}
             .eq('id', existing.id)
         } else {
           await supabase.from('chengyu_library').insert({
-            chengyu: result.chengyu,
-            pinyin: result.pinyin,
-            meaning: result.meaning,
-            result: result,
+            chengyu:   result.chengyu,
+            pinyin:    result.pinyin,
+            meaning:   result.meaning,
+            result:    result,
             hit_count: 1,
           })
         }
-      } catch {}
+      } catch (e) {
+        console.warn('chengyu_library upsert failed:', e)
+      }
 
       return NextResponse.json(result, { headers: CORS })
 
-    // ══════════════════════════════════════════════
-    // 模式三：文化句
-    // ══════════════════════════════════════════════
+    // ══ 模式三：文化句 ══
     } else if (mode === 'writing') {
       if (!sentence) return NextResponse.json({ error: '请输入内容' }, { status: 400, headers: CORS })
 
       const kw = keywords ? `本周学的字/词：${keywords}` : ''
       const prompt = `
-你是海外华人中文写作教育专家，精通口语转书面语教学和古诗文化连接。
+你是海外华人中文写作教育专家，精通把孩子的口语升华为书面中文，
+并用古诗词让孩子感受到「原来古人和我想的一样」。
 ${childCtx}
 当前家庭所在地：${scene}。
 ${kw}
