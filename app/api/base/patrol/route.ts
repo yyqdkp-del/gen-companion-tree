@@ -127,7 +127,7 @@ async function callClaude(grokData: string, geminiData: string, snapshot: any, l
         max_tokens: 2000,
         messages: [{
           role: 'user',
-          content: `你是「根」，清迈陪读家庭最懂你的AI闺蜜。
+          content: `你是「根」，${location}陪读家庭最懂你的AI闺蜜。
 
 Grok实时数据：
 ${grokData || '（无数据）'}
