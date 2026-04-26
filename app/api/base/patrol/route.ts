@@ -227,47 +227,53 @@ async function archiveOldHotspots(userId: string) {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json().catch(() => ({}))
-    const userId = body.user_id || await getDefaultUserId()
-    if (!userId) {
-      return NextResponse.json({ ok: false, error: 'no user found' }, { status: 400 })
-    }
-
     const hour = new Date().getHours()
     const patrolTime = hour < 10 ? '早安巡逻' : hour < 14 ? '午间巡逻' : hour < 18 ? '放学巡逻' : '晚间巡逻'
     console.log(`根开始${patrolTime}:`, new Date().toISOString())
 
-    // 归档昨天热点
-    await archiveOldHotspots(userId)
+    // 如果指定了 user_id 就只跑那个用户，否则跑所有用户
+    let userIds: string[] = []
+    if (body.user_id) {
+      userIds = [body.user_id]
+    } else {
+      const { data } = await supabase.auth.admin.listUsers({ perPage: 100 })
+      userIds = data?.users?.map((u: any) => u.id) || []
+    }
 
-    // 获取家庭快照
-    const snapshot = await getFamilySnapshot(userId)
-    const primaryPlace = snapshot.places?.find((p: any) => p.is_primary) || snapshot.places?.[0]
-    const location = primaryPlace?.city || primaryPlace?.name || 'Chiang Mai Thailand'
+    if (!userIds.length) {
+      return NextResponse.json({ ok: false, error: 'no users found' }, { status: 400 })
+    }
 
-    // Grok 和 Gemini 并行调用
-    const [grokData, geminiData] = await Promise.all([
-      callGrok(snapshot, location),
-      callGemini(snapshot, location),
-    ])
+    const results = []
 
-    console.log('Grok数据长度:', grokData.length)
-    console.log('Gemini数据长度:', geminiData.length)
+    for (const userId of userIds) {
+      try {
+        await archiveOldHotspots(userId)
+        const snapshot = await getFamilySnapshot(userId)
+        const primaryPlace = snapshot.places?.find((p: any) => p.is_primary) || snapshot.places?.[0]
+        const location = primaryPlace?.city || primaryPlace?.name || 'Chiang Mai Thailand'
 
-    // Claude 整合
-    const hotspots = await callClaude(grokData, geminiData, snapshot, location)
-    console.log(`Claude生成${hotspots.length}条热点`)
+        const [grokData, geminiData] = await Promise.all([
+          callGrok(snapshot, location),
+          callGemini(snapshot, location),
+        ])
 
-    // 保存
-    const saved = await saveHotspots(hotspots, userId)
-    console.log(`根${patrolTime}完成，写入${saved}条热点`)
+        const hotspots = await callClaude(grokData, geminiData, snapshot, location)
+        const saved = await saveHotspots(hotspots, userId)
+
+        console.log(`${patrolTime} 用户${userId.slice(0,8)} 写入${saved}条热点`)
+        results.push({ userId: userId.slice(0,8), generated: hotspots.length, saved })
+      } catch (e: any) {
+        console.error(`用户${userId.slice(0,8)}巡逻失败:`, e?.message)
+        results.push({ userId: userId.slice(0,8), error: e?.message })
+      }
+    }
 
     return NextResponse.json({
       ok: true,
       patrol_time: patrolTime,
-      grok_length: grokData.length,
-      gemini_length: geminiData.length,
-      generated: hotspots.length,
-      saved,
+      users: userIds.length,
+      results,
     })
 
   } catch (e: any) {
