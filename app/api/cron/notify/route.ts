@@ -2,8 +2,8 @@ export const dynamic = 'force-dynamic'
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { sendPushToUser } from '@/lib/push'
-
-const supabase = createClient(
+import { getUserLocation, isMorningReportTime, isEveningReportTime } from '@/lib/geofence'
+  const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || '',
   process.env.SUPABASE_SERVICE_ROLE_KEY || ''
 )
@@ -317,10 +317,12 @@ async function sendDepartureReminders(userId: string) {
 // ────────────────────────────────────────
 // 主入口
 // ────────────────────────────────────────
+// 替换 notify/route.ts 里的 GET 函数
+// 在文件顶部加：
+// import { getUserLocation, isMorningReportTime, isEveningReportTime } from '@/lib/geofence'
+
 export async function GET() {
   try {
-    const hour = new Date().getHours()
-    const minute = new Date().getMinutes()
     const users = await getAllSubscribedUsers()
 
     if (!users.length) {
@@ -330,24 +332,37 @@ export async function GET() {
     const tasks: string[] = []
 
     for (const userId of users) {
-      // 晨报 06:30
-      if (hour === 6 && minute >= 28 && minute <= 32) {
-        await sendMorningReport(userId)
-        tasks.push(`morning:${userId.slice(0, 8)}`)
-      }
+      try {
+        // 获取用户位置和时区
+        const userLocation = await getUserLocation(userId)
+        const timezone = userLocation.timezone
 
-      // 晚报 21:00
-      if (hour === 21 && minute <= 5) {
-        await sendEveningReminder(userId)
-        tasks.push(`evening:${userId.slice(0, 8)}`)
-      }
+        // 按用户时区判断时间
+        const isMorning = isMorningReportTime(timezone)
+        const isEvening = isEveningReportTime(timezone)
 
-      // 出发提醒 每小时都检查
-      await sendDepartureReminders(userId)
-      tasks.push(`departure_check:${userId.slice(0, 8)}`)
+        // 晨报（用户时区 6:30）
+        if (isMorning) {
+          await sendMorningReport(userId)
+          tasks.push(`morning:${userId.slice(0,8)}(${userLocation.city})`)
+        }
+
+        // 晚报（用户时区 21:00）
+        if (isEvening) {
+          await sendEveningReminder(userId)
+          tasks.push(`evening:${userId.slice(0,8)}(${userLocation.city})`)
+        }
+
+        // 出发提醒（每小时检查）
+        await sendDepartureReminders(userId)
+        tasks.push(`departure:${userId.slice(0,8)}`)
+
+      } catch (e: any) {
+        console.error(`用户${userId.slice(0,8)}推送失败:`, e?.message)
+      }
     }
 
-    return NextResponse.json({ ok: true, hour, minute, users: users.length, tasks })
+    return NextResponse.json({ ok: true, users: users.length, tasks })
 
   } catch (e: any) {
     console.error('notify 错误:', e?.message)
