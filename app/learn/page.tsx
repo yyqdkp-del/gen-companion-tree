@@ -854,47 +854,40 @@ try {
 
           {/* 汉字输入 */}
           {activeTab === 'hanzi' && (
-            <>
-              <div style={{ display: 'flex', gap: 10, marginBottom: 14 }}>
-
-<input
-  value={input}
-  onCompositionStart={() => { composingRef.current = true; setComposing(true) }}
-  onCompositionEnd={e => {
-    composingRef.current = false
-    setComposing(false)
-    const chars = [...e.currentTarget.value]
-    setInput(chars[chars.length - 1] || '')
-    setData(null)
-  }}
-  onChange={e => {
-    if (composingRef.current) return
-    const chars = [...e.target.value]
-    setInput(chars[chars.length - 1] || '')
-    setData(null)
-  }}
-  onKeyDown={e => e.key === 'Enter' && !composingRef.current && generate()}
-  placeholder="字"
-  style={{ width: 68, textAlign: 'center', fontSize: 48, border: '2px solid rgba(200,160,96,0.3)', borderRadius: 12, padding: '6px 0', fontFamily: "'Noto Serif SC', serif", color: THEME.text, background: THEME.paper, outline: 'none', flexShrink: 0, caretColor: THEME.gold }}
-/>
-                <motion.button whileTap={{ scale: 0.96 }} onClick={() => generate()}
-                  disabled={loading || !input.trim()}
-                  style={{ flex: 1, background: loading || !input.trim() ? '#C5B5A5' : THEME.red, color: '#fff', border: 'none', borderRadius: 12, fontSize: 16, fontFamily: "'Noto Serif SC', serif", cursor: loading || !input.trim() ? 'not-allowed' : 'pointer', letterSpacing: 1, boxShadow: !loading && input.trim() ? '0 4px 16px rgba(192,57,43,0.28)' : 'none' }}>
-                  {loading ? '解析中…' : '🧩 拆解'}
-                </motion.button>
-              </div>
-              <div style={{ fontSize: 10, color: THEME.textDim, letterSpacing: 3, marginBottom: 8, textTransform: 'uppercase', fontFamily: 'sans-serif' }}>快速体验</div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7 }}>
-                {QUICK_CHARS.map(c => (
-                  <motion.div key={c} whileTap={{ scale: 0.88 }} onClick={() => { setData(null); generate(c) }}
-                    style={{ width: 38, height: 38, background: THEME.paper, border: '1.5px solid rgba(200,160,96,0.28)', borderRadius: 10, fontSize: 20, fontFamily: "'Noto Serif SC', serif", color: THEME.textMid, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    {c}
-                  </motion.div>
-                ))}
-              </div>
-            </>
-          )}
-
+  <>
+    <div style={{ display: 'flex', gap: 10, marginBottom: 14 }}>
+      {/* 显示区：只展示，不接收输入 */}
+      <div style={{ width: 68, height: 68, borderRadius: 12, border: '2px solid rgba(200,160,96,0.3)', background: THEME.paper, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 48, fontFamily: "'Noto Serif SC', serif", color: THEME.text, flexShrink: 0 }}>
+        {input || <span style={{ fontSize: 16, color: 'rgba(200,160,96,0.4)' }}>字</span>}
+      </div>
+      {/* 真正接收输入的是全宽隐藏input */}
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <input
+          value={input}
+          onCompositionStart={() => { composingRef.current = true }}
+          onCompositionEnd={e => {
+            composingRef.current = false
+            const chars = [...e.currentTarget.value]
+            setInput(chars[chars.length - 1] || '')
+            setData(null)
+          }}
+          onChange={e => {
+            if (composingRef.current) return
+            const chars = [...e.target.value]
+            setInput(chars[chars.length - 1] || '')
+            setData(null)
+          }}
+          onKeyDown={e => e.key === 'Enter' && !composingRef.current && generate()}
+          placeholder="输入汉字"
+          style={{ width: '100%', padding: '0 14px', height: 32, border: '1px solid rgba(200,160,96,0.3)', borderRadius: 8, fontSize: 14, fontFamily: "'Noto Sans SC', sans-serif", color: THEME.text, background: THEME.paper, outline: 'none' }}
+        />
+        <motion.button whileTap={{ scale: 0.96 }} onClick={() => generate()}
+          disabled={loading || !input.trim()}
+          style={{ flex: 1, padding: '0 14px', height: 32, background: loading || !input.trim() ? '#C5B5A5' : THEME.red, color: '#fff', border: 'none', borderRadius: 8, fontSize: 14, fontFamily: "'Noto Serif SC', serif", cursor: loading || !input.trim() ? 'not-allowed' : 'pointer', letterSpacing: 1 }}>
+          {loading ? '解析中…' : '🧩 拆解'}
+        </motion.button>
+      </div>
+    </div>
           {/* 成语输入 */}
           {activeTab === 'chengyu' && (
             <>
