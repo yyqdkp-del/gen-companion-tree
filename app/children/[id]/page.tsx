@@ -411,7 +411,8 @@ function ChildEditContent() {
   const params = useParams()
   const isNew = params.id === 'new'
   const childId = isNew ? null : params.id as string
-
+  const searchParams = useSearchParams()
+    const isFromQuick = searchParams.get('from') === 'quick'
   const [step, setStep] = useState(0)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
@@ -594,7 +595,11 @@ function ChildEditContent() {
         {/* 步骤标题 */}
         <div style={{ fontSize: 18, fontWeight: 600, color: THEME.navy, marginBottom: 4 }}>{STEPS[step].label}</div>
         <div style={{ fontSize: 11, color: THEME.muted, marginBottom: 24 }}>步骤 {step + 1} / {STEPS.length}</div>
-
+        {isFromQuick && step === 0 && (
+  <div style={{ background: 'rgba(176,141,87,0.1)', borderRadius: 12, padding: '10px 14px', fontSize: 12, color: THEME.gold, marginBottom: 16, textAlign: 'center' }}>
+    🌱 基本信息已保存，继续补充完整资料吧
+  </div>
+)}
         {/* 内容卡片 */}
         <div style={{ background: 'rgba(255,255,255,0.6)', backdropFilter: 'blur(30px)', borderRadius: 24, padding: '24px 20px', border: '1px solid rgba(255,255,255,0.8)', boxShadow: '0 8px 32px rgba(0,0,0,0.06)', marginBottom: 20 }}>
           <AnimatePresence mode="wait">
