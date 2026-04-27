@@ -1,6 +1,6 @@
 'use client'
-import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect, Suspense } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@supabase/supabase-js'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
@@ -154,28 +154,28 @@ function StepAddress({ data, onChange }: { data: any; onChange: (d: any) => void
       <div style={{ fontSize: 12, color: THEME.muted, marginBottom: 20, lineHeight: 1.6 }}>用于导航和表格填写</div>
       <div style={{ fontSize: 12, color: THEME.gold, fontWeight: 700, marginBottom: 12 }}>住所地址</div>
       <SelectField
-  label="居住城市"
-  value={data.resident_city}
-  onChange={v => onChange({ ...data, resident_city: v })}
-  options={[
-    { value: '', label: '请选择城市' },
-    { value: 'Chiang Mai', label: '🇹🇭 清迈' },
-    { value: 'Bangkok', label: '🇹🇭 曼谷' },
-    { value: 'Phuket', label: '🇹🇭 普吉' },
-    { value: 'Pattaya', label: '🇹🇭 芭提雅' },
-    { value: 'Singapore', label: '🇸🇬 新加坡' },
-    { value: 'Kuala Lumpur', label: '🇲🇾 吉隆坡' },
-    { value: 'Bali', label: '🇮🇩 巴厘岛' },
-    { value: 'Manila', label: '🇵🇭 马尼拉' },
-    { value: 'Lisbon', label: '🇵🇹 里斯本' },
-    { value: 'Barcelona', label: '🇪🇸 巴塞罗那' },
-    { value: 'Berlin', label: '🇩🇪 柏林' },
-    { value: 'Amsterdam', label: '🇳🇱 阿姆斯特丹' },
-    { value: 'Vancouver', label: '🇨🇦 温哥华' },
-    { value: 'Los Angeles', label: '🇺🇸 洛杉矶' },
-    { value: 'Hong Kong', label: '🇭🇰 香港' },
-  ]}
-/>
+        label="居住城市"
+        value={data.resident_city}
+        onChange={v => onChange({ ...data, resident_city: v })}
+        options={[
+          { value: '', label: '请选择城市' },
+          { value: 'Chiang Mai', label: '🇹🇭 清迈' },
+          { value: 'Bangkok', label: '🇹🇭 曼谷' },
+          { value: 'Phuket', label: '🇹🇭 普吉' },
+          { value: 'Pattaya', label: '🇹🇭 芭提雅' },
+          { value: 'Singapore', label: '🇸🇬 新加坡' },
+          { value: 'Kuala Lumpur', label: '🇲🇾 吉隆坡' },
+          { value: 'Bali', label: '🇮🇩 巴厘岛' },
+          { value: 'Manila', label: '🇵🇭 马尼拉' },
+          { value: 'Lisbon', label: '🇵🇹 里斯本' },
+          { value: 'Barcelona', label: '🇪🇸 巴塞罗那' },
+          { value: 'Berlin', label: '🇩🇪 柏林' },
+          { value: 'Amsterdam', label: '🇳🇱 阿姆斯特丹' },
+          { value: 'Vancouver', label: '🇨🇦 温哥华' },
+          { value: 'Los Angeles', label: '🇺🇸 洛杉矶' },
+          { value: 'Hong Kong', label: '🇭🇰 香港' },
+        ]}
+      />
       <Field label="地址（英文）" value={data.home_address_en} onChange={v => onChange({ ...data, home_address_en: v })} placeholder="123 Nimman Rd, Chiang Mai 50200" />
       <Field label="地址（中文，可选）" value={data.home_address_zh} onChange={v => onChange({ ...data, home_address_zh: v })} placeholder="清迈市区尼曼路123号" />
       <div style={{ height: 1, background: 'rgba(0,0,0,0.07)', margin: '20px 0' }} />
@@ -209,11 +209,16 @@ function StepEmergency({ data, onChange }: { data: any; onChange: (d: any) => vo
   )
 }
 
-export default function ProfilePage() {
+// ── 主组件内容（需要 useSearchParams，包在 Suspense 里）──
+function ProfileContent() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const isEdit = searchParams.get('mode') === 'edit'
+
   const [step, setStep] = useState(0)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [saveError, setSaveError] = useState('')
   const [existingId, setExistingId] = useState<string | null>(null)
 
   const [memberData, setMemberData] = useState({
@@ -225,10 +230,10 @@ export default function ProfilePage() {
     visa_type: '', visa_expiry: '', tm30_number: '',
   })
   const [addressData, setAddressData] = useState({
-  home_address_en: '', home_address_zh: '',
-  school_name: '', school_address: '', hospital_name: '',
-  resident_city: '',
-})
+    home_address_en: '', home_address_zh: '',
+    school_name: '', school_address: '', hospital_name: '',
+    resident_city: '',
+  })
   const [emergencyData, setEmergencyData] = useState({
     emergency_name: '', emergency_relation: '', emergency_phone: '',
     blood_type: '', allergies: '', chronic_conditions: '',
@@ -265,6 +270,7 @@ export default function ProfilePage() {
           school_name: data.school_name || '',
           school_address: data.school_address || '',
           hospital_name: data.hospital_name || '',
+          resident_city: data.resident_city || '',  // ← 修复：读回城市
         })
         setEmergencyData({
           emergency_name: data.emergency_name || '',
@@ -279,16 +285,13 @@ export default function ProfilePage() {
     load()
   }, [])
 
-  // ══ 修复：每次保存时重新获取session ══
   const handleSave = async () => {
     setSaving(true)
+    setSaveError('')
     try {
       const { data: { session } } = await supabase.auth.getSession()
       const uid = session?.user?.id
-      if (!uid) {
-        router.push('/')
-        return
-      }
+      if (!uid) { router.push('/'); return }
 
       const payload = {
         user_id: uid,
@@ -306,17 +309,17 @@ export default function ProfilePage() {
         if (data) setExistingId(data.id)
       }
 
-      // 同步地址
+      // 同步地址到 family_places
       if (addressData.home_address_en) {
         const { data: existingPlace } = await supabase.from('family_places')
           .select('id').eq('user_id', uid).eq('place_type', 'home').single()
         const placePayload = {
-  user_id: uid, place_type: 'home', name: '家',
-  address: addressData.home_address_en,
-  address_zh: addressData.home_address_zh,
-  city: addressData.resident_city || null,
-  is_primary: true,
-}
+          user_id: uid, place_type: 'home', name: '家',
+          address: addressData.home_address_en,
+          address_zh: addressData.home_address_zh,
+          city: addressData.resident_city || null,
+          is_primary: true,
+        }
         if (existingPlace) {
           await supabase.from('family_places').update(placePayload).eq('id', existingPlace.id)
         } else {
@@ -325,9 +328,15 @@ export default function ProfilePage() {
       }
 
       setSaved(true)
-      setTimeout(() => router.push('/'), 1200)
+      // 编辑模式返回上一页，新建模式跳主页
+      setTimeout(() => {
+        if (isEdit) router.back()
+        else router.push('/')
+      }, 1200)
+
     } catch (e) {
       console.error('保存失败', e)
+      setSaveError('保存失败，请检查网络后重试')
     }
     setSaving(false)
   }
@@ -352,13 +361,13 @@ export default function ProfilePage() {
           style={{ background: 'none', border: 'none', cursor: 'pointer', color: THEME.navy }}>
           <ArrowLeft size={20} />
         </motion.button>
-        <span style={{ fontSize: 16, fontWeight: 700, color: THEME.navy }}>家庭档案</span>
-        {/* 跳过按钮（右上角） */}
-        <span
-          onClick={() => router.push('/')}
-          style={{ fontSize: 13, color: THEME.muted, cursor: 'pointer', textDecoration: 'underline' }}
-        >
-          跳过
+        {/* 标题根据模式变化 */}
+        <span style={{ fontSize: 16, fontWeight: 700, color: THEME.navy }}>
+          {isEdit ? '编辑个人资料' : '建立家庭档案'}
+        </span>
+        <span onClick={() => router.back()}
+          style={{ fontSize: 13, color: THEME.muted, cursor: 'pointer', textDecoration: 'underline' }}>
+          {isEdit ? '取消' : '跳过'}
         </span>
       </div>
 
@@ -418,6 +427,13 @@ export default function ProfilePage() {
           </AnimatePresence>
         </div>
 
+        {/* 错误提示 */}
+        {saveError && (
+          <div style={{ color: '#E07B2A', fontSize: 13, textAlign: 'center', marginBottom: 12, padding: '10px 14px', borderRadius: 12, background: 'rgba(224,123,42,0.08)', border: '1px solid rgba(224,123,42,0.2)' }}>
+            ⚠️ {saveError}
+          </div>
+        )}
+
         {/* 底部按钮 */}
         <div style={{ display: 'flex', gap: 10, paddingBottom: 20 }}>
           {isLastStep ? (
@@ -436,7 +452,7 @@ export default function ProfilePage() {
                   transition: 'background 0.3s',
                 }}>
                 {saving ? <Loader size={16} /> : saved ? <Check size={16} /> : <Save size={16} />}
-                {saving ? '保存中…' : saved ? '已保存 🌿' : '保存档案'}
+                {saving ? '保存中…' : saved ? '已保存 🌿' : isEdit ? '保存修改' : '保存档案'}
               </motion.button>
             </>
           ) : (
@@ -461,12 +477,12 @@ export default function ProfilePage() {
           )}
         </div>
 
-        {/* 暂时跳过（最后一步显示跳过不填） */}
+        {/* 底部辅助文字 */}
         <div style={{ textAlign: 'center', marginBottom: 40 }}>
           {isLastStep ? (
-            <span onClick={() => router.push('/')}
+            <span onClick={() => router.back()}
               style={{ fontSize: 12, color: THEME.muted, cursor: 'pointer', textDecoration: 'underline', opacity: 0.7 }}>
-              跳过，先去看看主页 →
+              {isEdit ? '放弃修改，返回' : '跳过，先去看看主页 →'}
             </span>
           ) : (
             <span onClick={() => setStep(step + 1)}
@@ -478,5 +494,14 @@ export default function ProfilePage() {
 
       </div>
     </main>
+  )
+}
+
+// ── 导出：包 Suspense 解决 useSearchParams 的 SSR 问题 ──
+export default function ProfilePage() {
+  return (
+    <Suspense>
+      <ProfileContent />
+    </Suspense>
   )
 }
