@@ -856,7 +856,6 @@ try {
           {activeTab === 'hanzi' && (
             <>
               <div style={{ display: 'flex', gap: 10, marginBottom: 14 }}>
-              const composingRef = useRef(false)
 
 <input
   value={input}
