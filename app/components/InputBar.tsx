@@ -198,7 +198,7 @@ export default function InputBar() {
 
       <footer style={{
         position: 'fixed',
-        bottom: 'max(env(safe-area-inset-bottom), 36px)',
+        bottom: 'calc(max(env(safe-area-inset-bottom), 36px) + var(--keyboard-height, 0px))',
         left: 0, right: 0, zIndex: 110,
         display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '0 16px',
       }}>
