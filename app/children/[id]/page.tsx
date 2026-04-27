@@ -39,6 +39,39 @@ const ACTIVITY_TYPES = [
   { value: 'other', label: '其他' },
 ]
 
+// ── 清迈医院预设列表 ──
+const PRESET_HOSPITALS = [
+  { category: '综合国际医院', hospitals: [
+    { name: '清迈曼谷医院 (Bangkok Hospital)', phone: '052-089-888' },
+    { name: '清迈兰医院 (Ram Hospital)', phone: '053-920-300' },
+    { name: '兰纳医院 (Lanna Hospital)', phone: '052-134-777' },
+    { name: '麦考密克医院 (McCormick)', phone: '053-921-777' },
+    { name: 'Rajavej 医院', phone: '052-011-999' },
+    { name: 'Sriphat 医疗中心 (清大附属)', phone: '053-936-900' },
+  ]},
+  { category: '牙科诊所', hospitals: [
+    { name: 'Grace Dental Care', phone: '053-894-568' },
+    { name: 'CIDC 国际牙科中心', phone: '052-089-323' },
+    { name: 'GrandDent Dental', phone: '053-274-420' },
+    { name: 'Kitcha Dental', phone: '053-202-011' },
+    { name: 'Dental 4 U', phone: '086-431-3711' },
+    { name: 'Elite Smile Dental', phone: '053-288-199' },
+  ]},
+  { category: '眼科', hospitals: [
+    { name: '圣彼得眼科医院', phone: '053-225-011' },
+    { name: 'CMES 清大专家诊所', phone: '090-670-1719' },
+    { name: 'Darin Eye Center', phone: '052-005-552' },
+    { name: '兰医院眼科中心', phone: '053-920-300' },
+    { name: 'Sriphat 眼科中心', phone: '053-936-948' },
+  ]},
+]
+
+// ── 健康选项 ──
+const BLOOD_TYPES = ['不知道', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-']
+const ALLERGY_OPTIONS = ['无', '青霉素', '头孢', '阿司匹林', '花生', '海鲜', '牛奶', '鸡蛋', '尘螨', '花粉', '猫狗毛', '乳胶', '其他']
+const CONDITION_OPTIONS = ['无', '哮喘', '湿疹', '过敏性鼻炎', '糖尿病', '癫痫', '心脏病', '其他']
+const MEDICATION_OPTIONS = ['无', '哮喘喷雾', '过敏药', '退烧药备用', '维生素', '其他']
+
 function Field({ label, value, onChange, placeholder, type = 'text' }: {
   label: string; value: string; onChange: (v: string) => void
   placeholder?: string; type?: string
@@ -67,26 +100,70 @@ function SelectField({ label, value, onChange, options }: {
   )
 }
 
+// ── 多选标签组件 ──
+function MultiSelect({ label, options, selected, onChange }: {
+  label: string
+  options: string[]
+  selected: string[]
+  onChange: (v: string[]) => void
+}) {
+  const [customInput, setCustomInput] = useState('')
+  const showCustom = selected.includes('其他')
+
+  const toggle = (opt: string) => {
+    if (opt === '无') { onChange(['无']); return }
+    const without = selected.filter(s => s !== '无')
+    if (without.includes(opt)) {
+      const next = without.filter(s => s !== opt)
+      onChange(next.length ? next : ['无'])
+    } else {
+      onChange([...without, opt])
+    }
+  }
+
+  return (
+    <div style={{ marginBottom: 16 }}>
+      <div style={{ fontSize: 12, color: THEME.muted, fontWeight: 700, marginBottom: 8, letterSpacing: '0.08em' }}>{label}</div>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+        {options.map(opt => {
+          const isSelected = selected.includes(opt)
+          return (
+            <motion.div key={opt} whileTap={{ scale: 0.92 }} onClick={() => toggle(opt)}
+              style={{ padding: '7px 14px', borderRadius: 20, fontSize: 13, cursor: 'pointer', background: isSelected ? 'rgba(176,141,87,0.15)' : 'rgba(255,255,255,0.6)', border: isSelected ? `1.5px solid ${THEME.gold}` : '1px solid rgba(0,0,0,0.1)', color: isSelected ? THEME.gold : THEME.text, fontWeight: isSelected ? 600 : 400 }}>
+              {opt}
+            </motion.div>
+          )
+        })}
+      </div>
+      {showCustom && (
+        <input value={customInput} onChange={e => setCustomInput(e.target.value)}
+          placeholder="请描述具体情况…"
+          style={{ width: '100%', marginTop: 8, padding: '10px 14px', borderRadius: 10, border: '1px solid rgba(0,0,0,0.1)', background: 'rgba(255,255,255,0.65)', fontSize: 13, outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit' }} />
+      )}
+    </div>
+  )
+}
+
 // ── Step 0：基本信息 ──
 function StepBasic({ data, onChange }: { data: any; onChange: (d: any) => void }) {
   const [uploading, setUploading] = useState(false)
+  const [uploadSuccess, setUploadSuccess] = useState(false)
   const photoRef = useRef<HTMLInputElement>(null)
 
   const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
     setUploading(true)
+    setUploadSuccess(false)
     try {
       const ext = file.name.split('.').pop()
       const path = `children/${Date.now()}.${ext}`
-      const { error } = await supabase.storage
-        .from('companion-files')
-        .upload(path, file, { upsert: true })
+      const { error } = await supabase.storage.from('companion-files').upload(path, file, { upsert: true })
       if (error) throw error
-      const { data: urlData } = supabase.storage
-        .from('companion-files')
-        .getPublicUrl(path)
+      const { data: urlData } = supabase.storage.from('companion-files').getPublicUrl(path)
       onChange({ ...data, avatar_url: urlData.publicUrl })
+      setUploadSuccess(true)
+      setTimeout(() => setUploadSuccess(false), 3000)
     } catch (e) {
       console.error('上传失败', e)
     }
@@ -97,27 +174,22 @@ function StepBasic({ data, onChange }: { data: any; onChange: (d: any) => void }
     <div>
       <div style={{ fontSize: 15, fontWeight: 600, color: THEME.navy, marginBottom: 20 }}>孩子是谁？🌱</div>
 
-      {/* 头像区域 */}
       <div style={{ marginBottom: 20 }}>
         <div style={{ fontSize: 12, color: THEME.muted, fontWeight: 700, marginBottom: 10, letterSpacing: '0.08em' }}>头像</div>
-        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 16, marginBottom: 12 }}>
-
-          {/* 当前头像预览 */}
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14, marginBottom: 12 }}>
           <div style={{ width: 72, height: 72, borderRadius: 20, overflow: 'hidden', border: '2px solid rgba(176,141,87,0.3)', flexShrink: 0, background: 'rgba(255,255,255,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 36 }}>
             {data.avatar_url
               ? <img src={data.avatar_url} alt="头像" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
               : data.emoji || '🌟'
             }
           </div>
-
-          {/* 上传按钮 */}
-          <div style={{ flex: 1 }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
             <input ref={photoRef} type="file" accept="image/*" onChange={handlePhotoUpload} style={{ display: 'none' }} />
             <motion.button whileTap={{ scale: 0.96 }} onClick={() => photoRef.current?.click()}
               disabled={uploading}
-              style={{ width: '100%', padding: '10px 14px', borderRadius: 12, border: `1.5px dashed rgba(176,141,87,0.4)`, background: 'rgba(176,141,87,0.06)', color: THEME.gold, fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, marginBottom: 8 }}>
-              {uploading ? <Loader size={14} /> : <Camera size={14} />}
-              {uploading ? '上传中…' : data.avatar_url ? '更换照片' : '上传照片'}
+              style={{ width: '100%', padding: '10px 14px', borderRadius: 12, border: `1.5px dashed rgba(176,141,87,0.4)`, background: uploadSuccess ? 'rgba(34,197,94,0.08)' : 'rgba(176,141,87,0.06)', color: uploadSuccess ? '#16a34a' : THEME.gold, fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, marginBottom: 8 }}>
+              {uploading ? <Loader size={14} /> : uploadSuccess ? <Check size={14} /> : <Camera size={14} />}
+              {uploading ? '上传中…' : uploadSuccess ? '上传成功 ✓' : data.avatar_url ? '更换照片' : '上传照片'}
             </motion.button>
             {data.avatar_url && (
               <motion.button whileTap={{ scale: 0.96 }}
@@ -129,13 +201,12 @@ function StepBasic({ data, onChange }: { data: any; onChange: (d: any) => void }
           </div>
         </div>
 
-        {/* 没有照片时显示 emoji 选择 */}
         {!data.avatar_url && (
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
             {EMOJIS.map(e => (
               <motion.div key={e} whileTap={{ scale: 0.85 }}
                 onClick={() => onChange({ ...data, emoji: e })}
-                style={{ width: 44, height: 44, borderRadius: 12, background: data.emoji === e ? 'rgba(176,141,87,0.2)' : 'rgba(255,255,255,0.5)', border: data.emoji === e ? `2px solid ${THEME.gold}` : '1px solid rgba(0,0,0,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24, cursor: 'pointer' }}>
+                style={{ width: 42, height: 42, borderRadius: 12, background: data.emoji === e ? 'rgba(176,141,87,0.2)' : 'rgba(255,255,255,0.5)', border: data.emoji === e ? `2px solid ${THEME.gold}` : '1px solid rgba(0,0,0,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, cursor: 'pointer' }}>
                 {e}
               </motion.div>
             ))}
@@ -146,7 +217,6 @@ function StepBasic({ data, onChange }: { data: any; onChange: (d: any) => void }
       <Field label="孩子名字" value={data.name} onChange={v => onChange({ ...data, name: v })} placeholder="小明 / William" />
       <Field label="生日" value={data.birthdate} onChange={v => onChange({ ...data, birthdate: v })} type="date" />
 
-      {/* 语言多选 */}
       <div style={{ marginBottom: 16 }}>
         <div style={{ fontSize: 12, color: THEME.muted, fontWeight: 700, marginBottom: 8, letterSpacing: '0.08em' }}>日常语言</div>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
@@ -175,7 +245,6 @@ function StepSchool({ data, onChange, schools }: { data: any; onChange: (d: any)
     <div>
       <div style={{ fontSize: 15, fontWeight: 600, color: THEME.navy, marginBottom: 20 }}>学校信息 🏫</div>
 
-      {/* 学校选择 */}
       <div style={{ marginBottom: 16 }}>
         <div style={{ fontSize: 12, color: THEME.muted, fontWeight: 700, marginBottom: 6, letterSpacing: '0.08em' }}>就读学校</div>
         <select value={data.school_id || ''} onChange={e => {
@@ -189,7 +258,6 @@ function StepSchool({ data, onChange, schools }: { data: any; onChange: (d: any)
         </select>
       </div>
 
-      {/* 学校不在列表时手动输入 */}
       {data.school_id === 'other' && (
         <Field label="学校名称" value={data.school || ''} onChange={v => onChange({ ...data, school: v })} placeholder="输入学校全名" />
       )}
@@ -199,9 +267,9 @@ function StepSchool({ data, onChange, schools }: { data: any; onChange: (d: any)
           { value: '', label: '请选择年级' },
           { value: 'Nursery', label: 'Nursery' },
           { value: 'K1', label: 'K1' }, { value: 'K2', label: 'K2' }, { value: 'K3', label: 'K3' },
-          { value: 'G1', label: 'G1 (小学一年级)' }, { value: 'G2', label: 'G2' }, { value: 'G3', label: 'G3' },
+          { value: 'G1', label: 'G1' }, { value: 'G2', label: 'G2' }, { value: 'G3', label: 'G3' },
           { value: 'G4', label: 'G4' }, { value: 'G5', label: 'G5' }, { value: 'G6', label: 'G6' },
-          { value: 'G7', label: 'G7 (中学一年级)' }, { value: 'G8', label: 'G8' }, { value: 'G9', label: 'G9' },
+          { value: 'G7', label: 'G7' }, { value: 'G8', label: 'G8' }, { value: 'G9', label: 'G9' },
           { value: 'G10', label: 'G10' }, { value: 'G11', label: 'G11' }, { value: 'G12', label: 'G12' },
         ]}
       />
@@ -232,6 +300,7 @@ function StepSchool({ data, onChange, schools }: { data: any; onChange: (d: any)
 function StepSchedule({ data, onChange }: { data: any; onChange: (d: any) => void }) {
   const [activeDay, setActiveDay] = useState('mon')
   const [parsing, setParsing] = useState(false)
+  const [parseSuccess, setParseSuccess] = useState(false)
   const [parseError, setParseError] = useState('')
   const fileRef = useRef<HTMLInputElement>(null)
 
@@ -239,15 +308,12 @@ function StepSchedule({ data, onChange }: { data: any; onChange: (d: any) => voi
   const activities = data.activities || []
 
   const updateDaySchedule = (day: string, text: string) => {
-    const slots = text.split('\n').map(s => s.trim()).filter(Boolean)
+    const slots = text.split('\n').map((s: string) => s.trim()).filter(Boolean)
     onChange({ ...data, class_schedule: { ...schedule, [day]: slots } })
   }
 
   const addActivity = () => {
-    onChange({
-      ...data,
-      activities: [...activities, { name: '', type: 'activity', day: 'mon', time: '', location: '' }]
-    })
+    onChange({ ...data, activities: [...activities, { name: '', type: 'activity', day: 'mon', time: '', location: '' }] })
   }
 
   const updateActivity = (i: number, field: string, val: string) => {
@@ -260,12 +326,12 @@ function StepSchedule({ data, onChange }: { data: any; onChange: (d: any) => voi
     onChange({ ...data, activities: activities.filter((_: any, idx: number) => idx !== i) })
   }
 
-  // 拍照解析
   const handlePhoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
     setParsing(true)
     setParseError('')
+    setParseSuccess(false)
     try {
       const base64 = await new Promise<string>((res, rej) => {
         const r = new FileReader()
@@ -281,6 +347,8 @@ function StepSchedule({ data, onChange }: { data: any; onChange: (d: any) => voi
       const result = await resp.json()
       if (result.error) throw new Error(result.error)
       onChange({ ...data, class_schedule: result.schedule })
+      setParseSuccess(true)
+      setTimeout(() => setParseSuccess(false), 3000)
     } catch (err: any) {
       setParseError('解析失败，请手动填写或重试')
     }
@@ -290,15 +358,14 @@ function StepSchedule({ data, onChange }: { data: any; onChange: (d: any) => voi
   return (
     <div>
       <div style={{ fontSize: 15, fontWeight: 600, color: THEME.navy, marginBottom: 4 }}>课程与活动 📚</div>
-      <div style={{ fontSize: 12, color: THEME.muted, marginBottom: 20, lineHeight: 1.6 }}>可拍课程表照片自动识别</div>
+      <div style={{ fontSize: 12, color: THEME.muted, marginBottom: 16, lineHeight: 1.6 }}>可拍课程表照片自动识别</div>
 
-      {/* 拍照解析按钮 */}
       <input ref={fileRef} type="file" accept="image/*" capture="environment" onChange={handlePhoto} style={{ display: 'none' }} />
       <motion.button whileTap={{ scale: 0.97 }} onClick={() => fileRef.current?.click()}
         disabled={parsing}
-        style={{ width: '100%', padding: '12px', borderRadius: 12, border: `1.5px dashed ${THEME.gold}`, background: 'rgba(176,141,87,0.06)', color: THEME.gold, fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginBottom: 12 }}>
-        {parsing ? <Loader size={16} /> : <Camera size={16} />}
-        {parsing ? '正在识别课程表…' : '拍照识别课程表'}
+        style={{ width: '100%', padding: '12px', borderRadius: 12, border: `1.5px dashed ${parseSuccess ? '#16a34a' : THEME.gold}`, background: parseSuccess ? 'rgba(34,197,94,0.08)' : 'rgba(176,141,87,0.06)', color: parseSuccess ? '#16a34a' : THEME.gold, fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginBottom: 12 }}>
+        {parsing ? <Loader size={16} /> : parseSuccess ? <Check size={16} /> : <Camera size={16} />}
+        {parsing ? '正在识别课程表…' : parseSuccess ? '识别成功！已填入下方 ✓' : '拍照识别课程表'}
       </motion.button>
 
       {parseError && (
@@ -307,18 +374,16 @@ function StepSchedule({ data, onChange }: { data: any; onChange: (d: any) => voi
         </div>
       )}
 
-      {/* 星期切换 */}
-      <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
+      <div style={{ display: 'flex', gap: 5, marginBottom: 12 }}>
         {DAYS.map(d => (
           <motion.button key={d.key} whileTap={{ scale: 0.92 }}
             onClick={() => setActiveDay(d.key)}
-            style={{ flex: 1, padding: '8px 4px', borderRadius: 10, border: 'none', background: activeDay === d.key ? THEME.navy : 'rgba(255,255,255,0.5)', color: activeDay === d.key ? '#fff' : THEME.muted, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+            style={{ flex: 1, padding: '8px 2px', borderRadius: 10, border: 'none', background: activeDay === d.key ? THEME.navy : 'rgba(255,255,255,0.5)', color: activeDay === d.key ? '#fff' : THEME.muted, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>
             {d.label}
           </motion.button>
         ))}
       </div>
 
-      {/* 课程表编辑 */}
       <div style={{ marginBottom: 20 }}>
         <div style={{ fontSize: 12, color: THEME.muted, marginBottom: 6 }}>每行一节课，按时间顺序填写</div>
         <textarea
@@ -330,10 +395,9 @@ function StepSchedule({ data, onChange }: { data: any; onChange: (d: any) => voi
         />
       </div>
 
-      {/* 课外活动 */}
-      <div style={{ fontSize: 12, color: THEME.gold, fontWeight: 700, marginBottom: 10, letterSpacing: '0.05em' }}>课外活动 / 补习课</div>
+      <div style={{ fontSize: 12, color: THEME.gold, fontWeight: 700, marginBottom: 10 }}>课外活动 / 补习课</div>
       {activities.map((act: any, i: number) => (
-        <div key={i} style={{ background: 'rgba(255,255,255,0.6)', borderRadius: 14, padding: '14px', marginBottom: 10, border: '1px solid rgba(0,0,0,0.07)' }}>
+        <div key={i} style={{ background: 'rgba(255,255,255,0.6)', borderRadius: 14, padding: '12px', marginBottom: 10, border: '1px solid rgba(0,0,0,0.07)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
             <span style={{ fontSize: 12, color: THEME.muted, fontWeight: 600 }}>活动 {i + 1}</span>
             <motion.button whileTap={{ scale: 0.85 }} onClick={() => removeActivity(i)}
@@ -343,21 +407,21 @@ function StepSchedule({ data, onChange }: { data: any; onChange: (d: any) => voi
           </div>
           <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
             <input value={act.name} onChange={e => updateActivity(i, 'name', e.target.value)}
-              placeholder="活动名称" style={{ flex: 2, padding: '9px 12px', borderRadius: 10, border: '1px solid rgba(0,0,0,0.1)', background: 'rgba(255,255,255,0.7)', fontSize: 13, outline: 'none', fontFamily: 'inherit' }} />
+              placeholder="活动名称" style={{ flex: 2, padding: '9px 12px', borderRadius: 10, border: '1px solid rgba(0,0,0,0.1)', background: 'rgba(255,255,255,0.7)', fontSize: 13, outline: 'none', fontFamily: 'inherit', minWidth: 0 }} />
             <select value={act.type} onChange={e => updateActivity(i, 'type', e.target.value)}
-              style={{ flex: 1, padding: '9px 10px', borderRadius: 10, border: '1px solid rgba(0,0,0,0.1)', background: 'rgba(255,255,255,0.7)', fontSize: 12, outline: 'none', appearance: 'none', fontFamily: 'inherit' }}>
+              style={{ flex: 1, padding: '9px 8px', borderRadius: 10, border: '1px solid rgba(0,0,0,0.1)', background: 'rgba(255,255,255,0.7)', fontSize: 12, outline: 'none', appearance: 'none', fontFamily: 'inherit', minWidth: 0 }}>
               {ACTIVITY_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
             </select>
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
             <select value={act.day} onChange={e => updateActivity(i, 'day', e.target.value)}
-              style={{ flex: 1, padding: '9px 10px', borderRadius: 10, border: '1px solid rgba(0,0,0,0.1)', background: 'rgba(255,255,255,0.7)', fontSize: 12, outline: 'none', appearance: 'none', fontFamily: 'inherit' }}>
+              style={{ flex: 1, padding: '9px 8px', borderRadius: 10, border: '1px solid rgba(0,0,0,0.1)', background: 'rgba(255,255,255,0.7)', fontSize: 12, outline: 'none', appearance: 'none', fontFamily: 'inherit', minWidth: 0 }}>
               {DAYS.map(d => <option key={d.key} value={d.key}>{d.label}</option>)}
             </select>
             <input value={act.time} onChange={e => updateActivity(i, 'time', e.target.value)}
-              type="time" style={{ flex: 1, padding: '9px 12px', borderRadius: 10, border: '1px solid rgba(0,0,0,0.1)', background: 'rgba(255,255,255,0.7)', fontSize: 13, outline: 'none', fontFamily: 'inherit' }} />
+              type="time" style={{ flex: 1, padding: '9px 10px', borderRadius: 10, border: '1px solid rgba(0,0,0,0.1)', background: 'rgba(255,255,255,0.7)', fontSize: 13, outline: 'none', fontFamily: 'inherit', minWidth: 0 }} />
             <input value={act.location} onChange={e => updateActivity(i, 'location', e.target.value)}
-              placeholder="地点" style={{ flex: 1, padding: '9px 12px', borderRadius: 10, border: '1px solid rgba(0,0,0,0.1)', background: 'rgba(255,255,255,0.7)', fontSize: 13, outline: 'none', fontFamily: 'inherit' }} />
+              placeholder="地点" style={{ flex: 1, padding: '9px 10px', borderRadius: 10, border: '1px solid rgba(0,0,0,0.1)', background: 'rgba(255,255,255,0.7)', fontSize: 13, outline: 'none', fontFamily: 'inherit', minWidth: 0 }} />
           </div>
         </div>
       ))}
@@ -372,32 +436,128 @@ function StepSchedule({ data, onChange }: { data: any; onChange: (d: any) => voi
 
 // ── Step 3：健康信息 ──
 function StepHealth({ data, onChange }: { data: any; onChange: (d: any) => void }) {
+  const [showHospitalPicker, setShowHospitalPicker] = useState(false)
+  const [customHospital, setCustomHospital] = useState('')
+
+  const hospitals: any[] = data.preferred_hospitals || []
+
+  const addHospital = (name: string, phone: string) => {
+    if (hospitals.find((h: any) => h.name === name)) return
+    onChange({ ...data, preferred_hospitals: [...hospitals, { name, phone }] })
+  }
+
+  const removeHospital = (i: number) => {
+    onChange({ ...data, preferred_hospitals: hospitals.filter((_: any, idx: number) => idx !== i) })
+  }
+
+  const addCustomHospital = () => {
+    if (!customHospital.trim()) return
+    addHospital(customHospital.trim(), '')
+    setCustomHospital('')
+  }
+
+  const parseArray = (val: any): string[] => {
+    if (Array.isArray(val)) return val
+    if (typeof val === 'string' && val) {
+      try { const p = JSON.parse(val); return Array.isArray(p) ? p : [val] } catch { return [val] }
+    }
+    return ['无']
+  }
+
   return (
     <div>
       <div style={{ fontSize: 15, fontWeight: 600, color: THEME.navy, marginBottom: 4 }}>健康信息 🏥</div>
       <div style={{ fontSize: 12, color: THEME.muted, marginBottom: 20, lineHeight: 1.6 }}>用于就诊卡和紧急情况</div>
-      <Field label="血型" value={data.blood_type || ''} onChange={v => onChange({ ...data, blood_type: v })} placeholder="A / B / AB / O" />
+
+      {/* 血型 */}
       <div style={{ marginBottom: 16 }}>
-        <div style={{ fontSize: 12, color: THEME.muted, fontWeight: 700, marginBottom: 6 }}>过敏史</div>
-        <textarea value={typeof data.allergies === 'string' ? data.allergies : JSON.stringify(data.allergies || '')}
-          onChange={e => onChange({ ...data, allergies: e.target.value })}
-          placeholder="青霉素过敏 / 花生过敏 / 无" rows={2}
-          style={{ width: '100%', padding: '12px 14px', borderRadius: 12, border: '1px solid rgba(0,0,0,0.1)', background: 'rgba(255,255,255,0.65)', fontSize: 14, outline: 'none', resize: 'none', fontFamily: 'inherit', boxSizing: 'border-box' }} />
+        <div style={{ fontSize: 12, color: THEME.muted, fontWeight: 700, marginBottom: 8, letterSpacing: '0.08em' }}>血型</div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+          {BLOOD_TYPES.map(bt => (
+            <motion.div key={bt} whileTap={{ scale: 0.92 }}
+              onClick={() => onChange({ ...data, blood_type: bt })}
+              style={{ padding: '7px 14px', borderRadius: 20, fontSize: 13, cursor: 'pointer', background: data.blood_type === bt ? 'rgba(176,141,87,0.15)' : 'rgba(255,255,255,0.6)', border: data.blood_type === bt ? `1.5px solid ${THEME.gold}` : '1px solid rgba(0,0,0,0.1)', color: data.blood_type === bt ? THEME.gold : THEME.text, fontWeight: data.blood_type === bt ? 600 : 400 }}>
+              {bt}
+            </motion.div>
+          ))}
+        </div>
       </div>
+
+      <MultiSelect label="过敏史" options={ALLERGY_OPTIONS} selected={parseArray(data.allergies)} onChange={v => onChange({ ...data, allergies: v })} />
+      <MultiSelect label="慢性病 / 医疗状况" options={CONDITION_OPTIONS} selected={parseArray(data.medical_conditions)} onChange={v => onChange({ ...data, medical_conditions: v })} />
+      <MultiSelect label="当前用药" options={MEDICATION_OPTIONS} selected={parseArray(data.medications_current)} onChange={v => onChange({ ...data, medications_current: v })} />
+
+      {/* 常用医院 */}
       <div style={{ marginBottom: 16 }}>
-        <div style={{ fontSize: 12, color: THEME.muted, fontWeight: 700, marginBottom: 6 }}>慢性病 / 医疗状况</div>
-        <textarea value={typeof data.medical_conditions === 'string' ? data.medical_conditions : JSON.stringify(data.medical_conditions || '')}
-          onChange={e => onChange({ ...data, medical_conditions: e.target.value })}
-          placeholder="哮喘 / 无" rows={2}
-          style={{ width: '100%', padding: '12px 14px', borderRadius: 12, border: '1px solid rgba(0,0,0,0.1)', background: 'rgba(255,255,255,0.65)', fontSize: 14, outline: 'none', resize: 'none', fontFamily: 'inherit', boxSizing: 'border-box' }} />
+        <div style={{ fontSize: 12, color: THEME.muted, fontWeight: 700, marginBottom: 8, letterSpacing: '0.08em' }}>常用医院</div>
+
+        {/* 已选医院列表 */}
+        {hospitals.map((h: any, i: number) => (
+          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderRadius: 12, background: 'rgba(176,141,87,0.08)', border: '1px solid rgba(176,141,87,0.2)', marginBottom: 8 }}>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: THEME.text }}>{h.name}</div>
+              {h.phone && <div style={{ fontSize: 11, color: THEME.muted, marginTop: 2 }}>📞 {h.phone}</div>}
+            </div>
+            <motion.button whileTap={{ scale: 0.85 }} onClick={() => removeHospital(i)}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: THEME.muted, flexShrink: 0 }}>
+              <X size={14} />
+            </motion.button>
+          </div>
+        ))}
+
+        {/* 从预设选择 */}
+        <motion.button whileTap={{ scale: 0.97 }}
+          onClick={() => setShowHospitalPicker(!showHospitalPicker)}
+          style={{ width: '100%', padding: '10px', borderRadius: 12, border: `1.5px dashed rgba(176,141,87,0.4)`, background: 'transparent', color: THEME.gold, fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, marginBottom: 8 }}>
+          <Plus size={14} /> 从清迈医院列表选择
+        </motion.button>
+
+        {/* 医院选择器 */}
+        <AnimatePresence>
+          {showHospitalPicker && (
+            <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}
+              style={{ overflow: 'hidden', marginBottom: 8 }}>
+              <div style={{ background: 'rgba(255,255,255,0.7)', borderRadius: 14, padding: '14px', border: '1px solid rgba(0,0,0,0.07)', maxHeight: 320, overflowY: 'auto' }}>
+                {PRESET_HOSPITALS.map(cat => (
+                  <div key={cat.category} style={{ marginBottom: 16 }}>
+                    <div style={{ fontSize: 11, color: THEME.gold, fontWeight: 700, letterSpacing: '0.05em', marginBottom: 8 }}>{cat.category}</div>
+                    {cat.hospitals.map(h => {
+                      const isAdded = hospitals.find((added: any) => added.name === h.name)
+                      return (
+                        <motion.div key={h.name} whileTap={{ scale: 0.98 }}
+                          onClick={() => { if (!isAdded) addHospital(h.name, h.phone) }}
+                          style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', borderRadius: 10, marginBottom: 6, background: isAdded ? 'rgba(34,197,94,0.08)' : 'rgba(255,255,255,0.6)', border: isAdded ? '1px solid rgba(34,197,94,0.3)' : '1px solid rgba(0,0,0,0.06)', cursor: isAdded ? 'default' : 'pointer' }}>
+                          <div>
+                            <div style={{ fontSize: 12, fontWeight: 600, color: THEME.text }}>{h.name}</div>
+                            <div style={{ fontSize: 11, color: THEME.muted }}>📞 {h.phone}</div>
+                          </div>
+                          {isAdded
+                            ? <Check size={14} color="#16a34a" />
+                            : <Plus size={14} color={THEME.muted} />
+                          }
+                        </motion.div>
+                      )
+                    })}
+                  </div>
+                ))}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* 手动添加 */}
+        <div style={{ display: 'flex', gap: 8 }}>
+          <input value={customHospital} onChange={e => setCustomHospital(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && addCustomHospital()}
+            placeholder="手动输入医院名称"
+            style={{ flex: 1, padding: '10px 14px', borderRadius: 10, border: '1px solid rgba(0,0,0,0.1)', background: 'rgba(255,255,255,0.65)', fontSize: 13, outline: 'none', fontFamily: 'inherit' }} />
+          <motion.button whileTap={{ scale: 0.95 }} onClick={addCustomHospital}
+            style={{ padding: '10px 16px', borderRadius: 10, border: 'none', background: THEME.navy, color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer', flexShrink: 0 }}>
+            添加
+          </motion.button>
+        </div>
       </div>
-      <div style={{ marginBottom: 16 }}>
-        <div style={{ fontSize: 12, color: THEME.muted, fontWeight: 700, marginBottom: 6 }}>当前用药</div>
-        <textarea value={typeof data.medications_current === 'string' ? data.medications_current : JSON.stringify(data.medications_current || '')}
-          onChange={e => onChange({ ...data, medications_current: e.target.value })}
-          placeholder="药名 / 剂量 / 频率，或填无" rows={2}
-          style={{ width: '100%', padding: '12px 14px', borderRadius: 12, border: '1px solid rgba(0,0,0,0.1)', background: 'rgba(255,255,255,0.65)', fontSize: 14, outline: 'none', resize: 'none', fontFamily: 'inherit', boxSizing: 'border-box' }} />
-      </div>
+
       <div style={{ padding: '12px 14px', borderRadius: 12, background: 'rgba(154,183,232,0.12)', fontSize: 12, color: THEME.muted, lineHeight: 1.7 }}>
         💡 健康信息用于生成就诊卡和学校紧急联系表
       </div>
@@ -412,7 +572,8 @@ function ChildEditContent() {
   const isNew = params.id === 'new'
   const childId = isNew ? null : params.id as string
   const searchParams = useSearchParams()
-    const isFromQuick = searchParams.get('from') === 'quick'
+  const isFromQuick = searchParams.get('from') === 'quick'
+
   const [step, setStep] = useState(0)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
@@ -420,8 +581,7 @@ function ChildEditContent() {
   const [schools, setSchools] = useState<any[]>([])
 
   const [basicData, setBasicData] = useState({
-    name: '', birthdate: '', emoji: '🌟', languages: [] as string[],
-    avatar_url: '',
+    name: '', birthdate: '', emoji: '🌟', languages: [] as string[], avatar_url: '',
   })
   const [schoolData, setSchoolData] = useState({
     school_id: '', school: '', school_name: '', grade: '',
@@ -432,7 +592,11 @@ function ChildEditContent() {
     activities: [] as any[],
   })
   const [healthData, setHealthData] = useState({
-    blood_type: '', allergies: '', medical_conditions: '', medications_current: '',
+    blood_type: '不知道',
+    allergies: ['无'] as string[],
+    medical_conditions: ['无'] as string[],
+    medications_current: ['无'] as string[],
+    preferred_hospitals: [] as any[],
   })
 
   useEffect(() => {
@@ -443,6 +607,14 @@ function ChildEditContent() {
   const loadSchools = async () => {
     const { data } = await supabase.from('schools').select('id, name_full, name_short').order('name_full')
     if (data) setSchools(data)
+  }
+
+  const parseArray = (val: any): string[] => {
+    if (Array.isArray(val)) return val
+    if (typeof val === 'string' && val) {
+      try { const p = JSON.parse(val); return Array.isArray(p) ? p : [val] } catch { return [val] }
+    }
+    return ['无']
   }
 
   const loadChild = async () => {
@@ -466,13 +638,13 @@ function ChildEditContent() {
       transport_method: child.transport_method || '',
     })
     setHealthData({
-      blood_type: child.blood_type || '',
-      allergies: typeof child.allergies === 'string' ? child.allergies : JSON.stringify(child.allergies || ''),
-      medical_conditions: typeof child.medical_conditions === 'string' ? child.medical_conditions : JSON.stringify(child.medical_conditions || ''),
-      medications_current: typeof child.medications_current === 'string' ? child.medications_current : JSON.stringify(child.medications_current || ''),
+      blood_type: child.blood_type || '不知道',
+      allergies: parseArray(child.allergies),
+      medical_conditions: parseArray(child.medical_conditions),
+      medications_current: parseArray(child.medications_current),
+      preferred_hospitals: child.preferred_hospitals || [],
     })
 
-    // 读 child_profiles
     const { data: profile } = await supabase.from('child_profiles').select('*').eq('child_id', childId).single()
     if (profile) {
       setScheduleData({
@@ -498,17 +670,18 @@ function ChildEditContent() {
         birthdate: basicData.birthdate || null,
         emoji: basicData.emoji,
         languages: basicData.languages,
+        avatar_url: basicData.avatar_url || null,
         school: schoolData.school,
         school_name: schoolData.school_name || schoolData.school,
         grade: schoolData.grade,
         school_start_time: schoolData.school_start_time || null,
         school_end_time: schoolData.school_end_time || null,
-        avatar_url: basicData.avatar_url || null,
         transport_method: schoolData.transport_method,
         blood_type: healthData.blood_type,
-        allergies: healthData.allergies,
-        medical_conditions: healthData.medical_conditions,
-        medications_current: healthData.medications_current,
+        allergies: JSON.stringify(healthData.allergies),
+        medical_conditions: JSON.stringify(healthData.medical_conditions),
+        medications_current: JSON.stringify(healthData.medications_current),
+        preferred_hospitals: healthData.preferred_hospitals,
         updated_at: new Date().toISOString(),
       }
 
@@ -521,7 +694,6 @@ function ChildEditContent() {
         await supabase.from('children').update(childPayload).eq('id', childId)
       }
 
-      // 保存课程表到 child_profiles
       if (savedChildId) {
         const { data: existingProfile } = await supabase.from('child_profiles')
           .select('id').eq('child_id', savedChildId).single()
@@ -539,7 +711,7 @@ function ChildEditContent() {
           await supabase.from('child_profiles').insert(profilePayload)
         }
 
-        // 更新 localStorage active_child
+        // 联通主屏头像：更新 localStorage
         localStorage.setItem('active_child_id', savedChildId)
         localStorage.setItem('active_child', JSON.stringify({
           id: savedChildId,
@@ -547,6 +719,7 @@ function ChildEditContent() {
           grade: schoolData.grade,
           level: 'R2',
           emoji: basicData.emoji,
+          avatar_url: basicData.avatar_url || null,  // ← 头像联通关键
           school: schoolData.school,
         }))
       }
@@ -567,41 +740,39 @@ function ChildEditContent() {
   return (
     <main style={{ minHeight: '100dvh', background: THEME.bg, fontFamily: "'Noto Sans SC', sans-serif" }}>
 
-      {/* 顶部 */}
-      <div style={{ position: 'sticky', top: 0, zIndex: 50, background: 'rgba(167,215,217,0.85)', backdropFilter: 'blur(20px)', padding: '16px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.3)' }}>
+      <div style={{ position: 'sticky', top: 0, zIndex: 50, background: 'rgba(167,215,217,0.85)', backdropFilter: 'blur(20px)', padding: '14px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.3)' }}>
         <motion.button whileTap={{ scale: 0.9 }}
           onClick={() => step > 0 ? setStep(step - 1) : router.back()}
-          style={{ background: 'none', border: 'none', cursor: 'pointer', color: THEME.navy }}>
+          style={{ background: 'none', border: 'none', cursor: 'pointer', color: THEME.navy, padding: '4px' }}>
           <ArrowLeft size={20} />
         </motion.button>
-        <span style={{ fontSize: 16, fontWeight: 700, color: THEME.navy }}>
+        <span style={{ fontSize: 15, fontWeight: 700, color: THEME.navy }}>
           {isNew ? '添加孩子' : '编辑孩子资料'}
         </span>
-        <span onClick={() => router.back()} style={{ fontSize: 13, color: THEME.muted, cursor: 'pointer', textDecoration: 'underline' }}>
+        <span onClick={() => router.back()} style={{ fontSize: 13, color: THEME.muted, cursor: 'pointer' }}>
           取消
         </span>
       </div>
 
-      <div style={{ maxWidth: 640, margin: '0 auto', padding: '20px 16px' }}>
+      <div style={{ maxWidth: 560, margin: '0 auto', padding: '16px 14px' }}>
 
-        {/* 进度条 */}
-        <div style={{ display: 'flex', gap: 6, marginBottom: 28 }}>
+        <div style={{ display: 'flex', gap: 6, marginBottom: 20 }}>
           {STEPS.map((s, i) => (
             <div key={i} onClick={() => i < step && setStep(i)}
               style={{ flex: 1, height: 3, borderRadius: 2, background: i <= step ? THEME.gold : 'rgba(0,0,0,0.1)', cursor: i < step ? 'pointer' : 'default', transition: 'background 0.3s' }} />
           ))}
         </div>
 
-        {/* 步骤标题 */}
-        <div style={{ fontSize: 18, fontWeight: 600, color: THEME.navy, marginBottom: 4 }}>{STEPS[step].label}</div>
-        <div style={{ fontSize: 11, color: THEME.muted, marginBottom: 24 }}>步骤 {step + 1} / {STEPS.length}</div>
+        <div style={{ fontSize: 17, fontWeight: 600, color: THEME.navy, marginBottom: 2 }}>{STEPS[step].label}</div>
+        <div style={{ fontSize: 11, color: THEME.muted, marginBottom: 16 }}>步骤 {step + 1} / {STEPS.length}</div>
+
         {isFromQuick && step === 0 && (
-  <div style={{ background: 'rgba(176,141,87,0.1)', borderRadius: 12, padding: '10px 14px', fontSize: 12, color: THEME.gold, marginBottom: 16, textAlign: 'center' }}>
-    🌱 基本信息已保存，继续补充完整资料吧
-  </div>
-)}
-        {/* 内容卡片 */}
-        <div style={{ background: 'rgba(255,255,255,0.6)', backdropFilter: 'blur(30px)', borderRadius: 24, padding: '24px 20px', border: '1px solid rgba(255,255,255,0.8)', boxShadow: '0 8px 32px rgba(0,0,0,0.06)', marginBottom: 20 }}>
+          <div style={{ background: 'rgba(176,141,87,0.1)', borderRadius: 12, padding: '10px 14px', fontSize: 12, color: THEME.gold, marginBottom: 14, textAlign: 'center' }}>
+            🌱 基本信息已保存，继续补充完整资料吧
+          </div>
+        )}
+
+        <div style={{ background: 'rgba(255,255,255,0.6)', backdropFilter: 'blur(30px)', borderRadius: 20, padding: '20px 16px', border: '1px solid rgba(255,255,255,0.8)', boxShadow: '0 8px 32px rgba(0,0,0,0.06)', marginBottom: 16 }}>
           <AnimatePresence mode="wait">
             <motion.div key={step} initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} transition={{ duration: 0.25 }}>
               {step === 0 && <StepBasic data={basicData} onChange={setBasicData} />}
@@ -612,14 +783,12 @@ function ChildEditContent() {
           </AnimatePresence>
         </div>
 
-        {/* 错误提示 */}
         {saveError && (
           <div style={{ color: '#E07B2A', fontSize: 13, textAlign: 'center', marginBottom: 12, padding: '10px 14px', borderRadius: 12, background: 'rgba(224,123,42,0.08)', border: '1px solid rgba(224,123,42,0.2)' }}>
             ⚠️ {saveError}
           </div>
         )}
 
-        {/* 底部按钮 */}
         <div style={{ display: 'flex', gap: 10, paddingBottom: 40 }}>
           {isLastStep ? (
             <>
@@ -648,7 +817,6 @@ function ChildEditContent() {
             </>
           )}
         </div>
-
       </div>
     </main>
   )
