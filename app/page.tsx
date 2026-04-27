@@ -243,6 +243,10 @@ function AddChildSheet({ onClose, onSave }: { onClose: () => void; onSave: (d: a
         style={{ width: '100%', padding: '14px', borderRadius: 16, border: 'none', background: name.trim() ? THEME.navy : 'rgba(0,0,0,0.08)', color: name.trim() ? '#fff' : THEME.muted, fontSize: 14, fontWeight: 600, cursor: name.trim() ? 'pointer' : 'default', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
         {saving ? <Loader size={16} /> : null}{saving ? '保存中…' : '添加孩子'}
       </motion.button>
+      {/* 新增：保存后跳转提示 */}
+<div style={{ textAlign: 'center', marginTop: 12, fontSize: 12, color: THEME.muted }}>
+  保存后可前往「孩子资料」补充课程表和健康信息
+</div>
     </BottomSheet>
   )
 }
@@ -339,17 +343,19 @@ export default function BasePage() {
   }
 
   // ── 孩子操作 ──
-  const handleAddChild = async (d: any) => {
-    const { data: { session } } = await supabase.auth.getSession()
-    const uid = session?.user?.id
-    if (!uid) return
-    await supabase.from('children').insert({
-      user_id: uid, name: d.name, emoji: d.emoji || '👶🏻',
-      energy: 75, status: 'active', school_name: d.school_name, grade: d.grade
-    })
-    await ctxSync()
-    setModal(null)
-  }
+ const handleAddChild = async (d: any) => {
+  const { data: { session } } = await supabase.auth.getSession()
+  const uid = session?.user?.id
+  if (!uid) return
+  const { data: newChild } = await supabase.from('children').insert({
+    user_id: uid, name: d.name, emoji: d.emoji || '👶🏻',
+    avatar_url: d.avatar_url || null,
+    energy: 75, status: 'active', school_name: d.school_name, grade: d.grade
+  }).select().single()
+  await ctxSync()
+  setModal(null)
+  if (newChild?.id) window.location.href = `/children/${newChild.id}?from=quick`
+}
 
   // ── 热点操作 ──
 const handleRead = async (id: string) => {
