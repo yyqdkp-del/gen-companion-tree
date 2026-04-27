@@ -558,6 +558,7 @@ export default function DecodePage() {
   const [locationScene, setLocationScene] = useState('海外华人家庭')
   const [userLocation, setUserLocation] = useState<UserLocation | null>(null)
   const loadMsgRef = useRef<NodeJS.Timeout | null>(null)
+  const composingRef = useRef(false)
 
   // ── 初始化 ──
   const init = useCallback(async () => {
@@ -856,21 +857,25 @@ try {
           {activeTab === 'hanzi' && (
             <>
               <div style={{ display: 'flex', gap: 10, marginBottom: 14 }}>
-                <input
+              const composingRef = useRef(false)
+
+<input
   value={input}
-  onCompositionStart={() => setComposing(true)}
+  onCompositionStart={() => { composingRef.current = true; setComposing(true) }}
   onCompositionEnd={e => {
+    composingRef.current = false
     setComposing(false)
     const chars = [...e.currentTarget.value]
     setInput(chars[chars.length - 1] || '')
     setData(null)
   }}
   onChange={e => {
+    if (composingRef.current) return
     const chars = [...e.target.value]
     setInput(chars[chars.length - 1] || '')
     setData(null)
   }}
-  onKeyDown={e => e.key === 'Enter' && !composing && generate()}
+  onKeyDown={e => e.key === 'Enter' && !composingRef.current && generate()}
   placeholder="字"
   style={{ width: 68, textAlign: 'center', fontSize: 48, border: '2px solid rgba(200,160,96,0.3)', borderRadius: 12, padding: '6px 0', fontFamily: "'Noto Serif SC', serif", color: THEME.text, background: THEME.paper, outline: 'none', flexShrink: 0, caretColor: THEME.gold }}
 />
