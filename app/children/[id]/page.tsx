@@ -69,22 +69,78 @@ function SelectField({ label, value, onChange, options }: {
 
 // ── Step 0：基本信息 ──
 function StepBasic({ data, onChange }: { data: any; onChange: (d: any) => void }) {
+  const [uploading, setUploading] = useState(false)
+  const photoRef = useRef<HTMLInputElement>(null)
+
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setUploading(true)
+    try {
+      const ext = file.name.split('.').pop()
+      const path = `children/${Date.now()}.${ext}`
+      const { error } = await supabase.storage
+        .from('companion-files')
+        .upload(path, file, { upsert: true })
+      if (error) throw error
+      const { data: urlData } = supabase.storage
+        .from('companion-files')
+        .getPublicUrl(path)
+      onChange({ ...data, avatar_url: urlData.publicUrl })
+    } catch (e) {
+      console.error('上传失败', e)
+    }
+    setUploading(false)
+  }
+
   return (
     <div>
       <div style={{ fontSize: 15, fontWeight: 600, color: THEME.navy, marginBottom: 20 }}>孩子是谁？🌱</div>
 
-      {/* Emoji 选择 */}
+      {/* 头像区域 */}
       <div style={{ marginBottom: 20 }}>
-        <div style={{ fontSize: 12, color: THEME.muted, fontWeight: 700, marginBottom: 10, letterSpacing: '0.08em' }}>选一个头像</div>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-          {EMOJIS.map(e => (
-            <motion.div key={e} whileTap={{ scale: 0.85 }}
-              onClick={() => onChange({ ...data, emoji: e })}
-              style={{ width: 44, height: 44, borderRadius: 12, background: data.emoji === e ? 'rgba(176,141,87,0.2)' : 'rgba(255,255,255,0.5)', border: data.emoji === e ? `2px solid ${THEME.gold}` : '1px solid rgba(0,0,0,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24, cursor: 'pointer' }}>
-              {e}
-            </motion.div>
-          ))}
+        <div style={{ fontSize: 12, color: THEME.muted, fontWeight: 700, marginBottom: 10, letterSpacing: '0.08em' }}>头像</div>
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 16, marginBottom: 12 }}>
+
+          {/* 当前头像预览 */}
+          <div style={{ width: 72, height: 72, borderRadius: 20, overflow: 'hidden', border: '2px solid rgba(176,141,87,0.3)', flexShrink: 0, background: 'rgba(255,255,255,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 36 }}>
+            {data.avatar_url
+              ? <img src={data.avatar_url} alt="头像" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              : data.emoji || '🌟'
+            }
+          </div>
+
+          {/* 上传按钮 */}
+          <div style={{ flex: 1 }}>
+            <input ref={photoRef} type="file" accept="image/*" onChange={handlePhotoUpload} style={{ display: 'none' }} />
+            <motion.button whileTap={{ scale: 0.96 }} onClick={() => photoRef.current?.click()}
+              disabled={uploading}
+              style={{ width: '100%', padding: '10px 14px', borderRadius: 12, border: `1.5px dashed rgba(176,141,87,0.4)`, background: 'rgba(176,141,87,0.06)', color: THEME.gold, fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, marginBottom: 8 }}>
+              {uploading ? <Loader size={14} /> : <Camera size={14} />}
+              {uploading ? '上传中…' : data.avatar_url ? '更换照片' : '上传照片'}
+            </motion.button>
+            {data.avatar_url && (
+              <motion.button whileTap={{ scale: 0.96 }}
+                onClick={() => onChange({ ...data, avatar_url: '' })}
+                style={{ width: '100%', padding: '8px', borderRadius: 10, border: '1px solid rgba(0,0,0,0.08)', background: 'transparent', color: THEME.muted, fontSize: 12, cursor: 'pointer' }}>
+                删除照片，用 emoji 代替
+              </motion.button>
+            )}
+          </div>
         </div>
+
+        {/* 没有照片时显示 emoji 选择 */}
+        {!data.avatar_url && (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+            {EMOJIS.map(e => (
+              <motion.div key={e} whileTap={{ scale: 0.85 }}
+                onClick={() => onChange({ ...data, emoji: e })}
+                style={{ width: 44, height: 44, borderRadius: 12, background: data.emoji === e ? 'rgba(176,141,87,0.2)' : 'rgba(255,255,255,0.5)', border: data.emoji === e ? `2px solid ${THEME.gold}` : '1px solid rgba(0,0,0,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24, cursor: 'pointer' }}>
+                {e}
+              </motion.div>
+            ))}
+          </div>
+        )}
       </div>
 
       <Field label="孩子名字" value={data.name} onChange={v => onChange({ ...data, name: v })} placeholder="小明 / William" />
@@ -364,6 +420,7 @@ function ChildEditContent() {
 
   const [basicData, setBasicData] = useState({
     name: '', birthdate: '', emoji: '🌟', languages: [] as string[],
+    avatar_url: '',
   })
   const [schoolData, setSchoolData] = useState({
     school_id: '', school: '', school_name: '', grade: '',
@@ -396,6 +453,7 @@ function ChildEditContent() {
       birthdate: child.birthdate || '',
       emoji: child.emoji || '🌟',
       languages: child.languages || [],
+      avatar_url: child.avatar_url || '',
     })
     setSchoolData({
       school_id: '',
@@ -444,6 +502,7 @@ function ChildEditContent() {
         grade: schoolData.grade,
         school_start_time: schoolData.school_start_time || null,
         school_end_time: schoolData.school_end_time || null,
+        avatar_url: basicData.avatar_url || null,
         transport_method: schoolData.transport_method,
         blood_type: healthData.blood_type,
         allergies: healthData.allergies,
