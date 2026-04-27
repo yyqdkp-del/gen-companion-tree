@@ -871,7 +871,6 @@ try {
   }}
   onKeyDown={e => e.key === 'Enter' && !composing && generate()}
   placeholder="字"
-  maxLength={2}
   style={{ width: 68, textAlign: 'center', fontSize: 48, border: '2px solid rgba(200,160,96,0.3)', borderRadius: 12, padding: '6px 0', fontFamily: "'Noto Serif SC', serif", color: THEME.text, background: THEME.paper, outline: 'none', flexShrink: 0, caretColor: THEME.gold }}
 />
                 <motion.button whileTap={{ scale: 0.96 }} onClick={() => generate()}
