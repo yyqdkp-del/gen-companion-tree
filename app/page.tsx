@@ -290,6 +290,7 @@ export default function BasePage() {
   const [oneTapTodo, setOneTapTodo] = useState<TodoItem | null>(null)
   const [patrolling, setPatrolling] = useState(false)
   const [mounted, setMounted] = useState(false)
+  const [keyboardOpen, setKeyboardOpen] = useState(false)
 
   // ── 孩子详情补全 ──
   const enrichKids = useCallback(async (uid: string) => {
@@ -330,6 +331,15 @@ export default function BasePage() {
     const ticker = setInterval(() => setTime(new Date()), 1000)
     return () => clearInterval(ticker)
   }, [])
+  useEffect(() => {
+  const handleResize = () => {
+    const currentHeight = window.visualViewport?.height || window.innerHeight
+    const screenHeight = window.screen.height
+    setKeyboardOpen(currentHeight < screenHeight * 0.75)
+  }
+  window.visualViewport?.addEventListener('resize', handleResize)
+  return () => window.visualViewport?.removeEventListener('resize', handleResize)
+}, [])
 
   // ── 待办操作 ──
   const markDone = async (id: string) => {
@@ -558,6 +568,7 @@ const handleRead = async (id: string) => {
   )}
 </AnimatePresence>
       <InstallPWA />
+      {!keyboardOpen && <InstallPWA />}
     </main>
   )
 }
