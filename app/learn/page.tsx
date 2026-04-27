@@ -558,7 +558,6 @@ export default function DecodePage() {
   const [locationScene, setLocationScene] = useState('海外华人家庭')
   const [userLocation, setUserLocation] = useState<UserLocation | null>(null)
   const loadMsgRef = useRef<NodeJS.Timeout | null>(null)
-  const composingRef = useRef(false)
 
   // ── 初始化 ──
   const init = useCallback(async () => {
