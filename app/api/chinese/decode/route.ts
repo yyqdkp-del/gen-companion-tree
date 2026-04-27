@@ -22,9 +22,15 @@ export async function POST(req: NextRequest) {
     mode, char, sentence, keywords,
     child_name, child_grade, child_level,
     location_scene,
+    // 修复四：接收地理围栏数据，不再写死清迈
+    geofence,
   } = await req.json()
 
-  const scene    = location_scene || '清迈华人陪读家庭'
+  // 修复四：优先用围栏城市，其次用 location_scene，最后降级
+  const scene = geofence?.city
+    ? `${geofence.city}华人陪读家庭`
+    : location_scene || '清迈华人陪读家庭'
+
   const childCtx = child_name
     ? `孩子叫${child_name}，${child_grade || ''}，当前中文水平${child_level || 'R2'}。`
     : `海外华人家庭孩子，当前中文水平${child_level || 'R2'}。`
@@ -54,11 +60,10 @@ export async function POST(req: NextRequest) {
 
   try {
 
-    // ══ 模式一：汉字拆解 ══
+    // ══ 模式一：汉字拆解（逻辑不动） ══
     if (mode === 'hanzi') {
       if (!char) return NextResponse.json({ error: '请输入汉字' }, { status: 400, headers: CORS })
 
-      // 第一层：查共享库缓存
       try {
         const { data: cached } = await supabase
           .from('hanzi_library')
@@ -74,7 +79,6 @@ export async function POST(req: NextRequest) {
         }
       } catch {}
 
-      // 第二层：Claude 生成
       const prompt = `
 你是台湾字理教学法专家和英文自然拼读（Phonics）教学顾问。
 ${childCtx}
@@ -119,24 +123,23 @@ ${childCtx}
 
       const result = await callClaude(prompt)
 
-      // 第三层：存入共享库
       try {
         await supabase.from('hanzi_library').insert({
-          char:               result.char || char,
-          pinyin:             result.pinyin,
-          traditional:        result.traditional,
-          meaning_short:      result.meaning,
-          parts:              result.parts,
-          evolution:          result.evolution,
-          phonics_bridge:     result.phonics_bridge,
-          family:             result.family,
-          mom_script:         result.mom_script,
-          scene_universal:    result.scene,
-          chengyu_connected:  { chengyu: result.chengyu, story: result.cy_story },
-          level_tag:          result.level,
-          result:             result,
-          created_by:         'ai',
-          hit_count:          1,
+          char:              result.char || char,
+          pinyin:            result.pinyin,
+          traditional:       result.traditional,
+          meaning_short:     result.meaning,
+          parts:             result.parts,
+          evolution:         result.evolution,
+          phonics_bridge:    result.phonics_bridge,
+          family:            result.family,
+          mom_script:        result.mom_script,
+          scene_universal:   result.scene,
+          chengyu_connected: { chengyu: result.chengyu, story: result.cy_story },
+          level_tag:         result.level,
+          result:            result,
+          created_by:        'ai',
+          hit_count:         1,
         })
       } catch (e) {
         console.warn('hanzi_library insert failed:', e)
@@ -148,6 +151,40 @@ ${childCtx}
     } else if (mode === 'chengyu') {
       if (!sentence) return NextResponse.json({ error: '请输入内容' }, { status: 400, headers: CORS })
 
+      // 修复二：先读缓存（原来只写不读）
+      // 用孩子说的话做关键词模糊匹配不现实，
+      // 所以先生成成语，再用成语本身查库
+      // 分两步：① 轻量调用只生成成语名 ② 查库命中则返回，未命中再完整生成
+      let chengyu_name = ''
+      try {
+        const quickRes = await callClaude(`
+孩子说了：「${sentence}」
+只返回最贴切的中文成语（4个字），JSON格式：{"chengyu":"____"}`)
+        chengyu_name = quickRes?.chengyu || ''
+      } catch {}
+
+      if (chengyu_name) {
+        try {
+          const { data: cached } = await supabase
+            .from('chengyu_library')
+            .select('*')
+            .eq('chengyu', chengyu_name)
+            .single()
+
+          if (cached?.result) {
+            await supabase.from('chengyu_library')
+              .update({ hit_count: (cached.hit_count || 1) + 1 })
+              .eq('id', cached.id)
+            // 把孩子的原话注入缓存结果再返回
+            return NextResponse.json(
+              { ...cached.result, original: sentence },
+              { headers: CORS }
+            )
+          }
+        } catch {}
+      }
+
+      // 未命中缓存，完整生成
       const prompt = `
 你是海外华人中文教育专家，精通中英习语对照教学。
 ${childCtx}
@@ -181,7 +218,6 @@ ${childCtx}
 
       const result = await callClaude(prompt)
 
-      // 存入共享成语库
       try {
         const { data: existing } = await supabase
           .from('chengyu_library')
@@ -237,7 +273,7 @@ ${kw}
 
 {
   "original": "孩子的原话",
-  "draft": "书面化版本（保留孩子视角，适合${child_grade || '小学'}水平，100-150字）",
+  "draft": "书面化版本（保留孩子视角，100-150字）",
   "keywords_used": ["用到的本周词汇1", "词汇2"],
   "fill_blanks": "填空练习版本：把关键词替换成___，让孩子填回去",
   "cultural_sentence": "一句相关的古诗词或文化名句",
@@ -251,6 +287,28 @@ ${kw}
 }`
 
       const result = await callClaude(prompt)
+
+      // 修复三：存入 chinese_sessions，不丢失历史
+      try {
+        // 从请求头取 user_id（前端调用时带 Authorization）
+        const authHeader = req.headers.get('authorization') || ''
+        const { data: { user } } = await supabase.auth.getUser(
+          authHeader.replace('Bearer ', '')
+        )
+        if (user?.id) {
+          await supabase.from('chinese_sessions').insert({
+            user_id:        user.id,
+            input_text:     sentence,
+            input_type:     'writing',
+            result:         result,
+            location_scene: scene,
+            learned_at:     new Date().toISOString(),
+          })
+        }
+      } catch (e) {
+        console.warn('writing session insert failed:', e)
+      }
+
       return NextResponse.json(result, { headers: CORS })
 
     } else {
