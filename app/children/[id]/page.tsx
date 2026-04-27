@@ -603,7 +603,15 @@ function ChildEditContent() {
     loadSchools()
     if (!isNew && childId) loadChild()
   }, [])
-
+  useEffect(() => {
+  const handleResize = () => {
+    const vh = window.visualViewport?.height || window.innerHeight
+    document.documentElement.style.setProperty('--vh', `${vh}px`)
+  }
+  window.visualViewport?.addEventListener('resize', handleResize)
+  handleResize()
+  return () => window.visualViewport?.removeEventListener('resize', handleResize)
+}, [])
   const loadSchools = async () => {
     const { data } = await supabase.from('schools').select('id, name_full, name_short').order('name_full')
     if (data) setSchools(data)
@@ -738,7 +746,7 @@ function ChildEditContent() {
   const canProceed = step === 0 ? !!basicData.name.trim() : true
 
   return (
-    <main style={{ minHeight: '100dvh', background: THEME.bg, fontFamily: "'Noto Sans SC', sans-serif" }}>
+    <main style={{ height: 'var(--vh, 100dvh)', overflow: 'hidden', display: 'flex', flexDirection: 'column', background: THEME.bg, fontFamily: "'Noto Sans SC', sans-serif" }}>
 
       <div style={{ position: 'sticky', top: 0, zIndex: 50, background: 'rgba(167,215,217,0.85)', backdropFilter: 'blur(20px)', padding: '14px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.3)' }}>
         <motion.button whileTap={{ scale: 0.9 }}
@@ -754,7 +762,7 @@ function ChildEditContent() {
         </span>
       </div>
 
-      <div style={{ maxWidth: 560, margin: '0 auto', padding: '16px 14px' }}>
+      <div style={{ flex: 1, overflowY: 'auto', maxWidth: 560, margin: '0 auto', padding: '16px 14px', WebkitOverflowScrolling: 'touch' }}>
 
         <div style={{ display: 'flex', gap: 6, marginBottom: 20 }}>
           {STEPS.map((s, i) => (
