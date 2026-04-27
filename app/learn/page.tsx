@@ -853,14 +853,12 @@ try {
         <div style={{ background: THEME.white, borderRadius: 20, padding: '18px 20px', boxShadow: '0 4px 24px rgba(26,18,8,0.07)', border: '1px solid rgba(200,160,96,0.18)', marginBottom: 14 }}>
 
           {/* 汉字输入 */}
-          {activeTab === 'hanzi' && (
+         {activeTab === 'hanzi' && (
   <>
     <div style={{ display: 'flex', gap: 10, marginBottom: 14 }}>
-      {/* 显示区：只展示，不接收输入 */}
       <div style={{ width: 68, height: 68, borderRadius: 12, border: '2px solid rgba(200,160,96,0.3)', background: THEME.paper, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 48, fontFamily: "'Noto Serif SC', serif", color: THEME.text, flexShrink: 0 }}>
         {input || <span style={{ fontSize: 16, color: 'rgba(200,160,96,0.4)' }}>字</span>}
       </div>
-      {/* 真正接收输入的是全宽隐藏input */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 8 }}>
         <input
           value={input}
@@ -888,6 +886,17 @@ try {
         </motion.button>
       </div>
     </div>
+    <div style={{ fontSize: 10, color: THEME.textDim, letterSpacing: 3, marginBottom: 8, textTransform: 'uppercase', fontFamily: 'sans-serif' }}>快速体验</div>
+    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7 }}>
+      {QUICK_CHARS.map(c => (
+        <motion.div key={c} whileTap={{ scale: 0.88 }} onClick={() => { setData(null); generate(c) }}
+          style={{ width: 38, height: 38, background: THEME.paper, border: '1.5px solid rgba(200,160,96,0.28)', borderRadius: 10, fontSize: 20, fontFamily: "'Noto Serif SC', serif", color: THEME.textMid, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          {c}
+        </motion.div>
+      ))}
+    </div>
+  </>
+)}
           {/* 成语输入 */}
           {activeTab === 'chengyu' && (
             <>
