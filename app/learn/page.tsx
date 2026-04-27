@@ -546,6 +546,7 @@ export default function DecodePage() {
   const [activeTab, setActiveTab] = useState<TabType>('hanzi')
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
+  const [composing, setComposing] = useState(false)
   const [loadMsg, setLoadMsg] = useState('')
   const [data, setData] = useState<any>(null)
   const [error, setError] = useState('')
@@ -812,13 +813,25 @@ export default function DecodePage() {
             <>
               <div style={{ display: 'flex', gap: 10, marginBottom: 14 }}>
                 <input
-                  value={input}
-                  onChange={e => { setInput(e.target.value.slice(-1)); setData(null) }}
-                  onKeyDown={e => e.key === 'Enter' && generate()}
-                  placeholder="字"
-                  maxLength={1}
-                  style={{ width: 68, textAlign: 'center', fontSize: 48, border: '2px solid rgba(200,160,96,0.3)', borderRadius: 12, padding: '6px 0', fontFamily: "'Noto Serif SC', serif", color: THEME.text, background: THEME.paper, outline: 'none', flexShrink: 0 }}
-                />
+  value={input}
+  onCompositionStart={() => setComposing(true)}
+  onCompositionEnd={e => {
+    setComposing(false)
+    const chars = [...e.currentTarget.value]
+    setInput(chars[chars.length - 1] || '')
+    setData(null)
+  }}
+  onChange={e => {
+    if (composing) return
+    const chars = [...e.target.value]
+    setInput(chars[chars.length - 1] || '')
+    setData(null)
+  }}
+  onKeyDown={e => e.key === 'Enter' && !composing && generate()}
+  placeholder="字"
+  maxLength={2}
+  style={{ width: 68, textAlign: 'center', fontSize: 48, border: '2px solid rgba(200,160,96,0.3)', borderRadius: 12, padding: '6px 0', fontFamily: "'Noto Serif SC', serif", color: THEME.text, background: THEME.paper, outline: 'none', flexShrink: 0, caretColor: THEME.gold }}
+/>
                 <motion.button whileTap={{ scale: 0.96 }} onClick={() => generate()}
                   disabled={loading || !input.trim()}
                   style={{ flex: 1, background: loading || !input.trim() ? '#C5B5A5' : THEME.red, color: '#fff', border: 'none', borderRadius: 12, fontSize: 16, fontFamily: "'Noto Serif SC', serif", cursor: loading || !input.trim() ? 'not-allowed' : 'pointer', letterSpacing: 1, boxShadow: !loading && input.trim() ? '0 4px 16px rgba(192,57,43,0.28)' : 'none' }}>
