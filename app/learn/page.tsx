@@ -9,18 +9,17 @@ import type { UserLocation } from '@/lib/geofence/types'
   process.env.NEXT_PUBLIC_SUPABASE_URL || '',
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
 )
-
 // ══════════════════════════════════════════════
 // 美学系统：纸质感+红金（教育气质）
 // ══════════════════════════════════════════════
 const THEME = {
   bg: '#F5F0E8',
   white: '#FFFFFF',
-  red: '#C03A2B',
+  red: '#E05C45',
   gold: '#C8A060',
   text: '#1A1208',
   textMid: '#4A3728',
-  textDim: '#907060',
+  textDim: '#7A5C48',
   paper: '#FDFBF7',
   green: '#2D6A4F',
   blue: '#1A3C5E',
@@ -30,11 +29,11 @@ const THEME = {
 }
 
 const LEVELS: Record<string, { color: string; bg: string; label: string }> = {
-  R1: { color: '#922B21', bg: '#FFF0EE', label: '入门' },
-  R2: { color: '#BA4A00', bg: '#FFF6EE', label: '基础' },
-  R3: { color: '#1E8449', bg: '#EDFAF1', label: '进阶' },
-  R4: { color: '#2874A2', bg: '#EBF5FB', label: '提升' },
-  R5: { color: '#6C3483', bg: '#F4ECF7', label: '高阶' },
+  R1: { color: '#C03A2B', bg: '#FFF0EE', label: '入门' },
+  R2: { color: '#BA6A00', bg: '#FFF6EE', label: '基础' },
+  R3: { color: '#A07800', bg: '#FFFBEE', label: '进阶' },
+  R4: { color: '#5C6E00', bg: '#F5F9EE', label: '提升' },
+  R5: { color: '#2D6A4F', bg: '#EDFAF1', label: '高阶' },
 }
 
 // ══ 地理围栏场景映射 ══
@@ -45,17 +44,20 @@ const LOCATION_SCENES: Record<string, string> = {
 }
 
 // ══ 快速体验 ══
-const QUICK_CHARS = ['明', '休', '森', '闻', '家', '笑', '飞', '鱼', '山', '水']
-const QUICK_CHENGYU = ['very many people', '一下子就完成了', '看大象很开心']
+const QUICK_CHARS_R1 = ['山', '水', '日', '月', '火', '木', '人', '口', '手', '心']
+const QUICK_CHARS_R2 = ['明', '休', '家', '笑', '飞', '鱼', '花', '草', '风', '云']
+const QUICK_CHARS_R3 = ['森', '闻', '静', '思', '望', '梦', '情', '意', '声', '影']
+const QUICK_CHARS = QUICK_CHARS_R2  // 默认展示R2，初始化后按孩子级别替换
+
+const QUICK_CHENGYU = ['very many people', '突然下好大的雨', '今天作业多到写不完']
 const QUICK_WRITING = ['今天去夜市，人超多，好开心', '下雨天在家，有点无聊', '今天考试考得很好']
 
 // ══ 加载文案 ══
 const LOAD_MSGS: Record<string, string[]> = {
   hanzi: ['正在查阅字理古籍…', '翻阅《说文解字》…', '正在拆解字的骨架…', '绘制汉字画面中…'],
   chengyu: ['正在连接中英智慧…', '寻找最贴切的成语…', '编写妈妈台词中…', '正在生成场景…'],
-  writing: ['感受孩子的经历…', '连接古人的智慧…', '正在升华文字…', '编写文化根脉…'],
+  writing: ['感受孩子的经历…', '连接古人的智慧…', '正在寻找共鸣古诗…', '为妈妈准备台词…'],
 }
-
 // ══ 数据类型 ══
 type TabType = 'hanzi' | 'chengyu' | 'writing'
 type ChildInfo = {
@@ -120,9 +122,9 @@ function HanziResult({ data, char, onMomCopy }: { data: any; char: string; onMom
   const exts = Array.isArray(data?.extension) ? data.extension : []
 
   useEffect(() => {
-    const t = setTimeout(() => setShowMerged(true), 800)
-    return () => clearTimeout(t)
-  }, [])
+  const t1 = setTimeout(() => setShowMerged(true), 3000)
+  return () => clearTimeout(t1)
+}, [])
 
   return (
     <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
