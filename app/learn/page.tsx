@@ -4,8 +4,8 @@ import React, { useEffect, useState, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@supabase/supabase-js'
 import { motion, AnimatePresence } from 'framer-motion'
-
-export const dynamic = 'force-dynamic'
+import { getUserLocation, updateUserLocationByGPS } from '@/lib/geofence'
+import type { UserLocation } from '@/lib/geofence/types'export const dynamic = 'force-dynamic'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || '',
@@ -556,7 +556,7 @@ export default function DecodePage() {
   const [learnedItems, setLearnedItems] = useState<LearnedItem[]>([])
   const [showProgress, setShowProgress] = useState(false)
   const [locationScene, setLocationScene] = useState('海外华人家庭')
-
+  const [userLocation, setUserLocation] = useState<UserLocation | null>(null)
   const loadMsgRef = useRef<NodeJS.Timeout | null>(null)
 
   // ── 初始化 ──
@@ -619,8 +619,28 @@ export default function DecodePage() {
   }, [])
 
   useEffect(() => { init() }, [init])
+  useEffect(() => {
+  const userId = localStorage.getItem('anon_id') || crypto.randomUUID()
+  localStorage.setItem('anon_id', userId)
 
-  // ── 切tab时清空结果 ──
+  getUserLocation(userId).then(loc => {
+    setUserLocation(loc)
+    setLocationScene(loc.city ? `${loc.city}华人陪读家庭` : '海外华人家庭')
+  })
+
+  navigator.geolocation?.getCurrentPosition(
+    async (pos) => {
+      const fresh = await updateUserLocationByGPS(
+        userId,
+        pos.coords.latitude,
+        pos.coords.longitude
+      )
+      setUserLocation(fresh)
+      setLocationScene(`${fresh.city}华人陪读家庭`)
+    },
+    () => {}
+  )
+}, [])  // ── 切tab时清空结果 ──
   const handleTabChange = (t: TabType) => {
     setActiveTab(t)
     setData(null)
@@ -663,17 +683,20 @@ export default function DecodePage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          mode: activeTab,
-          char: activeTab === 'hanzi' ? query : undefined,
-          sentence: activeTab !== 'hanzi' ? query : undefined,
-          // 家庭上下文
-          child_name: childInfo.name,
-          child_grade: childInfo.grade,
-          child_level: childInfo.level,
-          location_scene: locationScene,
-          learned_chars: learnedChars,
-        }),
-      })
+  mode: activeTab,
+  char: activeTab === 'hanzi' ? query : undefined,
+  sentence: activeTab !== 'hanzi' ? query : undefined,
+  child_name: childInfo.name,
+  child_grade: childInfo.grade,
+  child_level: childInfo.level,
+  location_scene: locationScene,
+  learned_chars: learnedChars,
+  geofence: userLocation ? {          // ← 加在这里
+    city:         userLocation.city,
+    country:      userLocation.country,
+    country_code: userLocation.country_code,
+  } : null,
+}),
 
       const json = await res.json()
       if (json.error) throw new Error(json.error)
