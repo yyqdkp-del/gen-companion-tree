@@ -866,7 +866,6 @@ try {
     setData(null)
   }}
   onChange={e => {
-    if (composing) return
     const chars = [...e.target.value]
     setInput(chars[chars.length - 1] || '')
     setData(null)
