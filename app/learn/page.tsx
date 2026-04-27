@@ -893,7 +893,6 @@ try {
     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7 }}>
       {QUICK_CHARS.map(c => (
       <motion.div key={c} whileTap={{ scale: 0.88 }} onClick={() => { setData(null); generate(c) }}
-          }
           style={{ width: 38, height: 38, background: THEME.paper, border: '1.5px solid rgba(200,160,96,0.28)', borderRadius: 10, fontSize: 20, fontFamily: "'Noto Serif SC', serif", color: THEME.textMid, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           {c}
         </motion.div>
