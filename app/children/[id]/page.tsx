@@ -1,4 +1,5 @@
 'use client'
+console.log('children page loaded', process.env.NEXT_PUBLIC_SUPABASE_URL)
 import { useState, useEffect, useRef, Suspense } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { createClient } from '@supabase/supabase-js'
