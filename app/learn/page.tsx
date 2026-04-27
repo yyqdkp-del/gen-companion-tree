@@ -4,11 +4,8 @@ import React, { useEffect, useState, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@supabase/supabase-js'
 import { motion, AnimatePresence } from 'framer-motion'
-import { getUserLocation, updateUserLocationByGPS } from '@/lib/geofence'
 import type { UserLocation } from '@/lib/geofence/types'
-  export const dynamic = 'force-dynamic'
-
-const supabase = createClient(
+  const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || '',
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
 )
@@ -624,24 +621,44 @@ export default function DecodePage() {
   const userId = localStorage.getItem('anon_id') || crypto.randomUUID()
   localStorage.setItem('anon_id', userId)
 
-  getUserLocation(userId).then(loc => {
-    setUserLocation(loc)
-    setLocationScene(loc.city ? `${loc.city}华人陪读家庭` : '海外华人家庭')
+  // 先读缓存
+  fetch('/api/geofence', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ userId }),
   })
+    .then(r => r.json())
+    .then(loc => {
+      if (!loc.error) {
+        setUserLocation(loc)
+        setLocationScene(loc.city ? `${loc.city}华人陪读家庭` : '海外华人家庭')
+      }
+    })
 
+  // 再用 GPS 精确更新
   navigator.geolocation?.getCurrentPosition(
-    async (pos) => {
-      const fresh = await updateUserLocationByGPS(
-        userId,
-        pos.coords.latitude,
-        pos.coords.longitude
-      )
-      setUserLocation(fresh)
-      setLocationScene(`${fresh.city}华人陪读家庭`)
+    (pos) => {
+      fetch('/api/geofence', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId,
+          lat: pos.coords.latitude,
+          lng: pos.coords.longitude,
+        }),
+      })
+        .then(r => r.json())
+        .then(loc => {
+          if (!loc.error) {
+            setUserLocation(loc)
+            setLocationScene(`${loc.city}华人陪读家庭`)
+          }
+        })
     },
     () => {}
   )
-}, [])  // ── 切tab时清空结果 ──
+}, [])
+  // ── 切tab时清空结果 ──
   const handleTabChange = (t: TabType) => {
     setActiveTab(t)
     setData(null)
