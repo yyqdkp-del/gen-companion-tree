@@ -5,7 +5,8 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@supabase/supabase-js'
 import { motion, AnimatePresence } from 'framer-motion'
 import { getUserLocation, updateUserLocationByGPS } from '@/lib/geofence'
-import type { UserLocation } from '@/lib/geofence/types'export const dynamic = 'force-dynamic'
+import type { UserLocation } from '@/lib/geofence/types'
+  export const dynamic = 'force-dynamic'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || '',
