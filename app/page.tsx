@@ -31,6 +31,7 @@ const THEME = {
 
 type Child = {
   id: string; name: string; emoji: string; energy: number
+  avatar_url?: string | null
   health_status?: string; mood_status?: string
   school_name?: string; grade?: string
   today_schedule?: ScheduleItem[]; urgent_items?: UrgentItem[]
@@ -314,6 +315,7 @@ export default function BasePage() {
       ].sort((a, b) => a.time.localeCompare(b.time))
       return {
         id: c.id, name: c.name || c.nickname || '孩子', emoji: c.emoji || '👶🏻',
+        avatar_url: c.avatar_url || null,
         energy, health_status: log?.health_status || 'normal', mood_status: log?.mood_status || 'calm',
         school_name: c.school_name, grade: c.grade, today_schedule,
       }
@@ -395,7 +397,10 @@ const handleRead = async (id: string) => {
               animate={{ boxShadow: [`0 0 15px ${getEnergyColor(selKid?.energy ?? 75)}40`, `0 0 35px ${getEnergyColor(selKid?.energy ?? 75)}80`, `0 0 15px ${getEnergyColor(selKid?.energy ?? 75)}40`] }}
               transition={{ duration: 4, repeat: Infinity }}
               style={{ width: 68, height: 68, borderRadius: '50%', background: 'rgba(255,255,255,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid white', cursor: 'pointer', fontSize: 34 }}>
-              {selKid?.emoji || '👶🏻'}
+              {selKid?.avatar_url
+    ? <img src={selKid.avatar_url} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
+    : selKid?.emoji || '👶🏻'
+  }
             </motion.div>
             <p style={{ marginTop: 8, fontSize: 10, color: THEME.text, fontWeight: 700, letterSpacing: '0.2em', textAlign: 'center' }}>{selKid?.name}</p>
             <div style={{ width: 56, height: 3, background: 'rgba(255,255,255,0.3)', borderRadius: 2, margin: '3px auto', overflow: 'hidden' }}>
