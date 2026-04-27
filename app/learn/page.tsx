@@ -676,32 +676,33 @@ export default function DecodePage() {
 
     // 已学的字列表（给API避免重复）
     const learnedChars = learnedItems
-      .filter(i => i.type === 'hanzi' && i.char)
-      .map(i => i.char!)
+  .filter(i => i.type === 'hanzi' && i.char)
+  .map(i => i.char!)
 
-    try {
-      const res = await fetch('/api/chinese/decode', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-  mode: activeTab,
-  char: activeTab === 'hanzi' ? query : undefined,
-  sentence: activeTab !== 'hanzi' ? query : undefined,
-  child_name: childInfo.name,
-  child_grade: childInfo.grade,
-  child_level: childInfo.level,
-  location_scene: locationScene,
-  learned_chars: learnedChars,
-  geofence: userLocation ? {          // ← 加在这里
-    city:         userLocation.city,
-    country:      userLocation.country,
-    country_code: userLocation.country_code,
-  } : null,
-}),
+try {
+  const res = await fetch('/api/chinese/decode', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      mode: activeTab,
+      char: activeTab === 'hanzi' ? query : undefined,
+      sentence: activeTab !== 'hanzi' ? query : undefined,
+      child_name: childInfo.name,
+      child_grade: childInfo.grade,
+      child_level: childInfo.level,
+      location_scene: locationScene,
+      learned_chars: learnedChars,
+      geofence: userLocation ? {
+        city:         userLocation.city,
+        country:      userLocation.country,
+        country_code: userLocation.country_code,
+      } : null,
+    }),
+  })
 
-      const json = await res.json()
-      if (json.error) throw new Error(json.error)
-      setData(json)
+  const json = await res.json()
+  if (json.error) throw new Error(json.error)
+  setData(json)
 
       // ── 写入学习记录 ──
       if (userId) {
