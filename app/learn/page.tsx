@@ -860,26 +860,29 @@ try {
         {input || <span style={{ fontSize: 16, color: 'rgba(200,160,96,0.4)' }}>字</span>}
       </div>
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 8 }}>
-        <input
-          value={input}
-          onCompositionStart={() => { composingRef.current = true }}
-          onCompositionEnd={e => {
-            composingRef.current = false
-            const chars = [...e.currentTarget.value]
-            setInput(chars[chars.length - 1] || '')
-            setData(null)
-          }}
-          onChange={e => {
-            if (composingRef.current) return
-            const chars = [...e.target.value]
-            setInput(chars[chars.length - 1] || '')
-            setData(null)
-          }}
-          onKeyDown={e => e.key === 'Enter' && !composingRef.current && generate()}
-          placeholder="输入汉字"
-          style={{ width: '100%', padding: '0 14px', height: 32, border: '1px solid rgba(200,160,96,0.3)', borderRadius: 8, fontSize: 14, fontFamily: "'Noto Sans SC', sans-serif", color: THEME.text, background: THEME.paper, outline: 'none' }}
-        />
-        <motion.button whileTap={{ scale: 0.96 }} onClick={() => generate()}
+        <textarea
+  value={input}
+  onChange={e => {
+    setInput(e.target.value)
+    setData(null)
+  }}
+  onKeyDown={e => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault()
+      const char = [...input].find(c => /\p{Script=Han}/u.test(c)) || input.trim()
+      setInput(char)
+      generate(char)
+    }
+  }}
+  placeholder="输入一个汉字"
+  rows={1}
+  style={{ width: 68, textAlign: 'center', fontSize: 48, border: '2px solid rgba(200,160,96,0.3)', borderRadius: 12, padding: '6px 0', fontFamily: "'Noto Serif SC', serif", color: THEME.text, background: THEME.paper, outline: 'none', flexShrink: 0, resize: 'none', caretColor: THEME.gold }}
+/>
+        <motion.button whileTap={{ scale: 0.96 }} onClick={() => {
+  const char = [...input].find(c => /\p{Script=Han}/u.test(c)) || input.trim()
+  setInput(char)
+  generate(char)
+}}
           disabled={loading || !input.trim()}
           style={{ flex: 1, padding: '0 14px', height: 32, background: loading || !input.trim() ? '#C5B5A5' : THEME.red, color: '#fff', border: 'none', borderRadius: 8, fontSize: 14, fontFamily: "'Noto Serif SC', serif", cursor: loading || !input.trim() ? 'not-allowed' : 'pointer', letterSpacing: 1 }}>
           {loading ? '解析中…' : '🧩 拆解'}
@@ -889,7 +892,8 @@ try {
     <div style={{ fontSize: 10, color: THEME.textDim, letterSpacing: 3, marginBottom: 8, textTransform: 'uppercase', fontFamily: 'sans-serif' }}>快速体验</div>
     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7 }}>
       {QUICK_CHARS.map(c => (
-        <motion.div key={c} whileTap={{ scale: 0.88 }} onClick={() => { setData(null); generate(c) }}
+      <motion.div key={c} whileTap={{ scale: 0.88 }} onClick={() => { setData(null); generate(c) }}
+          }
           style={{ width: 38, height: 38, background: THEME.paper, border: '1.5px solid rgba(200,160,96,0.28)', borderRadius: 10, fontSize: 20, fontFamily: "'Noto Serif SC', serif", color: THEME.textMid, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           {c}
         </motion.div>
