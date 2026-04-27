@@ -1,12 +1,14 @@
 'use client'
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Settings, Volume2, VolumeX, X, User } from 'lucide-react'
+import { Settings, Volume2, VolumeX, X, User, Baby } from 'lucide-react'
 
 const STORAGE_KEY = 'speech_enabled'
 const THEME = { text: '#2C3E50', gold: '#B08D57', navy: '#1A3C5E', muted: '#6B8BAA' }
 
 export default function SettingsButton() {
+  const router = useRouter()
   const [open, setOpen] = useState(false)
   const [enabled, setEnabled] = useState(true)
   const [mounted, setMounted] = useState(false)
@@ -24,6 +26,11 @@ export default function SettingsButton() {
     if (!next) window.speechSynthesis?.cancel()
   }
 
+  const goTo = (path: string) => {
+    setOpen(false)
+    router.push(path)
+  }
+
   if (!mounted) return null
 
   return (
@@ -32,20 +39,29 @@ export default function SettingsButton() {
         style={{ position: 'fixed', top: 'max(env(safe-area-inset-top, 0px) + 16px, 16px)', right: 16, zIndex: 200, width: 40, height: 40, borderRadius: '50%', background: 'rgba(255,255,255,0.2)', backdropFilter: 'blur(20px)', border: '1px solid rgba(255,255,255,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
         <Settings size={18} color={open ? THEME.gold : THEME.text} strokeWidth={1.8} />
       </motion.button>
+
       <AnimatePresence>
         {open && (
           <>
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
               onClick={() => setOpen(false)}
               style={{ position: 'fixed', inset: 0, zIndex: 198, background: 'rgba(0,0,0,0.1)' }} />
+
             <motion.div
-              initial={{ opacity: 0, scale: 0.9, y: -10 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.9, y: -10 }}
+              initial={{ opacity: 0, scale: 0.9, y: -10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: -10 }}
               transition={{ type: 'spring', damping: 25, stiffness: 300 }}
               style={{ position: 'fixed', top: 'max(env(safe-area-inset-top, 0px) + 66px, 66px)', right: 16, zIndex: 199, width: 220, background: 'rgba(255,255,255,0.92)', backdropFilter: 'blur(40px)', borderRadius: 20, boxShadow: '0 10px 40px rgba(0,0,0,0.12)', overflow: 'hidden' }}>
+
+              {/* 标题栏 */}
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 16px 10px', borderBottom: '1px solid rgba(0,0,0,0.06)' }}>
                 <span style={{ fontSize: 13, fontWeight: 700, color: THEME.text, letterSpacing: '0.05em' }}>设置</span>
-                <motion.div whileTap={{ scale: 0.85 }} onClick={() => setOpen(false)} style={{ cursor: 'pointer', opacity: 0.3 }}><X size={16} /></motion.div>
+                <motion.div whileTap={{ scale: 0.85 }} onClick={() => setOpen(false)} style={{ cursor: 'pointer', opacity: 0.3 }}>
+                  <X size={16} />
+                </motion.div>
               </div>
+
               <div style={{ padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: 8 }}>
 
                 {/* 语音播报 */}
@@ -64,13 +80,23 @@ export default function SettingsButton() {
                   </div>
                 </motion.div>
 
-                {/* 个人资料 */}
-                <motion.div whileTap={{ scale: 0.98 }} onClick={() => { setOpen(false); window.location.href = '/profile' }}
+                {/* 家长资料 */}
+                <motion.div whileTap={{ scale: 0.98 }} onClick={() => goTo('/profile?mode=edit')}
                   style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 12, cursor: 'pointer', background: 'rgba(0,0,0,0.03)', border: '1px solid rgba(0,0,0,0.06)' }}>
                   <User size={16} color={THEME.muted} />
                   <div>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: THEME.text }}>个人资料</div>
-                    <div style={{ fontSize: 11, color: THEME.muted, marginTop: 1 }}>查看或编辑档案</div>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: THEME.text }}>家长资料</div>
+                    <div style={{ fontSize: 11, color: THEME.muted, marginTop: 1 }}>证件 · 地址 · 紧急联系</div>
+                  </div>
+                </motion.div>
+
+                {/* 孩子资料 */}
+                <motion.div whileTap={{ scale: 0.98 }} onClick={() => goTo('/children')}
+                  style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 12, cursor: 'pointer', background: 'rgba(0,0,0,0.03)', border: '1px solid rgba(0,0,0,0.06)' }}>
+                  <Baby size={16} color={THEME.muted} />
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: THEME.text }}>孩子资料</div>
+                    <div style={{ fontSize: 11, color: THEME.muted, marginTop: 1 }}>学校 · 健康 · 日程</div>
                   </div>
                 </motion.div>
 
