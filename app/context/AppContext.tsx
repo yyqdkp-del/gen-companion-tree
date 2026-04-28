@@ -28,6 +28,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const router = useRouter()
   const [userId, setUserId] = useState('')
   const userIdRef = useRef('')
+  const lastSyncRef = useRef(0)
   const [kids, setKids] = useState<any[]>([])
   const [todos, setTodos] = useState<any[]>([])
   const [hotspots, setHotspots] = useState<any[]>([])
@@ -66,6 +67,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const sync = useCallback(async (forceUid?: string) => {
+    const now = Date.now()
+  if (now - lastSyncRef.current < 2000) return  // ← 加这行
+  lastSyncRef.current = now
     try {
       const uid = forceUid || userIdRef.current || (typeof window !== 'undefined' ? localStorage.getItem('app_user_id') : '') || ''
       if (!uid) return
