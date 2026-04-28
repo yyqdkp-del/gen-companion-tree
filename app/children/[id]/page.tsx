@@ -749,7 +749,7 @@ medications_current: healthData.medications_current,
       }
 
       setSaved(true)
-      setTimeout(() => router.push('/children'), 1200)
+      setTimeout(() => router.push('/'), 1200)
 
     } catch (e) {
       console.error('保存失败', e)
@@ -812,9 +812,7 @@ medications_current: healthData.medications_current,
             ⚠️ {saveError}
           </div>
         )}
-        <div style={{ fontSize: 10, color: 'red', wordBreak: 'break-all', marginBottom: 8, padding: '8px', background: 'rgba(255,0,0,0.05)', borderRadius: 8 }}>
-  school: {schoolData.school || '空'} | grade: {schoolData.grade || '空'} | blood: {healthData.blood_type || '空'} | allergies: {JSON.stringify(healthData.allergies)}
-</div>
+      
         <div style={{ display: 'flex', gap: 10, paddingBottom: 40 }}>
           {isLastStep ? (
             <>
