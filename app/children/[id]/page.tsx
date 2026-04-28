@@ -710,6 +710,7 @@ medications_current: healthData.medications_current,
   savedChildId = data?.id
 } else {
   const { error } = await supabase.from('children').update(childPayload).eq('id', childId)
+        savedChildId = childId
   if (error) { setSaveError('更新失败: ' + error.message); setSaving(false); return }
 }
 
