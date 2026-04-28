@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { Home as HomeIcon, Mic, Camera, Send, Square, Loader, Upload } from 'lucide-react'
 import { createBrowserClient } from '@supabase/ssr'
 import { useApp } from '@/app/context/AppContext'
+import SettingsButton from '@/app/components/SettingsButton'
   const supabase = createBrowserClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || '',
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
@@ -358,6 +359,8 @@ if (!SHOW_PATHS.includes(pathname)) return null
             <Camera size={21} color={inputMode === 'vision_file' ? THEME.gold : THEME.text} />
           </motion.button>
         </div>
+        {/* 设置按钮 */}
+<SettingsButton />
       </footer>
     </>
   )
