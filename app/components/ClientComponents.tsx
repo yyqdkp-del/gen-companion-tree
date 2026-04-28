@@ -9,15 +9,12 @@ export default function ClientComponents() {
   useEffect(() => {
     const viewport = window.visualViewport
     if (!viewport) return
-
     const update = () => {
-      const vh = viewport.height
-      document.documentElement.style.setProperty('--vh', `${vh}px`)
-      document.documentElement.style.setProperty(
-        '--keyboard-height',
-        `${Math.max(0, window.innerHeight - vh - viewport.offsetTop)}px`
-      )
-    }
+  const vh = viewport.height
+  const keyboardHeight = Math.max(0, window.innerHeight - vh - viewport.offsetTop)
+  document.documentElement.style.setProperty('--vh', `${vh}px`)
+  document.documentElement.style.setProperty('--keyboard-height', `${keyboardHeight}px`)
+}
 
     viewport.addEventListener('resize', update)
     viewport.addEventListener('scroll', update)
