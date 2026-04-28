@@ -300,7 +300,7 @@ function StepSchedule({ data, onChange }: { data: any; onChange: (d: any) => voi
   const [parseSuccess, setParseSuccess] = useState(false)
   const [parseError, setParseError] = useState('')
   const fileRef = useRef<HTMLInputElement>(null)
-
+  const cameraRef = useRef<HTMLInputElement>(null)
   const schedule = data.class_schedule || {}
   const activities = data.activities || []
 
