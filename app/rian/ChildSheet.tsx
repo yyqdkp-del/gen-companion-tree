@@ -408,24 +408,30 @@ export default function ChildSheet({ children, sel, onSel, onClose, onAdd, userI
     const yearEnd = new Date(new Date().getFullYear(), 11, 31).toISOString().split('T')[0]
 
     Promise.all([
-      supabase.from('child_schedule_template').select('*').eq('child_id', sel.id).eq('day_of_week', dow).order('period_start'),
-      supabase.from('child_school_calendar').select('*').eq('child_id', sel.id).gte('date_start', today).lte('date_start', yearEnd).order('date_start'),
-      supabase.from('child_health_records').select('*').eq('child_id', sel.id).eq('follow_up_date', today),
-      supabase.from('child_profiles').select('activities').eq('child_id', sel.id).single(),
-    ]).then(([schedRes, calRes, healthRes, profileRes]) => {
-      const schedData = schedRes.data || []
-      const calData = calRes.data || []
-      const healthData = healthRes.data || []
-      const activities = profileRes.data?.activities || []
+  supabase.from('child_profiles').select('class_schedule, activities').eq('child_id', sel.id).single(),  // ← 新第一个
+  supabase.from('child_school_calendar').select('*').eq('child_id', sel.id).gte('date_start', today).lte('date_start', yearEnd).order('date_start'),
+  supabase.from('child_health_records').select('*').eq('child_id', sel.id).eq('follow_up_date', today),
+]).then(([profileRes, calRes, healthRes]) => {
+  const schedData = profileRes.data
+  const calData = calRes.data || []
+  const healthData = healthRes.data || []
+  const activities = schedData?.activities || []
 
       const items: TimelineItem[] = []
 
-      schedData.forEach((s: any) => {
-        if (!s.period_start) return
-        items.push({ id: `sched_${s.id}`, time: s.period_start.substring(0, 5),
-          end_time: s.period_end?.substring(0, 5), title: s.subject,
-          type: 'class', source: 'schedule', event: s })
-      })
+     const dow = new Date().getDay()
+const dowKey = ['sun','mon','tue','wed','thu','fri','sat'][dow]
+const daySchedule: string[] = schedData?.class_schedule?.[dowKey] || []
+daySchedule.forEach((subject: string, i: number) => {
+  items.push({
+    id: `sched_${i}`,
+    time: '08:00',
+    title: subject,
+    type: 'class',
+    source: 'schedule',
+    event: { subject },
+  })
+})
 
       calData.filter((e: any) => e.date_start === today).forEach((e: any) => {
         const timeMatch = (e.description || e.title || '').match(/(\d{1,2}):(\d{2})/)
