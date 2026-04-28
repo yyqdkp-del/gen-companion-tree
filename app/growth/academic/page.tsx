@@ -345,6 +345,7 @@ ${assessment?.report ? JSON.stringify(assessment.report) : '暂无测评记录'}
   }
   setGenerating(false)
 }
+}
 
   if (loading) return (
     <div style={{ minHeight: '100dvh', background: THEME.bg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
