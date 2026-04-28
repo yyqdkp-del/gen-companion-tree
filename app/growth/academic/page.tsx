@@ -213,7 +213,7 @@ function AcademicContent() {
     generateReport(payload)
   }
 
-  const generateReport = async (visionData: any) => {
+  
     if (!childId) return
     setGenerating(true)
 
@@ -297,8 +297,7 @@ ${assessment?.report ? JSON.stringify(assessment.report) : '暂无测评记录'}
   ]
 }`
 
-    try {
-      const generateReport = async (visionData: any) => {
+    try {const generateReport = async (visionData: any) => {
   if (!childId) return
   setGenerating(true)
 
@@ -345,8 +344,6 @@ ${assessment?.report ? JSON.stringify(assessment.report) : '暂无测评记录'}
   }
   setGenerating(false)
 }
-}
-
   if (loading) return (
     <div style={{ minHeight: '100dvh', background: THEME.bg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       <motion.div animate={{ opacity: [0.4, 1, 0.4] }} transition={{ duration: 1.5, repeat: Infinity }}
