@@ -666,6 +666,8 @@ function ChildEditContent() {
     if (!basicData.name.trim()) { setSaveError('请填写孩子名字'); return }
     setSaving(true)
     setSaveError('')
+    console.log('schoolData:', schoolData)
+console.log('healthData:', healthData)
 
     try {
       const { data: { session } } = await supabase.auth.getSession()
@@ -686,9 +688,9 @@ function ChildEditContent() {
         school_end_time: schoolData.school_end_time || null,
         transport_method: schoolData.transport_method,
         blood_type: healthData.blood_type,
-        allergies: JSON.stringify(healthData.allergies),
-        medical_conditions: JSON.stringify(healthData.medical_conditions),
-        medications_current: JSON.stringify(healthData.medications_current),
+        allergies: healthData.allergies,
+medical_conditions: healthData.medical_conditions,
+medications_current: healthData.medications_current,
         preferred_hospitals: healthData.preferred_hospitals,
         updated_at: new Date().toISOString(),
       }
