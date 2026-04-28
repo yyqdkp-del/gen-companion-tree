@@ -56,12 +56,13 @@ export default function ChildrenPage() {
     if (data) {
       const enriched = await Promise.all(data.map(async (child) => {
         const { data: assessment } = await supabase
-          .from('assessments')
-          .select('report')
-          .eq('child_name', child.name)
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .single()
+  .from('assessments')
+  .select('report')
+  .eq('user_id', session.user.id)
+  .eq('child_name', child.name)
+  .order('created_at', { ascending: false })
+  .limit(1)
+  .single()
 
         let chinese_level = ''
         if (assessment?.report) {
