@@ -421,15 +421,16 @@ export default function ChildSheet({ children, sel, onSel, onClose, onAdd, userI
 
      const dow = new Date().getDay()
 const dowKey = ['sun','mon','tue','wed','thu','fri','sat'][dow]
-const daySchedule: string[] = schedData?.class_schedule?.[dowKey] || []
-daySchedule.forEach((subject: string, i: number) => {
+const daySchedule = schedData?.class_schedule?.[dowKey] || []
+daySchedule.forEach((item: any, i: number) => {
+  const isObject = typeof item === 'object'
   items.push({
     id: `sched_${i}`,
-    time: '08:00',
-    title: subject,
+    time: isObject ? item.time : '08:00',
+    title: isObject ? item.subject : item,
     type: 'class',
     source: 'schedule',
-    event: { subject },
+    event: item,
   })
 })
 
