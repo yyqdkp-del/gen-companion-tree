@@ -35,11 +35,18 @@ export default function SettingsButton() {
 
   return (
     <>
+      {/* 齿轮按钮：内嵌在 InputBar 里使用 */}
       <motion.button whileTap={{ scale: 0.9 }} onClick={() => setOpen(!open)}
-        style={{ position: 'fixed', top: 'max(env(safe-area-inset-top, 0px) + 16px, 16px)', right: 16, zIndex: 200, width: 40, height: 40, borderRadius: '50%', background: 'rgba(255,255,255,0.2)', backdropFilter: 'blur(20px)', border: '1px solid rgba(255,255,255,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
-        <Settings size={18} color={open ? THEME.gold : THEME.text} strokeWidth={1.8} />
+        style={{
+          width: 52, height: 46, borderRadius: 23,
+          background: open ? 'rgba(255,255,255,0.5)' : 'rgba(255,255,255,0.2)',
+          border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center',
+          cursor: 'pointer',
+        }}>
+        <Settings size={21} color={open ? THEME.gold : THEME.text} strokeWidth={1.8} />
       </motion.button>
 
+      {/* 设置面板：从底部弹出 */}
       <AnimatePresence>
         {open && (
           <>
@@ -48,13 +55,23 @@ export default function SettingsButton() {
               style={{ position: 'fixed', inset: 0, zIndex: 198, background: 'rgba(0,0,0,0.1)' }} />
 
             <motion.div
-              initial={{ opacity: 0, scale: 0.9, y: -10 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.9, y: -10 }}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 20 }}
               transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-              style={{ position: 'fixed', top: 'max(env(safe-area-inset-top, 0px) + 66px, 66px)', right: 16, zIndex: 199, width: 220, background: 'rgba(255,255,255,0.92)', backdropFilter: 'blur(40px)', borderRadius: 20, boxShadow: '0 10px 40px rgba(0,0,0,0.12)', overflow: 'hidden' }}>
+              style={{
+                position: 'fixed',
+                bottom: 'max(calc(env(safe-area-inset-bottom) + 80px), 90px)',
+                right: 16,
+                zIndex: 199,
+                width: 220,
+                background: 'rgba(255,255,255,0.92)',
+                backdropFilter: 'blur(40px)',
+                borderRadius: 20,
+                boxShadow: '0 10px 40px rgba(0,0,0,0.12)',
+                overflow: 'hidden',
+              }}>
 
-              {/* 标题栏 */}
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 16px 10px', borderBottom: '1px solid rgba(0,0,0,0.06)' }}>
                 <span style={{ fontSize: 13, fontWeight: 700, color: THEME.text, letterSpacing: '0.05em' }}>设置</span>
                 <motion.div whileTap={{ scale: 0.85 }} onClick={() => setOpen(false)} style={{ cursor: 'pointer', opacity: 0.3 }}>
@@ -64,7 +81,6 @@ export default function SettingsButton() {
 
               <div style={{ padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: 8 }}>
 
-                {/* 语音播报 */}
                 <motion.div whileTap={{ scale: 0.98 }} onClick={toggle}
                   style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 12px', borderRadius: 12, cursor: 'pointer', background: enabled ? 'rgba(176,141,87,0.08)' : 'rgba(0,0,0,0.03)', border: `1px solid ${enabled ? 'rgba(176,141,87,0.2)' : 'rgba(0,0,0,0.06)'}` }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -80,7 +96,6 @@ export default function SettingsButton() {
                   </div>
                 </motion.div>
 
-                {/* 家长资料 */}
                 <motion.div whileTap={{ scale: 0.98 }} onClick={() => goTo('/profile?mode=edit')}
                   style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 12, cursor: 'pointer', background: 'rgba(0,0,0,0.03)', border: '1px solid rgba(0,0,0,0.06)' }}>
                   <User size={16} color={THEME.muted} />
@@ -90,7 +105,6 @@ export default function SettingsButton() {
                   </div>
                 </motion.div>
 
-                {/* 孩子资料 */}
                 <motion.div whileTap={{ scale: 0.98 }} onClick={() => goTo('/children')}
                   style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 12, cursor: 'pointer', background: 'rgba(0,0,0,0.03)', border: '1px solid rgba(0,0,0,0.06)' }}>
                   <Baby size={16} color={THEME.muted} />
