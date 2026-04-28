@@ -309,7 +309,6 @@ ${assessment?.report ? JSON.stringify(assessment.report) : '暂无测评记录'}
   const { data: achievements } = await supabase.from('child_achievements').select('*').eq('child_id', childId)
   const { data: assessment } = await supabase.from('assessments').select('report').eq('child_id', childId).order('created_at', { ascending: false }).limit(1).maybeSingle()
 
-  try {
     const resp = await fetch('/api/children/pathway', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
