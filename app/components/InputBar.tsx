@@ -59,6 +59,9 @@ export default function InputBar() {
 
   const currentPage = PAGE_MAP[pathname] || '根·陪伴'
   const isTreehouse = pathname === '/treehouse'
+  const SHOW_PATHS = ['/', '/rian', '/growth', '/treehouse']
+const shouldShow = SHOW_PATHS.includes(pathname)
+if (!shouldShow) return null
 
   // ── uid 获取，永远不会空 ──
   const getUid = useCallback(() => {
