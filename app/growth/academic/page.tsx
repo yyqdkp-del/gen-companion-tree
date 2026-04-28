@@ -297,7 +297,7 @@ ${assessment?.report ? JSON.stringify(assessment.report) : '暂无测评记录'}
   ]
 }`
 
-    try {const generateReport = async (visionData: any) => {
+    const generateReport = async (visionData: any) => {
   if (!childId) return
   setGenerating(true)
 
