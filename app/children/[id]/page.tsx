@@ -323,34 +323,48 @@ function StepSchedule({ data, onChange }: { data: any; onChange: (d: any) => voi
     onChange({ ...data, activities: activities.filter((_: any, idx: number) => idx !== i) })
   }
 
-  const handlePhoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-    setParsing(true)
-    setParseError('')
-    setParseSuccess(false)
-    try {
-      const base64 = await new Promise<string>((res, rej) => {
-        const r = new FileReader()
-        r.onload = () => res((r.result as string).split(',')[1])
-        r.onerror = rej
-        r.readAsDataURL(file)
-      })
-      const resp = await fetch('/api/children/parse-schedule', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ image: base64 }),
-      })
-      const result = await resp.json()
-      if (result.error) throw new Error(result.error)
-      onChange({ ...data, class_schedule: result.schedule })
-      setParseSuccess(true)
-      setTimeout(() => setParseSuccess(false), 3000)
-    } catch (err: any) {
-      setParseError('解析失败，请手动填写或重试')
-    }
-    setParsing(false)
+ const handlePhoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const file = e.target.files?.[0]
+  if (!file) return
+  setParsing(true)
+  setParseError('')
+  setParseSuccess(false)
+  try {
+    // 统一转成 jpeg，解决 heic/png/webp 兼容问题
+    const base64 = await new Promise<string>((res, rej) => {
+      const img = new Image()
+      const url = URL.createObjectURL(file)
+      img.onload = () => {
+        const canvas = document.createElement('canvas')
+        canvas.width = img.width
+        canvas.height = img.height
+        canvas.getContext('2d')?.drawImage(img, 0, 0)
+        URL.revokeObjectURL(url)
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.9)
+        res(dataUrl.split(',')[1])
+      }
+      img.onerror = rej
+      img.src = url
+    })
+
+    const resp = await fetch('/api/children/parse-schedule', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ 
+        image: base64,
+        mediaType: 'image/jpeg',  // 统一 jpeg
+      }),
+    })
+    const result = await resp.json()
+    if (result.error) throw new Error(result.error)
+    onChange({ ...data, class_schedule: result.schedule })
+    setParseSuccess(true)
+    setTimeout(() => setParseSuccess(false), 3000)
+  } catch (err: any) {
+    setParseError('解析失败，请手动填写或重试')
   }
+  setParsing(false)
+}
 
   return (
     <div>
