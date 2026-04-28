@@ -714,22 +714,12 @@ medications_current: healthData.medications_current,
 }
 
       if (savedChildId) {
-        const { data: existingProfile } = await supabase.from('child_profiles')
-          .select('id').eq('child_id', savedChildId).single()
-
-        const profilePayload = {
-          child_id: savedChildId,
-          user_id: uid,
-          class_schedule: scheduleData.class_schedule,
-          activities: scheduleData.activities,
-        }
-
-        if (existingProfile) {
-          await supabase.from('child_profiles').update(profilePayload).eq('id', existingProfile.id)
-        } else {
-          await supabase.from('child_profiles').insert(profilePayload)
-        }
-
+        await supabase.from('child_profiles').upsert({
+  child_id: savedChildId,
+  user_id: uid,
+  class_schedule: scheduleData.class_schedule,
+  activities: scheduleData.activities,
+}, { onConflict: 'child_id' })
         // 联通主屏头像：更新 localStorage
         localStorage.setItem('active_child_id', savedChildId)
         localStorage.setItem('active_child', JSON.stringify({
