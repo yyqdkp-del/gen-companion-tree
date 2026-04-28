@@ -58,15 +58,15 @@ export default function InputBar() {
   const cameraInputRef = useRef<HTMLInputElement>(null)
 
   const currentPage = PAGE_MAP[pathname] || '根·陪伴'
-  const isTreehouse = pathname === '/treehouse'
-  const SHOW_PATHS = ['/', '/rian', '/growth', '/treehouse']
-const shouldShow = SHOW_PATHS.includes(pathname)
-if (!shouldShow) return null
+const isTreehouse = pathname === '/treehouse'
 
-  // ── uid 获取，永远不会空 ──
-  const getUid = useCallback(() => {
-    return userId || localStorage.getItem('app_user_id') || ''
-  }, [userId])
+// ── uid 获取，永远不会空 ──
+const getUid = useCallback(() => {
+  return userId || localStorage.getItem('app_user_id') || ''
+}, [userId])
+
+const SHOW_PATHS = ['/', '/rian', '/growth', '/treehouse']
+if (!SHOW_PATHS.includes(pathname)) return null
 
   // ── 文字发送 ──
  const sendCommand = async () => {
