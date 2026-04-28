@@ -113,7 +113,18 @@ export default function SettingsButton() {
                     <div style={{ fontSize: 11, color: THEME.muted, marginTop: 1 }}>学校 · 健康 · 日程</div>
                   </div>
                 </motion.div>
-
+                {/* 课外活动 */}
+<motion.div whileTap={{ scale: 0.98 }} onClick={() => {
+  const activeChildId = localStorage.getItem('active_child_id')
+  goTo(activeChildId ? `/children/${activeChildId}/activities` : '/children')
+}}
+  style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 12, cursor: 'pointer', background: 'rgba(0,0,0,0.03)', border: '1px solid rgba(0,0,0,0.06)' }}>
+  <span style={{ fontSize: 16 }}>🎯</span>
+  <div>
+    <div style={{ fontSize: 13, fontWeight: 600, color: THEME.text }}>课外活动</div>
+    <div style={{ fontSize: 11, color: THEME.muted, marginTop: 1 }}>兴趣班 · 补习课管理</div>
+  </div>
+</motion.div>
               </div>
             </motion.div>
           </>
