@@ -251,28 +251,7 @@ function AcademicContent() {
   // 不等待结果，监听 realtime
 }
 
-      const result = await resp.json()
-      if (result.error) throw new Error(result.error)
-
-      const reportData = result.report
-
-      await supabase.from('pathway_reports').insert({
-        child_id: childId,
-        user_id: uid,
-        profile_scores: reportData.profile_scores,
-        narrative: reportData.narrative,
-        gaps: reportData.gaps,
-        roadmap: reportData.roadmap,
-        this_semester: reportData.this_semester,
-      })
-
-      setReport(reportData)
-
-    } catch (e) {
-      console.error('生成报告失败', e)
-    }
-    setGenerating(false)
-  }
+   
 
   if (loading) return (
     <div style={{ minHeight: '100dvh', background: THEME.bg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
