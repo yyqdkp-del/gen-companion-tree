@@ -298,44 +298,53 @@ ${assessment?.report ? JSON.stringify(assessment.report) : '暂无测评记录'}
 }`
 
     try {
-      const response = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': process.env.NEXT_PUBLIC_ANTHROPIC_API_KEY || '',
-          'anthropic-version': '2023-06-01',
-        },
-        body: JSON.stringify({
-          model: 'claude-sonnet-4-20250514',
-          max_tokens: 3000,
-          messages: [{ role: 'user', content: prompt }],
-        }),
-      })
+      const generateReport = async (visionData: any) => {
+  if (!childId) return
+  setGenerating(true)
 
-      const data = await response.json()
-      const raw = data.content?.[0]?.text || ''
-      const match = raw.match(/\{[\s\S]*\}/)
-      if (match) {
-        const reportData = JSON.parse(match[0])
+  const { data: { session } } = await supabase.auth.getSession()
+  const uid = session?.user?.id
 
-        const { data: savedReport } = await supabase.from('pathway_reports').insert({
-          child_id: childId,
-          user_id: uid,
-          profile_scores: reportData.profile_scores,
-          narrative: reportData.narrative,
-          gaps: reportData.gaps,
-          roadmap: reportData.roadmap,
-          this_semester: reportData.this_semester,
-          generated_at: new Date().toISOString(),
-        }).select().single()
+  const { data: child } = await supabase.from('children').select('*').eq('id', childId).single()
+  const { data: activities } = await supabase.from('child_activities').select('*').eq('child_id', childId)
+  const { data: achievements } = await supabase.from('child_achievements').select('*').eq('child_id', childId)
+  const { data: assessment } = await supabase.from('assessments').select('report').eq('child_id', childId).order('created_at', { ascending: false }).limit(1).maybeSingle()
 
-        setReport({ ...reportData, ...savedReport })
-      }
-    } catch (e) {
-      console.error('生成报告失败', e)
-    }
-    setGenerating(false)
+  try {
+    const resp = await fetch('/api/children/pathway', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        child,
+        activities: activities || [],
+        achievements: achievements || [],
+        assessment: assessment?.report || null,
+        vision: visionData,
+      }),
+    })
+
+    const result = await resp.json()
+    if (result.error) throw new Error(result.error)
+
+    const reportData = result.report
+
+    await supabase.from('pathway_reports').insert({
+      child_id: childId,
+      user_id: uid,
+      profile_scores: reportData.profile_scores,
+      narrative: reportData.narrative,
+      gaps: reportData.gaps,
+      roadmap: reportData.roadmap,
+      this_semester: reportData.this_semester,
+    })
+
+    setReport(reportData)
+
+  } catch (e) {
+    console.error('生成报告失败', e)
   }
+  setGenerating(false)
+}
 
   if (loading) return (
     <div style={{ minHeight: '100dvh', background: THEME.bg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
