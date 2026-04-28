@@ -227,6 +227,64 @@ export default function GrowthPage() {
           进入
         </span>
       </motion.button>
+      {/* ══ 学业管理入口：左侧树干 ══ */}
+<motion.button
+  initial={{ opacity: 0 }}
+  animate={{ opacity: 1 }}
+  transition={{ delay: 1.8 }}
+  whileHover={{ scale: 1.1 }}
+  whileTap={{ scale: 0.93 }}
+  onClick={() => router.push('/growth/academic')}
+  style={{
+    position: 'absolute',
+    left: '6%',
+    top: '52%',
+    zIndex: 50,
+    background: 'transparent',
+    border: 'none',
+    cursor: 'pointer',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: '3px',
+    width: '72px',
+  }}
+>
+  <motion.div
+    animate={{ opacity: [0.3, 0.7, 0.3], scale: [1, 1.12, 1] }}
+    transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
+    style={{
+      position: 'absolute',
+      inset: '-16px',
+      borderRadius: '50% 50% 48% 48% / 42% 42% 58% 58%',
+      background: 'radial-gradient(ellipse, rgba(240,192,64,0.35) 0%, transparent 70%)',
+      pointerEvents: 'none',
+    }}
+  />
+  <motion.span
+    animate={{ opacity: [0.7, 1, 0.7] }}
+    transition={{ duration: 2.5, repeat: Infinity }}
+    style={{
+      fontSize: '13px',
+      fontWeight: 700,
+      color: '#FFE080',
+      letterSpacing: '0.1em',
+      textShadow: '0 0 10px rgba(255,180,0,0.9), 0 1px 3px rgba(0,0,0,0.5)',
+      lineHeight: 1.3,
+      textAlign: 'center',
+    }}
+  >
+    学业成长
+  </motion.span>
+  <span style={{
+    fontSize: '9px',
+    color: 'rgba(255,220,120,0.8)',
+    letterSpacing: '0.15em',
+    textShadow: '0 1px 4px rgba(0,0,0,0.6)',
+  }}>
+    进入
+  </span>
+</motion.button>
 
       {/* ══ 飘落树叶 ══ */}
       <FallingLeaves />
