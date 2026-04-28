@@ -406,7 +406,7 @@ function AcademicContent() {
                 disabled={!canNext() || saving}
                 style={{ flex: 2, padding: '14px', borderRadius: 14, border: 'none', background: canNext() ? THEME.gold : THEME.border, color: '#1A3C5E', fontSize: 14, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
                 {saving ? <Loader size={16} /> : <Sparkles size={16} />}
-                {saving ? '根正在分析…' : '生成我的规划'}
+                {saving ? '根正在分析…' : '撰写我的规划'}
               </motion.button>
             )}
           </div>
