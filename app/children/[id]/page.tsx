@@ -698,11 +698,13 @@ medications_current: healthData.medications_current,
       let savedChildId = childId
 
       if (isNew) {
-        const { data } = await supabase.from('children').insert(childPayload).select().single()
-        savedChildId = data?.id
-      } else {
-        await supabase.from('children').update(childPayload).eq('id', childId)
-      }
+  const { data, error } = await supabase.from('children').insert(childPayload).select().single()
+  if (error) { setSaveError('新建失败: ' + error.message); setSaving(false); return }
+  savedChildId = data?.id
+} else {
+  const { error } = await supabase.from('children').update(childPayload).eq('id', childId)
+  if (error) { setSaveError('更新失败: ' + error.message); setSaving(false); return }
+}
 
       if (savedChildId) {
         const { data: existingProfile } = await supabase.from('child_profiles')
