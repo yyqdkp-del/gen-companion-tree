@@ -357,13 +357,24 @@ function StepSchedule({ data, onChange }: { data: any; onChange: (d: any) => voi
       <div style={{ fontSize: 15, fontWeight: 600, color: THEME.navy, marginBottom: 4 }}>课程与活动 📚</div>
       <div style={{ fontSize: 12, color: THEME.muted, marginBottom: 16, lineHeight: 1.6 }}>可拍课程表照片自动识别</div>
 
-      <input ref={fileRef} type="file" accept="image/*" capture="environment" onChange={handlePhoto} style={{ display: 'none' }} />
-      <motion.button whileTap={{ scale: 0.97 }} onClick={() => fileRef.current?.click()}
-        disabled={parsing}
-        style={{ width: '100%', padding: '12px', borderRadius: 12, border: `1.5px dashed ${parseSuccess ? '#16a34a' : THEME.gold}`, background: parseSuccess ? 'rgba(34,197,94,0.08)' : 'rgba(176,141,87,0.06)', color: parseSuccess ? '#16a34a' : THEME.gold, fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginBottom: 12 }}>
-        {parsing ? <Loader size={16} /> : parseSuccess ? <Check size={16} /> : <Camera size={16} />}
-        {parsing ? '正在识别课程表…' : parseSuccess ? '识别成功！已填入下方 ✓' : '拍照识别课程表'}
-      </motion.button>
+      <input ref={fileRef} type="file" accept="image/*" onChange={handlePhoto} style={{ display: 'none' }} />
+      <input ref={fileRef} type="file" accept="image/*" onChange={handlePhoto} style={{ display: 'none' }} />
+<input ref={cameraRef} type="file" accept="image/*" capture="environment" onChange={handlePhoto} style={{ display: 'none' }} />
+
+<div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+  <motion.button whileTap={{ scale: 0.97 }} onClick={() => cameraRef.current?.click()}
+    disabled={parsing}
+    style={{ flex: 1, padding: '12px', borderRadius: 12, border: `1.5px dashed ${parseSuccess ? '#16a34a' : THEME.gold}`, background: parseSuccess ? 'rgba(34,197,94,0.08)' : 'rgba(176,141,87,0.06)', color: parseSuccess ? '#16a34a' : THEME.gold, fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+    {parsing ? <Loader size={16} /> : parseSuccess ? <Check size={16} /> : <Camera size={16} />}
+    {parsing ? '识别中…' : parseSuccess ? '识别成功 ✓' : '拍照识别'}
+  </motion.button>
+  <motion.button whileTap={{ scale: 0.97 }} onClick={() => fileRef.current?.click()}
+    disabled={parsing}
+    style={{ flex: 1, padding: '12px', borderRadius: 12, border: `1.5px dashed ${THEME.gold}`, background: 'rgba(176,141,87,0.06)', color: THEME.gold, fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+    <Plus size={16} />
+    从相册上传
+  </motion.button>
+</div>
 
       {parseError && (
         <div style={{ color: '#E07B2A', fontSize: 12, marginBottom: 12, padding: '8px 12px', borderRadius: 10, background: 'rgba(224,123,42,0.08)' }}>
@@ -570,7 +581,7 @@ function ChildEditContent() {
   const childId = isNew ? null : params.id as string
   const searchParams = useSearchParams()
   const isFromQuick = searchParams.get('from') === 'quick'
-
+  const cameraRef = useRef<HTMLInputElement>(null)
   const [step, setStep] = useState(0)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
@@ -689,7 +700,6 @@ console.log('healthData:', healthData)
 medical_conditions: healthData.medical_conditions,
 medications_current: healthData.medications_current,
         preferred_hospitals: healthData.preferred_hospitals,
-        updated_at: new Date().toISOString(),
       }
 
       let savedChildId = childId
