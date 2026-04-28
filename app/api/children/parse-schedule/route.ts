@@ -24,7 +24,8 @@ export async function POST(req: NextRequest) {
               source: { type: 'base64', media_type: 'image/jpeg', data: image },
             },
             {
-              text: `这是一张学校课程表图片。请仔细识别所有内容。
+              type: 'text',
+  text: `这是一张学校课程表图片。请仔细识别所有内容。
 
 返回JSON，直接{开头}结尾，不加任何其他文字：
 
