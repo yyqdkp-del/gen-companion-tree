@@ -2,15 +2,12 @@ export const dynamic = 'force-dynamic'
 export const maxDuration = 60
 
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/ssr'
+import { createClient } from '@supabase/supabase-js'
 
 async function generateAndSave(body: any) {
-  const { child, activities, achievements, assessment, vision, childId, uid } = body
-
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { cookies: { getAll: () => [], setAll: () => {} } }
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
   )
 
   const prompt = `你是一位顶尖的国际升学规划专家，有20年帮助海外华人家庭孩子申请美高、英国独立学校和欧美T50大学的经验。
