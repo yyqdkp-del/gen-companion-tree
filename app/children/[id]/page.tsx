@@ -293,102 +293,101 @@ function StepSchool({ data, onChange, schools }: { data: any; onChange: (d: any)
   )
 }
 
-// ── Step 2：课程表 + 活动 ──
+// ── Step 2：课程表 ──
 function StepSchedule({ data, onChange }: { data: any; onChange: (d: any) => void }) {
-  const [activeDay, setActiveDay] = useState('mon')
   const [parsing, setParsing] = useState(false)
   const [parseSuccess, setParseSuccess] = useState(false)
   const [parseError, setParseError] = useState('')
+  const [editDay, setEditDay] = useState<string | null>(null)
+  const [editText, setEditText] = useState('')
   const fileRef = useRef<HTMLInputElement>(null)
   const cameraRef = useRef<HTMLInputElement>(null)
+
   const schedule = data.class_schedule || {}
-  const activities = data.activities || []
 
-  const updateDaySchedule = (day: string, text: string) => {
-    const slots = text.split('\n').map((s: string) => s.trim()).filter(Boolean)
-    onChange({ ...data, class_schedule: { ...schedule, [day]: slots } })
+  const handlePhoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setParsing(true)
+    setParseError('')
+    setParseSuccess(false)
+    try {
+      const base64 = await new Promise<string>((res, rej) => {
+        const img = new Image()
+        const url = URL.createObjectURL(file)
+        img.onload = () => {
+          const canvas = document.createElement('canvas')
+          canvas.width = img.width
+          canvas.height = img.height
+          canvas.getContext('2d')?.drawImage(img, 0, 0)
+          URL.revokeObjectURL(url)
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.9)
+          res(dataUrl.split(',')[1])
+        }
+        img.onerror = rej
+        img.src = url
+      })
+      const resp = await fetch('/api/children/parse-schedule', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ image: base64, mediaType: 'image/jpeg' }),
+      })
+      const result = await resp.json()
+      if (result.error) throw new Error(result.error)
+      onChange({ ...data, class_schedule: result.schedule })
+      setParseSuccess(true)
+      setTimeout(() => setParseSuccess(false), 3000)
+    } catch (err: any) {
+      setParseError('解析失败，请手动填写或重试')
+    }
+    setParsing(false)
   }
 
-  const addActivity = () => {
-    onChange({ ...data, activities: [...activities, { name: '', type: 'activity', day: 'mon', time: '', location: '' }] })
+  const openEdit = (day: string) => {
+    const dayData = schedule[day] || []
+    const text = dayData.map((item: any) =>
+      typeof item === 'object' ? `${item.time} ${item.subject}` : item
+    ).join('\n')
+    setEditText(text)
+    setEditDay(day)
   }
 
-  const updateActivity = (i: number, field: string, val: string) => {
-    const updated = [...activities]
-    updated[i] = { ...updated[i], [field]: val }
-    onChange({ ...data, activities: updated })
-  }
-
-  const removeActivity = (i: number) => {
-    onChange({ ...data, activities: activities.filter((_: any, idx: number) => idx !== i) })
-  }
-
- const handlePhoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
-  const file = e.target.files?.[0]
-  if (!file) return
-  setParsing(true)
-  setParseError('')
-  setParseSuccess(false)
-  try {
-    // 统一转成 jpeg，解决 heic/png/webp 兼容问题
-    const base64 = await new Promise<string>((res, rej) => {
-      const img = new Image()
-      const url = URL.createObjectURL(file)
-      img.onload = () => {
-        const canvas = document.createElement('canvas')
-        canvas.width = img.width
-        canvas.height = img.height
-        canvas.getContext('2d')?.drawImage(img, 0, 0)
-        URL.revokeObjectURL(url)
-        const dataUrl = canvas.toDataURL('image/jpeg', 0.9)
-        res(dataUrl.split(',')[1])
-      }
-      img.onerror = rej
-      img.src = url
+  const saveEdit = () => {
+    if (!editDay) return
+    const slots = editText.split('\n').map(s => s.trim()).filter(Boolean).map(s => {
+      const timeMatch = s.match(/^(\d{1,2}:\d{2})\s+(.+)$/)
+      if (timeMatch) return { time: timeMatch[1], subject: timeMatch[2] }
+      return { time: '', subject: s }
     })
-
-    const resp = await fetch('/api/children/parse-schedule', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ 
-        image: base64,
-        mediaType: 'image/jpeg',  // 统一 jpeg
-      }),
-    })
-    const result = await resp.json()
-    if (result.error) throw new Error(result.error)
-    onChange({ ...data, class_schedule: result.schedule })
-    setParseSuccess(true)
-    setTimeout(() => setParseSuccess(false), 3000)
-  } catch (err: any) {
-    setParseError('解析失败，请手动填写或重试')
+    onChange({ ...data, class_schedule: { ...schedule, [editDay]: slots } })
+    setEditDay(null)
   }
-  setParsing(false)
-}
+
+  const getDayCount = (day: string) => (schedule[day] || []).length
 
   return (
     <div>
-      <div style={{ fontSize: 15, fontWeight: 600, color: THEME.navy, marginBottom: 4 }}>课程与活动 📚</div>
-      <div style={{ fontSize: 12, color: THEME.muted, marginBottom: 16, lineHeight: 1.6 }}>可拍课程表照片自动识别</div>
+      <div style={{ fontSize: 15, fontWeight: 600, color: THEME.navy, marginBottom: 4 }}>课程表 📚</div>
+      <div style={{ fontSize: 12, color: THEME.muted, marginBottom: 16, lineHeight: 1.6 }}>拍照识别或点击星期手动编辑</div>
 
+      {/* 上传按钮 */}
       <input ref={fileRef} type="file" accept="image/*" onChange={handlePhoto} style={{ display: 'none' }} />
-      <input ref={fileRef} type="file" accept="image/*" onChange={handlePhoto} style={{ display: 'none' }} />
-<input ref={cameraRef} type="file" accept="image/*" capture="environment" onChange={handlePhoto} style={{ display: 'none' }} />
+      <input ref={cameraRef} type="file" accept="image/*" capture="environment" onChange={handlePhoto} style={{ display: 'none' }} />
 
-<div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
-  <motion.button whileTap={{ scale: 0.97 }} onClick={() => cameraRef.current?.click()}
-    disabled={parsing}
-    style={{ flex: 1, padding: '12px', borderRadius: 12, border: `1.5px dashed ${parseSuccess ? '#16a34a' : THEME.gold}`, background: parseSuccess ? 'rgba(34,197,94,0.08)' : 'rgba(176,141,87,0.06)', color: parseSuccess ? '#16a34a' : THEME.gold, fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-    {parsing ? <Loader size={16} /> : parseSuccess ? <Check size={16} /> : <Camera size={16} />}
-    {parsing ? '识别中…' : parseSuccess ? '识别成功 ✓' : '拍照识别'}
-  </motion.button>
-  <motion.button whileTap={{ scale: 0.97 }} onClick={() => fileRef.current?.click()}
-    disabled={parsing}
-    style={{ flex: 1, padding: '12px', borderRadius: 12, border: `1.5px dashed ${THEME.gold}`, background: 'rgba(176,141,87,0.06)', color: THEME.gold, fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-    <Plus size={16} />
-    从相册上传
-  </motion.button>
-</div>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+        <motion.button whileTap={{ scale: 0.97 }} onClick={() => cameraRef.current?.click()}
+          disabled={parsing}
+          style={{ flex: 1, padding: '12px', borderRadius: 12, border: `1.5px dashed ${parseSuccess ? '#16a34a' : THEME.gold}`, background: parseSuccess ? 'rgba(34,197,94,0.08)' : 'rgba(176,141,87,0.06)', color: parseSuccess ? '#16a34a' : THEME.gold, fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+          {parsing ? <Loader size={16} /> : parseSuccess ? <Check size={16} /> : <Camera size={16} />}
+          {parsing ? '识别中…' : parseSuccess ? '识别成功 ✓' : '拍照识别'}
+        </motion.button>
+        <motion.button whileTap={{ scale: 0.97 }} onClick={() => fileRef.current?.click()}
+          disabled={parsing}
+          style={{ flex: 1, padding: '12px', borderRadius: 12, border: `1.5px dashed ${THEME.gold}`, background: 'rgba(176,141,87,0.06)', color: THEME.gold, fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+          <Plus size={16} />
+          从相册上传
+        </motion.button>
+      </div>
 
       {parseError && (
         <div style={{ color: '#E07B2A', fontSize: 12, marginBottom: 12, padding: '8px 12px', borderRadius: 10, background: 'rgba(224,123,42,0.08)' }}>
@@ -396,62 +395,81 @@ function StepSchedule({ data, onChange }: { data: any; onChange: (d: any) => voi
         </div>
       )}
 
-      <div style={{ display: 'flex', gap: 5, marginBottom: 12 }}>
-        {DAYS.map(d => (
-          <motion.button key={d.key} whileTap={{ scale: 0.92 }}
-            onClick={() => setActiveDay(d.key)}
-            style={{ flex: 1, padding: '8px 2px', borderRadius: 10, border: 'none', background: activeDay === d.key ? THEME.navy : 'rgba(255,255,255,0.5)', color: activeDay === d.key ? '#fff' : THEME.muted, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>
-            {d.label}
-          </motion.button>
-        ))}
+      {/* 星期卡片，点击进入弹窗编辑 */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {DAYS.map(d => {
+          const count = getDayCount(d.key)
+          const dayData = schedule[d.key] || []
+          const preview = dayData.slice(0, 2).map((item: any) =>
+            typeof item === 'object' ? item.subject : item
+          ).join(' · ')
+
+          return (
+            <motion.div key={d.key} whileTap={{ scale: 0.98 }}
+              onClick={() => openEdit(d.key)}
+              style={{ display: 'flex', alignItems: 'center', padding: '12px 14px', borderRadius: 12, background: 'rgba(255,255,255,0.65)', border: '1px solid rgba(0,0,0,0.08)', cursor: 'pointer' }}>
+              <div style={{ width: 36, height: 36, borderRadius: 10, background: count > 0 ? 'rgba(176,141,87,0.12)' : 'rgba(0,0,0,0.04)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginRight: 12 }}>
+                <span style={{ fontSize: 12, fontWeight: 700, color: count > 0 ? THEME.gold : THEME.muted }}>{d.label}</span>
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                {count > 0 ? (
+                  <>
+                    <div style={{ fontSize: 12, color: THEME.text, fontWeight: 500 }}>{count} 节课</div>
+                    <div style={{ fontSize: 11, color: THEME.muted, marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {preview}{count > 2 ? ` · 等${count}项` : ''}
+                    </div>
+                  </>
+                ) : (
+                  <div style={{ fontSize: 12, color: THEME.muted }}>点击添加课程</div>
+                )}
+              </div>
+              <span style={{ fontSize: 12, color: THEME.muted, flexShrink: 0 }}>编辑 ›</span>
+            </motion.div>
+          )
+        })}
       </div>
 
-      <div style={{ marginBottom: 20 }}>
-        <div style={{ fontSize: 12, color: THEME.muted, marginBottom: 6 }}>每行一节课，按时间顺序填写</div>
-        <textarea
-          value={(schedule[activeDay] || []).join('\n')}
-          onChange={e => updateDaySchedule(activeDay, e.target.value)}
-          placeholder={'早餐\n晨间例行程序\n数学\nELA\n…'}
-          rows={8}
-          style={{ width: '100%', padding: '12px 14px', borderRadius: 12, border: '1px solid rgba(0,0,0,0.1)', background: 'rgba(255,255,255,0.65)', fontSize: 13, color: THEME.text, outline: 'none', resize: 'none', fontFamily: 'inherit', lineHeight: 1.8, boxSizing: 'border-box' }}
-        />
-      </div>
+      {/* 弹窗编辑 */}
+      <AnimatePresence>
+        {editDay && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            style={{ position: 'fixed', inset: 0, zIndex: 300, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}
+            onClick={() => setEditDay(null)}>
+            <motion.div initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
+              transition={{ type: 'spring', damping: 28, stiffness: 300 }}
+              onClick={e => e.stopPropagation()}
+              style={{ width: '100%', maxWidth: 560, background: 'rgba(255,255,255,0.97)', borderRadius: '20px 20px 0 0', padding: '20px 16px 40px', maxHeight: '80vh', display: 'flex', flexDirection: 'column' }}>
 
-      <div style={{ fontSize: 12, color: THEME.gold, fontWeight: 700, marginBottom: 10 }}>课外活动 / 补习课</div>
-      {activities.map((act: any, i: number) => (
-        <div key={i} style={{ background: 'rgba(255,255,255,0.6)', borderRadius: 14, padding: '12px', marginBottom: 10, border: '1px solid rgba(0,0,0,0.07)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-            <span style={{ fontSize: 12, color: THEME.muted, fontWeight: 600 }}>活动 {i + 1}</span>
-            <motion.button whileTap={{ scale: 0.85 }} onClick={() => removeActivity(i)}
-              style={{ background: 'none', border: 'none', cursor: 'pointer', color: THEME.muted }}>
-              <X size={14} />
-            </motion.button>
-          </div>
-          <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
-            <input value={act.name} onChange={e => updateActivity(i, 'name', e.target.value)}
-              placeholder="活动名称" style={{ flex: 2, padding: '9px 12px', borderRadius: 10, border: '1px solid rgba(0,0,0,0.1)', background: 'rgba(255,255,255,0.7)', fontSize: 13, outline: 'none', fontFamily: 'inherit', minWidth: 0 }} />
-            <select value={act.type} onChange={e => updateActivity(i, 'type', e.target.value)}
-              style={{ flex: 1, padding: '9px 8px', borderRadius: 10, border: '1px solid rgba(0,0,0,0.1)', background: 'rgba(255,255,255,0.7)', fontSize: 12, outline: 'none', appearance: 'none', fontFamily: 'inherit', minWidth: 0 }}>
-              {ACTIVITY_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
-            </select>
-          </div>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <select value={act.day} onChange={e => updateActivity(i, 'day', e.target.value)}
-              style={{ flex: 1, padding: '9px 8px', borderRadius: 10, border: '1px solid rgba(0,0,0,0.1)', background: 'rgba(255,255,255,0.7)', fontSize: 12, outline: 'none', appearance: 'none', fontFamily: 'inherit', minWidth: 0 }}>
-              {DAYS.map(d => <option key={d.key} value={d.key}>{d.label}</option>)}
-            </select>
-            <input value={act.time} onChange={e => updateActivity(i, 'time', e.target.value)}
-              type="time" style={{ flex: 1, padding: '9px 10px', borderRadius: 10, border: '1px solid rgba(0,0,0,0.1)', background: 'rgba(255,255,255,0.7)', fontSize: 13, outline: 'none', fontFamily: 'inherit', minWidth: 0 }} />
-            <input value={act.location} onChange={e => updateActivity(i, 'location', e.target.value)}
-              placeholder="地点" style={{ flex: 1, padding: '9px 10px', borderRadius: 10, border: '1px solid rgba(0,0,0,0.1)', background: 'rgba(255,255,255,0.7)', fontSize: 13, outline: 'none', fontFamily: 'inherit', minWidth: 0 }} />
-          </div>
-        </div>
-      ))}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                <div style={{ fontSize: 15, fontWeight: 700, color: THEME.navy }}>
+                  {DAYS.find(d => d.key === editDay)?.label} 课程
+                </div>
+                <motion.button whileTap={{ scale: 0.85 }} onClick={() => setEditDay(null)}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: THEME.muted }}>
+                  <X size={18} />
+                </motion.button>
+              </div>
 
-      <motion.button whileTap={{ scale: 0.97 }} onClick={addActivity}
-        style={{ width: '100%', padding: '11px', borderRadius: 12, border: `1.5px dashed rgba(176,141,87,0.4)`, background: 'transparent', color: THEME.gold, fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-        <Plus size={15} /> 添加活动
-      </motion.button>
+              <div style={{ fontSize: 11, color: THEME.muted, marginBottom: 8, lineHeight: 1.6 }}>
+                每行一节课，格式：<span style={{ color: THEME.gold }}>07:50 早餐</span>（时间+空格+课程名）
+              </div>
+
+              <textarea
+                value={editText}
+                onChange={e => setEditText(e.target.value)}
+                placeholder={'07:50 早餐\n08:00 晨间例行程序\n08:15 数学\n09:00 英文\n…'}
+                autoFocus
+                style={{ flex: 1, width: '100%', padding: '12px 14px', borderRadius: 12, border: '1px solid rgba(0,0,0,0.1)', background: 'rgba(245,240,232,0.8)', fontSize: 13, color: THEME.text, outline: 'none', resize: 'none', fontFamily: 'inherit', lineHeight: 2, boxSizing: 'border-box', minHeight: 200 }}
+              />
+
+              <motion.button whileTap={{ scale: 0.97 }} onClick={saveEdit}
+                style={{ width: '100%', marginTop: 12, padding: '13px', borderRadius: 12, border: 'none', background: THEME.navy, color: '#fff', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
+                保存
+              </motion.button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }
@@ -610,9 +628,8 @@ function ChildEditContent() {
     school_start_time: '', school_end_time: '', transport_method: '',
   })
   const [scheduleData, setScheduleData] = useState({
-    class_schedule: {} as Record<string, string[]>,
-    activities: [] as any[],
-  })
+  class_schedule: {} as Record<string, any[]>,
+})
   const [healthData, setHealthData] = useState({
     blood_type: '不知道',
     allergies: ['无'] as string[],
@@ -729,12 +746,7 @@ medications_current: healthData.medications_current,
 }
 
       if (savedChildId) {
-        await supabase.from('child_profiles').upsert({
-  child_id: savedChildId,
-  user_id: uid,
-  class_schedule: scheduleData.class_schedule,
-  activities: scheduleData.activities,
-}, { onConflict: 'child_id' })
+       
         // 联通主屏头像：更新 localStorage
         localStorage.setItem('active_child_id', savedChildId)
         localStorage.setItem('active_child', JSON.stringify({
