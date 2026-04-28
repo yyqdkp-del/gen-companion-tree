@@ -17,7 +17,6 @@ const THEME = {
   border: 'rgba(253,248,243,0.15)',
 }
 
-// ── 愿景选项 ──
 const PERSON_TYPES = [
   { value: 'global_leader', emoji: '🌍', label: '有全球视野的领导者', desc: '在世界舞台上有影响力' },
   { value: 'innovator', emoji: '🔬', label: '改变世界的创新者', desc: 'STEM领域的探索者和建设者' },
@@ -54,7 +53,6 @@ const TARGET_PATHS = [
   { value: 'other', emoji: '🗺️', label: '其他路径', desc: '加拿大 / 澳洲 / 新加坡' },
 ]
 
-// ── 步骤组件 ──
 function StepScreen({ step, total, children }: {
   step: number; total: number; children: React.ReactNode
 }) {
@@ -67,7 +65,6 @@ function StepScreen({ step, total, children }: {
       transition={{ duration: 0.3 }}
       style={{ flex: 1, display: 'flex', flexDirection: 'column' }}
     >
-      {/* 进度点 */}
       <div style={{ display: 'flex', justifyContent: 'center', gap: 6, marginBottom: 32 }}>
         {Array.from({ length: total }).map((_, i) => (
           <div key={i} style={{
@@ -107,16 +104,13 @@ function OptionCard({ selected, onClick, emoji, label, desc }: {
   )
 }
 
-// ── 主页面 ──
 function AcademicContent() {
   const router = useRouter()
   const [loading, setLoading] = useState(true)
   const [hasVision, setHasVision] = useState(false)
   const [childId, setChildId] = useState<string | null>(null)
   const [childName, setChildName] = useState('')
-  const [childGrade, setChildGrade] = useState('')
 
-  // 愿景设定状态
   const [step, setStep] = useState(0)
   const [personType, setPersonType] = useState('')
   const [customVision, setCustomVision] = useState('')
@@ -125,7 +119,6 @@ function AcademicContent() {
   const [targetPath, setTargetPath] = useState('')
   const [saving, setSaving] = useState(false)
 
-  // 主页面状态
   const [vision, setVision] = useState<any>(null)
   const [report, setReport] = useState<any>(null)
   const [generating, setGenerating] = useState(false)
@@ -146,7 +139,6 @@ function AcademicContent() {
       if (storedChild) {
         const c = JSON.parse(storedChild)
         setChildName(c.name || '')
-        setChildGrade(c.grade || '')
       }
     }
 
@@ -155,7 +147,7 @@ function AcademicContent() {
         .from('family_vision')
         .select('*')
         .eq('child_id', stored)
-        .single()
+        .maybeSingle()
 
       if (visionData) {
         setHasVision(true)
@@ -168,7 +160,7 @@ function AcademicContent() {
         .eq('child_id', stored)
         .order('generated_at', { ascending: false })
         .limit(1)
-        .single()
+        .maybeSingle()
 
       if (reportData) setReport(reportData)
     }
@@ -199,7 +191,7 @@ function AcademicContent() {
       .from('family_vision')
       .select('id')
       .eq('child_id', childId)
-      .single()
+      .maybeSingle()
 
     if (existing) {
       await supabase.from('family_vision').update(payload).eq('id', existing.id)
@@ -213,7 +205,7 @@ function AcademicContent() {
     generateReport(payload)
   }
 
-  
+  const generateReport = async (visionData: any) => {
     if (!childId) return
     setGenerating(true)
 
@@ -223,126 +215,44 @@ function AcademicContent() {
     const { data: child } = await supabase.from('children').select('*').eq('id', childId).single()
     const { data: activities } = await supabase.from('child_activities').select('*').eq('child_id', childId)
     const { data: achievements } = await supabase.from('child_achievements').select('*').eq('child_id', childId)
-    const { data: assessment } = await supabase.from('assessments').select('report').eq('child_id', childId).order('created_at', { ascending: false }).limit(1).single()
+    const { data: assessment } = await supabase.from('assessments').select('report').eq('child_id', childId).order('created_at', { ascending: false }).limit(1).maybeSingle()
 
-    const prompt = `你是一位顶尖的国际升学规划专家，有20年帮助海外华人家庭孩子申请美高、英国独立学校和欧美T50大学的经验。
+    try {
+      const resp = await fetch('/api/children/pathway', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          child,
+          activities: activities || [],
+          achievements: achievements || [],
+          assessment: assessment?.report || null,
+          vision: visionData,
+        }),
+      })
 
-请根据以下信息，为这个孩子生成一份完整的升学规划报告。
+      const result = await resp.json()
+      if (result.error) throw new Error(result.error)
 
-【孩子基本信息】
-姓名：${child?.name}
-年级：${child?.grade || '未知'}
-学校：${child?.school_name || child?.school || '国际学校'}
-语言：${(child?.languages || []).join('、') || '未知'}
-当前所在地：清迈，泰国
+      const reportData = result.report
 
-【妈妈的愿景】
-期待孩子成为：${visionData.vision_statement}
-目标路径：${visionData.target_school_type}
-核心期待：${(visionData.priorities || []).join('、')}
-主要担忧：${(visionData.concerns || []).join('、')}
+      await supabase.from('pathway_reports').insert({
+        child_id: childId,
+        user_id: uid,
+        profile_scores: reportData.profile_scores,
+        narrative: reportData.narrative,
+        gaps: reportData.gaps,
+        roadmap: reportData.roadmap,
+        this_semester: reportData.this_semester,
+      })
 
-【现有课外活动】
-${activities?.length ? activities.map((a: any) => `- ${a.name}（${a.category}，每周${a.days?.join('/')}，已参与${Math.round((Date.now() - new Date(a.created_at).getTime()) / (1000 * 60 * 60 * 24 * 30))}个月）`).join('\n') : '暂无课外活动记录'}
+      setReport(reportData)
 
-【荣誉奖项】
-${achievements?.length ? achievements.map((a: any) => `- ${a.title}（${a.level}级别，${a.date}）`).join('\n') : '暂无记录'}
-
-【中文水平】
-${assessment?.report ? JSON.stringify(assessment.report) : '暂无测评记录'}
-
-请用JSON格式返回，直接{开头}结尾，不加任何其他文字：
-
-{
-  "profile_scores": {
-    "academic": 数字0-100,
-    "spike_depth": 数字0-100,
-    "leadership": 数字0-100,
-    "language": 数字0-100,
-    "community": 数字0-100,
-    "diversity": 数字0-100
-  },
-  "profile_summary": "一句话总结孩子现在的画像（20字以内）",
-  "narrative": "基于现有信息，这个孩子的申请故事主线是什么（3-5句话，要感性有力）",
-  "strengths": ["优势1", "优势2", "优势3"],
-  "gaps": ["缺口1（加具体说明）", "缺口2", "缺口3"],
-  "risks": ["风险1（加时间节点）", "风险2"],
-  "roadmap": [
-    {
-      "period": "时间段（如：现在-G1）",
-      "priority": "high/medium/low",
-      "actions": [
-        {
-          "action": "具体行动",
-          "reason": "为什么重要（一句话）",
-          "resource": "清迈可用的具体资源（机构名+地点）",
-          "tier": 数字1-4
-        }
-      ]
+    } catch (e) {
+      console.error('生成报告失败', e)
     }
-  ],
-  "this_semester": [
-    {
-      "action": "本学期最重要的事（具体可执行）",
-      "why": "申请价值说明",
-      "urgency": "high/medium"
-    }
-  ],
-  "key_deadlines": [
-    {
-      "event": "重要节点",
-      "date": "时间",
-      "note": "备注"
-    }
-  ]
-}`
-
-    const generateReport = async (visionData: any) => {
-  if (!childId) return
-  setGenerating(true)
-
-  const { data: { session } } = await supabase.auth.getSession()
-  const uid = session?.user?.id
-
-  const { data: child } = await supabase.from('children').select('*').eq('id', childId).single()
-  const { data: activities } = await supabase.from('child_activities').select('*').eq('child_id', childId)
-  const { data: achievements } = await supabase.from('child_achievements').select('*').eq('child_id', childId)
-  const { data: assessment } = await supabase.from('assessments').select('report').eq('child_id', childId).order('created_at', { ascending: false }).limit(1).maybeSingle()
-
-    const resp = await fetch('/api/children/pathway', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        child,
-        activities: activities || [],
-        achievements: achievements || [],
-        assessment: assessment?.report || null,
-        vision: visionData,
-      }),
-    })
-
-    const result = await resp.json()
-    if (result.error) throw new Error(result.error)
-
-    const reportData = result.report
-
-    await supabase.from('pathway_reports').insert({
-      child_id: childId,
-      user_id: uid,
-      profile_scores: reportData.profile_scores,
-      narrative: reportData.narrative,
-      gaps: reportData.gaps,
-      roadmap: reportData.roadmap,
-      this_semester: reportData.this_semester,
-    })
-
-    setReport(reportData)
-
-  } catch (e) {
-    console.error('生成报告失败', e)
+    setGenerating(false)
   }
-  setGenerating(false)
-}
+
   if (loading) return (
     <div style={{ minHeight: '100dvh', background: THEME.bg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       <motion.div animate={{ opacity: [0.4, 1, 0.4] }} transition={{ duration: 1.5, repeat: Infinity }}
@@ -350,7 +260,6 @@ ${assessment?.report ? JSON.stringify(assessment.report) : '暂无测评记录'}
     </div>
   )
 
-  // ── 愿景设定引导流程 ──
   if (!hasVision) {
     const TOTAL_STEPS = 5
     const canNext = () => {
@@ -368,7 +277,6 @@ ${assessment?.report ? JSON.stringify(assessment.report) : '暂无测评记录'}
 
           <AnimatePresence mode="wait">
 
-            {/* Step 0：欢迎 */}
             {step === 0 && (
               <StepScreen step={0} total={TOTAL_STEPS}>
                 <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center' }}>
@@ -393,7 +301,6 @@ ${assessment?.report ? JSON.stringify(assessment.report) : '暂无测评记录'}
               </StepScreen>
             )}
 
-            {/* Step 1：孩子要成为什么样的人 */}
             {step === 1 && (
               <StepScreen step={1} total={TOTAL_STEPS}>
                 <h2 style={{ fontSize: 20, fontWeight: 700, color: THEME.text, marginBottom: 8 }}>
@@ -423,7 +330,6 @@ ${assessment?.report ? JSON.stringify(assessment.report) : '暂无测评记录'}
               </StepScreen>
             )}
 
-            {/* Step 2：核心期待 */}
             {step === 2 && (
               <StepScreen step={2} total={TOTAL_STEPS}>
                 <h2 style={{ fontSize: 20, fontWeight: 700, color: THEME.text, marginBottom: 8 }}>
@@ -443,7 +349,6 @@ ${assessment?.report ? JSON.stringify(assessment.report) : '暂无测评记录'}
               </StepScreen>
             )}
 
-            {/* Step 3：主要担忧 */}
             {step === 3 && (
               <StepScreen step={3} total={TOTAL_STEPS}>
                 <h2 style={{ fontSize: 20, fontWeight: 700, color: THEME.text, marginBottom: 8 }}>
@@ -463,7 +368,6 @@ ${assessment?.report ? JSON.stringify(assessment.report) : '暂无测评记录'}
               </StepScreen>
             )}
 
-            {/* Step 4：目标路径 */}
             {step === 4 && (
               <StepScreen step={4} total={TOTAL_STEPS}>
                 <h2 style={{ fontSize: 20, fontWeight: 700, color: THEME.text, marginBottom: 8 }}>
@@ -482,7 +386,6 @@ ${assessment?.report ? JSON.stringify(assessment.report) : '暂无测评记录'}
 
           </AnimatePresence>
 
-          {/* 底部按钮 */}
           <div style={{ display: 'flex', gap: 12, marginTop: 24, paddingTop: 16, borderTop: `1px solid ${THEME.border}` }}>
             {step > 0 && (
               <motion.button whileTap={{ scale: 0.97 }} onClick={() => setStep(step - 1)}
@@ -512,7 +415,6 @@ ${assessment?.report ? JSON.stringify(assessment.report) : '暂无测评记录'}
     )
   }
 
-  // ── 主页面（有愿景后显示） ──
   const TABS = [
     { key: 'roadmap', label: '升学路径' },
     { key: 'profile', label: '成长画像' },
@@ -526,7 +428,6 @@ ${assessment?.report ? JSON.stringify(assessment.report) : '暂无测评记录'}
   return (
     <main style={{ minHeight: '100dvh', background: THEME.bg, fontFamily: "'Noto Sans SC', sans-serif", paddingBottom: 80 }}>
 
-      {/* 顶部 */}
       <div style={{ position: 'sticky', top: 0, zIndex: 50, background: 'rgba(26,60,94,0.9)', backdropFilter: 'blur(20px)', padding: '14px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: `1px solid ${THEME.border}` }}>
         <motion.button whileTap={{ scale: 0.9 }} onClick={() => router.back()}
           style={{ background: 'none', border: 'none', cursor: 'pointer', color: THEME.text, padding: 4 }}>
@@ -544,9 +445,8 @@ ${assessment?.report ? JSON.stringify(assessment.report) : '暂无测评记录'}
 
       <div style={{ maxWidth: 560, margin: '0 auto', padding: '16px 14px' }}>
 
-        {/* 愿景摘要卡片 */}
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
-          style={{ background: 'rgba(240,192,64,0.12)', borderRadius: 20, padding: '18px 18px', marginBottom: 20, border: `1px solid rgba(240,192,64,0.3)` }}>
+          style={{ background: 'rgba(240,192,64,0.12)', borderRadius: 20, padding: '18px', marginBottom: 20, border: `1px solid rgba(240,192,64,0.3)` }}>
           <div style={{ fontSize: 11, color: 'rgba(240,192,64,0.7)', fontWeight: 700, letterSpacing: '0.1em', marginBottom: 8 }}>妈妈的愿景</div>
           <div style={{ fontSize: 16, fontWeight: 700, color: THEME.gold, marginBottom: 6, lineHeight: 1.4 }}>
             {personTypeLabel}
@@ -564,7 +464,6 @@ ${assessment?.report ? JSON.stringify(assessment.report) : '暂无测评记录'}
           )}
         </motion.div>
 
-        {/* Tab 导航 */}
         <div style={{ display: 'flex', gap: 6, marginBottom: 20, overflowX: 'auto', scrollbarWidth: 'none' }}>
           {TABS.map(tab => (
             <motion.button key={tab.key} whileTap={{ scale: 0.95 }}
@@ -575,10 +474,8 @@ ${assessment?.report ? JSON.stringify(assessment.report) : '暂无测评记录'}
           ))}
         </div>
 
-        {/* Tab 内容 */}
         <AnimatePresence mode="wait">
 
-          {/* 升学路径 Tab */}
           {activeTab === 'roadmap' && (
             <motion.div key="roadmap" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
               {!report ? (
@@ -599,7 +496,6 @@ ${assessment?.report ? JSON.stringify(assessment.report) : '暂无测评记录'}
                 </div>
               ) : (
                 <div>
-                  {/* 叙事 */}
                   {report.narrative && (
                     <div style={{ background: THEME.card, borderRadius: 16, padding: '16px', marginBottom: 16, border: `1px solid ${THEME.border}`, borderLeft: `3px solid ${THEME.gold}` }}>
                       <div style={{ fontSize: 11, color: THEME.gold, fontWeight: 700, marginBottom: 8, letterSpacing: '0.1em' }}>申请故事主线</div>
@@ -607,7 +503,6 @@ ${assessment?.report ? JSON.stringify(assessment.report) : '暂无测评记录'}
                     </div>
                   )}
 
-                  {/* 缺口和风险 */}
                   {(report.gaps?.length > 0 || report.risks?.length > 0) && (
                     <div style={{ background: THEME.card, borderRadius: 16, padding: '16px', marginBottom: 16, border: `1px solid ${THEME.border}` }}>
                       <div style={{ fontSize: 11, color: '#FB7185', fontWeight: 700, marginBottom: 10, letterSpacing: '0.1em' }}>需要关注</div>
@@ -624,7 +519,6 @@ ${assessment?.report ? JSON.stringify(assessment.report) : '暂无测评记录'}
                     </div>
                   )}
 
-                  {/* 路线图 */}
                   {report.roadmap?.map((period: any, i: number) => (
                     <div key={i} style={{ marginBottom: 16 }}>
                       <div style={{ fontSize: 12, fontWeight: 700, color: THEME.gold, marginBottom: 10, display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -652,7 +546,6 @@ ${assessment?.report ? JSON.stringify(assessment.report) : '暂无测评记录'}
                     </div>
                   ))}
 
-                  {/* 重新生成按钮 */}
                   <motion.button whileTap={{ scale: 0.97 }} onClick={() => generateReport(vision)}
                     disabled={generating}
                     style={{ width: '100%', padding: '12px', borderRadius: 14, border: `1px solid ${THEME.border}`, background: 'transparent', color: THEME.muted, fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 8 }}>
@@ -664,19 +557,16 @@ ${assessment?.report ? JSON.stringify(assessment.report) : '暂无测评记录'}
             </motion.div>
           )}
 
-          {/* 成长画像 Tab */}
           {activeTab === 'profile' && (
             <motion.div key="profile" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
               {report?.profile_scores ? (
                 <div>
-                  <div style={{ fontSize: 13, color: THEME.muted, marginBottom: 4 }}>
-                    {report.profile_summary}
-                  </div>
-                  {Object.entries({
+                  <div style={{ fontSize: 13, color: THEME.muted, marginBottom: 16 }}>{report.profile_summary}</div>
+                  {(Object.entries({
                     academic: '学术能力', spike_depth: '特长深度',
                     leadership: '领导力', language: '语言能力',
                     community: '社区贡献', diversity: '多元性',
-                  }).map(([key, label]) => {
+                  }) as [string, string][]).map(([key, label]) => {
                     const score = report.profile_scores[key] || 0
                     return (
                       <div key={key} style={{ marginBottom: 16 }}>
@@ -704,7 +594,6 @@ ${assessment?.report ? JSON.stringify(assessment.report) : '暂无测评记录'}
             </motion.div>
           )}
 
-          {/* 本学期 Tab */}
           {activeTab === 'actions' && (
             <motion.div key="actions" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
               {report?.this_semester?.length > 0 ? (
@@ -732,15 +621,14 @@ ${assessment?.report ? JSON.stringify(assessment.report) : '暂无测评记录'}
             </motion.div>
           )}
 
-          {/* 档案记录 Tab */}
           {activeTab === 'records' && (
             <motion.div key="records" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                 {[
-                  { icon: '🏆', label: '荣誉奖项', desc: '比赛 / 考级 / 竞赛', path: `/growth/academic/achievements` },
-                  { icon: '📊', label: '学术记录', desc: '成绩 / 考试 / 语言', path: `/growth/academic/records` },
+                  { icon: '🏆', label: '荣誉奖项', desc: '比赛 / 考级 / 竞赛', path: '/growth/academic/achievements' },
+                  { icon: '📊', label: '学术记录', desc: '成绩 / 考试 / 语言', path: '/growth/academic/records' },
                   { icon: '🎯', label: '课外活动', desc: '兴趣班 / 补习课管理', path: childId ? `/children/${childId}/activities` : '/children' },
-                  { icon: '📝', label: '素材库', desc: '文书碎片 / 故事积累', path: `/growth/academic/essays` },
+                  { icon: '📝', label: '素材库', desc: '文书碎片 / 故事积累', path: '/growth/academic/essays' },
                 ].map(item => (
                   <motion.div key={item.label} whileTap={{ scale: 0.97 }}
                     onClick={() => router.push(item.path)}
