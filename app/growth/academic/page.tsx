@@ -127,7 +127,24 @@ function AcademicContent() {
   useEffect(() => {
     loadData()
   }, [])
+  useEffect(() => {
+  if (!childId) return
 
+  const channel = supabase
+    .channel('pathway_reports')
+    .on('postgres_changes', {
+      event: 'INSERT',
+      schema: 'public',
+      table: 'pathway_reports',
+      filter: `child_id=eq.${childId}`,
+    }, (payload) => {
+      setReport(payload.new)
+      setGenerating(false)
+    })
+    .subscribe()
+
+  return () => { supabase.removeChannel(channel) }
+}, [childId])Sonnet 4.6
   const loadData = async () => {
     const { data: { session } } = await supabase.auth.getSession()
     if (!session?.user?.id) { router.push('/auth'); return }
@@ -205,30 +222,34 @@ function AcademicContent() {
     generateReport(payload)
   }
 
-  const generateReport = async (visionData: any) => {
-    if (!childId) return
-    setGenerating(true)
+ const generateReport = async (visionData: any) => {
+  if (!childId) return
+  setGenerating(true)
 
-    const { data: { session } } = await supabase.auth.getSession()
-    const uid = session?.user?.id
+  const { data: { session } } = await supabase.auth.getSession()
+  const uid = session?.user?.id
 
-    const { data: child } = await supabase.from('children').select('*').eq('id', childId).single()
-    const { data: activities } = await supabase.from('child_activities').select('*').eq('child_id', childId)
-    const { data: achievements } = await supabase.from('child_achievements').select('*').eq('child_id', childId)
-    const { data: assessment } = await supabase.from('assessments').select('report').eq('child_id', childId).order('created_at', { ascending: false }).limit(1).maybeSingle()
+  const { data: child } = await supabase.from('children').select('*').eq('id', childId).single()
+  const { data: activities } = await supabase.from('child_activities').select('*').eq('child_id', childId)
+  const { data: achievements } = await supabase.from('child_achievements').select('*').eq('child_id', childId)
+  const { data: assessment } = await supabase.from('assessments').select('report').eq('child_id', childId).order('created_at', { ascending: false }).limit(1).maybeSingle()
 
-    try {
-      const resp = await fetch('/api/children/pathway', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          child,
-          activities: activities || [],
-          achievements: achievements || [],
-          assessment: assessment?.report || null,
-          vision: visionData,
-        }),
-      })
+  await fetch('/api/children/pathway', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      child,
+      activities: activities || [],
+      achievements: achievements || [],
+      assessment: assessment?.report || null,
+      vision: visionData,
+      childId,
+      uid,
+    }),
+  })
+
+  // 不等待结果，监听 realtime
+}
 
       const result = await resp.json()
       if (result.error) throw new Error(result.error)
@@ -482,14 +503,14 @@ function AcademicContent() {
                 <div style={{ textAlign: 'center', padding: '40px 20px' }}>
                   {generating ? (
                     <motion.div animate={{ opacity: [0.4, 1, 0.4] }} transition={{ duration: 1.5, repeat: Infinity }}
-                      style={{ fontSize: 14, color: THEME.muted }}>AI正在生成你的专属规划…</motion.div>
+                      style={{ fontSize: 14, color: THEME.muted }}>根正在撰写您的专属规划…</motion.div>
                   ) : (
                     <>
                       <div style={{ fontSize: 48, marginBottom: 16 }}>🗺️</div>
-                      <div style={{ fontSize: 14, color: THEME.muted, marginBottom: 20 }}>点击生成专属升学路线图</div>
+                      <div style={{ fontSize: 14, color: THEME.muted, marginBottom: 20 }}>点击撰写专属升学路线图</div>
                       <motion.button whileTap={{ scale: 0.97 }} onClick={() => generateReport(vision)}
                         style={{ padding: '12px 28px', borderRadius: 20, background: THEME.gold, color: '#1A3C5E', border: 'none', fontSize: 14, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, margin: '0 auto' }}>
-                        <Sparkles size={16} /> 生成规划
+                        <Sparkles size={16} /> 撰写规划
                       </motion.button>
                     </>
                   )}
@@ -550,7 +571,7 @@ function AcademicContent() {
                     disabled={generating}
                     style={{ width: '100%', padding: '12px', borderRadius: 14, border: `1px solid ${THEME.border}`, background: 'transparent', color: THEME.muted, fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 8 }}>
                     {generating ? <Loader size={14} /> : <Sparkles size={14} />}
-                    {generating ? '重新分析中…' : '重新生成规划'}
+                    {generating ? '重新分析中…' : '重新撰写规划'}
                   </motion.button>
                 </div>
               )}
