@@ -144,7 +144,7 @@ function AcademicContent() {
     .subscribe()
 
   return () => { supabase.removeChannel(channel) }
-}, [childId])Sonnet 4.6
+}, [childId])
   const loadData = async () => {
     const { data: { session } } = await supabase.auth.getSession()
     if (!session?.user?.id) { router.push('/auth'); return }
