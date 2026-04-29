@@ -8,6 +8,7 @@ import {
   User, FileText, MapPin, Shield, Loader, Save,
 } from 'lucide-react'
 
+import { createClient } from '@/lib/supabase/client'
 const supabase = createClient()
 
 const THEME = {
