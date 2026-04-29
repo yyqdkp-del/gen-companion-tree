@@ -8,9 +8,7 @@ import {
   User, FileText, MapPin, Shield, Loader, Save,
 } from 'lucide-react'
 
-import { createClient } from '@/lib/supabase/client'
 const supabase = createClient()
-
 const THEME = {
   bg: 'linear-gradient(180deg, #A7D7D9 0%, #D9A7B4 100%)',
   text: '#2C3E50',
