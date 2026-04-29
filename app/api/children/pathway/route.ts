@@ -3,12 +3,20 @@ export const maxDuration = 60
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-async function generateAndSave(body: any) {
-  const { child, activities, achievements, assessment, vision, childId, uid } = body
+
+async function generateAndSave(body: any, authHeader: string) {
+  const { child, activities, achievements, assessment, vision, childId } = body
+
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   )
+
+  // ✅ 安全：从 token 解析 uid，不信任客户端传来的值
+  const token = authHeader.replace('Bearer ', '')
+  const { data: { user } } = await supabase.auth.getUser(token)
+  const uid = user?.id
+  if (!uid) return
 
   const prompt = `你是一位顶尖的国际升学规划专家，有20年帮助海外华人家庭孩子申请美高、英国独立学校和欧美T50大学的经验。
 
@@ -120,12 +128,14 @@ ${assessment ? JSON.stringify(assessment) : '暂无测评记录'}
 
 export async function POST(req: NextRequest) {
   const body = await req.json()
+  const authHeader = req.headers.get('authorization') || ''
+
   if (!body.child || !body.vision) {
     return NextResponse.json({ error: '缺少必要数据' }, { status: 400 })
   }
 
   // 立即返回，后台继续处理
-  generateAndSave(body).catch(console.error)
+  generateAndSave(body, authHeader).catch(console.error)
 
   return NextResponse.json({ status: 'processing' })
 }
