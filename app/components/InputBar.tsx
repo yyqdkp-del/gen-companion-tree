@@ -7,7 +7,6 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { Home as HomeIcon, Mic, Camera, Send, Square, Loader, Upload } from 'lucide-react'
 import { useApp } from '@/app/context/AppContext'
 import SettingsButton from '@/app/components/SettingsButton'
-)
 
 const THEME = {
   text: '#2C3E50',

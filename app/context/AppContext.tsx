@@ -4,7 +4,6 @@ const supabase = createClient()
 import { createContext, useContext, useState, useEffect, useRef, useCallback, ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 
-)
 
 type AppContextType = {
   userId: string

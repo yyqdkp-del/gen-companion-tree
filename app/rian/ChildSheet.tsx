@@ -8,7 +8,6 @@ import VoiceBtn from '@/app/components/VoiceBtn'
 import PackCheckItem from '@/app/components/PackCheckItem'
 import ChildActionSheet, { ChildEvent } from '@/app/rian/ChildActionSheet'
 
-)
 
 const THEME = { text: '#2C3E50', gold: '#B08D57', muted: '#6B8BAA', navy: '#1A3C5E' }
 const G = { bg: '#E1F5EE', border: '#9FE1CB', mid: '#5DCAA5', deep: '#1D9E75', dark: '#0F6E56' }

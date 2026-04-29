@@ -17,7 +17,6 @@ import HotspotSheet from '@/app/rian/HotspotSheet'
 import { useApp } from '@/app/context/AppContext'
 import TodoSheet from '@/app/rian/TodoSheet'
 
-)
 
 const THEME = {
   bg: 'linear-gradient(180deg, #A7D7D9 0%, #D9A7B4 100%)',

@@ -13,7 +13,6 @@ import nextDynamic from 'next/dynamic'
 const TodoDetailModal = nextDynamic(() => import('./TodoDetailModal'), { ssr: false })
 export const dynamic = 'force-dynamic'
 import { useApp } from '@/app/context/AppContext'
-)
   const THEME = {
   bg: 'linear-gradient(180deg, #A7D7D9 0%, #D9A7B4 100%)',
   text: '#2C3E50',
