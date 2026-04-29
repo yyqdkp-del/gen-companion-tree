@@ -12,11 +12,10 @@ async function generateAndSave(body: any, authHeader: string) {
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   )
 
-  // ✅ 安全：从 token 解析 uid，不信任客户端传来的值
+  // 从 token 解析 uid，失败则 uid 为 null，不阻断生成流程
   const token = authHeader.replace('Bearer ', '')
   const { data: { user } } = await supabase.auth.getUser(token)
-  const uid = user?.id
-  if (!uid) return
+  const uid = user?.id || null
 
   const prompt = `你是一位顶尖的国际升学规划专家，有20年帮助海外华人家庭孩子申请美高、英国独立学校和欧美T50大学的经验。
 
@@ -134,7 +133,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: '缺少必要数据' }, { status: 400 })
   }
 
-  // 立即返回，后台继续处理
   generateAndSave(body, authHeader).catch(console.error)
 
   return NextResponse.json({ status: 'processing' })
