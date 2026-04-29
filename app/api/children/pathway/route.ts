@@ -4,6 +4,7 @@ export const maxDuration = 60
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
+  console.log("generateAndSave started", { childId: body?.childId, hasChild: !!body?.child, hasVision: !!body?.vision, authHeader: authHeader?.slice(0,20) })
 async function generateAndSave(body: any, authHeader: string) {
   const { child, activities, achievements, assessment, vision, childId } = body
 
@@ -16,7 +17,9 @@ async function generateAndSave(body: any, authHeader: string) {
   const token = authHeader.replace('Bearer ', '')
   const { data: { user } } = await supabase.auth.getUser(token)
   const uid = user?.id || null
+  console.log("auth result", { uid, tokenLength: token?.length })
 
+  console.log("about to call Anthropic", { childName: child?.name, visionStatement: vision?.vision_statement })
   const prompt = `你是一位顶尖的国际升学规划专家，有20年帮助海外华人家庭孩子申请美高、英国独立学校和欧美T50大学的经验。
 
 请根据以下信息，为这个孩子生成一份完整的升学规划报告。
