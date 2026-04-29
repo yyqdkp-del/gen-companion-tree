@@ -1,14 +1,12 @@
 'use client'
+import { createClient } from '@/lib/supabase/client'
+const supabase = createClient()
 import React, { useState, useRef, useCallback } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Home as HomeIcon, Mic, Camera, Send, Square, Loader, Upload } from 'lucide-react'
-import { createBrowserClient } from '@supabase/ssr'
 import { useApp } from '@/app/context/AppContext'
 import SettingsButton from '@/app/components/SettingsButton'
-  const supabase = createBrowserClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
 )
 
 const THEME = {

@@ -2,15 +2,13 @@
 
 import React, { useEffect, useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { createClient } from '@supabase/supabase-js'
+import { createClient } from '@/lib/supabase/client'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Play, Share2, Home as HomeIcon, Sprout } from 'lucide-react'
 
 export const dynamic = 'force-dynamic'
 
 const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
 )
 
 const CATEGORY = {

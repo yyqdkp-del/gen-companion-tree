@@ -1,15 +1,13 @@
 'use client'
+import { createClient } from '@/lib/supabase/client'
+const supabase = createClient()
 import React, { useState, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, Plus, ChevronDown, ChevronRight } from 'lucide-react'
-import { createBrowserClient } from '@supabase/ssr'
 import VoiceBtn from '@/app/components/VoiceBtn'
 import PackCheckItem from '@/app/components/PackCheckItem'
 import ChildActionSheet, { ChildEvent } from '@/app/rian/ChildActionSheet'
 
-const supabase = createBrowserClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
 )
 
 const THEME = { text: '#2C3E50', gold: '#B08D57', muted: '#6B8BAA', navy: '#1A3C5E' }

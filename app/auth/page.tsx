@@ -1,12 +1,10 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
-import { createClient } from '@supabase/supabase-js'
+import { createClient } from '@/lib/supabase/client'
 import { motion, AnimatePresence } from 'framer-motion'
 
 const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
 )
 
 const LINE_CLIENT_ID = process.env.NEXT_PUBLIC_LINE_CLIENT_ID || '2009745649'

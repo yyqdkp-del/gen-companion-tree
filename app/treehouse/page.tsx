@@ -2,14 +2,12 @@
 
 import React, { useEffect, useState, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { createClient } from '@supabase/supabase-js'
+import { createClient } from '@/lib/supabase/client'
 import { motion, AnimatePresence } from 'framer-motion'
 
 export const dynamic = 'force-dynamic'
 
 const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
 )
 
 // ── 深夜色系 ──

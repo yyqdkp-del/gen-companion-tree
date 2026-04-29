@@ -1,4 +1,6 @@
 'use client'
+import { createClient } from '@/lib/supabase/client'
+const supabase = createClient()
 import InstallPWA from '@/app/components/InstallPWA'
 import React, { useEffect, useState, useRef, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -12,13 +14,9 @@ export const dynamic = 'force-dynamic'
 import TodoDetailModal from '@/app/rian/TodoDetailModal'
 import ChildSheet from '@/app/rian/ChildSheet'
 import HotspotSheet from '@/app/rian/HotspotSheet'
-import { createBrowserClient } from '@supabase/ssr'
 import { useApp } from '@/app/context/AppContext'
 import TodoSheet from '@/app/rian/TodoSheet'
 
-const supabase = createBrowserClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
 )
 
 const THEME = {

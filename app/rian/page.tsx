@@ -1,4 +1,6 @@
 'use client'
+import { createClient } from '@/lib/supabase/client'
+const supabase = createClient()
 import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -10,11 +12,7 @@ import {
 import nextDynamic from 'next/dynamic'
 const TodoDetailModal = nextDynamic(() => import('./TodoDetailModal'), { ssr: false })
 export const dynamic = 'force-dynamic'
-import { createBrowserClient } from '@supabase/ssr'
 import { useApp } from '@/app/context/AppContext'
-const supabase = createBrowserClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
 )
   const THEME = {
   bg: 'linear-gradient(180deg, #A7D7D9 0%, #D9A7B4 100%)',
