@@ -1,18 +1,14 @@
 'use client'
-import { useState, useEffect, useRef, Suspense } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
-  ArrowLeft, ArrowRight, Check, Loader, ChevronRight,
-  Sparkles, Plus, X, Trophy, BookOpen, Target, FileText,
-  TrendingUp, AlertTriangle, Clock, Star, GraduationCap,
-  Activity, Heart, Globe
+  ArrowLeft, ArrowRight, Check, Loader, ChevronRight, Sparkles,
 } from 'lucide-react'
 
 const supabase = createClient()
 
-// ── 美学主题：深色学院风 × 清迈自然 ──
 const T = {
   bg: '#0F1A14',
   bgCard: 'rgba(255,255,255,0.04)',
@@ -30,30 +26,29 @@ const T = {
   navy: '#1A3C5E',
 }
 
-// ── 全球顶尖院校数据库 ──
 const SCHOOL_DB = {
   us_boarding: [
-    { name: 'Phillips Exeter Academy', country: '🇺🇸', type: '美高', acceptance: '14%', ssat: '90%+', deadline: '1月15日', note: 'Harkness教学法，Ivy接受率30%' },
-    { name: 'Phillips Andover', country: '🇺🇸', type: '美高', acceptance: '13%', ssat: '89%+', deadline: '1月15日', note: '全美最大捐赠基金之一' },
-    { name: 'Choate Rosemary Hall', country: '🇺🇸', type: '美高', acceptance: '16%', ssat: '85%+', deadline: '1月15日', note: 'JFK母校，国际生友好' },
-    { name: 'Taft School', country: '🇺🇸', type: '美高', acceptance: '22%', ssat: '87%', deadline: '1月15日', note: '录取中位SSAT 87百分位' },
-    { name: 'Hotchkiss School', country: '🇺🇸', type: '美高', acceptance: '18%', ssat: '86%+', deadline: '1月15日', note: '艺术项目顶尖' },
-    { name: 'Deerfield Academy', country: '🇺🇸', type: '美高', acceptance: '20%', ssat: '85%+', deadline: '1月15日', note: '体育奖学金丰厚' },
+    { name: 'Phillips Exeter Academy', country: '🇺🇸', acceptance: '14%', ssat: '90%+', deadline: '1月15日', note: 'Harkness教学法，Ivy接受率30%' },
+    { name: 'Phillips Andover', country: '🇺🇸', acceptance: '13%', ssat: '89%+', deadline: '1月15日', note: '全美最大捐赠基金之一' },
+    { name: 'Choate Rosemary Hall', country: '🇺🇸', acceptance: '16%', ssat: '85%+', deadline: '1月15日', note: 'JFK母校，国际生友好' },
+    { name: 'Taft School', country: '🇺🇸', acceptance: '22%', ssat: '87%', deadline: '1月15日', note: '录取中位SSAT 87百分位' },
+    { name: 'Hotchkiss School', country: '🇺🇸', acceptance: '18%', ssat: '86%+', deadline: '1月15日', note: '艺术项目顶尖' },
+    { name: 'Deerfield Academy', country: '🇺🇸', acceptance: '20%', ssat: '85%+', deadline: '1月15日', note: '体育奖学金丰厚' },
   ],
   uk_boarding: [
-    { name: 'Eton College', country: '🇬🇧', type: '英高', acceptance: '竞争激烈', fee: '£63,300/年', deadline: 'Year5前注册', note: '20位英国首相，需提前4-5年注册' },
-    { name: 'Winchester College', country: '🇬🇧', type: '英高', acceptance: '竞争激烈', fee: '£60,000/年', deadline: 'Year5前注册', note: '学术顶尖，A*/A 86.95%' },
-    { name: 'Harrow School', country: '🇬🇧', type: '英高', acceptance: '竞争激烈', fee: '£62,000/年', deadline: '提前2年', note: '丘吉尔母校，体育艺术均强' },
-    { name: 'Brighton College', country: '🇬🇧', type: '英高', acceptance: '选拔制', fee: '~£55,000/年', deadline: '提前1-2年', note: 'Sunday Times年度学校，A-Level 99.3% A*-B' },
-    { name: 'Wycombe Abbey', country: '🇬🇧', type: '英高(女)', acceptance: '选拔制', fee: '£55,350/年', deadline: '提前2年', note: '英国顶尖女校，GCSE 97.60% A*/A' },
+    { name: 'Eton College', country: '🇬🇧', fee: '£63,300/年', deadline: 'Year5前注册', note: '20位英国首相，需提前4-5年注册' },
+    { name: 'Winchester College', country: '🇬🇧', fee: '£60,000/年', deadline: 'Year5前注册', note: '学术顶尖，A*/A 86.95%' },
+    { name: 'Harrow School', country: '🇬🇧', fee: '£62,000/年', deadline: '提前2年', note: '丘吉尔母校，体育艺术均强' },
+    { name: 'Brighton College', country: '🇬🇧', fee: '~£55,000/年', deadline: '提前1-2年', note: 'Sunday Times年度学校，A-Level 99.3% A*-B' },
+    { name: 'Wycombe Abbey', country: '🇬🇧', fee: '£55,350/年', deadline: '提前2年', note: '英国顶尖女校，GCSE 97.60% A*/A' },
   ],
   us_university: [
-    { name: 'MIT', country: '🇺🇸', type: '美本', acceptance: '3.9%', sat: '1570+', deadline: '11月1日 EA', note: 'STEM绝对顶尖，需竞赛级别课外' },
-    { name: 'Stanford', country: '🇺🇸', type: '美本', acceptance: '3.7%', sat: '1570+', deadline: '11月1日 REA', note: '最难进，Spike模式' },
-    { name: 'Harvard', country: '🇺🇸', type: '美本', acceptance: '3.6%', sat: '1580+', deadline: '11月1日 REA', note: '综合全面型，领导力权重极高' },
-    { name: 'Yale', country: '🇺🇸', type: '美本', acceptance: '4.6%', sat: '1560+', deadline: '11月1日 REA', note: '艺术人文顶尖，戏剧音乐强' },
-    { name: 'Princeton', country: '🇺🇸', type: '美本', acceptance: '4.7%', sat: '1570+', deadline: '11月1日 REA', note: '数学物理传统强校' },
-    { name: 'Columbia', country: '🇺🇸', type: '美本', acceptance: '3.9%', sat: '1550+', deadline: '11月1日 ED', note: '纽约，通识教育著名' },
+    { name: 'MIT', country: '🇺🇸', acceptance: '3.9%', sat: '1570+', deadline: '11月1日 EA', note: 'STEM绝对顶尖，需竞赛级别课外' },
+    { name: 'Stanford', country: '🇺🇸', acceptance: '3.7%', sat: '1570+', deadline: '11月1日 REA', note: '最难进，Spike模式' },
+    { name: 'Harvard', country: '🇺🇸', acceptance: '3.6%', sat: '1580+', deadline: '11月1日 REA', note: '综合全面型，领导力权重极高' },
+    { name: 'Yale', country: '🇺🇸', acceptance: '4.6%', sat: '1560+', deadline: '11月1日 REA', note: '艺术人文顶尖，戏剧音乐强' },
+    { name: 'Princeton', country: '🇺🇸', acceptance: '4.7%', sat: '1570+', deadline: '11月1日 REA', note: '数学物理传统强校' },
+    { name: 'Columbia', country: '🇺🇸', acceptance: '3.9%', sat: '1550+', deadline: '11月1日 ED', note: '纽约，通识教育著名' },
   ],
 }
 
@@ -102,21 +97,10 @@ const PROFILE_DIMS = [
   { key: 'diversity', label: '多元性', icon: '🌍', target: 75 },
 ]
 
-// ── 小组件 ──
 function Card({ children, style = {}, onClick }: any) {
   return (
-    <motion.div
-      whileTap={onClick ? { scale: 0.98 } : undefined}
-      onClick={onClick}
-      style={{
-        background: T.bgCard,
-        border: `1px solid ${T.border}`,
-        borderRadius: 16,
-        padding: '16px',
-        cursor: onClick ? 'pointer' : 'default',
-        ...style,
-      }}
-    >
+    <motion.div whileTap={onClick ? { scale: 0.98 } : undefined} onClick={onClick}
+      style={{ background: T.bgCard, border: `1px solid ${T.border}`, borderRadius: 16, padding: '16px', cursor: onClick ? 'pointer' : 'default', ...style }}>
       {children}
     </motion.div>
   )
@@ -124,30 +108,22 @@ function Card({ children, style = {}, onClick }: any) {
 
 function Badge({ text, color = T.gold }: { text: string; color?: string }) {
   return (
-    <span style={{
-      fontSize: 10, fontWeight: 700, padding: '3px 8px',
-      borderRadius: 20, background: `${color}20`, color,
-      letterSpacing: '0.05em',
-    }}>{text}</span>
+    <span style={{ fontSize: 10, fontWeight: 700, padding: '3px 8px', borderRadius: 20, background: `${color}20`, color, letterSpacing: '0.05em' }}>
+      {text}
+    </span>
   )
 }
 
-function SectionTitle({ icon, title, action, onAction }: any) {
+function SectionTitle({ icon, title }: any) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
       <span style={{ fontSize: 16 }}>{icon}</span>
-      <span style={{ fontSize: 13, fontWeight: 700, color: T.text, letterSpacing: '0.05em', flex: 1 }}>{title}</span>
-      {action && (
-        <motion.button whileTap={{ scale: 0.9 }} onClick={onAction}
-          style={{ background: 'none', border: 'none', color: T.goldDim, fontSize: 12, cursor: 'pointer' }}>
-          {action}
-        </motion.button>
-      )}
+      <span style={{ fontSize: 13, fontWeight: 700, color: T.text, letterSpacing: '0.05em' }}>{title}</span>
     </div>
   )
 }
 
-// ── 愿景设定引导流程 ──
+// ── 愿景设定（安全版：用 getUser() 不用 getSession()）──
 function VisionSetup({ childName, childId, onComplete }: {
   childName: string; childId: string; onComplete: (vision: any) => void
 }) {
@@ -171,13 +147,13 @@ function VisionSetup({ childName, childId, onComplete }: {
 
   const save = async () => {
     setSaving(true)
-    const { data: { session } } = await supabase.auth.getSession()
-    const uid = session?.user?.id
-    if (!uid) return
+    // ✅ 安全：用 getUser() 服务端验证，不用 getSession()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) { setSaving(false); return }
 
     const payload = {
       child_id: childId,
-      user_id: uid,
+      user_id: user.id,
       person_type: personType,
       vision_statement: personType === 'custom' ? customVision : PERSON_TYPES.find(p => p.value === personType)?.label || '',
       priorities,
@@ -199,12 +175,7 @@ function VisionSetup({ childName, childId, onComplete }: {
 
   const OptionPill = ({ value, label, emoji, selected, onSelect, desc }: any) => (
     <motion.div whileTap={{ scale: 0.97 }} onClick={() => onSelect(value)}
-      style={{
-        padding: '14px 16px', borderRadius: 14, cursor: 'pointer', marginBottom: 10,
-        background: selected ? `${T.gold}12` : T.bgCard,
-        border: `1.5px solid ${selected ? T.gold : T.border}`,
-        display: 'flex', alignItems: 'center', gap: 12, transition: 'all 0.2s',
-      }}>
+      style={{ padding: '14px 16px', borderRadius: 14, cursor: 'pointer', marginBottom: 10, background: selected ? `${T.gold}12` : T.bgCard, border: `1.5px solid ${selected ? T.gold : T.border}`, display: 'flex', alignItems: 'center', gap: 12, transition: 'all 0.2s' }}>
       <span style={{ fontSize: 22, flexShrink: 0 }}>{emoji}</span>
       <div style={{ flex: 1 }}>
         <div style={{ fontSize: 14, fontWeight: selected ? 600 : 400, color: selected ? T.gold : T.text }}>{label}</div>
@@ -218,13 +189,11 @@ function VisionSetup({ childName, childId, onComplete }: {
     <div style={{ minHeight: '100dvh', background: T.bg, fontFamily: "'Noto Sans SC', sans-serif", display: 'flex', flexDirection: 'column' }}>
       <div style={{ maxWidth: 480, margin: '0 auto', width: '100%', flex: 1, display: 'flex', flexDirection: 'column', padding: '52px 20px 32px' }}>
 
-        {/* 进度条 */}
         <div style={{ display: 'flex', gap: 5, marginBottom: 40 }}>
           {Array.from({ length: TOTAL }).map((_, i) => (
             <motion.div key={i}
               animate={{ width: i === step ? 28 : 6, background: i <= step ? T.gold : T.border }}
-              style={{ height: 4, borderRadius: 2, transition: 'all 0.3s' }}
-            />
+              style={{ height: 4, borderRadius: 2, transition: 'all 0.3s' }} />
           ))}
         </div>
 
@@ -240,9 +209,7 @@ function VisionSetup({ childName, childId, onComplete }: {
                   {childName}的<br />学业成长档案
                 </h1>
                 <p style={{ fontSize: 14, color: T.textDim, lineHeight: 1.9, marginBottom: 32, maxWidth: 300 }}>
-                  在开始之前，根想先了解<br />
-                  你对{childName}最深的期待。<br />
-                  这将成为所有规划的北极星。
+                  在开始之前，根想先了解<br />你对{childName}最深的期待。<br />这将成为所有规划的北极星。
                 </p>
                 <div style={{ fontSize: 11, color: T.goldDim, letterSpacing: '0.15em' }}>约需 3 分钟 · 可随时修改</div>
               </div>
@@ -253,9 +220,7 @@ function VisionSetup({ childName, childId, onComplete }: {
                 <div style={{ fontFamily: "'Noto Serif SC', serif", fontSize: 22, fontWeight: 700, color: T.text, marginBottom: 6, lineHeight: 1.4 }}>
                   你希望{childName}<br />成为什么样的人？
                 </div>
-                <div style={{ fontSize: 13, color: T.textDim, marginBottom: 24, lineHeight: 1.7 }}>
-                  不是去哪所学校，而是成为什么人。
-                </div>
+                <div style={{ fontSize: 13, color: T.textDim, marginBottom: 24, lineHeight: 1.7 }}>不是去哪所学校，而是成为什么人。</div>
                 <div style={{ flex: 1, overflowY: 'auto' }}>
                   {PERSON_TYPES.map(p => (
                     <OptionPill key={p.value} value={p.value} label={p.label} emoji={p.emoji} desc={p.desc}
@@ -273,17 +238,13 @@ function VisionSetup({ childName, childId, onComplete }: {
 
             {step === 2 && (
               <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-                <div style={{ fontFamily: "'Noto Serif SC', serif", fontSize: 22, fontWeight: 700, color: T.text, marginBottom: 6, lineHeight: 1.4 }}>
-                  最核心的期待是什么？
-                </div>
+                <div style={{ fontFamily: "'Noto Serif SC', serif", fontSize: 22, fontWeight: 700, color: T.text, marginBottom: 6, lineHeight: 1.4 }}>最核心的期待是什么？</div>
                 <div style={{ fontSize: 13, color: T.textDim, marginBottom: 24 }}>可以多选</div>
                 <div style={{ flex: 1, overflowY: 'auto' }}>
                   {PRIORITIES.map(p => (
                     <OptionPill key={p.value} value={p.value} label={p.label} emoji={p.emoji}
                       selected={priorities.includes(p.value)}
-                      onSelect={(v: string) => setPriorities(prev =>
-                        prev.includes(v) ? prev.filter(x => x !== v) : [...prev, v]
-                      )} />
+                      onSelect={(v: string) => setPriorities(prev => prev.includes(v) ? prev.filter(x => x !== v) : [...prev, v])} />
                   ))}
                 </div>
               </div>
@@ -291,17 +252,13 @@ function VisionSetup({ childName, childId, onComplete }: {
 
             {step === 3 && (
               <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-                <div style={{ fontFamily: "'Noto Serif SC', serif", fontSize: 22, fontWeight: 700, color: T.text, marginBottom: 6 }}>
-                  你最担心什么？
-                </div>
+                <div style={{ fontFamily: "'Noto Serif SC', serif", fontSize: 22, fontWeight: 700, color: T.text, marginBottom: 6 }}>你最担心什么？</div>
                 <div style={{ fontSize: 13, color: T.textDim, marginBottom: 24 }}>诚实说，根会帮你应对</div>
                 <div style={{ flex: 1, overflowY: 'auto' }}>
                   {CONCERNS.map(c => (
                     <OptionPill key={c.value} value={c.value} label={c.label} emoji={c.emoji}
                       selected={concerns.includes(c.value)}
-                      onSelect={(v: string) => setConcerns(prev =>
-                        prev.includes(v) ? prev.filter(x => x !== v) : [...prev, v]
-                      )} />
+                      onSelect={(v: string) => setConcerns(prev => prev.includes(v) ? prev.filter(x => x !== v) : [...prev, v])} />
                   ))}
                 </div>
               </div>
@@ -309,9 +266,7 @@ function VisionSetup({ childName, childId, onComplete }: {
 
             {step === 4 && (
               <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-                <div style={{ fontFamily: "'Noto Serif SC', serif", fontSize: 22, fontWeight: 700, color: T.text, marginBottom: 6, lineHeight: 1.4 }}>
-                  倾向的升学路径？
-                </div>
+                <div style={{ fontFamily: "'Noto Serif SC', serif", fontSize: 22, fontWeight: 700, color: T.text, marginBottom: 6, lineHeight: 1.4 }}>倾向的升学路径？</div>
                 <div style={{ fontSize: 13, color: T.textDim, marginBottom: 24 }}>不确定也没关系，可以随时调整</div>
                 <div style={{ flex: 1, overflowY: 'auto' }}>
                   {TARGET_PATHS.map(p => (
@@ -325,7 +280,6 @@ function VisionSetup({ childName, childId, onComplete }: {
           </motion.div>
         </AnimatePresence>
 
-        {/* 按钮 */}
         <div style={{ display: 'flex', gap: 10, marginTop: 24, paddingTop: 16, borderTop: `1px solid ${T.border}` }}>
           {step > 0 && (
             <motion.button whileTap={{ scale: 0.97 }} onClick={() => setStep(step - 1)}
@@ -352,25 +306,16 @@ function VisionSetup({ childName, childId, onComplete }: {
 }
 
 // ── 今日仪表盘 ──
-function DashboardSection({ report, vision, childName, activities }: any) {
+function DashboardSection({ report, vision, childName }: any) {
   const thisMonth = report?.this_semester || []
   const gaps = report?.gaps || []
   const targetLabel = TARGET_PATHS.find(p => p.value === vision?.target_school_type)?.label || '升学目标'
-
-  const gradeToYears = (grade: string) => {
-    const map: Record<string, number> = {
-      'K1': 9, 'K2': 8, 'K3': 7, 'G1': 8, 'G2': 7, 'G3': 6,
-      'G4': 5, 'G5': 4, 'G6': 3, 'G7': 3, 'G8': 2, 'G9': 1,
-    }
-    return map[grade] || 6
-  }
-
+  const gradeToYears: Record<string, number> = { 'K1': 9, 'K2': 8, 'K3': 7, 'G1': 8, 'G2': 7, 'G3': 6, 'G4': 5, 'G5': 4, 'G6': 3, 'G7': 3, 'G8': 2, 'G9': 1 }
   const storedChild = typeof window !== 'undefined' ? JSON.parse(localStorage.getItem('active_child') || '{}') : {}
-  const years = gradeToYears(storedChild.grade || 'K3')
+  const years = gradeToYears[storedChild.grade] || 6
 
   return (
     <div>
-      {/* 顶部状态卡 */}
       <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
         style={{ background: `linear-gradient(135deg, ${T.gold}18 0%, rgba(78,205,196,0.08) 100%)`, borderRadius: 20, padding: '20px', marginBottom: 16, border: `1px solid ${T.borderGold}`, position: 'relative', overflow: 'hidden' }}>
         <div style={{ position: 'absolute', right: -20, top: -20, width: 100, height: 100, borderRadius: '50%', background: `${T.gold}08` }} />
@@ -384,17 +329,13 @@ function DashboardSection({ report, vision, childName, activities }: any) {
         </div>
       </motion.div>
 
-      {/* 本学期行动 */}
       {thisMonth.length > 0 && (
-        <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}
-          style={{ marginBottom: 16 }}>
+        <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} style={{ marginBottom: 16 }}>
           <SectionTitle icon="⚡" title="本学期重点" />
           {thisMonth.map((item: any, i: number) => (
             <Card key={i} style={{ marginBottom: 8, borderColor: item.urgency === 'high' ? T.borderGold : T.border }}>
               <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
-                <div style={{ width: 26, height: 26, borderRadius: '50%', background: item.urgency === 'high' ? T.gold : T.bgCardHover, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: item.urgency === 'high' ? '#0F1A14' : T.textDim, flexShrink: 0 }}>
-                  {i + 1}
-                </div>
+                <div style={{ width: 26, height: 26, borderRadius: '50%', background: item.urgency === 'high' ? T.gold : T.bgCardHover, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: item.urgency === 'high' ? '#0F1A14' : T.textDim, flexShrink: 0 }}>{i + 1}</div>
                 <div>
                   <div style={{ fontSize: 13, fontWeight: 600, color: T.text, marginBottom: 4 }}>{item.action}</div>
                   <div style={{ fontSize: 11, color: T.textDim }}>{item.why}</div>
@@ -405,10 +346,8 @@ function DashboardSection({ report, vision, childName, activities }: any) {
         </motion.div>
       )}
 
-      {/* 需要关注 */}
       {gaps.length > 0 && (
-        <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}
-          style={{ marginBottom: 16 }}>
+        <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} style={{ marginBottom: 16 }}>
           <SectionTitle icon="⚠️" title="需要关注" />
           <Card style={{ borderColor: 'rgba(255,107,107,0.2)' }}>
             {gaps.map((gap: string, i: number) => (
@@ -421,14 +360,11 @@ function DashboardSection({ report, vision, childName, activities }: any) {
         </motion.div>
       )}
 
-      {/* 申请故事主线 */}
       {report?.narrative && (
         <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}>
           <SectionTitle icon="📖" title="申请故事主线" />
           <Card style={{ borderLeft: `3px solid ${T.gold}` }}>
-            <div style={{ fontSize: 13, color: T.text, lineHeight: 1.9, fontStyle: 'italic' }}>
-              "{report.narrative}"
-            </div>
+            <div style={{ fontSize: 13, color: T.text, lineHeight: 1.9, fontStyle: 'italic' }}>"{report.narrative}"</div>
           </Card>
         </motion.div>
       )}
@@ -453,7 +389,6 @@ function DashboardSection({ report, vision, childName, activities }: any) {
 // ── 成长画像 ──
 function ProfileSection({ report }: any) {
   const scores = report?.profile_scores || {}
-
   return (
     <div>
       {report?.profile_summary && (
@@ -462,15 +397,13 @@ function ProfileSection({ report }: any) {
           {report.profile_summary}
         </motion.div>
       )}
-
       <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
         {PROFILE_DIMS.map((dim, i) => {
           const score = scores[dim.key] || 0
           const color = score >= 70 ? T.green : score >= 40 ? T.gold : T.coral
           const gap = dim.target - score
           return (
-            <motion.div key={dim.key} initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: i * 0.08 }}>
+            <motion.div key={dim.key} initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.08 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <span style={{ fontSize: 16 }}>{dim.icon}</span>
@@ -482,7 +415,6 @@ function ProfileSection({ report }: any) {
                 </div>
               </div>
               <div style={{ height: 6, borderRadius: 3, background: 'rgba(255,255,255,0.06)', overflow: 'hidden', position: 'relative' }}>
-                {/* 目标线 */}
                 <div style={{ position: 'absolute', left: `${dim.target}%`, top: 0, bottom: 0, width: 1, background: 'rgba(255,255,255,0.2)', zIndex: 2 }} />
                 <motion.div initial={{ width: 0 }} animate={{ width: `${score}%` }}
                   transition={{ duration: 1, delay: i * 0.1, ease: 'easeOut' }}
@@ -497,20 +429,14 @@ function ProfileSection({ report }: any) {
           )
         })}
       </div>
-
-      {!report && (
-        <div style={{ textAlign: 'center', padding: '40px 20px', color: T.textDim, fontSize: 14 }}>
-          生成规划后，成长画像自动计算
-        </div>
-      )}
+      {!report && <div style={{ textAlign: 'center', padding: '40px 20px', color: T.textDim, fontSize: 14 }}>生成规划后，成长画像自动计算</div>}
     </div>
   )
 }
 
-// ── 升学路径时间轴 ──
-function RoadmapSection({ report, vision, generating, onGenerate }: any) {
+// ── 升学路径 ──
+function RoadmapSection({ report, generating, onGenerate }: any) {
   const roadmap = report?.roadmap || []
-  const priorityColor = (p: string) => p === 'high' ? T.gold : p === 'medium' ? T.teal : T.textDim
   const tierColor = (t: number) => t === 1 ? T.gold : t === 2 ? T.teal : T.textDim
 
   return (
@@ -518,21 +444,14 @@ function RoadmapSection({ report, vision, generating, onGenerate }: any) {
       {roadmap.length > 0 ? (
         <div>
           <div style={{ position: 'relative' }}>
-            {/* 时间轴线 */}
             <div style={{ position: 'absolute', left: 10, top: 16, bottom: 0, width: 1, background: `linear-gradient(to bottom, ${T.gold}40, transparent)` }} />
-
             {roadmap.map((period: any, i: number) => (
               <motion.div key={i} initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: i * 0.1 }} style={{ paddingLeft: 32, marginBottom: 24, position: 'relative' }}>
-                {/* 时间节点 */}
                 <div style={{ position: 'absolute', left: 0, top: 4, width: 20, height: 20, borderRadius: '50%', background: i === 0 ? T.gold : T.bgCard, border: `2px solid ${i === 0 ? T.gold : T.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   {i === 0 && <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#0F1A14' }} />}
                 </div>
-
-                <div style={{ fontSize: 12, fontWeight: 700, color: i === 0 ? T.gold : T.textDim, marginBottom: 10, letterSpacing: '0.05em' }}>
-                  {period.period}
-                </div>
-
+                <div style={{ fontSize: 12, fontWeight: 700, color: i === 0 ? T.gold : T.textDim, marginBottom: 10, letterSpacing: '0.05em' }}>{period.period}</div>
                 {period.actions?.map((action: any, j: number) => (
                   <Card key={j} style={{ marginBottom: 8 }}>
                     <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
@@ -542,11 +461,7 @@ function RoadmapSection({ report, vision, generating, onGenerate }: any) {
                       <div style={{ flex: 1 }}>
                         <div style={{ fontSize: 13, fontWeight: 600, color: T.text, marginBottom: 4 }}>{action.action}</div>
                         <div style={{ fontSize: 11, color: T.textDim, marginBottom: 4, lineHeight: 1.5 }}>{action.reason}</div>
-                        {action.resource && (
-                          <div style={{ fontSize: 11, color: T.teal, display: 'flex', alignItems: 'center', gap: 4 }}>
-                            📍 {action.resource}
-                          </div>
-                        )}
+                        {action.resource && <div style={{ fontSize: 11, color: T.teal }}>📍 {action.resource}</div>}
                       </div>
                     </div>
                   </Card>
@@ -554,11 +469,9 @@ function RoadmapSection({ report, vision, generating, onGenerate }: any) {
               </motion.div>
             ))}
           </div>
-
           <div style={{ padding: '10px 14px', borderRadius: 12, background: T.bgCard, border: `1px solid ${T.border}`, fontSize: 11, color: T.textDim, lineHeight: 1.7, marginTop: 8 }}>
             💡 T1=顶级权重（全国/国际级）· T2=重要 · T3=有益 · T4=锦上添花
           </div>
-
           <motion.button whileTap={{ scale: 0.97 }} onClick={onGenerate} disabled={generating}
             style={{ width: '100%', marginTop: 16, padding: '12px', borderRadius: 14, border: `1px solid ${T.border}`, background: 'transparent', color: T.textDim, fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
             {generating ? <Loader size={14} /> : <Sparkles size={14} />}
@@ -569,12 +482,8 @@ function RoadmapSection({ report, vision, generating, onGenerate }: any) {
         <div style={{ textAlign: 'center', padding: '40px 20px' }}>
           {generating ? (
             <div>
-              <motion.div animate={{ scale: [1, 1.1, 1] }} transition={{ duration: 2, repeat: Infinity }}
-                style={{ fontSize: 48, marginBottom: 16 }}>🌱</motion.div>
-              <div style={{ fontSize: 14, color: T.textDim, lineHeight: 1.7 }}>
-                正在撰写专属升学路线图<br />
-                <span style={{ fontSize: 11, color: T.textFaint }}>通常需要30-60秒</span>
-              </div>
+              <motion.div animate={{ scale: [1, 1.1, 1] }} transition={{ duration: 2, repeat: Infinity }} style={{ fontSize: 48, marginBottom: 16 }}>🌱</motion.div>
+              <div style={{ fontSize: 14, color: T.textDim, lineHeight: 1.7 }}>正在撰写专属升学路线图<br /><span style={{ fontSize: 11, color: T.textFaint }}>通常需要30-60秒</span></div>
             </div>
           ) : (
             <div>
@@ -600,7 +509,6 @@ function RecordsSection({ childId, router }: any) {
     { icon: '🎯', label: '课外活动', desc: '兴趣班 · 补习课 · 参与年限', color: '#A78BFA', path: childId ? `/children/${childId}/activities` : '/children' },
     { icon: '📝', label: '文书素材库', desc: '故事碎片 · 申请角度 · 文书准备', color: '#FB923C', path: '/growth/academic/essays' },
   ]
-
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
       {modules.map((m, i) => (
@@ -608,9 +516,7 @@ function RecordsSection({ childId, router }: any) {
           transition={{ delay: i * 0.07 }} whileTap={{ scale: 0.98 }}
           onClick={() => router.push(m.path)}
           style={{ background: T.bgCard, borderRadius: 16, padding: '16px', border: `1px solid ${T.border}`, display: 'flex', alignItems: 'center', gap: 14, cursor: 'pointer' }}>
-          <div style={{ width: 44, height: 44, borderRadius: 12, background: `${m.color}15`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, flexShrink: 0 }}>
-            {m.icon}
-          </div>
+          <div style={{ width: 44, height: 44, borderRadius: 12, background: `${m.color}15`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, flexShrink: 0 }}>{m.icon}</div>
           <div style={{ flex: 1 }}>
             <div style={{ fontSize: 14, fontWeight: 600, color: T.text, marginBottom: 3 }}>{m.label}</div>
             <div style={{ fontSize: 11, color: T.textDim }}>{m.desc}</div>
@@ -625,33 +531,26 @@ function RecordsSection({ childId, router }: any) {
 // ── 目标院校库 ──
 function SchoolsSection({ vision }: any) {
   const [activeCategory, setActiveCategory] = useState('us_boarding')
-  const path = vision?.target_school_type || 'us_boarding'
-
   const categories = [
     { key: 'us_boarding', label: '美高', emoji: '🏫' },
     { key: 'uk_boarding', label: '英高', emoji: '🎩' },
     { key: 'us_university', label: '美本T50', emoji: '🎓' },
   ]
-
   const schools = SCHOOL_DB[activeCategory as keyof typeof SCHOOL_DB] || []
 
   return (
     <div>
-      {/* 分类切换 */}
       <div style={{ display: 'flex', gap: 8, marginBottom: 16, overflowX: 'auto', scrollbarWidth: 'none' }}>
         {categories.map(cat => (
-          <motion.button key={cat.key} whileTap={{ scale: 0.93 }}
-            onClick={() => setActiveCategory(cat.key)}
+          <motion.button key={cat.key} whileTap={{ scale: 0.93 }} onClick={() => setActiveCategory(cat.key)}
             style={{ padding: '8px 16px', borderRadius: 20, border: 'none', background: activeCategory === cat.key ? T.gold : T.bgCard, color: activeCategory === cat.key ? '#0F1A14' : T.textDim, fontSize: 12, fontWeight: activeCategory === cat.key ? 700 : 400, cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0, display: 'flex', alignItems: 'center', gap: 5 }}>
             {cat.emoji} {cat.label}
           </motion.button>
         ))}
       </div>
-
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         {schools.map((school: any, i: number) => (
-          <motion.div key={school.name} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: i * 0.06 }}>
+          <motion.div key={school.name} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.06 }}>
             <Card>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
                 <div>
@@ -679,7 +578,6 @@ function SchoolsSection({ vision }: any) {
           </motion.div>
         ))}
       </div>
-
       <div style={{ marginTop: 14, padding: '10px 14px', borderRadius: 12, background: T.bgCard, border: `1px solid ${T.border}`, fontSize: 11, color: T.textFaint, lineHeight: 1.7 }}>
         📡 院校数据来源：各校官方网站 2025-26学年数据，每学期更新
       </div>
@@ -717,8 +615,9 @@ function AcademicContent() {
   }, [childId])
 
   const loadData = async () => {
-    const { data: { session } } = await supabase.auth.getSession()
-    if (!session?.user?.id) { router.push('/auth'); return }
+    // ✅ 安全：getUser() 服务端验证，middleware 已保护路由，这里静默返回
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
 
     const stored = localStorage.getItem('active_child_id')
     const storedChild = localStorage.getItem('active_child')
@@ -736,7 +635,6 @@ function AcademicContent() {
         supabase.from('pathway_reports').select('*').eq('child_id', stored).order('generated_at', { ascending: false }).limit(1).maybeSingle(),
         supabase.from('child_activities').select('*').eq('child_id', stored),
       ])
-
       if (visionRes.data) { setHasVision(true); setVision(visionRes.data) }
       if (reportRes.data) setReport(reportRes.data)
       if (activitiesRes.data) setActivities(activitiesRes.data)
@@ -748,8 +646,9 @@ function AcademicContent() {
     if (!childId) return
     setGenerating(true)
 
+    // ✅ 安全：不传 uid 给 API，服务端从 Authorization header 自己取
     const { data: { session } } = await supabase.auth.getSession()
-    const uid = session?.user?.id
+    const accessToken = session?.access_token
 
     const [childRes, activitiesRes, achievementsRes, assessmentRes] = await Promise.all([
       supabase.from('children').select('*').eq('id', childId).single(),
@@ -760,7 +659,11 @@ function AcademicContent() {
 
     await fetch('/api/children/pathway', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        // ✅ 安全：token 放 header，服务端验证后自己取 uid
+        ...(accessToken ? { 'Authorization': `Bearer ${accessToken}` } : {}),
+      },
       body: JSON.stringify({
         child: childRes.data,
         activities: activitiesRes.data || [],
@@ -768,7 +671,7 @@ function AcademicContent() {
         assessment: assessmentRes.data?.report || null,
         vision: visionData,
         childId,
-        uid,
+        // ✅ uid 不再从客户端传，服务端自己从 token 解析
       }),
     })
   }
@@ -800,8 +703,6 @@ function AcademicContent() {
 
   return (
     <main style={{ minHeight: '100dvh', background: T.bg, fontFamily: "'Noto Sans SC', sans-serif", paddingBottom: 80 }}>
-
-      {/* 顶部导航 */}
       <div style={{ position: 'sticky', top: 0, zIndex: 50, background: 'rgba(15,26,20,0.92)', backdropFilter: 'blur(24px)', borderBottom: `1px solid ${T.border}` }}>
         <div style={{ maxWidth: 560, margin: '0 auto', padding: '14px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <motion.button whileTap={{ scale: 0.9 }} onClick={() => router.back()}
@@ -822,12 +723,9 @@ function AcademicContent() {
             调整愿景
           </motion.button>
         </div>
-
-        {/* Tab 导航 */}
         <div style={{ maxWidth: 560, margin: '0 auto', padding: '0 16px 12px', display: 'flex', gap: 4 }}>
           {TABS.map(tab => (
-            <motion.button key={tab.key} whileTap={{ scale: 0.93 }}
-              onClick={() => setActiveTab(tab.key)}
+            <motion.button key={tab.key} whileTap={{ scale: 0.93 }} onClick={() => setActiveTab(tab.key)}
               style={{ flex: 1, padding: '8px 4px', borderRadius: 12, border: 'none', background: activeTab === tab.key ? `${T.gold}18` : 'transparent', color: activeTab === tab.key ? T.gold : T.textFaint, fontSize: 10, fontWeight: activeTab === tab.key ? 700 : 400, cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, transition: 'all 0.2s' }}>
               <span style={{ fontSize: 14 }}>{tab.emoji}</span>
               {tab.label}
@@ -836,23 +734,15 @@ function AcademicContent() {
         </div>
       </div>
 
-      {/* 内容区 */}
       <div style={{ maxWidth: 560, margin: '0 auto', padding: '16px 14px' }}>
         <AnimatePresence mode="wait">
           <motion.div key={activeTab} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0 }} transition={{ duration: 0.2 }}>
-
-            {activeTab === 'dashboard' && (
-              <DashboardSection report={report} vision={vision} childName={childName} activities={activities} />
-            )}
+            {activeTab === 'dashboard' && <DashboardSection report={report} vision={vision} childName={childName} activities={activities} />}
             {activeTab === 'profile' && <ProfileSection report={report} />}
-            {activeTab === 'roadmap' && (
-              <RoadmapSection report={report} vision={vision} generating={generating}
-                onGenerate={() => generateReport(vision)} />
-            )}
+            {activeTab === 'roadmap' && <RoadmapSection report={report} vision={vision} generating={generating} onGenerate={() => generateReport(vision)} />}
             {activeTab === 'records' && <RecordsSection childId={childId} router={router} />}
             {activeTab === 'schools' && <SchoolsSection vision={vision} />}
-
           </motion.div>
         </AnimatePresence>
       </div>
