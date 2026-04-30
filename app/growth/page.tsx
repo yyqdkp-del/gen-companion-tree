@@ -1,9 +1,21 @@
 'use client'
-import React from 'react'
+import React, { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { motion } from 'framer-motion'
+import { createClient } from '@/lib/supabase/client'
+import { motion, AnimatePresence } from 'framer-motion'
 
 export const dynamic = 'force-dynamic'
+
+const supabase = createClient()
+
+type Kid = {
+  id: string
+  name: string
+  grade?: string
+  level?: string
+  emoji?: string
+  school?: string
+}
 
 function FallingLeaves() {
   const leaves = [
@@ -35,6 +47,37 @@ function FallingLeaves() {
 
 export default function GrowthPage() {
   const router = useRouter()
+  const [kids, setKids] = useState<Kid[]>([])
+  const [activeKid, setActiveKid] = useState<Kid | null>(null)
+
+  useEffect(() => {
+    const load = async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+      const { data } = await supabase.from('children').select('*').eq('user_id', user.id)
+      if (!data?.length) return
+      setKids(data)
+
+      // 读已选的孩子，没有则默认第一个
+      const storedId = localStorage.getItem('active_child_id')
+      const found = data.find((k: Kid) => k.id === storedId) || data[0]
+      selectKid(found)
+    }
+    load()
+  }, [])
+
+  const selectKid = (kid: Kid) => {
+    setActiveKid(kid)
+    localStorage.setItem('active_child_id', kid.id)
+    localStorage.setItem('active_child', JSON.stringify({
+      id: kid.id,
+      name: kid.name,
+      grade: kid.grade,
+      level: kid.level || 'R2',
+      emoji: kid.emoji || '🌟',
+      school: kid.school,
+    }))
+  }
 
   return (
     <main style={{
@@ -51,8 +94,55 @@ export default function GrowthPage() {
         backgroundPosition: 'center top',
         backgroundRepeat: 'no-repeat',
       }} />
-      {/* 遮罩 */}
       <div style={{ position: 'absolute', inset: 0, background: 'rgba(20,40,10,0.08)' }} />
+
+      {/* ══ 孩子切换栏 — 顶部安全区下方 ══ */}
+      {kids.length > 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: -8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.6 }}
+          style={{
+            position: 'absolute',
+            top: 'max(52px, env(safe-area-inset-top, 52px))',
+            left: 0, right: 0,
+            display: 'flex',
+            justifyContent: 'center',
+            gap: 10,
+            padding: '0 16px',
+            zIndex: 50,
+            flexWrap: 'wrap',
+          }}
+        >
+          {kids.map(kid => (
+            <motion.button
+              key={kid.id}
+              whileTap={{ scale: 0.93 }}
+              onClick={() => selectKid(kid)}
+              style={{
+                padding: '6px 16px',
+                borderRadius: 20,
+                border: activeKid?.id === kid.id
+                  ? '1.5px solid rgba(255,224,128,0.9)'
+                  : '1px solid rgba(255,255,255,0.25)',
+                background: activeKid?.id === kid.id
+                  ? 'rgba(255,210,80,0.18)'
+                  : 'rgba(255,255,255,0.10)',
+                backdropFilter: 'blur(10px)',
+                color: activeKid?.id === kid.id ? '#FFE080' : 'rgba(255,255,255,0.75)',
+                fontSize: 13,
+                fontWeight: activeKid?.id === kid.id ? 700 : 400,
+                letterSpacing: '0.08em',
+                cursor: 'pointer',
+                fontFamily: "'Noto Serif SC', serif",
+                textShadow: activeKid?.id === kid.id ? '0 0 8px rgba(255,180,0,0.6)' : 'none',
+              }}
+            >
+              {kid.emoji || '🌟'} {kid.name}
+            </motion.button>
+          ))}
+        </motion.div>
+      )}
 
       {/* ══ 学业成长入口 — 上半屏中部 ══ */}
       <motion.button
@@ -64,25 +154,19 @@ export default function GrowthPage() {
         onClick={() => router.push('/growth/academic')}
         style={{
           position: 'absolute',
-          left: '50%',
-          top: '28vh',
+          left: '50%', top: '30vh',
           transform: 'translateX(-50%)',
           zIndex: 50,
-          background: 'transparent',
-          border: 'none',
+          background: 'transparent', border: 'none',
           cursor: 'pointer',
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          gap: '4px',
+          display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px',
         }}
       >
         <motion.div
           animate={{ opacity: [0.25, 0.65, 0.25], scale: [1, 1.15, 1] }}
           transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
           style={{
-            position: 'absolute', inset: '-20px',
-            borderRadius: '50%',
+            position: 'absolute', inset: '-20px', borderRadius: '50%',
             background: 'radial-gradient(ellipse, rgba(240,192,64,0.32) 0%, transparent 70%)',
             pointerEvents: 'none',
           }}
@@ -91,21 +175,19 @@ export default function GrowthPage() {
           animate={{ opacity: [0.75, 1, 0.75] }}
           transition={{ duration: 2.5, repeat: Infinity }}
           style={{
-            fontSize: '15px', fontWeight: 700,
-            color: '#FFE080', letterSpacing: '0.12em',
+            fontSize: '15px', fontWeight: 700, color: '#FFE080',
+            letterSpacing: '0.12em',
             textShadow: '0 0 12px rgba(255,180,0,0.95), 0 1px 4px rgba(0,0,0,0.6)',
             lineHeight: 1.3, textAlign: 'center',
           }}
         >
-          学业成长
+          {activeKid ? `${activeKid.name}的学业` : '学业成长'}
         </motion.span>
         <span style={{
           fontSize: '10px', color: 'rgba(255,220,120,0.8)',
           letterSpacing: '0.18em',
           textShadow: '0 1px 4px rgba(0,0,0,0.6)',
-        }}>
-          进入
-        </span>
+        }}>进入</span>
       </motion.button>
 
       {/* ══ 根·中文入口 — 下半屏中部 ══ */}
@@ -118,25 +200,19 @@ export default function GrowthPage() {
         onClick={() => router.push('/learn')}
         style={{
           position: 'absolute',
-          left: '50%',
-          top: '62vh',
+          left: '50%', top: '63vh',
           transform: 'translateX(-50%)',
           zIndex: 50,
-          background: 'transparent',
-          border: 'none',
+          background: 'transparent', border: 'none',
           cursor: 'pointer',
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          gap: '4px',
+          display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px',
         }}
       >
         <motion.div
           animate={{ opacity: [0.25, 0.65, 0.25], scale: [1, 1.15, 1] }}
           transition={{ duration: 2.8, repeat: Infinity, ease: 'easeInOut' }}
           style={{
-            position: 'absolute', inset: '-20px',
-            borderRadius: '50%',
+            position: 'absolute', inset: '-20px', borderRadius: '50%',
             background: 'radial-gradient(ellipse, rgba(255,210,80,0.32) 0%, transparent 70%)',
             pointerEvents: 'none',
           }}
@@ -145,8 +221,8 @@ export default function GrowthPage() {
           animate={{ opacity: [0.75, 1, 0.75] }}
           transition={{ duration: 2.5, repeat: Infinity }}
           style={{
-            fontSize: '15px', fontWeight: 700,
-            color: '#FFE080', letterSpacing: '0.12em',
+            fontSize: '15px', fontWeight: 700, color: '#FFE080',
+            letterSpacing: '0.12em',
             textShadow: '0 0 12px rgba(255,180,0,0.95), 0 1px 4px rgba(0,0,0,0.6)',
             lineHeight: 1.3, textAlign: 'center',
           }}
@@ -157,9 +233,7 @@ export default function GrowthPage() {
           fontSize: '10px', color: 'rgba(255,220,120,0.8)',
           letterSpacing: '0.18em',
           textShadow: '0 1px 4px rgba(0,0,0,0.6)',
-        }}>
-          进入
-        </span>
+        }}>进入</span>
       </motion.button>
 
       {/* 飘落树叶 */}
