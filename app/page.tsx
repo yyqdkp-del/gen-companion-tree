@@ -4,6 +4,7 @@ const supabase = createClient()
 import InstallPWA from '@/app/components/InstallPWA'
 import React, { useEffect, useState, useRef, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import dynamic from 'next/dynamic'
 import {
   X, Plus, ChevronRight, CheckCircle2, Bell,
   Zap, Heart, Clock, Loader, FileText,
@@ -17,6 +18,7 @@ import HotspotSheet from '@/app/rian/HotspotSheet'
 import { useApp } from '@/app/context/AppContext'
 import TodoSheet from '@/app/rian/TodoSheet'
 
+const ChildAvatar = dynamic(() => import('@/app/components/ChildAvatar'), { ssr: false })
 
 const THEME = {
   bg: 'linear-gradient(180deg, #A7D7D9 0%, #D9A7B4 100%)',
@@ -241,10 +243,9 @@ function AddChildSheet({ onClose, onSave }: { onClose: () => void; onSave: (d: a
         style={{ width: '100%', padding: '14px', borderRadius: 16, border: 'none', background: name.trim() ? THEME.navy : 'rgba(0,0,0,0.08)', color: name.trim() ? '#fff' : THEME.muted, fontSize: 14, fontWeight: 600, cursor: name.trim() ? 'pointer' : 'default', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
         {saving ? <Loader size={16} /> : null}{saving ? '保存中…' : '添加孩子'}
       </motion.button>
-      {/* 新增：保存后跳转提示 */}
-<div style={{ textAlign: 'center', marginTop: 12, fontSize: 12, color: THEME.muted }}>
-  保存后可前往「孩子资料」补充课程表和健康信息
-</div>
+      <div style={{ textAlign: 'center', marginTop: 12, fontSize: 12, color: THEME.muted }}>
+        保存后可前往「孩子资料」补充课程表和健康信息
+      </div>
     </BottomSheet>
   )
 }
@@ -278,18 +279,16 @@ function InputSheet({ onClose, userId, onProcessing }: { onClose: () => void; us
   )
 }
 
-// ── 主页面 ──
 export default function BasePage() {
- const { userId, kids, todos, hotspots, loading, sync: ctxSync, processStatus, setProcessStatus } = useApp()
+  const { userId, kids, todos, hotspots, loading, sync: ctxSync, processStatus, setProcessStatus, activeKid, setActiveKid } = useApp()
   const [time, setTime] = useState(new Date())
-  const [selKid, setSelKid] = useState<Child | null>(null)
   const [modal, setModal] = useState<'child' | 'todo' | 'hotspot' | 'addChild' | 'oneTap' | 'input' | null>(null)
+  const [enrichedKids, setEnrichedKids] = useState<Child[]>([])
   const [oneTapTodo, setOneTapTodo] = useState<TodoItem | null>(null)
   const [patrolling, setPatrolling] = useState(false)
   const [mounted, setMounted] = useState(false)
   const [keyboardOpen, setKeyboardOpen] = useState(false)
 
-  // ── 孩子详情补全 ──
   const enrichKids = useCallback(async (uid: string) => {
     const today = new Date().toISOString().split('T')[0]
     const dow = new Date().getDay()
@@ -318,27 +317,35 @@ export default function BasePage() {
         school_name: c.school_name, grade: c.grade, today_schedule,
       }
     }))
-    setSelKid(prev => prev ? enriched.find(c => c.id === prev.id) || enriched[0] : enriched[0])
-  }, [])
+    setEnrichedKids(enriched)
+    const storedId = localStorage.getItem('active_child_id')
+    const current = enriched.find(c => c.id === storedId) || enriched[0]
+    setActiveKid(current)
+  }, [setActiveKid])
 
   useEffect(() => { if (userId) enrichKids(userId) }, [userId, enrichKids])
+  useEffect(() => {
+    const onChildChanged = () => { if (userId) enrichKids(userId) }
+    window.addEventListener('child-changed', onChildChanged)
+    return () => window.removeEventListener('child-changed', onChildChanged)
+  }, [userId, enrichKids])
 
   useEffect(() => {
     setMounted(true)
     const ticker = setInterval(() => setTime(new Date()), 1000)
     return () => clearInterval(ticker)
   }, [])
-  useEffect(() => {
-  const handleResize = () => {
-    const currentHeight = window.visualViewport?.height || window.innerHeight
-    const screenHeight = window.screen.height
-    setKeyboardOpen(currentHeight < screenHeight * 0.75)
-  }
-  window.visualViewport?.addEventListener('resize', handleResize)
-  return () => window.visualViewport?.removeEventListener('resize', handleResize)
-}, [])
 
-  // ── 待办操作 ──
+  useEffect(() => {
+    const handleResize = () => {
+      const currentHeight = window.visualViewport?.height || window.innerHeight
+      const screenHeight = window.screen.height
+      setKeyboardOpen(currentHeight < screenHeight * 0.75)
+    }
+    window.visualViewport?.addEventListener('resize', handleResize)
+    return () => window.visualViewport?.removeEventListener('resize', handleResize)
+  }, [])
+
   const markDone = async (id: string) => {
     await supabase.from('todo_items').update({ status: 'done', completed_at: new Date().toISOString() }).eq('id', id)
     ctxSync()
@@ -351,25 +358,23 @@ export default function BasePage() {
     ctxSync()
   }
 
-  // ── 孩子操作 ──
- const handleAddChild = async (d: any) => {
-  const { data: { session } } = await supabase.auth.getSession()
-  const uid = session?.user?.id
-  if (!uid) return
-  const { data: newChild } = await supabase.from('children').insert({
-    user_id: uid, name: d.name, emoji: d.emoji || '👶🏻',
-    avatar_url: d.avatar_url || null,
-    energy: 75, status: 'active', school_name: d.school_name, grade: d.grade
-  }).select().single()
-  await ctxSync()
-  setModal(null)
-  if (newChild?.id) window.location.href = `/children/${newChild.id}?from=quick`
-}
+  const handleAddChild = async (d: any) => {
+    const { data: { session } } = await supabase.auth.getSession()
+    const uid = session?.user?.id
+    if (!uid) return
+    const { data: newChild } = await supabase.from('children').insert({
+      user_id: uid, name: d.name, emoji: d.emoji || '👶🏻',
+      avatar_url: d.avatar_url || null,
+      energy: 75, status: 'active', school_name: d.school_name, grade: d.grade
+    }).select().single()
+    await ctxSync()
+    setModal(null)
+    if (newChild?.id) window.location.href = `/children/${newChild.id}?from=quick`
+  }
 
-  // ── 热点操作 ──
-const handleRead = async (id: string) => {
-  await supabase.from('hotspot_items').update({ status: 'read' }).eq('id', id)
-}
+  const handleRead = async (id: string) => {
+    await supabase.from('hotspot_items').update({ status: 'read' }).eq('id', id)
+  }
 
   const handlePatrol = async () => {
     setPatrolling(true)
@@ -383,12 +388,12 @@ const handleRead = async (id: string) => {
     } catch { setPatrolling(false) }
   }
 
-  const cState = dropState('child', selKid)
+  const cState = dropState('child', activeKid)
   const tState = dropState('todo', todos)
   const hState = dropState('hotspot', hotspots)
   const redCount = todos.filter(t => t.priority === 'red').length
   const unread = hotspots.filter(h => h.status === 'unread').length
-  const childUrgent = (selKid?.urgent_items || []).filter(i => i.level === 'red').length
+  const childUrgent = (activeKid?.urgent_items || []).filter(i => i.level === 'red').length
   const hour = time.getHours()
   const greeting = hour < 6 ? '夜深了' : hour < 12 ? '早上好' : hour < 18 ? '下午好' : '晚上好'
 
@@ -396,35 +401,9 @@ const handleRead = async (id: string) => {
     <main style={{ position: 'fixed', inset: 0, width: '100vw', height: '100vh', overflow: 'hidden', background: THEME.bg, fontFamily: 'sans-serif' }}>
       <div style={{ position: 'absolute', top: '12%', right: '-4%', fontSize: 'clamp(60px, 18vw, 130px)', fontWeight: 'bold', color: THEME.text, opacity: 0.07, pointerEvents: 'none', fontStyle: 'italic', whiteSpace: 'nowrap', lineHeight: 1, userSelect: 'none' }}>根·陪伴</div>
 
-      {/* 左上角孩子头像 */}
-      <div style={{ position: 'absolute', top: '5%', left: '5%', zIndex: 100 }}>
-        {kids.length > 0 ? (
-          <div>
-            <motion.div onClick={() => setModal('child')}
-              animate={{ boxShadow: [`0 0 15px ${getEnergyColor(selKid?.energy ?? 75)}40`, `0 0 35px ${getEnergyColor(selKid?.energy ?? 75)}80`, `0 0 15px ${getEnergyColor(selKid?.energy ?? 75)}40`] }}
-              transition={{ duration: 4, repeat: Infinity }}
-              style={{ width: 68, height: 68, borderRadius: '50%', background: 'rgba(255,255,255,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid white', cursor: 'pointer', fontSize: 34 }}>
-              {selKid?.avatar_url
-    ? <img src={selKid.avatar_url} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
-    : selKid?.emoji || '👶🏻'
-  }
-            </motion.div>
-            <p style={{ marginTop: 8, fontSize: 10, color: THEME.text, fontWeight: 700, letterSpacing: '0.2em', textAlign: 'center' }}>{selKid?.name}</p>
-            <div style={{ width: 56, height: 3, background: 'rgba(255,255,255,0.3)', borderRadius: 2, margin: '3px auto', overflow: 'hidden' }}>
-              <motion.div animate={{ width: `${selKid?.energy ?? 75}%` }} style={{ height: '100%', background: getEnergyColor(selKid?.energy ?? 75) }} />
-            </div>
-          </div>
-        ) : (
-          <motion.div whileTap={{ scale: 0.9 }} onClick={() => setModal('addChild')}
-            style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
-            <div style={{ width: 68, height: 68, borderRadius: '50%', background: 'rgba(255,255,255,0.45)', border: '2px dashed rgba(255,255,255,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 32 }}>🌱</div>
-            <span style={{ fontSize: 10, color: THEME.muted, fontWeight: 700, letterSpacing: '0.15em' }}>添加孩子</span>
-          </motion.div>
-        )}
-      </div>
+      <ChildAvatar />
 
-      {/* 右上角时钟 */}
-      <header style={{ position: 'absolute', top: '5%', right: '6%', zIndex: 50, textAlign: 'right' }}>
+      <header style={{ position: 'fixed', top: 'max(48px, env(safe-area-inset-top, 48px))', right: '6%', zIndex: 50, textAlign: 'right' }}>
         <h1 style={{ fontSize: 'clamp(48px, 15vw, 76px)', fontWeight: 100, color: THEME.text, opacity: 0.9, lineHeight: 1, margin: 0 }}>
           {mounted ? `${time.getHours()}:${time.getMinutes() < 10 ? `0${time.getMinutes()}` : time.getMinutes()}` : '--:--'}
         </h1>
@@ -433,7 +412,6 @@ const handleRead = async (id: string) => {
         </p>
       </header>
 
-      {/* 水珠 */}
       {loading ? (
         <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <motion.div animate={{ opacity: [0.3, 1, 0.3] }} transition={{ duration: 1.5, repeat: Infinity }}
@@ -441,7 +419,7 @@ const handleRead = async (id: string) => {
         </div>
       ) : (
         <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'clamp(20px, 5vw, 36px)' }}>
-          <WaterDrop state={cState} icon={<Heart size={24} />} label="孩子" value={selKid ? `${selKid.energy}%` : '—'} badge={childUrgent} pulse={childUrgent > 0} onClick={() => setModal('child')} size={124} delay={0} />
+          <WaterDrop state={cState} icon={<Heart size={24} />} label="孩子" value={activeKid ? `${activeKid.energy ?? 75}%` : '—'} badge={childUrgent} pulse={childUrgent > 0} onClick={() => setModal('child')} size={124} delay={0} />
           <div style={{ display: 'flex', gap: 'clamp(28px, 8vw, 52px)', alignItems: 'center' }}>
             <WaterDrop state={tState} icon={<Bell size={20} />} label="待办" value={todos.filter(t => t.status !== 'done').length > 0 ? `${todos.filter(t => t.status !== 'done').length}条` : '静默'} badge={redCount} pulse={redCount > 0} onClick={() => setModal('todo')} size={98} delay={1.8} />
             <WaterDrop state={hState} icon={patrolling ? <Loader size={20} /> : <Zap size={20} />} label="热点" value={unread > 0 ? `${unread}条` : '根'} badge={unread} pulse={unread > 0} onClick={() => setModal('hotspot')} size={98} delay={3.4} />
@@ -449,26 +427,25 @@ const handleRead = async (id: string) => {
         </div>
       )}
 
-      {/* 弹窗 */}
       <AnimatePresence>
-     {modal === 'child' && (
-  <ChildSheet
-    key="child"
-    children={kids}
-    sel={selKid}
-    onSel={c => setSelKid(c)}
-    onClose={() => setModal(null)}
-    onAdd={() => setModal('addChild')}
-    userId={userId}
-  />
-)}
+        {modal === 'child' && (
+          <ChildSheet
+            key="child"
+            children={enrichedKids.length ? enrichedKids : kids}
+            sel={activeKid}
+            onSel={c => setActiveKid(c)}
+            onClose={() => setModal(null)}
+            onAdd={() => setModal('addChild')}
+            userId={userId}
+          />
+        )}
         {modal === 'todo' && (
           <TodoSheet key="todo" todos={todos} onClose={() => setModal(null)} onAction={t => {
             setOneTapTodo(t)
             setModal('oneTap')
           }} />
         )}
-       {modal === 'hotspot' && (
+        {modal === 'hotspot' && (
           <HotspotSheet
             key="hotspot"
             hotspots={hotspots}
@@ -501,70 +478,51 @@ const handleRead = async (id: string) => {
           />
         )}
         {modal === 'input' && (
-  <InputSheet
-    key="input"
-    onClose={() => setModal(null)}
-    userId={userId}
-    onProcessing={() => setProcessStatus({ status: 'processing', message: '根正在整理中...' })}
-  />
-)}
-      </AnimatePresence>
-      <AnimatePresence>
-  {processStatus && (
-    <motion.div
-      initial={{ opacity: 0, y: 30 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: 30 }}
-      onClick={() => {
-        if (processStatus.status === 'done') {
-          setModal('todo')
-          setProcessStatus(null)
-        }
-      }}
-      style={{
-        position: 'fixed',
-        bottom: 90,
-        left: 16, right: 16,
-        zIndex: 500,
-        background: processStatus.status === 'done'
-          ? 'rgba(29,158,117,0.95)'
-          : processStatus.status === 'failed'
-          ? 'rgba(220,38,38,0.95)'
-          : 'rgba(26,60,94,0.95)',
-        backdropFilter: 'blur(20px)',
-        padding: '14px 20px',
-        borderRadius: 16,
-        display: 'flex',
-        alignItems: 'center',
-        gap: 10,
-        boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
-        cursor: processStatus.status === 'done' ? 'pointer' : 'default',
-      }}
-    >
-      {processStatus.status === 'processing' && (
-        <motion.div
-          animate={{ rotate: 360 }}
-          transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
-        >
-          🌱
-        </motion.div>
-      )}
-      {processStatus.status === 'done' && <span>✓</span>}
-      {processStatus.status === 'failed' && <span>⚠</span>}
-      <div style={{ flex: 1 }}>
-        <div style={{ fontSize: 13, fontWeight: 500, color: '#fff' }}>
-          {processStatus.message}
-        </div>
-        {processStatus.status === 'done' && (
-          <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)', marginTop: 2 }}>
-            点击查看待办
-          </div>
+          <InputSheet
+            key="input"
+            onClose={() => setModal(null)}
+            userId={userId}
+            onProcessing={() => setProcessStatus({ status: 'processing', message: '根正在整理中...' })}
+          />
         )}
-      </div>
-    </motion.div>
-  )}
-</AnimatePresence>
-      <InstallPWA />
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {processStatus && (
+          <motion.div
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 30 }}
+            onClick={() => {
+              if (processStatus.status === 'done') {
+                setModal('todo')
+                setProcessStatus(null)
+              }
+            }}
+            style={{
+              position: 'fixed', bottom: 90, left: 16, right: 16, zIndex: 500,
+              background: processStatus.status === 'done' ? 'rgba(29,158,117,0.95)' : processStatus.status === 'failed' ? 'rgba(220,38,38,0.95)' : 'rgba(26,60,94,0.95)',
+              backdropFilter: 'blur(20px)', padding: '14px 20px', borderRadius: 16,
+              display: 'flex', alignItems: 'center', gap: 10,
+              boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
+              cursor: processStatus.status === 'done' ? 'pointer' : 'default',
+            }}
+          >
+            {processStatus.status === 'processing' && (
+              <motion.div animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}>🌱</motion.div>
+            )}
+            {processStatus.status === 'done' && <span>✓</span>}
+            {processStatus.status === 'failed' && <span>⚠</span>}
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 13, fontWeight: 500, color: '#fff' }}>{processStatus.message}</div>
+              {processStatus.status === 'done' && (
+                <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)', marginTop: 2 }}>点击查看待办</div>
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {!keyboardOpen && <InstallPWA />}
     </main>
   )
