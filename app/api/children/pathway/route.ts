@@ -4,22 +4,22 @@ export const maxDuration = 60
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
-  console.log("generateAndSave started", { childId: body?.childId, hasChild: !!body?.child, hasVision: !!body?.vision, authHeader: authHeader?.slice(0,20) })
 async function generateAndSave(body: any, authHeader: string) {
   const { child, activities, achievements, assessment, vision, childId } = body
+
+  console.log('generateAndSave started', { childId, hasChild: !!child, hasVision: !!vision, authHeaderLen: authHeader?.length })
 
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   )
 
-  // 从 token 解析 uid，失败则 uid 为 null，不阻断生成流程
   const token = authHeader.replace('Bearer ', '')
   const { data: { user } } = await supabase.auth.getUser(token)
   const uid = user?.id || null
-  console.log("auth result", { uid, tokenLength: token?.length })
 
-  console.log("about to call Anthropic", { childName: child?.name, visionStatement: vision?.vision_statement })
+  console.log('auth result', { uid, tokenLen: token?.length })
+
   const prompt = `你是一位顶尖的国际升学规划专家，有20年帮助海外华人家庭孩子申请美高、英国独立学校和欧美T50大学的经验。
 
 请根据以下信息，为这个孩子生成一份完整的升学规划报告。
@@ -91,6 +91,8 @@ ${assessment ? JSON.stringify(assessment) : '暂无测评记录'}
   ]
 }`
 
+  console.log('calling Anthropic', { childName: child?.name })
+
   try {
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
@@ -107,13 +109,18 @@ ${assessment ? JSON.stringify(assessment) : '暂无测评记录'}
     })
 
     const data = await response.json()
+    console.log('Anthropic response status', response.status, data.error || 'ok')
+
     const raw = data.content?.[0]?.text || ''
     const match = raw.match(/\{[\s\S]*\}/)
-    if (!match) return
+    if (!match) {
+      console.log('no JSON found in response', raw.slice(0, 200))
+      return
+    }
 
     const reportData = JSON.parse(match[0])
 
-    await supabase.from('pathway_reports').insert({
+    const { error: insertError } = await supabase.from('pathway_reports').insert({
       child_id: childId,
       user_id: uid,
       profile_scores: reportData.profile_scores,
@@ -123,14 +130,18 @@ ${assessment ? JSON.stringify(assessment) : '暂无测评记录'}
       this_semester: reportData.this_semester,
     })
 
-  } catch (e) {
-    console.error('规划生成失败', e)
+    console.log('insert result', { insertError })
+
+  } catch (e: any) {
+    console.error('generateAndSave error', e?.message || e)
   }
 }
 
 export async function POST(req: NextRequest) {
   const body = await req.json()
   const authHeader = req.headers.get('authorization') || ''
+
+  console.log('POST received', { hasChild: !!body.child, hasVision: !!body.vision, authHeaderLen: authHeader.length })
 
   if (!body.child || !body.vision) {
     return NextResponse.json({ error: '缺少必要数据' }, { status: 400 })
