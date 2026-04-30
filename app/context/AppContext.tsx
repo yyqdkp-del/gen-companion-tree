@@ -32,12 +32,26 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [todos, setTodos] = useState<any[]>([])
   const [hotspots, setHotspots] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
-  const [processStatus, setProcessStatus] = useState<{
+ const [processStatus, setProcessStatus] = useState<{
   status: 'processing' | 'done' | 'failed' | null
   message: string
   tools?: any[]
 } | null>(null)
 
+const [activeKid, setActiveKidState] = useState<any | null>(null)
+const setActiveKid = (kid: any) => {
+  setActiveKidState(kid)
+  if (kid && typeof window !== 'undefined') {
+    localStorage.setItem('active_child_id', kid.id)
+    localStorage.setItem('active_child', JSON.stringify({
+      id: kid.id, name: kid.name, grade: kid.grade,
+      level: kid.chinese_level || kid.level || 'R2',
+      emoji: kid.emoji || '👶🏻',
+      school: kid.school_name || kid.school || '',
+    }))
+    window.dispatchEvent(new Event('child-changed'))
+  }
+}
   const setUserIdSafe = (id: string) => {
     userIdRef.current = id
     setUserId(id)
