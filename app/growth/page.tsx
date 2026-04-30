@@ -3,8 +3,8 @@ import React, { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
 import { useApp } from '@/app/context/AppContext'
-import ChildAvatar from '@/app/components/ChildAvatar'
-
+import dynamic from 'next/dynamic'
+const ChildAvatar = dynamic(() => import('@/app/components/ChildAvatar'), { ssr: false })
 export const dynamic = 'force-dynamic'
 
 function FallingLeaves() {
