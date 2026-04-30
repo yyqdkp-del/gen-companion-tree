@@ -55,12 +55,12 @@ ${assessment ? JSON.stringify(assessment) : '暂无测评记录'}
 
 {
   "profile_scores": {
-    "academic": 数字0-100,
-    "spike_depth": 数字0-100,
-    "leadership": 数字0-100,
-    "language": 数字0-100,
-    "community": 数字0-100,
-    "diversity": 数字0-100
+    "academic": 75,
+    "spike_depth": 60,
+    "leadership": 40,
+    "language": 85,
+    "community": 30,
+    "diversity": 55
   },
   "profile_summary": "一句话总结孩子现在的画像（20字以内）",
   "narrative": "这个孩子的申请故事主线（3-5句话，感性有力）",
@@ -76,7 +76,7 @@ ${assessment ? JSON.stringify(assessment) : '暂无测评记录'}
           "action": "具体行动",
           "reason": "为什么重要",
           "resource": "清迈可用资源",
-          "tier": 数字1-4
+          "tier": 2
         }
       ]
     }
