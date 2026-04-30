@@ -291,8 +291,8 @@ export default function BasePage() {
   const enrichCacheRef = useRef<Record<string, Child>>({})
 
   const enrichKids = useCallback(async (uid: string) => {
-    const storedId = localStorage.getItem('active_child_id')
-    const cached = enrichCacheRef.current[storedId || '']
+    const _cachedId = localStorage.getItem('active_child_id')
+    const cached = enrichCacheRef.current[_cachedId || '']
     if (cached) setActiveKid(cached)
     const today = new Date().toISOString().split('T')[0]
     const dow = new Date().getDay()
