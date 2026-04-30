@@ -4,7 +4,7 @@ const supabase = createClient()
 import InstallPWA from '@/app/components/InstallPWA'
 import React, { useEffect, useState, useRef, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import dynamic from 'next/dynamic'
+import nextDynamic from 'next/dynamic'
 import {
   X, Plus, ChevronRight, CheckCircle2, Bell,
   Zap, Heart, Clock, Loader, FileText,
@@ -18,7 +18,7 @@ import HotspotSheet from '@/app/rian/HotspotSheet'
 import { useApp } from '@/app/context/AppContext'
 import TodoSheet from '@/app/rian/TodoSheet'
 
-const ChildAvatar = dynamic(() => import('@/app/components/ChildAvatar'), { ssr: false })
+const ChildAvatar = nextDynamic(() => import('@/app/components/ChildAvatar'), { ssr: false })
 
 const THEME = {
   bg: 'linear-gradient(180deg, #A7D7D9 0%, #D9A7B4 100%)',
