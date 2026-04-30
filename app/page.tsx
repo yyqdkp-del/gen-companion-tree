@@ -322,6 +322,11 @@ export default function BasePage() {
   }, [])
 
   useEffect(() => { if (userId) enrichKids(userId) }, [userId, enrichKids])
+  useEffect(() => {
+    const onChildChanged = () => { if (userId) enrichKids(userId) }
+    window.addEventListener('child-changed', onChildChanged)
+    return () => window.removeEventListener('child-changed', onChildChanged)
+  }, [userId, enrichKids])
 
   useEffect(() => {
     setMounted(true)
