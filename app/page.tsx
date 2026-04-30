@@ -330,10 +330,18 @@ export default function BasePage() {
 
   useEffect(() => { if (userId) enrichKids(userId) }, [userId, enrichKids])
   useEffect(() => {
-    const onChildChanged = () => { if (userId) enrichKids(userId) }
+    const onChildChanged = () => {
+      const id = localStorage.getItem('active_child_id')
+      const cached = enrichCacheRef.current[id || '']
+      if (cached) {
+        setActiveKid(cached)
+        return
+      }
+      if (userId) enrichKids(userId)
+    }
     window.addEventListener('child-changed', onChildChanged)
     return () => window.removeEventListener('child-changed', onChildChanged)
-  }, [userId, enrichKids])
+  }, [userId, enrichKids, setActiveKid])
 
   useEffect(() => {
     setMounted(true)
