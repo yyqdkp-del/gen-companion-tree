@@ -1,21 +1,14 @@
 'use client'
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion } from 'framer-motion'
+import { useApp } from '@/app/context/AppContext'
+import ChildAvatar from '@/app/components/ChildAvatar'
 
 export const dynamic = 'force-dynamic'
 
 const supabase = createClient()
-
-type Kid = {
-  id: string
-  name: string
-  grade?: string
-  level?: string
-  emoji?: string
-  school?: string
-}
 
 function FallingLeaves() {
   const leaves = [
@@ -47,37 +40,25 @@ function FallingLeaves() {
 
 export default function GrowthPage() {
   const router = useRouter()
-  const [kids, setKids] = useState<Kid[]>([])
-  const [activeKid, setActiveKid] = useState<Kid | null>(null)
+  const { kids } = useApp()
+  const [activeKidName, setActiveKidName] = useState('')
 
-  useEffect(() => {
-    const load = async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
-      const { data } = await supabase.from('children').select('*').eq('user_id', user.id)
-      if (!data?.length) return
-      setKids(data)
-
-      // 读已选的孩子，没有则默认第一个
-      const storedId = localStorage.getItem('active_child_id')
-      const found = data.find((k: Kid) => k.id === storedId) || data[0]
-      selectKid(found)
-    }
-    load()
+  // 读当前选中孩子名字，监听切换事件
+  const readActive = useCallback(() => {
+    try {
+      const raw = localStorage.getItem('active_child')
+      if (raw) {
+        const c = JSON.parse(raw)
+        setActiveKidName(c.name || '')
+      }
+    } catch {}
   }, [])
 
-  const selectKid = (kid: Kid) => {
-    setActiveKid(kid)
-    localStorage.setItem('active_child_id', kid.id)
-    localStorage.setItem('active_child', JSON.stringify({
-      id: kid.id,
-      name: kid.name,
-      grade: kid.grade,
-      level: kid.level || 'R2',
-      emoji: kid.emoji || '🌟',
-      school: kid.school,
-    }))
-  }
+  useEffect(() => {
+    readActive()
+    window.addEventListener('child-changed', readActive)
+    return () => window.removeEventListener('child-changed', readActive)
+  }, [readActive])
 
   return (
     <main style={{
@@ -86,6 +67,7 @@ export default function GrowthPage() {
       overflow: 'hidden',
       fontFamily: "'Noto Serif SC', Georgia, serif",
     }}>
+
       {/* 背景图 */}
       <div style={{
         position: 'absolute', inset: 0,
@@ -96,60 +78,30 @@ export default function GrowthPage() {
       }} />
       <div style={{ position: 'absolute', inset: 0, background: 'rgba(20,40,10,0.08)' }} />
 
-      {/* ══ 孩子切换栏 — 顶部安全区下方 ══ */}
-      {kids.length > 0 && (
-        <motion.div
-          initial={{ opacity: 0, y: -8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.6 }}
-          style={{
-            position: 'absolute',
-            top: 'max(52px, env(safe-area-inset-top, 52px))',
-            left: 0, right: 0,
-            display: 'flex',
-            justifyContent: 'center',
-            gap: 10,
-            padding: '0 16px',
-            zIndex: 50,
-            flexWrap: 'wrap',
+      {/* ══ 左上角孩子头像（与主页一致） ══ */}
+      <div style={{ position: 'absolute', top: 'max(48px, env(safe-area-inset-top, 48px))', left: '5%', zIndex: 100 }}>
+        <ChildAvatar
+          size={68}
+          showName={true}
+          showEnergy={true}
+          onSelect={(kid) => {
+            localStorage.setItem('active_child_id', kid.id)
+            localStorage.setItem('active_child', JSON.stringify({
+              id: kid.id, name: kid.name, grade: kid.grade,
+              level: kid.level || 'R2', emoji: kid.emoji || '👶🏻', school: kid.school,
+            }))
+            window.dispatchEvent(new Event('child-changed'))
+            setActiveKidName(kid.name || '')
           }}
-        >
-          {kids.map(kid => (
-            <motion.button
-              key={kid.id}
-              whileTap={{ scale: 0.93 }}
-              onClick={() => selectKid(kid)}
-              style={{
-                padding: '6px 16px',
-                borderRadius: 20,
-                border: activeKid?.id === kid.id
-                  ? '1.5px solid rgba(255,224,128,0.9)'
-                  : '1px solid rgba(255,255,255,0.25)',
-                background: activeKid?.id === kid.id
-                  ? 'rgba(255,210,80,0.18)'
-                  : 'rgba(255,255,255,0.10)',
-                backdropFilter: 'blur(10px)',
-                color: activeKid?.id === kid.id ? '#FFE080' : 'rgba(255,255,255,0.75)',
-                fontSize: 13,
-                fontWeight: activeKid?.id === kid.id ? 700 : 400,
-                letterSpacing: '0.08em',
-                cursor: 'pointer',
-                fontFamily: "'Noto Serif SC', serif",
-                textShadow: activeKid?.id === kid.id ? '0 0 8px rgba(255,180,0,0.6)' : 'none',
-              }}
-            >
-              {kid.emoji || '🌟'} {kid.name}
-            </motion.button>
-          ))}
-        </motion.div>
-      )}
+        />
+      </div>
 
       {/* ══ 学业成长入口 — 上半屏中部 ══ */}
       <motion.button
         initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 1.2 }}
-        whileHover={{ scale: 1.08 }}
+        transition={{ delay: 1.0 }}
+        whileHover={{ scale: 1.06 }}
         whileTap={{ scale: 0.93 }}
         onClick={() => router.push('/growth/academic')}
         style={{
@@ -157,83 +109,83 @@ export default function GrowthPage() {
           left: '50%', top: '30vh',
           transform: 'translateX(-50%)',
           zIndex: 50,
-          background: 'transparent', border: 'none',
+          background: 'rgba(20,12,4,0.52)',
+          border: '1px solid rgba(240,192,64,0.45)',
+          borderRadius: 16,
+          backdropFilter: 'blur(14px)',
           cursor: 'pointer',
-          display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px',
+          width: 'min(280px, 75vw)',
+          padding: '14px 18px',
+          display: 'flex', alignItems: 'center', gap: 14,
         }}
       >
-        <motion.div
-          animate={{ opacity: [0.25, 0.65, 0.25], scale: [1, 1.15, 1] }}
-          transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
-          style={{
-            position: 'absolute', inset: '-20px', borderRadius: '50%',
-            background: 'radial-gradient(ellipse, rgba(240,192,64,0.32) 0%, transparent 70%)',
-            pointerEvents: 'none',
-          }}
-        />
-        <motion.span
-          animate={{ opacity: [0.75, 1, 0.75] }}
-          transition={{ duration: 2.5, repeat: Infinity }}
-          style={{
-            fontSize: '15px', fontWeight: 700, color: '#FFE080',
-            letterSpacing: '0.12em',
-            textShadow: '0 0 12px rgba(255,180,0,0.95), 0 1px 4px rgba(0,0,0,0.6)',
-            lineHeight: 1.3, textAlign: 'center',
-          }}
-        >
-          {activeKid ? `${activeKid.name}的学业` : '学业成长'}
-        </motion.span>
-        <span style={{
-          fontSize: '10px', color: 'rgba(255,220,120,0.8)',
-          letterSpacing: '0.18em',
-          textShadow: '0 1px 4px rgba(0,0,0,0.6)',
-        }}>进入</span>
+        <div style={{
+          width: 44, height: 44, borderRadius: 22,
+          background: 'rgba(240,192,64,0.15)',
+          border: '1px solid rgba(240,192,64,0.35)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: 24, flexShrink: 0,
+        }}>🏆</div>
+        <div style={{ flex: 1, textAlign: 'left' }}>
+          <div style={{
+            fontSize: 15, fontWeight: 700, color: '#FFE080',
+            letterSpacing: '0.08em',
+            textShadow: '0 0 10px rgba(255,180,0,0.7)',
+            lineHeight: 1.3,
+          }}>
+            {activeKidName ? `${activeKidName}的学业` : '学业成长'}
+          </div>
+          <div style={{ fontSize: 11, color: 'rgba(255,220,120,0.6)', marginTop: 3, letterSpacing: '0.06em' }}>
+            升学规划 · 成长档案
+          </div>
+        </div>
+        <div style={{ fontSize: 18, color: 'rgba(255,220,120,0.5)', flexShrink: 0 }}>›</div>
       </motion.button>
 
       {/* ══ 根·中文入口 — 下半屏中部 ══ */}
       <motion.button
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 1.5 }}
-        whileHover={{ scale: 1.08 }}
+        transition={{ delay: 1.2 }}
+        whileHover={{ scale: 1.06 }}
         whileTap={{ scale: 0.93 }}
         onClick={() => router.push('/learn')}
         style={{
           position: 'absolute',
-          left: '50%', top: '63vh',
+          left: '50%', top: '62vh',
           transform: 'translateX(-50%)',
           zIndex: 50,
-          background: 'transparent', border: 'none',
+          background: 'rgba(20,4,4,0.52)',
+          border: '1px solid rgba(192,57,43,0.45)',
+          borderRadius: 16,
+          backdropFilter: 'blur(14px)',
           cursor: 'pointer',
-          display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px',
+          width: 'min(280px, 75vw)',
+          padding: '14px 18px',
+          display: 'flex', alignItems: 'center', gap: 14,
         }}
       >
-        <motion.div
-          animate={{ opacity: [0.25, 0.65, 0.25], scale: [1, 1.15, 1] }}
-          transition={{ duration: 2.8, repeat: Infinity, ease: 'easeInOut' }}
-          style={{
-            position: 'absolute', inset: '-20px', borderRadius: '50%',
-            background: 'radial-gradient(ellipse, rgba(255,210,80,0.32) 0%, transparent 70%)',
-            pointerEvents: 'none',
-          }}
-        />
-        <motion.span
-          animate={{ opacity: [0.75, 1, 0.75] }}
-          transition={{ duration: 2.5, repeat: Infinity }}
-          style={{
-            fontSize: '15px', fontWeight: 700, color: '#FFE080',
-            letterSpacing: '0.12em',
-            textShadow: '0 0 12px rgba(255,180,0,0.95), 0 1px 4px rgba(0,0,0,0.6)',
-            lineHeight: 1.3, textAlign: 'center',
-          }}
-        >
-          根·中文
-        </motion.span>
-        <span style={{
-          fontSize: '10px', color: 'rgba(255,220,120,0.8)',
-          letterSpacing: '0.18em',
-          textShadow: '0 1px 4px rgba(0,0,0,0.6)',
-        }}>进入</span>
+        <div style={{
+          width: 44, height: 44, borderRadius: 22,
+          background: 'rgba(192,57,43,0.15)',
+          border: '1px solid rgba(192,57,43,0.35)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: 24, flexShrink: 0,
+        }}>📖</div>
+        <div style={{ flex: 1, textAlign: 'left' }}>
+          <div style={{
+            fontSize: 15, fontWeight: 700, color: '#FFE080',
+            letterSpacing: '0.08em',
+            textShadow: '0 0 10px rgba(255,100,80,0.7)',
+            lineHeight: 1.3,
+          }}>
+            根·中文
+          </div>
+          <div style={{ fontSize: 11, color: 'rgba(255,220,120,0.6)', marginTop: 3, letterSpacing: '0.06em' }}>
+            字理解码 · 成语 · 文化句
+          </div>
+        </div>
+        <div style={{ fontSize: 18, color: 'rgba(255,220,120,0.5)', flexShrink: 0 }}>›</div>
       </motion.button>
 
       {/* 飘落树叶 */}
