@@ -15,6 +15,7 @@ import TodoDetailModal from '@/app/rian/TodoDetailModal'
 import ChildSheet from '@/app/rian/ChildSheet'
 import HotspotSheet from '@/app/rian/HotspotSheet'
 import { useApp } from '@/app/context/AppContext'
+import ChildAvatar from '@/app/components/ChildAvatar'
 import TodoSheet from '@/app/rian/TodoSheet'
 
 
@@ -317,7 +318,7 @@ export default function BasePage() {
         school_name: c.school_name, grade: c.grade, today_schedule,
       }
     }))
-    setSelKid(prev => prev ? enriched.find(c => c.id === prev.id) || enriched[0] : enriched[0])
+    setActiveKid(prev => prev ? enriched.find(c => c.id === prev.id) || enriched[0] : enriched[0])
   }, [])
 
   useEffect(() => { if (userId) enrichKids(userId) }, [userId, enrichKids])
