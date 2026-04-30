@@ -643,38 +643,42 @@ function AcademicContent() {
   }
 
   const generateReport = async (visionData: any) => {
-    if (!childId) return
-    setGenerating(true)
+  if (!childId) return
+  setGenerating(true)
 
-    // ✅ 安全：不传 uid 给 API，服务端从 Authorization header 自己取
-    const { data: { session } } = await supabase.auth.getSession()
-    const accessToken = session?.access_token
+  const { data: { session } } = await supabase.auth.getSession()
+  const accessToken = session?.access_token
 
-    const [childRes, activitiesRes, achievementsRes, assessmentRes] = await Promise.all([
-      supabase.from('children').select('*').eq('id', childId).single(),
-      supabase.from('child_activities').select('*').eq('child_id', childId),
-      supabase.from('child_achievements').select('*').eq('child_id', childId),
-      supabase.from('assessments').select('report').eq('child_id', childId).order('created_at', { ascending: false }).limit(1).maybeSingle(),
-    ])
+  const [childRes, activitiesRes, achievementsRes, assessmentRes, essaysRes] = await Promise.all([
+    supabase.from('children').select('*').eq('id', childId).single(),
+    supabase.from('child_activities').select('*').eq('child_id', childId),
+    supabase.from('child_achievements').select('*').eq('child_id', childId),
+    supabase.from('assessments').select('report').eq('child_id', childId).order('created_at', { ascending: false }).limit(1).maybeSingle(),
+    supabase.from('essay_materials').select('*').eq('child_id', childId),
+  ])
 
-    await fetch('/api/children/pathway', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        // ✅ 安全：token 放 header，服务端验证后自己取 uid
-        ...(accessToken ? { 'Authorization': `Bearer ${accessToken}` } : {}),
-      },
-      body: JSON.stringify({
-        child: childRes.data,
-        activities: activitiesRes.data || [],
-        achievements: achievementsRes.data || [],
-        assessment: assessmentRes.data?.report || null,
-        vision: visionData,
-        childId,
-        // ✅ uid 不再从客户端传，服务端自己从 token 解析
-      }),
-    })
-  }
+  // 读地理围栏
+  const storedChild = localStorage.getItem('active_child')
+  const geofence = storedChild ? JSON.parse(storedChild)?.geofence || null : null
+
+  await fetch('/api/children/pathway', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(accessToken ? { 'Authorization': `Bearer ${accessToken}` } : {}),
+    },
+    body: JSON.stringify({
+      child: childRes.data,
+      activities: activitiesRes.data || [],
+      achievements: achievementsRes.data || [],
+      essays: essaysRes.data || [],
+      assessment: assessmentRes.data?.report || null,
+      vision: visionData,
+      childId,
+      geofence,
+    }),
+  })
+}
 
   if (loading) return (
     <div style={{ minHeight: '100dvh', background: T.bg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
