@@ -288,8 +288,12 @@ export default function BasePage() {
   const [patrolling, setPatrolling] = useState(false)
   const [mounted, setMounted] = useState(false)
   const [keyboardOpen, setKeyboardOpen] = useState(false)
+  const enrichCacheRef = useRef<Record<string, Child>>({})
 
   const enrichKids = useCallback(async (uid: string) => {
+    const storedId = localStorage.getItem('active_child_id')
+    const cached = enrichCacheRef.current[storedId || '']
+    if (cached) setActiveKid(cached)
     const today = new Date().toISOString().split('T')[0]
     const dow = new Date().getDay()
     const { data: childData } = await supabase.from('children').select('*').eq('user_id', uid)
@@ -318,6 +322,7 @@ export default function BasePage() {
       }
     }))
     setEnrichedKids(enriched)
+    enriched.forEach(c => { enrichCacheRef.current[c.id] = c })
     const storedId = localStorage.getItem('active_child_id')
     const current = enriched.find(c => c.id === storedId) || enriched[0]
     setActiveKid(current)
