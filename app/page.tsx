@@ -282,7 +282,6 @@ function InputSheet({ onClose, userId, onProcessing }: { onClose: () => void; us
 export default function BasePage() {
  const { userId, kids, todos, hotspots, loading, sync: ctxSync, processStatus, setProcessStatus } = useApp()
   const [time, setTime] = useState(new Date())
-  const [selKid, setSelKid] = useState<Child | null>(null)
   const [modal, setModal] = useState<'child' | 'todo' | 'hotspot' | 'addChild' | 'oneTap' | 'input' | null>(null)
   const [oneTapTodo, setOneTapTodo] = useState<TodoItem | null>(null)
   const [patrolling, setPatrolling] = useState(false)
@@ -388,12 +387,12 @@ const handleRead = async (id: string) => {
     } catch { setPatrolling(false) }
   }
 
-  const cState = dropState('child', selKid)
+  const cState = dropState('child', activeKid)
   const tState = dropState('todo', todos)
   const hState = dropState('hotspot', hotspots)
   const redCount = todos.filter(t => t.priority === 'red').length
   const unread = hotspots.filter(h => h.status === 'unread').length
-  const childUrgent = (selKid?.urgent_items || []).filter(i => i.level === 'red').length
+  const childUrgent = (activeKid?.urgent_items || []).filter(i => i.level === 'red').length
   const hour = time.getHours()
   const greeting = hour < 6 ? '夜深了' : hour < 12 ? '早上好' : hour < 18 ? '下午好' : '晚上好'
 
@@ -402,31 +401,7 @@ const handleRead = async (id: string) => {
       <div style={{ position: 'absolute', top: '12%', right: '-4%', fontSize: 'clamp(60px, 18vw, 130px)', fontWeight: 'bold', color: THEME.text, opacity: 0.07, pointerEvents: 'none', fontStyle: 'italic', whiteSpace: 'nowrap', lineHeight: 1, userSelect: 'none' }}>根·陪伴</div>
 
       {/* 左上角孩子头像 */}
-      <div style={{ position: 'absolute', top: '5%', left: '5%', zIndex: 100 }}>
-        {kids.length > 0 ? (
-          <div>
-            <motion.div onClick={() => setModal('child')}
-              animate={{ boxShadow: [`0 0 15px ${getEnergyColor(selKid?.energy ?? 75)}40`, `0 0 35px ${getEnergyColor(selKid?.energy ?? 75)}80`, `0 0 15px ${getEnergyColor(selKid?.energy ?? 75)}40`] }}
-              transition={{ duration: 4, repeat: Infinity }}
-              style={{ width: 68, height: 68, borderRadius: '50%', background: 'rgba(255,255,255,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid white', cursor: 'pointer', fontSize: 34 }}>
-              {selKid?.avatar_url
-    ? <img src={selKid.avatar_url} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
-    : selKid?.emoji || '👶🏻'
-  }
-            </motion.div>
-            <p style={{ marginTop: 8, fontSize: 10, color: THEME.text, fontWeight: 700, letterSpacing: '0.2em', textAlign: 'center' }}>{selKid?.name}</p>
-            <div style={{ width: 56, height: 3, background: 'rgba(255,255,255,0.3)', borderRadius: 2, margin: '3px auto', overflow: 'hidden' }}>
-              <motion.div animate={{ width: `${selKid?.energy ?? 75}%` }} style={{ height: '100%', background: getEnergyColor(selKid?.energy ?? 75) }} />
-            </div>
-          </div>
-        ) : (
-          <motion.div whileTap={{ scale: 0.9 }} onClick={() => setModal('addChild')}
-            style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
-            <div style={{ width: 68, height: 68, borderRadius: '50%', background: 'rgba(255,255,255,0.45)', border: '2px dashed rgba(255,255,255,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 32 }}>🌱</div>
-            <span style={{ fontSize: 10, color: THEME.muted, fontWeight: 700, letterSpacing: '0.15em' }}>添加孩子</span>
-          </motion.div>
-        )}
-      </div>
+      <ChildAvatar />
 
       {/* 右上角时钟 */}
       <header style={{ position: 'absolute', top: '5%', right: '6%', zIndex: 50, textAlign: 'right' }}>
@@ -446,7 +421,7 @@ const handleRead = async (id: string) => {
         </div>
       ) : (
         <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'clamp(20px, 5vw, 36px)' }}>
-          <WaterDrop state={cState} icon={<Heart size={24} />} label="孩子" value={selKid ? `${selKid.energy}%` : '—'} badge={childUrgent} pulse={childUrgent > 0} onClick={() => setModal('child')} size={124} delay={0} />
+          <WaterDrop state={cState} icon={<Heart size={24} />} label="孩子" value={activeKid ? `${activeKid.energy ?? 75}%` : '—'} badge={childUrgent} pulse={childUrgent > 0} onClick={() => setModal('child')} size={124} delay={0} />
           <div style={{ display: 'flex', gap: 'clamp(28px, 8vw, 52px)', alignItems: 'center' }}>
             <WaterDrop state={tState} icon={<Bell size={20} />} label="待办" value={todos.filter(t => t.status !== 'done').length > 0 ? `${todos.filter(t => t.status !== 'done').length}条` : '静默'} badge={redCount} pulse={redCount > 0} onClick={() => setModal('todo')} size={98} delay={1.8} />
             <WaterDrop state={hState} icon={patrolling ? <Loader size={20} /> : <Zap size={20} />} label="热点" value={unread > 0 ? `${unread}条` : '根'} badge={unread} pulse={unread > 0} onClick={() => setModal('hotspot')} size={98} delay={3.4} />
@@ -460,8 +435,8 @@ const handleRead = async (id: string) => {
   <ChildSheet
     key="child"
     children={kids}
-    sel={selKid}
-    onSel={c => setSelKid(c)}
+    sel={activeKid}
+    onSel={c => setActiveKid(c)}
     onClose={() => setModal(null)}
     onAdd={() => setModal('addChild')}
     userId={userId}
