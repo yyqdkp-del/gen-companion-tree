@@ -422,15 +422,21 @@ ${JSON.stringify(nodesWithCompletion, null, 2)}
     if (insertError) {
       console.error('insert error', insertError)
       // 尝试用最小字段集重新插入
-      await supabase.from('pathway_reports').insert({
-        child_id: childId,
-        user_id: uid,
-        profile_scores: finalReport.profile_scores,
-        narrative: finalReport.narrative,
-        gaps: finalReport.gaps,
-        roadmap: finalReport.roadmap_nodes,
-        this_semester: finalReport.this_month,
-      })
+      aawait supabase.from('pathway_reports').insert({
+  child_id: childId,
+  user_id: uid,
+  profile_scores: finalReport.profile_scores,
+  narrative: finalReport.narrative,
+  gaps: finalReport.gaps,
+  roadmap: finalReport.roadmap_nodes,
+  this_semester: finalReport.this_month,
+  spike_options: finalReport.spike_options,
+  today_priority: finalReport.today_priority,
+  key_insight: finalReport.key_insight,
+  years_to_apply: finalReport.years_to_apply,
+  target_path: finalReport.target_path,
+  grade: finalReport.grade,
+})
     } else {
       console.log('pathway report saved', { childId, uid, nodes: nodesWithCompletion.length })
     }
