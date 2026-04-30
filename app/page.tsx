@@ -280,7 +280,7 @@ function InputSheet({ onClose, userId, onProcessing }: { onClose: () => void; us
 
 // ── 主页面 ──
 export default function BasePage() {
- const { userId, kids, todos, hotspots, loading, sync: ctxSync, processStatus, setProcessStatus } = useApp()
+ const { userId, kids, todos, hotspots, loading, sync: ctxSync, processStatus, setProcessStatus, activeKid, setActiveKid } = useApp()
   const [time, setTime] = useState(new Date())
   const [modal, setModal] = useState<'child' | 'todo' | 'hotspot' | 'addChild' | 'oneTap' | 'input' | null>(null)
   const [oneTapTodo, setOneTapTodo] = useState<TodoItem | null>(null)
