@@ -3,11 +3,10 @@ export const maxDuration = 60
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { waitUntil } from '@vercel/functions'
 
 async function generateAndSave(body: any, authHeader: string) {
   const { child, activities, achievements, assessment, vision, childId } = body
-
-  console.log('generateAndSave started', { childId, hasChild: !!child, hasVision: !!vision, authHeaderLen: authHeader?.length })
 
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -91,8 +90,6 @@ ${assessment ? JSON.stringify(assessment) : '暂无测评记录'}
   ]
 }`
 
-  console.log('calling Anthropic', { childName: child?.name })
-
   try {
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
@@ -109,12 +106,12 @@ ${assessment ? JSON.stringify(assessment) : '暂无测评记录'}
     })
 
     const data = await response.json()
-    console.log('Anthropic response status', response.status, data.error || 'ok')
+    console.log('Anthropic response', response.status, data.error || 'ok')
 
     const raw = data.content?.[0]?.text || ''
     const match = raw.match(/\{[\s\S]*\}/)
     if (!match) {
-      console.log('no JSON found in response', raw.slice(0, 200))
+      console.error('no JSON in response', raw.slice(0, 200))
       return
     }
 
@@ -141,13 +138,12 @@ export async function POST(req: NextRequest) {
   const body = await req.json()
   const authHeader = req.headers.get('authorization') || ''
 
-  console.log('POST received', { hasChild: !!body.child, hasVision: !!body.vision, authHeaderLen: authHeader.length })
-
   if (!body.child || !body.vision) {
     return NextResponse.json({ error: '缺少必要数据' }, { status: 400 })
   }
 
-  generateAndSave(body, authHeader).catch(console.error)
+  // waitUntil 保证 Vercel 在返回响应后继续执行后台任务
+  waitUntil(generateAndSave(body, authHeader))
 
   return NextResponse.json({ status: 'processing' })
 }
