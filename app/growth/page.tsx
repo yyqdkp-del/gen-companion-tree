@@ -1,14 +1,11 @@
 'use client'
 import React, { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { createClient } from '@/lib/supabase/client'
 import { motion } from 'framer-motion'
 import { useApp } from '@/app/context/AppContext'
 import ChildAvatar from '@/app/components/ChildAvatar'
 
 export const dynamic = 'force-dynamic'
-
-const supabase = createClient()
 
 function FallingLeaves() {
   const leaves = [
@@ -40,25 +37,7 @@ function FallingLeaves() {
 
 export default function GrowthPage() {
   const router = useRouter()
-  const { kids } = useApp()
-  const [activeKidName, setActiveKidName] = useState('')
-
-  // 读当前选中孩子名字，监听切换事件
-  const readActive = useCallback(() => {
-    try {
-      const raw = localStorage.getItem('active_child')
-      if (raw) {
-        const c = JSON.parse(raw)
-        setActiveKidName(c.name || '')
-      }
-    } catch {}
-  }, [])
-
-  useEffect(() => {
-    readActive()
-    window.addEventListener('child-changed', readActive)
-    return () => window.removeEventListener('child-changed', readActive)
-  }, [readActive])
+  const { activeKid } = useApp()
 
   return (
     <main style={{
@@ -67,8 +46,6 @@ export default function GrowthPage() {
       overflow: 'hidden',
       fontFamily: "'Noto Serif SC', Georgia, serif",
     }}>
-
-      {/* 背景图 */}
       <div style={{
         position: 'absolute', inset: 0,
         backgroundImage: "url('/forest-bg.png')",
@@ -78,25 +55,8 @@ export default function GrowthPage() {
       }} />
       <div style={{ position: 'absolute', inset: 0, background: 'rgba(20,40,10,0.08)' }} />
 
-      {/* ══ 左上角孩子头像（与主页一致） ══ */}
-      <div style={{ position: 'absolute', top: 'max(48px, env(safe-area-inset-top, 48px))', left: '5%', zIndex: 100 }}>
-        <ChildAvatar
-          size={68}
-          showName={true}
-          showEnergy={true}
-          onSelect={(kid) => {
-            localStorage.setItem('active_child_id', kid.id)
-            localStorage.setItem('active_child', JSON.stringify({
-              id: kid.id, name: kid.name, grade: kid.grade,
-              level: kid.level || 'R2', emoji: kid.emoji || '👶🏻', school: kid.school,
-            }))
-            window.dispatchEvent(new Event('child-changed'))
-            setActiveKidName(kid.name || '')
-          }}
-        />
-      </div>
+      <ChildAvatar />
 
-      {/* ══ 学业成长入口 — 上半屏中部 ══ */}
       <motion.button
         initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
@@ -133,7 +93,7 @@ export default function GrowthPage() {
             textShadow: '0 0 10px rgba(255,180,0,0.7)',
             lineHeight: 1.3,
           }}>
-            {activeKidName ? `${activeKidName}的学业` : '学业成长'}
+            {activeKid ? `${activeKid.name}的学业` : '学业成长'}
           </div>
           <div style={{ fontSize: 11, color: 'rgba(255,220,120,0.6)', marginTop: 3, letterSpacing: '0.06em' }}>
             升学规划 · 成长档案
@@ -142,7 +102,6 @@ export default function GrowthPage() {
         <div style={{ fontSize: 18, color: 'rgba(255,220,120,0.5)', flexShrink: 0 }}>›</div>
       </motion.button>
 
-      {/* ══ 根·中文入口 — 下半屏中部 ══ */}
       <motion.button
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
@@ -188,7 +147,6 @@ export default function GrowthPage() {
         <div style={{ fontSize: 18, color: 'rgba(255,220,120,0.5)', flexShrink: 0 }}>›</div>
       </motion.button>
 
-      {/* 飘落树叶 */}
       <FallingLeaves />
 
       <style>{`
