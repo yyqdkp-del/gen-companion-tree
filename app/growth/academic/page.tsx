@@ -4,7 +4,8 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
-  ArrowLeft, ArrowRight, Check, Loader, ChevronRight, Sparkles,
+  ArrowLeft, ArrowRight, Check, Loader, ChevronRight,
+  Sparkles, ChevronDown, ChevronUp, Plus, Target,
 } from 'lucide-react'
 
 const supabase = createClient()
@@ -23,33 +24,6 @@ const T = {
   textDim: 'rgba(245,240,232,0.5)',
   textFaint: 'rgba(245,240,232,0.25)',
   green: '#4ADE80',
-  navy: '#1A3C5E',
-}
-
-const SCHOOL_DB = {
-  us_boarding: [
-    { name: 'Phillips Exeter Academy', country: '🇺🇸', acceptance: '14%', ssat: '90%+', deadline: '1月15日', note: 'Harkness教学法，Ivy接受率30%' },
-    { name: 'Phillips Andover', country: '🇺🇸', acceptance: '13%', ssat: '89%+', deadline: '1月15日', note: '全美最大捐赠基金之一' },
-    { name: 'Choate Rosemary Hall', country: '🇺🇸', acceptance: '16%', ssat: '85%+', deadline: '1月15日', note: 'JFK母校，国际生友好' },
-    { name: 'Taft School', country: '🇺🇸', acceptance: '22%', ssat: '87%', deadline: '1月15日', note: '录取中位SSAT 87百分位' },
-    { name: 'Hotchkiss School', country: '🇺🇸', acceptance: '18%', ssat: '86%+', deadline: '1月15日', note: '艺术项目顶尖' },
-    { name: 'Deerfield Academy', country: '🇺🇸', acceptance: '20%', ssat: '85%+', deadline: '1月15日', note: '体育奖学金丰厚' },
-  ],
-  uk_boarding: [
-    { name: 'Eton College', country: '🇬🇧', fee: '£63,300/年', deadline: 'Year5前注册', note: '20位英国首相，需提前4-5年注册' },
-    { name: 'Winchester College', country: '🇬🇧', fee: '£60,000/年', deadline: 'Year5前注册', note: '学术顶尖，A*/A 86.95%' },
-    { name: 'Harrow School', country: '🇬🇧', fee: '£62,000/年', deadline: '提前2年', note: '丘吉尔母校，体育艺术均强' },
-    { name: 'Brighton College', country: '🇬🇧', fee: '~£55,000/年', deadline: '提前1-2年', note: 'Sunday Times年度学校，A-Level 99.3% A*-B' },
-    { name: 'Wycombe Abbey', country: '🇬🇧', fee: '£55,350/年', deadline: '提前2年', note: '英国顶尖女校，GCSE 97.60% A*/A' },
-  ],
-  us_university: [
-    { name: 'MIT', country: '🇺🇸', acceptance: '3.9%', sat: '1570+', deadline: '11月1日 EA', note: 'STEM绝对顶尖，需竞赛级别课外' },
-    { name: 'Stanford', country: '🇺🇸', acceptance: '3.7%', sat: '1570+', deadline: '11月1日 REA', note: '最难进，Spike模式' },
-    { name: 'Harvard', country: '🇺🇸', acceptance: '3.6%', sat: '1580+', deadline: '11月1日 REA', note: '综合全面型，领导力权重极高' },
-    { name: 'Yale', country: '🇺🇸', acceptance: '4.6%', sat: '1560+', deadline: '11月1日 REA', note: '艺术人文顶尖，戏剧音乐强' },
-    { name: 'Princeton', country: '🇺🇸', acceptance: '4.7%', sat: '1570+', deadline: '11月1日 REA', note: '数学物理传统强校' },
-    { name: 'Columbia', country: '🇺🇸', acceptance: '3.9%', sat: '1550+', deadline: '11月1日 ED', note: '纽约，通识教育著名' },
-  ],
 }
 
 const PERSON_TYPES = [
@@ -74,29 +48,27 @@ const CONCERNS = [
   { value: 'pressure', emoji: '😰', label: '孩子课业压力太大' },
   { value: 'missed_window', emoji: '⏰', label: '错过关键培养窗口期' },
   { value: 'direction', emoji: '🧭', label: '不知道往哪个方向走' },
-  { value: 'resources', emoji: '📍', label: '清迈资源有限' },
+  { value: 'resources', emoji: '📍', label: '当地资源有限' },
   { value: 'chinese', emoji: '📖', label: '中文水平跟不上' },
   { value: 'competition', emoji: '🌏', label: '国际竞争太激烈' },
 ]
 
 const TARGET_PATHS = [
-  { value: 'us_boarding', emoji: '🏫', label: '美国寄宿高中', desc: 'G9申请，1月15日截止，SSAT 80-90%+' },
-  { value: 'us_university', emoji: '🎓', label: '美国本科T50', desc: 'G12申请，SAT/ACT，EA/ED优势大' },
-  { value: 'uk_school', emoji: '🎩', label: '英国独立学校', desc: '11+/13+，Eton需Year5前注册' },
-  { value: 'uk_university', emoji: '🏛️', label: '英国罗素大学群', desc: 'A-Level/IB，牛剑10月15日截止' },
-  { value: 'flexible', emoji: '🌐', label: '多路并进，保持灵活', desc: '同时布局美英，视孩子特长决定' },
+  { value: 'us_boarding', emoji: '🏫', label: '美国寄宿高中', desc: 'G9申请，1月15日截止' },
+  { value: 'us_university', emoji: '🎓', label: '美国本科T50', desc: 'G12申请，EA/ED优势大' },
+  { value: 'uk_school', emoji: '🎩', label: '英国独立学校', desc: '11+/13+，顶校需提前注册' },
+  { value: 'uk_university', emoji: '🏛️', label: '英国罗素大学群', desc: 'A-Level/IB，牛剑10月截止' },
+  { value: 'flexible', emoji: '🌐', label: '多路并进，保持灵活', desc: '同时布局，视特长决定' },
   { value: 'other', emoji: '🗺️', label: '其他路径', desc: '加拿大 / 澳洲 / 新加坡' },
 ]
 
-const PROFILE_DIMS = [
-  { key: 'academic', label: '学术能力', icon: '📚', target: 85 },
-  { key: 'spike_depth', label: '特长深度', icon: '⭐', target: 80 },
-  { key: 'leadership', label: '领导力', icon: '👑', target: 75 },
-  { key: 'language', label: '语言能力', icon: '🗣️', target: 90 },
-  { key: 'community', label: '社区贡献', icon: '🤝', target: 70 },
-  { key: 'diversity', label: '多元性', icon: '🌍', target: 75 },
-]
+const urgencyColor = (u: string) =>
+  u === 'critical' ? T.coral : u === 'high' ? T.gold : u === 'medium' ? T.teal : T.textDim
 
+const urgencyLabel = (u: string) =>
+  u === 'critical' ? '紧急' : u === 'high' ? '重要' : u === 'medium' ? '中期' : '长期'
+
+// ── 小组件 ──
 function Card({ children, style = {}, onClick }: any) {
   return (
     <motion.div whileTap={onClick ? { scale: 0.98 } : undefined} onClick={onClick}
@@ -114,18 +86,9 @@ function Badge({ text, color = T.gold }: { text: string; color?: string }) {
   )
 }
 
-function SectionTitle({ icon, title }: any) {
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
-      <span style={{ fontSize: 16 }}>{icon}</span>
-      <span style={{ fontSize: 13, fontWeight: 700, color: T.text, letterSpacing: '0.05em' }}>{title}</span>
-    </div>
-  )
-}
-
-// ── 愿景设定（安全版：用 getUser() 不用 getSession()）──
+// ── 愿景设定 ──
 function VisionSetup({ childName, childId, onComplete }: {
-  childName: string; childId: string; onComplete: (vision: any) => void
+  childName: string; childId: string; onComplete: (v: any) => void
 }) {
   const [step, setStep] = useState(0)
   const [personType, setPersonType] = useState('')
@@ -147,18 +110,13 @@ function VisionSetup({ childName, childId, onComplete }: {
 
   const save = async () => {
     setSaving(true)
-    // ✅ 安全：用 getUser() 服务端验证，不用 getSession()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { setSaving(false); return }
 
     const payload = {
-      child_id: childId,
-      user_id: user.id,
-      person_type: personType,
+      child_id: childId, user_id: user.id, person_type: personType,
       vision_statement: personType === 'custom' ? customVision : PERSON_TYPES.find(p => p.value === personType)?.label || '',
-      priorities,
-      concerns,
-      target_school_type: targetPath,
+      priorities, concerns, target_school_type: targetPath,
       updated_at: new Date().toISOString(),
     }
 
@@ -168,14 +126,16 @@ function VisionSetup({ childName, childId, onComplete }: {
     } else {
       await supabase.from('family_vision').insert(payload)
     }
-
     setSaving(false)
     onComplete(payload)
   }
 
-  const OptionPill = ({ value, label, emoji, selected, onSelect, desc }: any) => (
+  const Pill = ({ value, label, emoji, selected, onSelect, desc }: any) => (
     <motion.div whileTap={{ scale: 0.97 }} onClick={() => onSelect(value)}
-      style={{ padding: '14px 16px', borderRadius: 14, cursor: 'pointer', marginBottom: 10, background: selected ? `${T.gold}12` : T.bgCard, border: `1.5px solid ${selected ? T.gold : T.border}`, display: 'flex', alignItems: 'center', gap: 12, transition: 'all 0.2s' }}>
+      style={{ padding: '14px 16px', borderRadius: 14, cursor: 'pointer', marginBottom: 10,
+        background: selected ? `${T.gold}12` : T.bgCard,
+        border: `1.5px solid ${selected ? T.gold : T.border}`,
+        display: 'flex', alignItems: 'center', gap: 12, transition: 'all 0.2s' }}>
       <span style={{ fontSize: 22, flexShrink: 0 }}>{emoji}</span>
       <div style={{ flex: 1 }}>
         <div style={{ fontSize: 14, fontWeight: selected ? 600 : 400, color: selected ? T.gold : T.text }}>{label}</div>
@@ -188,12 +148,10 @@ function VisionSetup({ childName, childId, onComplete }: {
   return (
     <div style={{ minHeight: '100dvh', background: T.bg, fontFamily: "'Noto Sans SC', sans-serif", display: 'flex', flexDirection: 'column' }}>
       <div style={{ maxWidth: 480, margin: '0 auto', width: '100%', flex: 1, display: 'flex', flexDirection: 'column', padding: '52px 20px 32px' }}>
-
         <div style={{ display: 'flex', gap: 5, marginBottom: 40 }}>
           {Array.from({ length: TOTAL }).map((_, i) => (
-            <motion.div key={i}
-              animate={{ width: i === step ? 28 : 6, background: i <= step ? T.gold : T.border }}
-              style={{ height: 4, borderRadius: 2, transition: 'all 0.3s' }} />
+            <motion.div key={i} animate={{ width: i === step ? 28 : 6, background: i <= step ? T.gold : T.border }}
+              style={{ height: 4, borderRadius: 2 }} />
           ))}
         </div>
 
@@ -203,8 +161,7 @@ function VisionSetup({ childName, childId, onComplete }: {
 
             {step === 0 && (
               <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center' }}>
-                <motion.div animate={{ scale: [1, 1.08, 1] }} transition={{ duration: 3, repeat: Infinity }}
-                  style={{ fontSize: 72, marginBottom: 28 }}>🌱</motion.div>
+                <motion.div animate={{ scale: [1, 1.08, 1] }} transition={{ duration: 3, repeat: Infinity }} style={{ fontSize: 72, marginBottom: 28 }}>🌱</motion.div>
                 <h1 style={{ fontSize: 26, fontWeight: 800, color: T.text, marginBottom: 14, lineHeight: 1.3, fontFamily: "'Noto Serif SC', serif" }}>
                   {childName}的<br />学业成长档案
                 </h1>
@@ -222,10 +179,7 @@ function VisionSetup({ childName, childId, onComplete }: {
                 </div>
                 <div style={{ fontSize: 13, color: T.textDim, marginBottom: 24, lineHeight: 1.7 }}>不是去哪所学校，而是成为什么人。</div>
                 <div style={{ flex: 1, overflowY: 'auto' }}>
-                  {PERSON_TYPES.map(p => (
-                    <OptionPill key={p.value} value={p.value} label={p.label} emoji={p.emoji} desc={p.desc}
-                      selected={personType === p.value} onSelect={setPersonType} />
-                  ))}
+                  {PERSON_TYPES.map(p => <Pill key={p.value} value={p.value} label={p.label} emoji={p.emoji} desc={p.desc} selected={personType === p.value} onSelect={setPersonType} />)}
                   {personType === 'custom' && (
                     <motion.textarea initial={{ opacity: 0 }} animate={{ opacity: 1 }}
                       value={customVision} onChange={e => setCustomVision(e.target.value)}
@@ -241,11 +195,8 @@ function VisionSetup({ childName, childId, onComplete }: {
                 <div style={{ fontFamily: "'Noto Serif SC', serif", fontSize: 22, fontWeight: 700, color: T.text, marginBottom: 6, lineHeight: 1.4 }}>最核心的期待是什么？</div>
                 <div style={{ fontSize: 13, color: T.textDim, marginBottom: 24 }}>可以多选</div>
                 <div style={{ flex: 1, overflowY: 'auto' }}>
-                  {PRIORITIES.map(p => (
-                    <OptionPill key={p.value} value={p.value} label={p.label} emoji={p.emoji}
-                      selected={priorities.includes(p.value)}
-                      onSelect={(v: string) => setPriorities(prev => prev.includes(v) ? prev.filter(x => x !== v) : [...prev, v])} />
-                  ))}
+                  {PRIORITIES.map(p => <Pill key={p.value} value={p.value} label={p.label} emoji={p.emoji} selected={priorities.includes(p.value)}
+                    onSelect={(v: string) => setPriorities(prev => prev.includes(v) ? prev.filter(x => x !== v) : [...prev, v])} />)}
                 </div>
               </div>
             )}
@@ -255,11 +206,8 @@ function VisionSetup({ childName, childId, onComplete }: {
                 <div style={{ fontFamily: "'Noto Serif SC', serif", fontSize: 22, fontWeight: 700, color: T.text, marginBottom: 6 }}>你最担心什么？</div>
                 <div style={{ fontSize: 13, color: T.textDim, marginBottom: 24 }}>诚实说，根会帮你应对</div>
                 <div style={{ flex: 1, overflowY: 'auto' }}>
-                  {CONCERNS.map(c => (
-                    <OptionPill key={c.value} value={c.value} label={c.label} emoji={c.emoji}
-                      selected={concerns.includes(c.value)}
-                      onSelect={(v: string) => setConcerns(prev => prev.includes(v) ? prev.filter(x => x !== v) : [...prev, v])} />
-                  ))}
+                  {CONCERNS.map(c => <Pill key={c.value} value={c.value} label={c.label} emoji={c.emoji} selected={concerns.includes(c.value)}
+                    onSelect={(v: string) => setConcerns(prev => prev.includes(v) ? prev.filter(x => x !== v) : [...prev, v])} />)}
                 </div>
               </div>
             )}
@@ -269,14 +217,10 @@ function VisionSetup({ childName, childId, onComplete }: {
                 <div style={{ fontFamily: "'Noto Serif SC', serif", fontSize: 22, fontWeight: 700, color: T.text, marginBottom: 6, lineHeight: 1.4 }}>倾向的升学路径？</div>
                 <div style={{ fontSize: 13, color: T.textDim, marginBottom: 24 }}>不确定也没关系，可以随时调整</div>
                 <div style={{ flex: 1, overflowY: 'auto' }}>
-                  {TARGET_PATHS.map(p => (
-                    <OptionPill key={p.value} value={p.value} label={p.label} emoji={p.emoji} desc={p.desc}
-                      selected={targetPath === p.value} onSelect={setTargetPath} />
-                  ))}
+                  {TARGET_PATHS.map(p => <Pill key={p.value} value={p.value} label={p.label} emoji={p.emoji} desc={p.desc} selected={targetPath === p.value} onSelect={setTargetPath} />)}
                 </div>
               </div>
             )}
-
           </motion.div>
         </AnimatePresence>
 
@@ -305,40 +249,99 @@ function VisionSetup({ childName, childId, onComplete }: {
   )
 }
 
-// ── 今日仪表盘 ──
-function DashboardSection({ report, vision, childName }: any) {
-  const thisMonth = report?.this_semester || []
-  const gaps = report?.gaps || []
-  const targetLabel = TARGET_PATHS.find(p => p.value === vision?.target_school_type)?.label || '升学目标'
-  const gradeToYears: Record<string, number> = { 'K1': 9, 'K2': 8, 'K3': 7, 'G1': 8, 'G2': 7, 'G3': 6, 'G4': 5, 'G5': 4, 'G6': 3, 'G7': 3, 'G8': 2, 'G9': 1 }
-  const storedChild = typeof window !== 'undefined' ? JSON.parse(localStorage.getItem('active_child') || '{}') : {}
-  const years = gradeToYears[storedChild.grade] || 6
+// ── 今日指令（首屏）──
+function TodaySection({ report, vision, childName, childId }: any) {
+  const [memo, setMemo] = useState('')
+  const [savingMemo, setSavingMemo] = useState(false)
+  const [memoSaved, setMemoSaved] = useState(false)
+
+  const todayPriority = report?.today_priority || (report?.this_semester?.[0] ? {
+    action: report.this_semester[0].action,
+    reason: report.this_semester[0].why,
+    urgency: report.this_semester[0].urgency,
+  } : null)
+
+  const urgentNode = report?.roadmap?.find((n: any) => n.urgency === 'critical' || n.urgency === 'high')
+  const yearsToApply = report?.years_to_apply || 6
+
+  const saveMemo = async () => {
+    if (!memo.trim() || !childId) return
+    setSavingMemo(true)
+    const { data: { user } } = await supabase.auth.getUser()
+    await supabase.from('essay_materials').insert({
+      child_id: childId, user_id: user?.id,
+      content: memo, tags: ['日常记录'],
+      created_at: new Date().toISOString(),
+    })
+    setMemo('')
+    setSavingMemo(false)
+    setMemoSaved(true)
+    setTimeout(() => setMemoSaved(false), 2000)
+  }
 
   return (
     <div>
-      <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
-        style={{ background: `linear-gradient(135deg, ${T.gold}18 0%, rgba(78,205,196,0.08) 100%)`, borderRadius: 20, padding: '20px', marginBottom: 16, border: `1px solid ${T.borderGold}`, position: 'relative', overflow: 'hidden' }}>
-        <div style={{ position: 'absolute', right: -20, top: -20, width: 100, height: 100, borderRadius: '50%', background: `${T.gold}08` }} />
-        <div style={{ fontSize: 11, color: T.goldDim, fontWeight: 700, letterSpacing: '0.12em', marginBottom: 8 }}>妈妈的愿景</div>
-        <div style={{ fontSize: 17, fontWeight: 800, color: T.gold, marginBottom: 6, fontFamily: "'Noto Serif SC', serif", lineHeight: 1.3 }}>
-          {PERSON_TYPES.find(p => p.value === vision?.person_type)?.label || vision?.vision_statement}
+      {/* 顶部状态条 */}
+      <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
+        style={{ background: `linear-gradient(135deg, ${T.gold}15 0%, rgba(78,205,196,0.06) 100%)`, borderRadius: 18, padding: '16px 18px', marginBottom: 14, border: `1px solid ${T.borderGold}` }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+          <div>
+            <div style={{ fontSize: 11, color: T.goldDim, fontWeight: 700, letterSpacing: '0.1em', marginBottom: 6 }}>妈妈的愿景</div>
+            <div style={{ fontSize: 15, fontWeight: 700, color: T.gold, lineHeight: 1.3, fontFamily: "'Noto Serif SC', serif" }}>
+              {PERSON_TYPES.find(p => p.value === vision?.person_type)?.label || vision?.vision_statement}
+            </div>
+          </div>
+          <div style={{ textAlign: 'right', flexShrink: 0, marginLeft: 12 }}>
+            <div style={{ fontSize: 10, color: T.textDim, marginBottom: 3 }}>距申请</div>
+            <div style={{ fontSize: 20, fontWeight: 800, color: T.gold, fontFamily: "'Space Mono', monospace" }}>{yearsToApply}</div>
+            <div style={{ fontSize: 10, color: T.textDim }}>年</div>
+          </div>
         </div>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          <Badge text={targetLabel} color={T.teal} />
-          <Badge text={`距申请约 ${years} 年`} color={T.goldDim} />
-        </div>
+        {urgentNode && (
+          <div style={{ marginTop: 10, paddingTop: 10, borderTop: `1px solid ${T.borderGold}`, display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div style={{ width: 6, height: 6, borderRadius: '50%', background: urgencyColor(urgentNode.urgency), flexShrink: 0 }} />
+            <div style={{ fontSize: 11, color: T.textDim }}>
+              下一关键节点：<span style={{ color: urgencyColor(urgentNode.urgency), fontWeight: 600 }}>{urgentNode.title}</span>
+              <span style={{ color: T.textFaint }}>（{urgentNode.year_target}年）</span>
+            </div>
+          </div>
+        )}
       </motion.div>
 
-      {thisMonth.length > 0 && (
-        <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} style={{ marginBottom: 16 }}>
-          <SectionTitle icon="⚡" title="本学期重点" />
-          {thisMonth.map((item: any, i: number) => (
-            <Card key={i} style={{ marginBottom: 8, borderColor: item.urgency === 'high' ? T.borderGold : T.border }}>
-              <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
-                <div style={{ width: 26, height: 26, borderRadius: '50%', background: item.urgency === 'high' ? T.gold : T.bgCardHover, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: item.urgency === 'high' ? '#0F1A14' : T.textDim, flexShrink: 0 }}>{i + 1}</div>
-                <div>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: T.text, marginBottom: 4 }}>{item.action}</div>
-                  <div style={{ fontSize: 11, color: T.textDim }}>{item.why}</div>
+      {/* 顾问洞见 */}
+      {report?.key_insight && (
+        <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }}
+          style={{ background: T.bgCard, borderRadius: 14, padding: '14px 16px', marginBottom: 14, border: `1px solid ${T.border}`, borderLeft: `3px solid ${T.teal}` }}>
+          <div style={{ fontSize: 10, color: T.teal, fontWeight: 700, letterSpacing: '0.1em', marginBottom: 6 }}>根的判断</div>
+          <div style={{ fontSize: 13, color: T.text, lineHeight: 1.8, fontStyle: 'italic' }}>"{report.key_insight}"</div>
+        </motion.div>
+      )}
+
+      {/* 今天最重要的一件事 */}
+      {todayPriority && (
+        <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}
+          style={{ marginBottom: 14 }}>
+          <div style={{ fontSize: 11, color: T.textDim, fontWeight: 700, letterSpacing: '0.1em', marginBottom: 8 }}>⚡ 今天最重要的一件事</div>
+          <Card style={{ borderColor: T.borderGold, background: `${T.gold}08` }}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: T.gold, marginBottom: 6 }}>{todayPriority.action}</div>
+            <div style={{ fontSize: 12, color: T.textDim, lineHeight: 1.6 }}>{todayPriority.reason}</div>
+          </Card>
+        </motion.div>
+      )}
+
+      {/* 本月重点 */}
+      {report?.this_semester?.length > 0 && (
+        <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}
+          style={{ marginBottom: 14 }}>
+          <div style={{ fontSize: 11, color: T.textDim, fontWeight: 700, letterSpacing: '0.1em', marginBottom: 8 }}>📋 本月重点</div>
+          {report.this_semester.map((item: any, i: number) => (
+            <Card key={i} style={{ marginBottom: 8 }}>
+              <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+                <div style={{ width: 24, height: 24, borderRadius: '50%', background: item.urgency === 'high' ? T.gold : T.bgCardHover, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: item.urgency === 'high' ? '#0F1A14' : T.textDim, flexShrink: 0 }}>{i + 1}</div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: T.text, marginBottom: 3 }}>{item.action}</div>
+                  <div style={{ fontSize: 11, color: T.textDim, marginBottom: item.local_resource ? 4 : 0 }}>{item.why}</div>
+                  {item.local_resource && <div style={{ fontSize: 10, color: T.teal }}>📍 {item.local_resource}</div>}
                 </div>
               </div>
             </Card>
@@ -346,155 +349,317 @@ function DashboardSection({ report, vision, childName }: any) {
         </motion.div>
       )}
 
-      {gaps.length > 0 && (
-        <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} style={{ marginBottom: 16 }}>
-          <SectionTitle icon="⚠️" title="需要关注" />
-          <Card style={{ borderColor: 'rgba(255,107,107,0.2)' }}>
-            {gaps.map((gap: string, i: number) => (
-              <div key={i} style={{ display: 'flex', gap: 10, marginBottom: i < gaps.length - 1 ? 10 : 0, paddingBottom: i < gaps.length - 1 ? 10 : 0, borderBottom: i < gaps.length - 1 ? `1px solid ${T.border}` : 'none' }}>
-                <span style={{ color: T.coral, flexShrink: 0, marginTop: 1 }}>•</span>
-                <span style={{ fontSize: 13, color: T.textDim, lineHeight: 1.6 }}>{gap}</span>
+      {/* 需要关注 */}
+      {report?.gaps?.length > 0 && (
+        <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}
+          style={{ marginBottom: 14 }}>
+          <div style={{ fontSize: 11, color: T.textDim, fontWeight: 700, letterSpacing: '0.1em', marginBottom: 8 }}>⚠️ 需要关注</div>
+          <Card style={{ borderColor: 'rgba(255,107,107,0.15)' }}>
+            {report.gaps.map((gap: string, i: number) => (
+              <div key={i} style={{ display: 'flex', gap: 8, marginBottom: i < report.gaps.length - 1 ? 8 : 0, paddingBottom: i < report.gaps.length - 1 ? 8 : 0, borderBottom: i < report.gaps.length - 1 ? `1px solid ${T.border}` : 'none' }}>
+                <span style={{ color: T.coral, flexShrink: 0 }}>•</span>
+                <span style={{ fontSize: 12, color: T.textDim, lineHeight: 1.6 }}>{gap}</span>
               </div>
             ))}
           </Card>
         </motion.div>
       )}
 
+      {/* 申请故事主线 */}
       {report?.narrative && (
-        <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}>
-          <SectionTitle icon="📖" title="申请故事主线" />
+        <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }}
+          style={{ marginBottom: 14 }}>
+          <div style={{ fontSize: 11, color: T.textDim, fontWeight: 700, letterSpacing: '0.1em', marginBottom: 8 }}>📖 申请故事主线</div>
           <Card style={{ borderLeft: `3px solid ${T.gold}` }}>
             <div style={{ fontSize: 13, color: T.text, lineHeight: 1.9, fontStyle: 'italic' }}>"{report.narrative}"</div>
           </Card>
         </motion.div>
       )}
 
+      {/* 快速记录今天 */}
+      <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}
+        style={{ marginBottom: 14 }}>
+        <div style={{ fontSize: 11, color: T.textDim, fontWeight: 700, letterSpacing: '0.1em', marginBottom: 8 }}>✏️ 记录今天</div>
+        <Card>
+          <div style={{ fontSize: 12, color: T.textDim, marginBottom: 10 }}>
+            {childName}今天有什么亮点？随手记，都是未来文书的素材。
+          </div>
+          <textarea value={memo} onChange={e => setMemo(e.target.value)}
+            placeholder="今天他说了一句很有趣的话… 第一次赢了比赛… 帮助了同学…"
+            rows={3}
+            style={{ width: '100%', padding: '10px 12px', borderRadius: 10, border: `1px solid ${T.border}`, background: T.bgCardHover, color: T.text, fontSize: 13, outline: 'none', resize: 'none', fontFamily: 'inherit', boxSizing: 'border-box' }} />
+          <motion.button whileTap={{ scale: 0.97 }} onClick={saveMemo} disabled={!memo.trim() || savingMemo}
+            style={{ marginTop: 10, padding: '9px 20px', borderRadius: 10, border: 'none', background: memo.trim() ? T.gold : T.bgCard, color: memo.trim() ? '#0F1A14' : T.textFaint, fontSize: 12, fontWeight: 700, cursor: memo.trim() ? 'pointer' : 'default', display: 'flex', alignItems: 'center', gap: 6 }}>
+            {memoSaved ? <><Check size={13} /> 已保存到素材库</> : savingMemo ? <><Loader size={13} /> 保存中…</> : <><Plus size={13} /> 存入素材库</>}
+          </motion.button>
+        </Card>
+      </motion.div>
+
       {!report && (
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.2 }}
-          style={{ textAlign: 'center', padding: '40px 20px' }}>
-          <div style={{ fontSize: 48, marginBottom: 16 }}>🗺️</div>
-          <div style={{ fontSize: 14, color: T.textDim, marginBottom: 20, lineHeight: 1.7 }}>
-            根正在根据{childName}的信息<br />撰写专属升学规划
+        <div style={{ textAlign: 'center', padding: '40px 20px' }}>
+          <motion.div animate={{ rotate: 360 }} transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}
+            style={{ fontSize: 40, marginBottom: 14, display: 'inline-block' }}>🌱</motion.div>
+          <div style={{ fontSize: 14, color: T.textDim, lineHeight: 1.7 }}>
+            根正在撰写{childName}的专属规划<br />
+            <span style={{ fontSize: 11, color: T.textFaint }}>完成后自动显示，通常需要30-60秒</span>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, fontSize: 12, color: T.goldDim }}>
-            <motion.div animate={{ rotate: 360 }} transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}>🌱</motion.div>
-            正在撰写中，完成后自动显示
-          </div>
-        </motion.div>
+        </div>
       )}
     </div>
   )
 }
 
-// ── 成长画像 ──
-function ProfileSection({ report }: any) {
-  const scores = report?.profile_scores || {}
+// ── 路线图 ──
+function RoadmapSection({ report, childId, generating, onGenerate }: any) {
+  const [expandedNode, setExpandedNode] = useState<string | null>(null)
+  const [conditions, setConditions] = useState<Record<string, boolean>>({})
+
+  const roadmap: any[] = report?.roadmap || []
+
+  useEffect(() => {
+    if (!childId || !roadmap.length) return
+    loadConditions()
+  }, [childId, roadmap.length])
+
+  const loadConditions = async () => {
+    const { data } = await supabase.from('pathway_node_conditions')
+      .select('node_id, condition_id, completed')
+      .eq('child_id', childId)
+    if (data) {
+      const map: Record<string, boolean> = {}
+      data.forEach((r: any) => { map[`${r.node_id}_${r.condition_id}`] = r.completed })
+      setConditions(map)
+    }
+  }
+
+  const toggleCondition = async (nodeId: string, condId: string, currentVal: boolean) => {
+    const key = `${nodeId}_${condId}`
+    setConditions(prev => ({ ...prev, [key]: !currentVal }))
+
+    const { data: { user } } = await supabase.auth.getUser()
+    const { data: existing } = await supabase.from('pathway_node_conditions')
+      .select('id').eq('child_id', childId).eq('node_id', nodeId).eq('condition_id', condId).maybeSingle()
+
+    if (existing) {
+      await supabase.from('pathway_node_conditions').update({
+        completed: !currentVal,
+        completed_at: !currentVal ? new Date().toISOString() : null,
+      }).eq('id', existing.id)
+    } else {
+      await supabase.from('pathway_node_conditions').insert({
+        child_id: childId, user_id: user?.id,
+        node_id: nodeId, condition_id: condId,
+        completed: !currentVal,
+        completed_at: !currentVal ? new Date().toISOString() : null,
+      })
+    }
+  }
+
+  const getNodeCompletion = (node: any) => {
+    if (!node.conditions?.length) return node.completion || 0
+    const manualDone = node.conditions.filter((c: any) =>
+      conditions[`${node.id}_${c.id}`]
+    ).length
+    const autoDone = node.conditions.filter((c: any) =>
+      c.type !== 'manual' && conditions[`${node.id}_${c.id}`]
+    ).length
+    return Math.round(((manualDone) / node.conditions.length) * 100)
+  }
+
+  if (!roadmap.length) {
+    return (
+      <div style={{ textAlign: 'center', padding: '40px 20px' }}>
+        {generating ? (
+          <div>
+            <motion.div animate={{ scale: [1, 1.1, 1] }} transition={{ duration: 2, repeat: Infinity }} style={{ fontSize: 48, marginBottom: 16 }}>🌱</motion.div>
+            <div style={{ fontSize: 14, color: T.textDim }}>正在撰写升学路线图…</div>
+          </div>
+        ) : (
+          <div>
+            <div style={{ fontSize: 48, marginBottom: 16 }}>🗺️</div>
+            <motion.button whileTap={{ scale: 0.97 }} onClick={onGenerate}
+              style={{ padding: '13px 28px', borderRadius: 20, background: T.gold, color: '#0F1A14', border: 'none', fontSize: 14, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, margin: '16px auto 0' }}>
+              <Sparkles size={16} /> 开始撰写规划
+            </motion.button>
+          </div>
+        )}
+      </div>
+    )
+  }
+
   return (
     <div>
-      {report?.profile_summary && (
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-          style={{ fontSize: 13, color: T.textDim, marginBottom: 20, lineHeight: 1.7, padding: '12px 14px', background: T.bgCard, borderRadius: 12, border: `1px solid ${T.border}` }}>
-          {report.profile_summary}
-        </motion.div>
-      )}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-        {PROFILE_DIMS.map((dim, i) => {
-          const score = scores[dim.key] || 0
-          const color = score >= 70 ? T.green : score >= 40 ? T.gold : T.coral
-          const gap = dim.target - score
+      <div style={{ position: 'relative' }}>
+        <div style={{ position: 'absolute', left: 11, top: 24, bottom: 0, width: 1, background: `linear-gradient(to bottom, ${T.gold}50, transparent)` }} />
+
+        {roadmap.map((node: any, i: number) => {
+          const completion = getNodeCompletion(node)
+          const isExpanded = expandedNode === node.id
+          const color = urgencyColor(node.urgency)
+          const isCurrent = i === 0
+
           return (
-            <motion.div key={dim.key} initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.08 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ fontSize: 16 }}>{dim.icon}</span>
-                  <span style={{ fontSize: 13, color: T.text }}>{dim.label}</span>
-                </div>
+            <motion.div key={node.id} initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.08 }}
+              style={{ paddingLeft: 30, marginBottom: 12, position: 'relative' }}>
+
+              {/* 节点圆点 */}
+              <div style={{ position: 'absolute', left: 0, top: 16, width: 22, height: 22, borderRadius: '50%', background: isCurrent ? color : T.bgCard, border: `2px solid ${isCurrent ? color : T.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                {completion === 100
+                  ? <Check size={12} color={isCurrent ? '#0F1A14' : T.textDim} />
+                  : isCurrent && <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#0F1A14' }} />}
+              </div>
+
+              {/* 节点卡片 */}
+              <Card onClick={() => setExpandedNode(isExpanded ? null : node.id)}
+                style={{ cursor: 'pointer', borderColor: isCurrent ? `${color}40` : T.border }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  {gap > 20 && <span style={{ fontSize: 10, color: T.coral }}>距目标 {gap}分</span>}
-                  <span style={{ fontSize: 14, fontWeight: 700, color, fontFamily: "'Space Mono', monospace" }}>{score || '—'}</span>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                      <span style={{ fontSize: 13, fontWeight: 700, color: isCurrent ? color : T.text }}>{node.title}</span>
+                      <Badge text={urgencyLabel(node.urgency)} color={color} />
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span style={{ fontSize: 10, color: T.textDim }}>{node.grade_target} · {node.year_target}年</span>
+                      <div style={{ flex: 1, height: 3, borderRadius: 2, background: 'rgba(255,255,255,0.08)', overflow: 'hidden' }}>
+                        <div style={{ height: '100%', borderRadius: 2, background: completion === 100 ? T.green : color, width: `${completion}%`, transition: 'width 0.5s' }} />
+                      </div>
+                      <span style={{ fontSize: 10, color: completion === 100 ? T.green : color, fontFamily: "'Space Mono', monospace", flexShrink: 0 }}>{completion}%</span>
+                    </div>
+                  </div>
+                  {isExpanded ? <ChevronUp size={14} color={T.textFaint} /> : <ChevronDown size={14} color={T.textFaint} />}
                 </div>
-              </div>
-              <div style={{ height: 6, borderRadius: 3, background: 'rgba(255,255,255,0.06)', overflow: 'hidden', position: 'relative' }}>
-                <div style={{ position: 'absolute', left: `${dim.target}%`, top: 0, bottom: 0, width: 1, background: 'rgba(255,255,255,0.2)', zIndex: 2 }} />
-                <motion.div initial={{ width: 0 }} animate={{ width: `${score}%` }}
-                  transition={{ duration: 1, delay: i * 0.1, ease: 'easeOut' }}
-                  style={{ height: '100%', borderRadius: 3, background: `linear-gradient(90deg, ${color}80, ${color})` }} />
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4 }}>
-                <span style={{ fontSize: 9, color: T.textFaint }}>0</span>
-                <span style={{ fontSize: 9, color: T.textFaint }}>目标 {dim.target}</span>
-                <span style={{ fontSize: 9, color: T.textFaint }}>100</span>
-              </div>
+
+                <AnimatePresence>
+                  {isExpanded && (
+                    <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}
+                      style={{ overflow: 'hidden' }}>
+                      <div style={{ paddingTop: 12, marginTop: 12, borderTop: `1px solid ${T.border}` }}>
+                        <div style={{ fontSize: 12, color: T.textDim, marginBottom: 10, lineHeight: 1.6 }}>{node.description}</div>
+                        <div style={{ fontSize: 10, color: T.textFaint, fontWeight: 700, letterSpacing: '0.08em', marginBottom: 8 }}>达成条件</div>
+                        {node.conditions?.map((cond: any) => {
+                          const key = `${node.id}_${cond.id}`
+                          const done = conditions[key] || false
+                          return (
+                            <motion.div key={cond.id} whileTap={{ scale: 0.98 }}
+                              onClick={e => { e.stopPropagation(); toggleCondition(node.id, cond.id, done) }}
+                              style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderBottom: `1px solid ${T.border}`, cursor: 'pointer' }}>
+                              <div style={{ width: 18, height: 18, borderRadius: 5, border: `1.5px solid ${done ? T.green : T.border}`, background: done ? T.green : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: 'all 0.2s' }}>
+                                {done && <Check size={11} color="#0F1A14" />}
+                              </div>
+                              <span style={{ fontSize: 12, color: done ? T.green : T.textDim, textDecoration: done ? 'line-through' : 'none', lineHeight: 1.5 }}>{cond.text}</span>
+                              {cond.type === 'manual' && <span style={{ fontSize: 9, color: T.textFaint, flexShrink: 0, marginLeft: 'auto' }}>手动</span>}
+                            </motion.div>
+                          )
+                        })}
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </Card>
             </motion.div>
           )
         })}
       </div>
-      {!report && <div style={{ textAlign: 'center', padding: '40px 20px', color: T.textDim, fontSize: 14 }}>生成规划后，成长画像自动计算</div>}
+
+      <motion.button whileTap={{ scale: 0.97 }} onClick={onGenerate} disabled={generating}
+        style={{ width: '100%', marginTop: 8, padding: '11px', borderRadius: 14, border: `1px solid ${T.border}`, background: 'transparent', color: T.textDim, fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+        {generating ? <Loader size={13} /> : <Sparkles size={13} />}
+        {generating ? '正在撰写中…' : '重新撰写规划'}
+      </motion.button>
     </div>
   )
 }
 
-// ── 升学路径 ──
-function RoadmapSection({ report, generating, onGenerate }: any) {
-  const roadmap = report?.roadmap || []
-  const tierColor = (t: number) => t === 1 ? T.gold : t === 2 ? T.teal : T.textDim
+// ── Spike 战略 ──
+function SpikeSection({ report, childId, vision }: any) {
+  const [selectedSpike, setSelectedSpike] = useState<any>(null)
+  const [locking, setLocking] = useState(false)
+  const [locked, setLocked] = useState(false)
+
+  useEffect(() => {
+    if (report?.selected_spike) {
+      setSelectedSpike(report.selected_spike)
+      setLocked(true)
+    }
+  }, [report])
+
+  const lockSpike = async (spike: any) => {
+    setLocking(true)
+    setSelectedSpike(spike)
+
+    // 先查最新报告 ID
+    const { data: latestReport } = await supabase.from('pathway_reports')
+      .select('id').eq('child_id', childId)
+      .order('generated_at', { ascending: false }).limit(1).maybeSingle()
+
+    if (latestReport) {
+      await supabase.from('pathway_reports')
+        .update({ selected_spike: spike })
+        .eq('id', latestReport.id)
+    }
+
+    setLocked(true)
+    setLocking(false)
+  }
+
+  const spikes = report?.spike_options || []
+
+  if (!spikes.length) {
+    return (
+      <div style={{ textAlign: 'center', padding: '40px 20px', color: T.textDim, fontSize: 14 }}>
+        先生成规划，Spike方向自动出现
+      </div>
+    )
+  }
 
   return (
     <div>
-      {roadmap.length > 0 ? (
+      {locked && selectedSpike ? (
         <div>
-          <div style={{ position: 'relative' }}>
-            <div style={{ position: 'absolute', left: 10, top: 16, bottom: 0, width: 1, background: `linear-gradient(to bottom, ${T.gold}40, transparent)` }} />
-            {roadmap.map((period: any, i: number) => (
-              <motion.div key={i} initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: i * 0.1 }} style={{ paddingLeft: 32, marginBottom: 24, position: 'relative' }}>
-                <div style={{ position: 'absolute', left: 0, top: 4, width: 20, height: 20, borderRadius: '50%', background: i === 0 ? T.gold : T.bgCard, border: `2px solid ${i === 0 ? T.gold : T.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  {i === 0 && <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#0F1A14' }} />}
-                </div>
-                <div style={{ fontSize: 12, fontWeight: 700, color: i === 0 ? T.gold : T.textDim, marginBottom: 10, letterSpacing: '0.05em' }}>{period.period}</div>
-                {period.actions?.map((action: any, j: number) => (
-                  <Card key={j} style={{ marginBottom: 8 }}>
-                    <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
-                      <div style={{ width: 22, height: 22, borderRadius: 6, background: `${tierColor(action.tier)}20`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 800, color: tierColor(action.tier), flexShrink: 0, marginTop: 1, fontFamily: "'Space Mono', monospace" }}>
-                        T{action.tier}
-                      </div>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ fontSize: 13, fontWeight: 600, color: T.text, marginBottom: 4 }}>{action.action}</div>
-                        <div style={{ fontSize: 11, color: T.textDim, marginBottom: 4, lineHeight: 1.5 }}>{action.reason}</div>
-                        {action.resource && <div style={{ fontSize: 11, color: T.teal }}>📍 {action.resource}</div>}
-                      </div>
-                    </div>
-                  </Card>
-                ))}
-              </motion.div>
-            ))}
-          </div>
-          <div style={{ padding: '10px 14px', borderRadius: 12, background: T.bgCard, border: `1px solid ${T.border}`, fontSize: 11, color: T.textDim, lineHeight: 1.7, marginTop: 8 }}>
-            💡 T1=顶级权重（全国/国际级）· T2=重要 · T3=有益 · T4=锦上添花
-          </div>
-          <motion.button whileTap={{ scale: 0.97 }} onClick={onGenerate} disabled={generating}
-            style={{ width: '100%', marginTop: 16, padding: '12px', borderRadius: 14, border: `1px solid ${T.border}`, background: 'transparent', color: T.textDim, fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-            {generating ? <Loader size={14} /> : <Sparkles size={14} />}
-            {generating ? '正在撰写中…' : '重新撰写规划'}
+          <div style={{ fontSize: 11, color: T.green, fontWeight: 700, letterSpacing: '0.1em', marginBottom: 8 }}>✅ 已锁定Spike方向</div>
+          <Card style={{ borderColor: `${T.green}40`, marginBottom: 16 }}>
+            <div style={{ fontSize: 15, fontWeight: 700, color: T.green, marginBottom: 6 }}>{selectedSpike.direction}</div>
+            <div style={{ fontSize: 12, color: T.textDim, lineHeight: 1.7, marginBottom: 8 }}>{selectedSpike.rationale}</div>
+            <div style={{ fontSize: 12, color: T.gold, fontWeight: 600, marginBottom: 4 }}>第一步：</div>
+            <div style={{ fontSize: 12, color: T.text, lineHeight: 1.6 }}>{selectedSpike.first_step}</div>
+          </Card>
+          <motion.button whileTap={{ scale: 0.97 }} onClick={() => { setLocked(false); setSelectedSpike(null) }}
+            style={{ padding: '9px 18px', borderRadius: 10, border: `1px solid ${T.border}`, background: 'transparent', color: T.textDim, fontSize: 12, cursor: 'pointer' }}>
+            重新选择方向
           </motion.button>
         </div>
       ) : (
-        <div style={{ textAlign: 'center', padding: '40px 20px' }}>
-          {generating ? (
-            <div>
-              <motion.div animate={{ scale: [1, 1.1, 1] }} transition={{ duration: 2, repeat: Infinity }} style={{ fontSize: 48, marginBottom: 16 }}>🌱</motion.div>
-              <div style={{ fontSize: 14, color: T.textDim, lineHeight: 1.7 }}>正在撰写专属升学路线图<br /><span style={{ fontSize: 11, color: T.textFaint }}>通常需要30-60秒</span></div>
-            </div>
-          ) : (
-            <div>
-              <div style={{ fontSize: 48, marginBottom: 16 }}>🗺️</div>
-              <div style={{ fontSize: 14, color: T.textDim, marginBottom: 24 }}>点击生成专属升学路线图</div>
-              <motion.button whileTap={{ scale: 0.97 }} onClick={onGenerate}
-                style={{ padding: '13px 28px', borderRadius: 20, background: T.gold, color: '#0F1A14', border: 'none', fontSize: 14, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, margin: '0 auto' }}>
-                <Sparkles size={16} /> 开始撰写规划
-              </motion.button>
-            </div>
-          )}
+        <div>
+          <div style={{ fontSize: 12, color: T.textDim, lineHeight: 1.7, marginBottom: 16 }}>
+            根基于{vision?.vision_statement || '你的愿景'}和孩子现有情况，分析了以下Spike方向。选择一个方向锁定后，所有建议都会围绕这个方向展开。
+          </div>
+          {spikes.map((spike: any, i: number) => (
+            <motion.div key={i} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.08 }}
+              style={{ marginBottom: 10 }}>
+              <Card style={{ borderColor: selectedSpike?.direction === spike.direction ? T.borderGold : T.border, background: selectedSpike?.direction === spike.direction ? `${T.gold}08` : T.bgCard }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: T.text }}>{spike.direction}</div>
+                  <Target size={14} color={T.goldDim} style={{ flexShrink: 0, marginLeft: 8 }} />
+                </div>
+                <div style={{ fontSize: 12, color: T.textDim, lineHeight: 1.7, marginBottom: 8 }}>{spike.rationale}</div>
+                <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+                  <div style={{ flex: 1, padding: '8px 10px', borderRadius: 8, background: `${T.green}10`, border: `1px solid ${T.green}20` }}>
+                    <div style={{ fontSize: 9, color: T.green, fontWeight: 700, marginBottom: 3 }}>优势</div>
+                    <div style={{ fontSize: 11, color: T.textDim }}>{spike.pros}</div>
+                  </div>
+                  <div style={{ flex: 1, padding: '8px 10px', borderRadius: 8, background: `${T.coral}10`, border: `1px solid ${T.coral}20` }}>
+                    <div style={{ fontSize: 9, color: T.coral, fontWeight: 700, marginBottom: 3 }}>挑战</div>
+                    <div style={{ fontSize: 11, color: T.textDim }}>{spike.cons}</div>
+                  </div>
+                </div>
+                <motion.button whileTap={{ scale: 0.97 }} onClick={() => lockSpike(spike)} disabled={locking}
+                  style={{ width: '100%', padding: '10px', borderRadius: 10, border: 'none', background: T.gold, color: '#0F1A14', fontSize: 12, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                  {locking ? <Loader size={12} /> : <Check size={12} />}
+                  选择并锁定这个方向
+                </motion.button>
+              </Card>
+            </motion.div>
+          ))}
         </div>
       )}
     </div>
@@ -506,15 +671,14 @@ function RecordsSection({ childId, router }: any) {
   const modules = [
     { icon: '🏆', label: '荣誉奖项', desc: '比赛 · 考级 · 竞赛 · 申请权重', color: T.gold, path: '/growth/academic/achievements' },
     { icon: '📊', label: '学术记录', desc: '成绩轨迹 · 考试 · 语言成绩', color: T.teal, path: '/growth/academic/records' },
-    { icon: '🎯', label: '课外活动', desc: '兴趣班 · 补习课 · 参与年限', color: '#A78BFA', path: childId ? `/children/${childId}/activities` : '/children' },
+    { icon: '🎯', label: '课外活动', desc: '兴趣班 · 参与年限 · Spike积累', color: '#A78BFA', path: childId ? `/children/${childId}/activities` : '/children' },
     { icon: '📝', label: '文书素材库', desc: '故事碎片 · 申请角度 · 文书准备', color: '#FB923C', path: '/growth/academic/essays' },
   ]
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
       {modules.map((m, i) => (
-        <motion.div key={m.label} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: i * 0.07 }} whileTap={{ scale: 0.98 }}
-          onClick={() => router.push(m.path)}
+        <motion.div key={m.label} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.07 }}
+          whileTap={{ scale: 0.98 }} onClick={() => router.push(m.path)}
           style={{ background: T.bgCard, borderRadius: 16, padding: '16px', border: `1px solid ${T.border}`, display: 'flex', alignItems: 'center', gap: 14, cursor: 'pointer' }}>
           <div style={{ width: 44, height: 44, borderRadius: 12, background: `${m.color}15`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, flexShrink: 0 }}>{m.icon}</div>
           <div style={{ flex: 1 }}>
@@ -524,63 +688,6 @@ function RecordsSection({ childId, router }: any) {
           <ChevronRight size={16} color={T.textFaint} />
         </motion.div>
       ))}
-    </div>
-  )
-}
-
-// ── 目标院校库 ──
-function SchoolsSection({ vision }: any) {
-  const [activeCategory, setActiveCategory] = useState('us_boarding')
-  const categories = [
-    { key: 'us_boarding', label: '美高', emoji: '🏫' },
-    { key: 'uk_boarding', label: '英高', emoji: '🎩' },
-    { key: 'us_university', label: '美本T50', emoji: '🎓' },
-  ]
-  const schools = SCHOOL_DB[activeCategory as keyof typeof SCHOOL_DB] || []
-
-  return (
-    <div>
-      <div style={{ display: 'flex', gap: 8, marginBottom: 16, overflowX: 'auto', scrollbarWidth: 'none' }}>
-        {categories.map(cat => (
-          <motion.button key={cat.key} whileTap={{ scale: 0.93 }} onClick={() => setActiveCategory(cat.key)}
-            style={{ padding: '8px 16px', borderRadius: 20, border: 'none', background: activeCategory === cat.key ? T.gold : T.bgCard, color: activeCategory === cat.key ? '#0F1A14' : T.textDim, fontSize: 12, fontWeight: activeCategory === cat.key ? 700 : 400, cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0, display: 'flex', alignItems: 'center', gap: 5 }}>
-            {cat.emoji} {cat.label}
-          </motion.button>
-        ))}
-      </div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-        {schools.map((school: any, i: number) => (
-          <motion.div key={school.name} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.06 }}>
-            <Card>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
-                <div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-                    <span style={{ fontSize: 14 }}>{school.country}</span>
-                    <span style={{ fontSize: 14, fontWeight: 700, color: T.text }}>{school.name}</span>
-                  </div>
-                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                    {school.acceptance && <Badge text={`录取率 ${school.acceptance}`} color={T.coral} />}
-                    {school.ssat && <Badge text={`SSAT ${school.ssat}`} color={T.teal} />}
-                    {school.sat && <Badge text={`SAT ${school.sat}`} color={T.teal} />}
-                    {school.fee && <Badge text={school.fee} color={T.textDim} />}
-                  </div>
-                </div>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div style={{ fontSize: 11, color: T.textDim, lineHeight: 1.5, flex: 1 }}>{school.note}</div>
-                {school.deadline && (
-                  <div style={{ fontSize: 10, color: T.goldDim, flexShrink: 0, marginLeft: 10, textAlign: 'right' }}>
-                    截止<br />{school.deadline}
-                  </div>
-                )}
-              </div>
-            </Card>
-          </motion.div>
-        ))}
-      </div>
-      <div style={{ marginTop: 14, padding: '10px 14px', borderRadius: 12, background: T.bgCard, border: `1px solid ${T.border}`, fontSize: 11, color: T.textFaint, lineHeight: 1.7 }}>
-        📡 院校数据来源：各校官方网站 2025-26学年数据，每学期更新
-      </div>
     </div>
   )
 }
@@ -595,27 +702,20 @@ function AcademicContent() {
   const [vision, setVision] = useState<any>(null)
   const [report, setReport] = useState<any>(null)
   const [generating, setGenerating] = useState(false)
-  const [activeTab, setActiveTab] = useState('dashboard')
-  const [activities, setActivities] = useState<any[]>([])
+  const [activeTab, setActiveTab] = useState('today')
 
   useEffect(() => { loadData() }, [])
 
   useEffect(() => {
     if (!childId) return
     const channel = supabase.channel('pathway_watch')
-      .on('postgres_changes', {
-        event: 'INSERT', schema: 'public', table: 'pathway_reports',
-        filter: `child_id=eq.${childId}`,
-      }, (payload) => {
-        setReport(payload.new)
-        setGenerating(false)
-      })
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'pathway_reports', filter: `child_id=eq.${childId}` },
+        (payload) => { setReport(payload.new); setGenerating(false) })
       .subscribe()
     return () => { supabase.removeChannel(channel) }
   }, [childId])
 
   const loadData = async () => {
-    // ✅ 安全：getUser() 服务端验证，middleware 已保护路由，这里静默返回
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
 
@@ -623,62 +723,55 @@ function AcademicContent() {
     const storedChild = localStorage.getItem('active_child')
     if (stored) {
       setChildId(stored)
-      if (storedChild) {
-        const c = JSON.parse(storedChild)
-        setChildName(c.name || '')
-      }
+      if (storedChild) setChildName(JSON.parse(storedChild)?.name || '')
     }
 
     if (stored) {
-      const [visionRes, reportRes, activitiesRes] = await Promise.all([
+      const [visionRes, reportRes] = await Promise.all([
         supabase.from('family_vision').select('*').eq('child_id', stored).maybeSingle(),
         supabase.from('pathway_reports').select('*').eq('child_id', stored).order('generated_at', { ascending: false }).limit(1).maybeSingle(),
-        supabase.from('child_activities').select('*').eq('child_id', stored),
       ])
       if (visionRes.data) { setHasVision(true); setVision(visionRes.data) }
       if (reportRes.data) setReport(reportRes.data)
-      if (activitiesRes.data) setActivities(activitiesRes.data)
     }
     setLoading(false)
   }
 
   const generateReport = async (visionData: any) => {
-  if (!childId) return
-  setGenerating(true)
+    if (!childId) return
+    setGenerating(true)
 
-  const { data: { session } } = await supabase.auth.getSession()
-  const accessToken = session?.access_token
+    const { data: { session } } = await supabase.auth.getSession()
+    const accessToken = session?.access_token
+    const storedChild = localStorage.getItem('active_child')
+    const geofence = storedChild ? JSON.parse(storedChild)?.geofence || null : null
 
-  const [childRes, activitiesRes, achievementsRes, assessmentRes, essaysRes] = await Promise.all([
-    supabase.from('children').select('*').eq('id', childId).single(),
-    supabase.from('child_activities').select('*').eq('child_id', childId),
-    supabase.from('child_achievements').select('*').eq('child_id', childId),
-    supabase.from('assessments').select('report').eq('child_id', childId).order('created_at', { ascending: false }).limit(1).maybeSingle(),
-    supabase.from('essay_materials').select('*').eq('child_id', childId),
-  ])
+    const [childRes, activitiesRes, achievementsRes, assessmentRes, essaysRes] = await Promise.all([
+      supabase.from('children').select('*').eq('id', childId).single(),
+      supabase.from('child_activities').select('*').eq('child_id', childId),
+      supabase.from('child_achievements').select('*').eq('child_id', childId),
+      supabase.from('assessments').select('report').eq('child_id', childId).order('created_at', { ascending: false }).limit(1).maybeSingle(),
+      supabase.from('essay_materials').select('*').eq('child_id', childId),
+    ])
 
-  // 读地理围栏
-  const storedChild = localStorage.getItem('active_child')
-  const geofence = storedChild ? JSON.parse(storedChild)?.geofence || null : null
-
-  await fetch('/api/children/pathway', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(accessToken ? { 'Authorization': `Bearer ${accessToken}` } : {}),
-    },
-    body: JSON.stringify({
-      child: childRes.data,
-      activities: activitiesRes.data || [],
-      achievements: achievementsRes.data || [],
-      essays: essaysRes.data || [],
-      assessment: assessmentRes.data?.report || null,
-      vision: visionData,
-      childId,
-      geofence,
-    }),
-  })
-}
+    await fetch('/api/children/pathway', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(accessToken ? { 'Authorization': `Bearer ${accessToken}` } : {}),
+      },
+      body: JSON.stringify({
+        child: childRes.data,
+        activities: activitiesRes.data || [],
+        achievements: achievementsRes.data || [],
+        essays: essaysRes.data || [],
+        assessment: assessmentRes.data?.report || null,
+        vision: visionData,
+        childId,
+        geofence,
+      }),
+    })
+  }
 
   if (loading) return (
     <div style={{ minHeight: '100dvh', background: T.bg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -691,23 +784,20 @@ function AcademicContent() {
 
   if (!hasVision) return (
     <VisionSetup childName={childName} childId={childId!} onComplete={(v) => {
-      setVision(v)
-      setHasVision(true)
-      generateReport(v)
+      setVision(v); setHasVision(true); generateReport(v)
     }} />
   )
 
   const TABS = [
-    { key: 'dashboard', label: '今日', emoji: '⚡' },
-    { key: 'profile', label: '画像', emoji: '📊' },
+    { key: 'today', label: '今日', emoji: '⚡' },
     { key: 'roadmap', label: '路径', emoji: '🗺️' },
+    { key: 'spike', label: 'Spike', emoji: '⭐' },
     { key: 'records', label: '档案', emoji: '📁' },
-    { key: 'schools', label: '院校', emoji: '🏛️' },
   ]
 
   return (
     <main style={{ minHeight: '100dvh', background: T.bg, fontFamily: "'Noto Sans SC', sans-serif", paddingBottom: 80 }}>
-      <div style={{ position: 'sticky', top: 0, zIndex: 50, background: 'rgba(15,26,20,0.92)', backdropFilter: 'blur(24px)', borderBottom: `1px solid ${T.border}` }}>
+      <div style={{ position: 'sticky', top: 0, zIndex: 50, background: 'rgba(15,26,20,0.94)', backdropFilter: 'blur(24px)', borderBottom: `1px solid ${T.border}` }}>
         <div style={{ maxWidth: 560, margin: '0 auto', padding: '14px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <motion.button whileTap={{ scale: 0.9 }} onClick={() => router.back()}
             style={{ background: 'none', border: 'none', cursor: 'pointer', color: T.text, padding: 4 }}>
@@ -740,13 +830,11 @@ function AcademicContent() {
 
       <div style={{ maxWidth: 560, margin: '0 auto', padding: '16px 14px' }}>
         <AnimatePresence mode="wait">
-          <motion.div key={activeTab} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0 }} transition={{ duration: 0.2 }}>
-            {activeTab === 'dashboard' && <DashboardSection report={report} vision={vision} childName={childName} activities={activities} />}
-            {activeTab === 'profile' && <ProfileSection report={report} />}
-            {activeTab === 'roadmap' && <RoadmapSection report={report} vision={vision} generating={generating} onGenerate={() => generateReport(vision)} />}
+          <motion.div key={activeTab} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.18 }}>
+            {activeTab === 'today' && <TodaySection report={report} vision={vision} childName={childName} childId={childId} />}
+            {activeTab === 'roadmap' && <RoadmapSection report={report} childId={childId} generating={generating} onGenerate={() => generateReport(vision)} />}
+            {activeTab === 'spike' && <SpikeSection report={report} childId={childId} vision={vision} />}
             {activeTab === 'records' && <RecordsSection childId={childId} router={router} />}
-            {activeTab === 'schools' && <SchoolsSection vision={vision} />}
           </motion.div>
         </AnimatePresence>
       </div>
@@ -761,9 +849,5 @@ function AcademicContent() {
 }
 
 export default function AcademicPage() {
-  return (
-    <Suspense>
-      <AcademicContent />
-    </Suspense>
-  )
+  return <Suspense><AcademicContent /></Suspense>
 }
