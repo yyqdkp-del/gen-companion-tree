@@ -202,7 +202,7 @@ if ('Notification' in window && 'serviceWorker' in navigator) {
   return () => { supabase.removeChannel(channel) }
 }, [userId])
   return (
-   <AppContext.Provider value={{ userId, userIdRef, kids, todos, hotspots, loading, sync, setUserIdSafe, addTempTodo, removeTempTodo, processStatus, setProcessStatus }}>
+   <AppContext.Provider value={{ userId, userIdRef, kids, todos, hotspots, loading, sync, setUserIdSafe, addTempTodo, removeTempTodo, processStatus, setProcessStatus, activeKid, setActiveKid }}>
       {children}
     </AppContext.Provider>
   )
