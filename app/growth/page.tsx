@@ -1,12 +1,13 @@
 'use client'
-import React, { useEffect, useState, useCallback } from 'react'
+import React from 'react'
 import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
 import { useApp } from '@/app/context/AppContext'
-import dynamic from 'next/dynamic'
-const ChildAvatar = dynamic(() => import('@/app/components/ChildAvatar'), { ssr: false })
+import nextDynamic from 'next/dynamic'
+
 export const dynamic = 'force-dynamic'
 
+const ChildAvatar = nextDynamic(() => import('@/app/components/ChildAvatar'), { ssr: false })
 function FallingLeaves() {
   const leaves = [
     { id: 0, sx: 28, dur: 12, d: 0,   size: 13, r: 20  },
