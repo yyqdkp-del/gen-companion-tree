@@ -17,8 +17,6 @@ async function generateAndSave(body: any, authHeader: string) {
   const { data: { user } } = await supabase.auth.getUser(token)
   const uid = user?.id || null
 
-  console.log('auth result', { uid, tokenLen: token?.length })
-
   const prompt = `你是一位顶尖的国际升学规划专家，有20年帮助海外华人家庭孩子申请美高、英国独立学校和欧美T50大学的经验。
 
 请根据以下信息，为这个孩子生成一份完整的升学规划报告。
@@ -37,58 +35,61 @@ async function generateAndSave(body: any, authHeader: string) {
 主要担忧：${(vision?.concerns || []).join('、')}
 
 【现有课外活动】
-${activities?.length ? activities.map((a: any) => `- ${a.name}（${a.category}，每周${a.days?.join('/')}）`).join('\n') : '暂无课外活动记录'}
+${activities?.length ? activities.map((a: any) => `- ${a.name}（${a.category}）`).join('\n') : '暂无课外活动记录'}
 
 【荣誉奖项】
-${achievements?.length ? achievements.map((a: any) => `- ${a.title}（${a.level}级别，${a.date}）`).join('\n') : '暂无记录'}
+${achievements?.length ? achievements.map((a: any) => `- ${a.title}（${a.level}级别）`).join('\n') : '暂无记录'}
 
 【中文水平】
 ${assessment ? JSON.stringify(assessment) : '暂无测评记录'}
 
-规划报告要求：
-- roadmap 最多3个时间段，每个时间段最多3个actions
-- this_semester 最多3条
-- 语言亲切自然，像一位资深教育顾问在和妈妈对话
-- 所有建议具体可执行，结合清迈本地资源
-
-请用JSON格式返回，直接{开头}结尾，不加任何其他文字：
+请严格按以下JSON结构返回，直接以{开头以}结尾，不加任何其他文字、注释或代码块标记：
 
 {
   "profile_scores": {
-    "academic": 75,
-    "spike_depth": 60,
-    "leadership": 40,
-    "language": 85,
-    "community": 30,
-    "diversity": 55
+    "academic": 0到100之间的整数,
+    "spike_depth": 0到100之间的整数,
+    "leadership": 0到100之间的整数,
+    "language": 0到100之间的整数,
+    "community": 0到100之间的整数,
+    "diversity": 0到100之间的整数
   },
-  "profile_summary": "一句话总结孩子现在的画像（20字以内）",
-  "narrative": "这个孩子的申请故事主线（3-5句话，感性有力）",
-  "strengths": ["优势1", "优势2"],
-  "gaps": ["缺口1", "缺口2"],
-  "risks": ["风险1", "风险2"],
+  "profile_summary": "20字以内的一句话总结",
+  "narrative": "3到5句话的申请故事主线，感性有力",
+  "strengths": ["优势描述1", "优势描述2"],
+  "gaps": ["缺口描述1", "缺口描述2"],
+  "risks": ["风险描述1", "风险描述2"],
   "roadmap": [
     {
-      "period": "时间段",
-      "priority": "high/medium/low",
+      "period": "时间段描述",
+      "priority": "high",
       "actions": [
         {
-          "action": "具体行动",
-          "reason": "为什么重要",
+          "action": "具体行动描述",
+          "reason": "重要原因",
           "resource": "清迈可用资源",
-          "tier": 2
+          "tier": 1到4之间的整数
         }
       ]
     }
   ],
   "this_semester": [
     {
-      "action": "本学期最重要的事",
-      "why": "价值说明",
-      "urgency": "high/medium"
+      "action": "本学期最重要的具体行动",
+      "why": "申请价值说明",
+      "urgency": "high"
     }
   ]
-}`
+}
+
+要求：
+- roadmap最多3个时间段，每个时间段最多3个actions
+- this_semester最多3条
+- tier字段必须是1、2、3、4中的一个整数
+- urgency字段必须是high或medium
+- priority字段必须是high、medium或low
+- 所有整数字段不能有引号
+- 语言亲切自然，结合清迈本地资源`
 
   try {
     const response = await fetch('https://api.anthropic.com/v1/messages', {
@@ -106,12 +107,13 @@ ${assessment ? JSON.stringify(assessment) : '暂无测评记录'}
     })
 
     const data = await response.json()
-    console.log('Anthropic response', response.status, data.error || 'ok')
-
     const raw = data.content?.[0]?.text || ''
-    const match = raw.match(/\{[\s\S]*\}/)
+
+    // 提取JSON，去掉可能的markdown代码块
+    const cleaned = raw.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
+    const match = cleaned.match(/\{[\s\S]*\}/)
     if (!match) {
-      console.error('no JSON in response', raw.slice(0, 200))
+      console.error('no JSON in response', raw.slice(0, 300))
       return
     }
 
@@ -127,7 +129,11 @@ ${assessment ? JSON.stringify(assessment) : '暂无测评记录'}
       this_semester: reportData.this_semester,
     })
 
-    console.log('insert result', { insertError })
+    if (insertError) {
+      console.error('insert error', insertError)
+    } else {
+      console.log('pathway report saved successfully', { childId, uid })
+    }
 
   } catch (e: any) {
     console.error('generateAndSave error', e?.message || e)
@@ -142,7 +148,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: '缺少必要数据' }, { status: 400 })
   }
 
-  // waitUntil 保证 Vercel 在返回响应后继续执行后台任务
   waitUntil(generateAndSave(body, authHeader))
 
   return NextResponse.json({ status: 'processing' })
