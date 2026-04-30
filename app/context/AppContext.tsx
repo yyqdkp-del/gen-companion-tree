@@ -212,6 +212,13 @@ if ('Notification' in window && 'serviceWorker' in navigator) {
 
 export function useApp() {
   const ctx = useContext(AppContext)
-  if (!ctx) throw new Error('useApp must be used within AppProvider')
+  if (!ctx) return {
+    userId: '', userIdRef: { current: '' } as React.MutableRefObject<string>,
+    kids: [], todos: [], hotspots: [],
+    loading: true, sync: async () => {}, setUserIdSafe: () => {},
+    addTempTodo: () => '', removeTempTodo: () => {},
+    processStatus: null, setProcessStatus: () => {},
+    activeKid: null, setActiveKid: () => {},
+  } as AppContextType
   return ctx
 }
