@@ -284,6 +284,7 @@ export default function BasePage() {
  const { userId, kids, todos, hotspots, loading, sync: ctxSync, processStatus, setProcessStatus, activeKid, setActiveKid } = useApp()
   const [time, setTime] = useState(new Date())
   const [modal, setModal] = useState<'child' | 'todo' | 'hotspot' | 'addChild' | 'oneTap' | 'input' | null>(null)
+  const [enrichedKids, setEnrichedKids] = useState<Child[]>([])
   const [oneTapTodo, setOneTapTodo] = useState<TodoItem | null>(null)
   const [patrolling, setPatrolling] = useState(false)
   const [mounted, setMounted] = useState(false)
@@ -318,7 +319,9 @@ export default function BasePage() {
         school_name: c.school_name, grade: c.grade, today_schedule,
       }
     }))
-    setActiveKid(prev => prev ? enriched.find(c => c.id === prev.id) || enriched[0] : enriched[0])
+    setEnrichedKids(enriched)
+    const current = enriched.find(c => c.id === localStorage.getItem('active_child_id')) || enriched[0]
+    setActiveKid(current)
   }, [])
 
   useEffect(() => { if (userId) enrichKids(userId) }, [userId, enrichKids])
@@ -405,7 +408,7 @@ const handleRead = async (id: string) => {
       <ChildAvatar />
 
       {/* 右上角时钟 */}
-      <header style={{ position: 'absolute', top: '5%', right: '6%', zIndex: 50, textAlign: 'right' }}>
+      <header style={{ position: 'fixed', top: 'max(48px, env(safe-area-inset-top, 48px))', right: '6%', zIndex: 50, textAlign: 'right' }}>
         <h1 style={{ fontSize: 'clamp(48px, 15vw, 76px)', fontWeight: 100, color: THEME.text, opacity: 0.9, lineHeight: 1, margin: 0 }}>
           {mounted ? `${time.getHours()}:${time.getMinutes() < 10 ? `0${time.getMinutes()}` : time.getMinutes()}` : '--:--'}
         </h1>
@@ -435,7 +438,7 @@ const handleRead = async (id: string) => {
      {modal === 'child' && (
   <ChildSheet
     key="child"
-    children={kids}
+    children={enrichedKids.length ? enrichedKids : kids}
     sel={activeKid}
     onSel={c => setActiveKid(c)}
     onClose={() => setModal(null)}
@@ -545,7 +548,6 @@ const handleRead = async (id: string) => {
     </motion.div>
   )}
 </AnimatePresence>
-      <InstallPWA />
       {!keyboardOpen && <InstallPWA />}
     </main>
   )
