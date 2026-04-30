@@ -100,8 +100,9 @@ ${assessment ? JSON.stringify(assessment) : '暂无测评记录'}
         'anthropic-version': '2023-06-01',
       },
       body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001',
+        model: 'claude-sonnet-4-20250514',
         max_tokens: 2000,
+        system: '你只输出合法的JSON对象，不加任何其他内容、注释或markdown代码块标记。',
         messages: [{ role: 'user', content: prompt }],
       }),
     })
