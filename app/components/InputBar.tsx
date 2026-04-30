@@ -60,7 +60,7 @@ const isTreehouse = pathname === '/treehouse'
 
 // ── uid 获取，永远不会空 ──
 const getUid = useCallback(() => {
-  return userId || localStorage.getItem('app_user_id') || ''
+  return userId || (typeof window !== 'undefined' ? localStorage.getItem('app_user_id') : '') || ''
 }, [userId])
 
 const SHOW_PATHS = ['/', '/rian', '/growth', '/treehouse']
