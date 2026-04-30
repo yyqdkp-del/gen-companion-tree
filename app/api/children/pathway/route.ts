@@ -422,7 +422,7 @@ ${JSON.stringify(nodesWithCompletion, null, 2)}
     if (insertError) {
       console.error('insert error', insertError)
       // 尝试用最小字段集重新插入
-      aawait supabase.from('pathway_reports').insert({
+      await supabase.from('pathway_reports').insert({
   child_id: childId,
   user_id: uid,
   profile_scores: finalReport.profile_scores,
