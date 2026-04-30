@@ -18,6 +18,8 @@ type AppContextType = {
   removeTempTodo: (id: string) => void
   processStatus: { status: 'processing' | 'done' | 'failed' | null; message: string; tools?: any[] } | null
   setProcessStatus: (status: { status: 'processing' | 'done' | 'failed' | null; message: string; tools?: any[] } | null) => void
+  activeKid: any | null
+  setActiveKid: (kid: any) => void
 }
 const AppContext = createContext<AppContextType | null>(null)
 
