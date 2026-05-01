@@ -39,7 +39,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 } | null>(null)
 
 const [activeKid, setActiveKidState] = useState<any | null>(null)
-const setActiveKid = (kid: any) => {
+const setActiveKid = useCallback((kid: any) => {
   setActiveKidState(kid)
   if (kid && typeof window !== 'undefined') {
     localStorage.setItem('active_child_id', kid.id)
@@ -51,7 +51,7 @@ const setActiveKid = (kid: any) => {
     }))
     window.dispatchEvent(new Event('child-changed'))
   }
-}
+}, [])
   const setUserIdSafe = (id: string) => {
     userIdRef.current = id
     setUserId(id)
