@@ -748,6 +748,7 @@ medications_current: healthData.medications_current,
       if (savedChildId) {
        
         // 联通主屏头像：更新 localStorage
+        await supabase.from('child_profiles').upsert({ child_id: savedChildId, user_id: uid, class_schedule: scheduleData.class_schedule, activities: (scheduleData as any).activities || [] }, { onConflict: 'child_id' })
         localStorage.setItem('active_child_id', savedChildId)
         localStorage.setItem('active_child', JSON.stringify({
           id: savedChildId,
