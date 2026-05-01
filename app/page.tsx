@@ -300,7 +300,7 @@ export default function BasePage() {
     if (!childData?.length) return
     const enriched: Child[] = await Promise.all(childData.map(async (c: any) => {
       const [logRes, schedRes, evtRes] = await Promise.all([
-        supabase.from('child_daily_log').select('*').eq('child_id', c.id).eq('user_id', uid).eq('date', today).single(),
+        supabase.from('child_daily_log').select('*').eq('child_id', c.id).eq('user_id', uid).eq('date', today).maybeSingle(),
         supabase.from('child_schedule_template').select('*').eq('child_id', c.id).eq('day_of_week', dow).order('period_start'),
         supabase.from('child_school_calendar').select('*').eq('child_id', c.id).eq('user_id', uid).eq('date_start', today),
       ])

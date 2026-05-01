@@ -391,7 +391,7 @@ export default function ChildSheet({ children, sel, onSel, onClose, onAdd, userI
   useEffect(() => {
     if (!sel?.id) return
     supabase.from('child_daily_log').select('id, health_status, mood_status')
-      .eq('child_id', sel.id).eq('date', today).single()
+      .eq('child_id', sel.id).eq('date', today).maybeSingle()
       .then(({ data }) => {
         if (data) setDailyLog(data)
         else setDailyLog({ health_status: sel.health_status || 'normal', mood_status: sel.mood_status || 'calm' })
