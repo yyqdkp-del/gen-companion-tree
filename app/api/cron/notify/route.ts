@@ -73,13 +73,7 @@ async function sendMorningReport(userId: string) {
     .in('child_id', childIds)
     .eq('date_start', today)
 
-  // 今天常规课表（携带物品）
-  const { data: schedule } = await supabase
-    .from('child_schedule_template')
-    .select('child_id, subject, period_start, requires_items')
-    .in('child_id', childIds)
-    .eq('day_of_week', dow)
-    .order('period_start', { ascending: true })
+
 
   // 今天到期红色待办
   const { data: urgentTodos } = await supabase
@@ -104,19 +98,7 @@ async function sendMorningReport(userId: string) {
     }
   }
 
-  // 常规课表携带物品（去重）
-  const packMap: Record<string, string[]> = {}
-  for (const s of schedule || []) {
-    const items = Array.isArray(s.requires_items) ? s.requires_items : []
-    if (!items.length) continue
-    const name = childMap[s.child_id] || '孩子'
-    if (!packMap[name]) packMap[name] = []
-    packMap[name].push(...items)
-  }
-  for (const [name, items] of Object.entries(packMap)) {
-    const unique = [...new Set(items)]
-    lines.push(`${name} 今天带：${unique.slice(0, 4).join('、')}`)
-  }
+
 
   // 紧急待办
   if (urgentTodos?.length) {
@@ -163,12 +145,7 @@ async function sendEveningReminder(userId: string) {
     .in('child_id', childIds)
     .eq('date_start', tomorrowStr)
 
-  // 明天常规课表携带物品
-  const { data: schedule } = await supabase
-    .from('child_schedule_template')
-    .select('child_id, subject, requires_items')
-    .in('child_id', childIds)
-    .eq('day_of_week', tomorrowDow)
+
 
   const lines: string[] = []
 
@@ -182,19 +159,7 @@ async function sendEveningReminder(userId: string) {
     }
   }
 
-  // 课表携带物品
-  const packMap: Record<string, string[]> = {}
-  for (const s of schedule || []) {
-    const items = Array.isArray(s.requires_items) ? s.requires_items : []
-    if (!items.length) continue
-    const name = childMap[s.child_id] || '孩子'
-    if (!packMap[name]) packMap[name] = []
-    packMap[name].push(...items)
-  }
-  for (const [name, items] of Object.entries(packMap)) {
-    const unique = [...new Set(items)]
-    lines.push(`${name} 明天带：${unique.slice(0, 4).join('、')}`)
-  }
+
 
   if (!lines.length) return
 

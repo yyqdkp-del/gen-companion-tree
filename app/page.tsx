@@ -299,19 +299,13 @@ export default function BasePage() {
     const { data: childData } = await supabase.from('children').select('*').eq('user_id', uid)
     if (!childData?.length) return
     const enriched: Child[] = await Promise.all(childData.map(async (c: any) => {
-      const [logRes, schedRes, evtRes] = await Promise.all([
+      const [logRes, evtRes] = await Promise.all([
         supabase.from('child_daily_log').select('*').eq('child_id', c.id).eq('user_id', uid).eq('date', today).maybeSingle(),
-        supabase.from('child_schedule_template').select('*').eq('child_id', c.id).eq('day_of_week', dow).order('period_start'),
         supabase.from('child_school_calendar').select('*').eq('child_id', c.id).eq('user_id', uid).eq('date_start', today),
       ])
       const log = logRes.data
       const energy = c.energy || inferEnergy(log?.health_status, log?.mood_status)
       const today_schedule: ScheduleItem[] = [
-        ...(schedRes.data || []).map((s: any) => ({
-          time: s.period_start?.substring(0, 5) || '',
-          title: s.subject, location: s.location,
-          requires_action: s.requires_items?.length ? `带：${s.requires_items.join('、')}` : undefined
-        })),
         ...(evtRes.data || []).map((e: any) => ({ time: '', title: e.title, requires_action: e.requires_action }))
       ].sort((a, b) => a.time.localeCompare(b.time))
       return {
