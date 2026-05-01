@@ -236,15 +236,15 @@ export async function POST(req: NextRequest) {
         .eq('status', 'pending')
     }
 
-    // 4. 记录行为信号（学习用）
-    try {
-      await supabase.from('behavior_signals').insert({
-        family_id: 'default',
-        signal_type: 'todo_complete',
-        signal_content: `${todo.title} → ${action}`,
-        extracted_topics: [todo.category],
-      })
-    } catch (_) {}
+//     // 4. 记录行为信号（学习用）
+//     try {
+//       await supabase.from('behavior_signals').insert({
+//         family_id: 'default',
+//         signal_type: 'todo_complete',
+//         signal_content: `${todo.title} → ${action}`,
+//         extracted_topics: [todo.category],
+//       })
+//     } catch (_) {}
     return NextResponse.json({
       ok: success,
       message,
