@@ -14,12 +14,14 @@ export async function POST(req: NextRequest) {
   const dow = new Date().getDay()
   const hour = new Date().getHours()
 
-  const [{ data: child }, { data: logs }, { data: sched }, { data: events }] = await Promise.all([
+  const [{ data: child }, { data: logs }, { data: profile }, { data: events }] = await Promise.all([
     supabase.from('children').select('*').eq('id', child_id).single(),
     supabase.from('child_daily_log').select('*').eq('child_id', child_id).order('date', { ascending: false }).limit(7),
-    supabase.from('child_schedule_template').select('*').eq('child_id', child_id).eq('day_of_week', dow),
+    supabase.from('child_profiles').select('class_schedule').eq('child_id', child_id).maybeSingle(),
     supabase.from('child_school_calendar').select('*').eq('child_id', child_id).eq('date_start', today),
   ])
+  const dowKey = ['sun','mon','tue','wed','thu','fri','sat'][dow]
+  const sched = profile?.class_schedule?.[dowKey] || []
 
   const prompt = `你是一个了解儿童生理节律的AI助手。根据以下信息，评估这个孩子当前时刻的精力值（0-100）。
 
