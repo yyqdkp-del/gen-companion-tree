@@ -705,8 +705,6 @@ function ChildEditContent() {
     if (!basicData.name.trim()) { setSaveError('请填写孩子名字'); return }
     setSaving(true)
     setSaveError('')
-    console.log('schoolData:', schoolData)
-console.log('healthData:', healthData)
 
     try {
       const { data: { session } } = await supabase.auth.getSession()
