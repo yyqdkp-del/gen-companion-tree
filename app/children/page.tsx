@@ -62,7 +62,7 @@ export default function ChildrenPage() {
   .eq('child_name', child.name)
   .order('created_at', { ascending: false })
   .limit(1)
-  .single()
+  .maybeSingle()
 
         let chinese_level = ''
         if (assessment?.report) {
