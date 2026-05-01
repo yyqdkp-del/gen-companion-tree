@@ -520,9 +520,125 @@ function TabBar({ active, onChange }: { active: TabType; onChange: (t: TabType) 
   )
 }
 
+<<<<<<< HEAD
 // ══ 智能推荐字（从 hanzi_library 按孩子级别推荐未学字） ══
 function SmartQuickChars({ level, learnedChars, onSelect }: { level: string; learnedChars: string[]; onSelect: (c: string) => void }) {
   const [chars, setChars] = useState<string[]>([])
+=======
+// ══════════════════════════════════════════════
+// 子组件：汉字拆解结果
+// ══════════════════════════════════════════════
+
+// ══ 字族+成语区块（查库或生成） ══
+function FamilySection({ family, chengyu, cy_story, childLevel }: {
+  family: string[]; chengyu?: string; cy_story?: string; childLevel: string
+}) {
+  const [popup, setPopup] = useState<{ word: string; data: any | null; loading: boolean } | null>(null)
+
+  const handleWordClick = async (word: string) => {
+    setPopup({ word, data: null, loading: true })
+    // 先查 hanzi_library 缓存
+    try {
+      const char = [...word].find(c => /\p{Script=Han}/u.test(c)) || word[0]
+      const { data: cached } = await supabase
+        .from('hanzi_library').select('*').eq('char', char).single()
+      if (cached?.result) {
+        const result = typeof cached.result === 'string' ? JSON.parse(cached.result) : cached.result
+        setPopup({ word, data: result, loading: false })
+        return
+      }
+    } catch {}
+    // 没有缓存则调用 API
+    try {
+      const char = [...word].find(c => /\p{Script=Han}/u.test(c)) || word[0]
+      const res = await fetch('/api/chinese/decode', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode: 'hanzi', char, child_level: childLevel }),
+      })
+      const json = await res.json()
+      setPopup({ word, data: json.error ? null : json, loading: false })
+    } catch {
+      setPopup({ word, data: null, loading: false })
+    }
+  }
+
+  return (
+    <>
+      <div style={{ background: THEME.white, borderRadius: 16, padding: '16px 18px', marginBottom: 10, border: '1px solid rgba(200,160,96,0.13)' }}>
+        {family.length > 0 && (
+          <>
+            <div style={{ fontSize: 10, letterSpacing: 3, color: THEME.red, textTransform: 'uppercase', marginBottom: 10, fontFamily: 'sans-serif' }}>🌳 字族 · 延伸</div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7, marginBottom: chengyu ? 14 : 0 }}>
+              {family.map((f, i) => (
+                <button key={i} onClick={() => handleWordClick(f)}
+                  style={{ padding: '5px 13px', borderRadius: 20, background: 'rgba(45,106,79,0.08)', border: '1px solid rgba(45,106,79,0.2)', fontSize: 13, fontFamily: "'Noto Serif SC', serif", color: THEME.green, cursor: 'pointer' }}>
+                  {f}
+                </button>
+              ))}
+            </div>
+          </>
+        )}
+        {chengyu && (
+          <>
+            <div style={{ fontSize: 10, letterSpacing: 3, color: THEME.red, textTransform: 'uppercase', marginBottom: 8, fontFamily: 'sans-serif' }}>🌟 相关成语</div>
+            <button onClick={() => handleWordClick(chengyu)}
+              style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', background: THEME.paper, border: '1px solid rgba(200,160,96,0.25)', borderRadius: 12, padding: '10px 14px', cursor: 'pointer', textAlign: 'left' }}>
+              <span style={{ fontSize: 20, fontFamily: "'Noto Serif SC', serif", color: THEME.text }}>{chengyu}</span>
+              {cy_story && <span style={{ fontSize: 11, color: THEME.textDim, fontFamily: 'sans-serif', flex: 1, lineHeight: 1.5 }}>{cy_story.slice(0, 30)}…</span>}
+            </button>
+          </>
+        )}
+      </div>
+
+      <AnimatePresence>
+        {popup && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            style={{ position: 'fixed', inset: 0, background: 'rgba(26,18,8,0.5)', zIndex: 300, display: 'flex', alignItems: 'flex-end', justifyContent: 'center', padding: '0 0 80px' }}
+            onClick={() => setPopup(null)}>
+            <motion.div initial={{ y: 60, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 60, opacity: 0 }}
+              transition={{ type: 'spring', damping: 28, stiffness: 300 }}
+              style={{ background: THEME.white, borderRadius: 20, padding: '20px', width: '100%', maxWidth: 440, margin: '0 16px', maxHeight: '70vh', overflowY: 'auto' }}
+              onClick={e => e.stopPropagation()}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+                <div style={{ fontSize: 28, fontFamily: "'Noto Serif SC', serif", color: THEME.text }}>{popup.word}</div>
+                <button onClick={() => setPopup(null)} style={{ background: 'none', border: 'none', fontSize: 18, color: THEME.textDim, cursor: 'pointer' }}>✕</button>
+              </div>
+              {popup.loading ? (
+                <div style={{ textAlign: 'center', padding: '20px 0', color: THEME.textDim, fontFamily: 'sans-serif', fontSize: 13 }}>
+                  正在查询…
+                </div>
+              ) : popup.data ? (
+                <div style={{ fontFamily: 'sans-serif' }}>
+                  {popup.data.pinyin && <div style={{ fontSize: 13, color: THEME.textDim, marginBottom: 8 }}>{popup.data.pinyin}</div>}
+                  {popup.data.meaning && <div style={{ fontSize: 15, fontWeight: 600, color: THEME.text, marginBottom: 10, fontFamily: "'Noto Serif SC', serif" }}>{popup.data.meaning}</div>}
+                  {popup.data.story && <div style={{ fontSize: 13, color: THEME.textMid, lineHeight: 1.85, marginBottom: 10 }}>{popup.data.story}</div>}
+                  {popup.data.mom_script && (
+                    <div style={{ padding: '12px', borderRadius: 12, background: 'rgba(200,160,96,0.08)', border: '1px solid rgba(200,160,96,0.2)', fontSize: 13, color: THEME.text, lineHeight: 1.8, fontStyle: 'italic' }}>
+                      👩 {popup.data.mom_script}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div style={{ textAlign: 'center', padding: '20px 0', color: THEME.textDim, fontFamily: 'sans-serif', fontSize: 13 }}>
+                  暂无数据
+                </div>
+              )}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </>
+  )
+}
+
+function HanziResult({ data, char, onMomCopy, childLevel }: { data: any; char: string; onMomCopy: () => void; childLevel: string }) {
+  const [showMerged, setShowMerged] = useState(false)
+  const [momOpen, setMomOpen] = useState(false)
+  const [phonicsOpen, setPhonicsOpen] = useState(false)
+  const lv = data?.level || 'R2'
+  const lvCfg = LEVELS[lv] || LEVELS.R2
+  const exts = Array.isArray(data?.extension) ? data.extension : []
+>>>>>>> bdc20a9 (feat: 字族词点击查库或生成内容)
 
   useEffect(() => {
     async function load() {
@@ -561,6 +677,7 @@ function SmartQuickChars({ level, learnedChars, onSelect }: { level: string; lea
       <div style={{ fontSize: 10, color: THEME.textDim, letterSpacing: 3, marginBottom: 8, textTransform: 'uppercase', fontFamily: 'sans-serif' }}>
         {level} 推荐
       </div>
+<<<<<<< HEAD
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7 }}>
         {chars.map(c => (
           <motion.button key={c} whileTap={{ scale: 0.88 }} onClick={() => onSelect(c)}
@@ -570,6 +687,124 @@ function SmartQuickChars({ level, learnedChars, onSelect }: { level: string; lea
         ))}
       </div>
     </>
+=======
+
+      {/* ── 造字演变 ── */}
+      {data.evolution && (
+        <div style={{ background: THEME.white, borderRadius: 16, padding: '16px 18px', marginBottom: 10, border: '1px solid rgba(200,160,96,0.13)' }}>
+          <div style={{ fontSize: 10, letterSpacing: 3, color: THEME.gold, textTransform: 'uppercase', marginBottom: 8, fontFamily: 'sans-serif' }}>📜 造字演变</div>
+          <div style={{ fontSize: 13, color: THEME.text, lineHeight: 1.85, fontFamily: 'sans-serif' }}>{data.evolution}</div>
+        </div>
+      )}
+
+      {/* ── Phonics桥梁（可展开） ── */}
+      {data.english_link && (
+        <div style={{ background: THEME.white, borderRadius: 16, overflow: 'hidden', marginBottom: 10, border: '1px solid rgba(26,60,94,0.1)' }}>
+          <button onClick={() => setPhonicsOpen(!phonicsOpen)}
+            style={{ width: '100%', padding: '14px 18px', background: 'none', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', textAlign: 'left' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ fontSize: 16 }}>🔗</span>
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: THEME.navy, fontFamily: 'sans-serif' }}>英文自然拼读连接</div>
+                <div style={{ fontSize: 11, color: THEME.textDim, fontFamily: 'sans-serif' }}>Phonics × 字理，双语解锁</div>
+              </div>
+            </div>
+            <motion.span animate={{ rotate: phonicsOpen ? 180 : 0 }} style={{ fontSize: 18, color: THEME.gold, display: 'inline-block' }}>⌄</motion.span>
+          </button>
+          <AnimatePresence>
+            {phonicsOpen && (
+              <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.3 }} style={{ overflow: 'hidden' }}>
+                <div style={{ padding: '0 18px 16px', borderTop: '1px solid rgba(200,160,96,0.15)', fontFamily: 'sans-serif' }}>
+                  <div style={{ fontSize: 13, color: THEME.blue, lineHeight: 1.85, marginTop: 12, fontStyle: 'italic' }}>{data.english_link}</div>
+                  {data.phonics_bridge && (
+                    <div style={{ marginTop: 10, padding: '8px 12px', borderRadius: 10, background: 'rgba(26,60,94,0.05)', fontSize: 12, color: THEME.textMid, lineHeight: 1.7 }}>
+                      💡 {data.phonics_bridge}
+                    </div>
+                  )}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+      )}
+
+      {/* ── 文化故事 ── */}
+      {data.story && (
+        <div style={{ background: THEME.white, borderRadius: 16, padding: '16px 18px', marginBottom: 10, border: '1px solid rgba(200,160,96,0.13)' }}>
+          <div style={{ fontSize: 10, letterSpacing: 3, color: THEME.red, textTransform: 'uppercase', marginBottom: 8, fontFamily: 'sans-serif' }}>📖 文化故事</div>
+          <div style={{ fontSize: 13, color: THEME.text, lineHeight: 1.85, fontFamily: 'sans-serif' }}>{data.story}</div>
+          {data.scene && (
+            <div style={{ background: 'rgba(200,160,96,0.08)', borderRadius: 10, padding: '10px 13px', borderLeft: '3px solid #C8A060', marginTop: 12 }}>
+              <div style={{ fontSize: 10, letterSpacing: 2, color: THEME.gold, marginBottom: 4, fontFamily: 'sans-serif' }}>🌍 生活场景</div>
+              <div style={{ fontSize: 12, color: THEME.textMid, lineHeight: 1.75, fontStyle: 'italic', fontFamily: 'sans-serif' }}>{data.scene}</div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── 字族+成语（点击查库或生成） ── */}
+      {(data.family?.length > 0 || data.chengyu) && (
+        <FamilySection
+          family={(data.family || []).slice(0, 3)}
+          chengyu={data.chengyu}
+          cy_story={data.cy_story}
+          childLevel={childLevel}
+        />
+      )}
+
+      {/* ── 妈妈台词（最重要，永远在最显眼处） ── */}
+      <div style={{ background: THEME.white, borderRadius: 16, overflow: 'hidden', border: '2px solid rgba(200,160,96,0.35)', marginBottom: 10, boxShadow: '0 4px 20px rgba(200,160,96,0.12)' }}>
+        <button onClick={() => setMomOpen(!momOpen)}
+          style={{ width: '100%', padding: '16px 18px', background: momOpen ? 'rgba(200,160,96,0.06)' : 'none', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', textAlign: 'left' }}>
+          <div>
+            <div style={{ fontSize: 15, color: THEME.textMid, fontFamily: "'Noto Serif SC', serif", fontWeight: 700 }}>👩 妈妈台词</div>
+            <div style={{ fontSize: 11, color: THEME.textDim, marginTop: 2, fontFamily: 'sans-serif' }}>
+              {momOpen ? '点击收起' : '点击展开 · 今天就能用'}
+            </div>
+          </div>
+          <motion.span animate={{ rotate: momOpen ? 180 : 0 }} style={{ fontSize: 20, color: THEME.gold, display: 'inline-block' }}>⌄</motion.span>
+        </button>
+        <AnimatePresence>
+          {momOpen && (
+            <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.3 }} style={{ overflow: 'hidden' }}>
+              <div style={{ padding: '0 18px 18px', borderTop: '1px solid rgba(200,160,96,0.2)' }}>
+                {/* 主台词 */}
+                {data.mom_script && (
+                  <div style={{ marginTop: 14, padding: '14px', borderRadius: 12, background: 'linear-gradient(135deg, rgba(200,160,96,0.1), rgba(192,57,43,0.05))', border: '1px solid rgba(200,160,96,0.2)' }}>
+                    <div style={{ fontSize: 11, color: THEME.gold, fontWeight: 700, marginBottom: 8, letterSpacing: '0.1em', fontFamily: 'sans-serif' }}>📢 主台词</div>
+                    <div style={{ fontSize: 13, color: THEME.text, lineHeight: 1.9, fontStyle: 'italic', fontFamily: 'sans-serif' }}>「{data.mom_script}」</div>
+                  </div>
+                )}
+                {/* 引导问题 */}
+                {(data.mom_questions || []).length > 0 && (
+                  <>
+                    <div style={{ fontSize: 10, letterSpacing: 3, color: THEME.gold, margin: '14px 0 10px', fontFamily: 'sans-serif' }}>自然聊天，不是考试</div>
+                    {(data.mom_questions || []).map((q: string, i: number) => (
+                      <div key={i} style={{ display: 'flex', gap: 10, marginBottom: 10, alignItems: 'flex-start' }}>
+                        <div style={{ width: 24, height: 24, borderRadius: '50%', background: THEME.gold, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, flexShrink: 0, marginTop: 2, fontFamily: 'sans-serif' }}>{i + 1}</div>
+                        <div style={{ fontSize: 13, color: THEME.text, lineHeight: 1.75, fontFamily: 'sans-serif' }}>{q}</div>
+                      </div>
+                    ))}
+                  </>
+                )}
+                {/* 小贴士 */}
+                <div style={{ background: 'rgba(192,57,43,0.06)', borderRadius: 10, padding: '10px 13px', marginTop: 4 }}>
+                  <div style={{ fontSize: 10, letterSpacing: 2, color: THEME.red, fontFamily: 'sans-serif', marginBottom: 4 }}>💡 小贴士</div>
+                  <div style={{ fontSize: 12, color: THEME.textMid, lineHeight: 1.7, fontFamily: 'sans-serif' }}>问完后，让孩子用「{char}」造一个句子。不需要正确，有趣就好。</div>
+                </div>
+                {/* 复制按钮 */}
+                <motion.button whileTap={{ scale: 0.95 }} onClick={onMomCopy}
+                  style={{ width: '100%', marginTop: 12, padding: '10px', borderRadius: 10, border: `1px solid ${THEME.gold}`, background: 'transparent', fontSize: 13, color: THEME.gold, fontWeight: 600, cursor: 'pointer', fontFamily: 'sans-serif' }}>
+                  📋 复制台词
+                </motion.button>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+
+    </motion.div>
+>>>>>>> bdc20a9 (feat: 字族词点击查库或生成内容)
   )
 }
 
@@ -848,7 +1083,7 @@ export default function DecodePage() {
         <AnimatePresence>
           {data && !loading && (
             <>
-              {activeTab === 'hanzi' && <HanziResult data={data} char={input} onMomCopy={handleMomCopy} />}
+              {activeTab === 'hanzi' && <HanziResult data={data} char={input} onMomCopy={handleMomCopy} childLevel={childInfo.level} />}
               {activeTab === 'chengyu' && <ChengYuResult data={data} onMomCopy={handleMomCopy} />}
               {activeTab === 'writing' && <WritingResult data={data} onMomCopy={handleMomCopy} />}
 
