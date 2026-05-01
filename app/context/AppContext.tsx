@@ -49,7 +49,6 @@ const setActiveKid = useCallback((kid: any) => {
       emoji: kid.emoji || '👶🏻',
       school: kid.school_name || kid.school || '',
     }))
-    window.dispatchEvent(new Event('child-changed'))
   }
 }, [])
   const setUserIdSafe = (id: string) => {
