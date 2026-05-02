@@ -2,14 +2,11 @@
 
 import React, { useEffect, useState, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { createClient } from '@supabase/supabase-js'
+import { createClient } from '@/lib/supabase/client'
 import { motion, AnimatePresence } from 'framer-motion'
 import type { UserLocation } from '@/lib/geofence/types'
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
-)
+const supabase = createClient()
 
 const THEME = {
   bg: '#F5F0E8',
@@ -732,9 +729,11 @@ export default function DecodePage() {
       const uid = session?.user?.id
       if (!uid) return
       setUserId(uid)
-      const { data: sessions } = await supabase
+      let sessionQuery = supabase
         .from('chinese_sessions').select('input_type, result, learned_at')
-        .eq('user_id', uid).order('learned_at', { ascending: false }).limit(200)
+        .eq('user_id', uid)
+      if (childInfo.id) sessionQuery = sessionQuery.eq('child_id', childInfo.id)
+      const { data: sessions } = await sessionQuery.order('learned_at', { ascending: false }).limit(200)
       if (sessions) {
         setLearnedItems(sessions.filter((s: any) => s.result).map((s: any) => {
           const r = typeof s.result === 'string' ? JSON.parse(s.result) : s.result
