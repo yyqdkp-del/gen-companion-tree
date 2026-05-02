@@ -99,3 +99,66 @@ export async function saveDailyLog(
     .select().single()
   return data?.id
 }
+
+export async function enrichChildren(
+  uid: string,
+  today: string,
+): Promise<any[]> {
+  const { data: childData, error } = await supabase
+    .from('children').select('*').eq('user_id', uid)
+  if (error || !childData?.length) return []
+
+  const results = await Promise.allSettled(
+    childData.map(async (c: any) => {
+      const [logRes, evtRes] = await Promise.allSettled([
+        supabase.from('child_daily_log')
+          .select('*').eq('child_id', c.id)
+          .eq('user_id', uid).eq('date', today).maybeSingle(),
+        supabase.from('child_school_calendar')
+          .select('*').eq('child_id', c.id)
+          .eq('user_id', uid).eq('date_start', today),
+      ])
+      const log  = logRes.status === 'fulfilled' ? logRes.value.data : null
+      const evts = evtRes.status === 'fulfilled' ? (evtRes.value.data || []) : []
+      const hour = new Date().getHours()
+      let base = hour >= 7 && hour <= 9 ? 80 : hour >= 12 && hour <= 14 ? 65
+        : hour >= 15 && hour <= 17 ? 85 : hour >= 20 ? 45 : 75
+      if (log?.health_status === 'sick') base -= 35
+      if (log?.health_status === 'recovering') base -= 15
+      if (log?.mood_status === 'upset') base -= 20
+      if (log?.mood_status === 'anxious') base -= 10
+      if (log?.mood_status === 'happy') base += 10
+      const energy = Math.max(10, Math.min(100, base))
+      return {
+        id: c.id, name: c.name || '孩子',
+        emoji: c.emoji || '👶🏻',
+        avatar_url: c.avatar_url || null,
+        energy: c.energy || energy,
+        health_status: log?.health_status || 'normal',
+        mood_status: log?.mood_status || 'calm',
+        school_name: c.school_name, grade: c.grade,
+        today_schedule: evts.map((e: any) => ({
+          time: '', title: e.title,
+          requires_action: e.requires_action,
+        })),
+      }
+    })
+  )
+
+  return results
+    .filter(r => r.status === 'fulfilled')
+    .map(r => (r as PromiseFulfilledResult<any>).value)
+}
+
+export async function addChild(
+  uid: string,
+  d: { name: string; emoji: string; school_name?: string; grade?: string; avatar_url?: string | null },
+): Promise<string | null> {
+  const { data } = await supabase.from('children').insert({
+    user_id: uid, name: d.name, emoji: d.emoji || '👶🏻',
+    avatar_url: d.avatar_url || null,
+    energy: 75, status: 'active',
+    school_name: d.school_name, grade: d.grade,
+  }).select().single()
+  return data?.id ?? null
+}

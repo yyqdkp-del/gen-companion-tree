@@ -17,56 +17,19 @@ import ChildSheet from '@/app/rian/ChildSheet'
 import HotspotSheet from '@/app/rian/HotspotSheet'
 import { useApp } from '@/app/context/AppContext'
 import TodoSheet from '@/app/rian/TodoSheet'
+import { THEME } from '@/app/_shared/_constants/theme'
+import type { Child, TodoItem, HotspotItem } from '@/app/_shared/_types'
+import { useChildData } from '@/app/_shared/_hooks/useChildData'
+import { useTodoActions } from '@/app/_shared/_hooks/useTodoActions'
+import { addChild } from '@/app/_shared/_services/childService'
 
 const ChildAvatar = nextDynamic(() => import('@/app/components/ChildAvatar'), { ssr: false })
 
-const THEME = {
-  bg: 'linear-gradient(180deg, #A7D7D9 0%, #D9A7B4 100%)',
-  text: '#2C3E50',
-  gold: '#B08D57',
-  navy: '#1A3C5E',
-  muted: '#6B8BAA',
-}
-
-type Child = {
-  id: string; name: string; emoji: string; energy: number
-  avatar_url?: string | null
-  health_status?: string; mood_status?: string
-  school_name?: string; grade?: string
-  today_schedule?: ScheduleItem[]; urgent_items?: UrgentItem[]
-  packing_alerts?: PackingAlert[]
-}
 type ScheduleItem = { time: string; title: string; location?: string; requires_action?: string }
 type UrgentItem = { title: string; level: 'red' | 'orange' | 'yellow' }
 type PackingAlert = { item: string; level: 1 | 2 | 3 | 'today'; days_left?: number; need_buy: boolean }
-type TodoItem = {
-  id: string; title: string; priority: string; category?: string
-  due_date?: string; ai_draft?: string; ai_action_type?: string
-  one_tap_ready?: boolean; delegated_to?: string; status: string
-  ai_action_data?: any
-}
-type HotspotItem = {
-  id: string; category: string; urgency: string; title: string
-  summary: string; relevance_reason?: string
-  action_available?: boolean; action_type?: string
-  action_data?: any; created_at: string; status: string
-}
 
 const getEnergyColor = (v: number) => v > 70 ? '#4ADE80' : v > 40 ? '#FACC15' : '#FB7185'
-
-function inferEnergy(health?: string, mood?: string): number {
-  const hour = new Date().getHours()
-  let base = hour >= 7 && hour <= 9 ? 80
-    : hour >= 12 && hour <= 14 ? 65
-    : hour >= 15 && hour <= 17 ? 85
-    : hour >= 20 ? 45 : 75
-  if (health === 'sick') base -= 35
-  if (health === 'recovering') base -= 15
-  if (mood === 'upset') base -= 20
-  if (mood === 'anxious') base -= 10
-  if (mood === 'happy') base += 10
-  return Math.max(10, Math.min(100, base))
-}
 
 function dropState(type: string, data: any) {
   if (type === 'child') {
@@ -107,27 +70,21 @@ function WaterDrop({ state, icon, label, value, badge, pulse, onClick, size = 96
   const c = COLORS[state] || COLORS.calm
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
-      <motion.div
-        onClick={onClick}
+      <motion.div onClick={onClick}
         animate={{ y: [0, -13, 0], x: [0, 3, -2, 0], rotate: [0, 1.2, -0.8, 0] }}
         transition={{ duration: 7, repeat: Infinity, delay, ease: 'easeInOut' }}
         whileTap={{ scale: 0.92 }}
-        style={{ position: 'relative', cursor: 'pointer' }}
-      >
+        style={{ position: 'relative', cursor: 'pointer' }}>
         {pulse && (
-          <motion.div
-            animate={{ scale: [1, 1.3, 1], opacity: [0.6, 0, 0.6] }}
+          <motion.div animate={{ scale: [1, 1.3, 1], opacity: [0.6, 0, 0.6] }}
             transition={{ duration: 1.8, repeat: Infinity }}
-            style={{ position: 'absolute', inset: -12, borderRadius: '66% 34% 71% 29% / 37% 53% 47% 63%', background: c.glow }}
-          />
+            style={{ position: 'absolute', inset: -12, borderRadius: '66% 34% 71% 29% / 37% 53% 47% 63%', background: c.glow }} />
         )}
         <div style={{
-          width: size, height: size,
-          backdropFilter: 'blur(20px)',
+          width: size, height: size, backdropFilter: 'blur(20px)',
           border: `1.5px solid ${c.border}`,
           borderRadius: '66% 34% 71% 29% / 37% 53% 47% 63%',
-          position: 'relative',
-          display: 'flex', flexDirection: 'column',
+          position: 'relative', display: 'flex', flexDirection: 'column',
           alignItems: 'center', justifyContent: 'center',
           background: `radial-gradient(circle at 33% 33%, rgba(255,255,255,0.42) 0%, ${c.fill} 100%)`,
           boxShadow: `inset 5px 5px 10px rgba(255,255,255,0.35), 8px 14px 28px rgba(0,0,0,0.08)`,
@@ -136,41 +93,17 @@ function WaterDrop({ state, icon, label, value, badge, pulse, onClick, size = 96
           {value && <span style={{ fontSize: size > 100 ? 14 : 12, fontWeight: 600, color: THEME.text }}>{value}</span>}
           <span style={{ fontSize: 7.5, fontWeight: 700, color: THEME.text, opacity: 0.32, letterSpacing: '0.12em', textTransform: 'uppercase' }}>{label}</span>
           {(badge ?? 0) > 0 && (
-            <motion.div
-              animate={{ scale: [1, 1.35, 1] }} transition={{ repeat: Infinity, duration: 1.5 }}
-              style={{ position: 'absolute', top: 9, right: 11, width: 10, height: 10, borderRadius: '50%', background: state === 'red' ? '#FF3333' : state === 'orange' ? '#FF8000' : '#E6B800', border: '2px solid white' }}
-            />
+            <motion.div animate={{ scale: [1, 1.35, 1] }} transition={{ repeat: Infinity, duration: 1.5 }}
+              style={{ position: 'absolute', top: 9, right: 11, width: 10, height: 10, borderRadius: '50%',
+                background: state === 'red' ? '#FF3333' : state === 'orange' ? '#FF8000' : '#E6B800',
+                border: '2px solid white' }} />
           )}
-          <div style={{ position: 'absolute', top: 13, left: 18, width: 15, height: 7, background: 'rgba(255,255,255,0.5)', borderRadius: '50%', transform: 'rotate(-35deg)' }} />
+          <div style={{ position: 'absolute', top: 13, left: 18, width: 15, height: 7,
+            background: 'rgba(255,255,255,0.5)', borderRadius: '50%', transform: 'rotate(-35deg)' }} />
         </div>
       </motion.div>
       <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.2em', color: THEME.text, opacity: 0.55 }}>{label}</span>
     </div>
-  )
-}
-
-function BottomSheet({ children, onClose, title }: { children: React.ReactNode; onClose: () => void; title: string }) {
-  return (
-    <motion.div
-      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-      style={{ position: 'fixed', inset: 0, zIndex: 300, background: 'rgba(0,0,0,0.38)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}
-      onClick={e => { if (e.target === e.currentTarget) onClose() }}
-    >
-      <motion.div
-        initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
-        transition={{ type: 'spring', damping: 28, stiffness: 300 }}
-        style={{ width: '100%', maxWidth: 480, background: 'rgba(255,255,255,0.93)', backdropFilter: 'blur(40px)', borderRadius: '28px 28px 0 0', maxHeight: '88vh', overflowY: 'auto', boxShadow: '0 -10px 60px rgba(0,0,0,0.14)' }}
-      >
-        <div style={{ display: 'flex', justifyContent: 'center', paddingTop: 14 }}>
-          <div style={{ width: 40, height: 4, borderRadius: 2, background: 'rgba(0,0,0,0.1)' }} />
-        </div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 20px 0' }}>
-          <h2 style={{ margin: 0, fontSize: 20, fontWeight: 600, color: THEME.text }}>{title}</h2>
-          <motion.div whileTap={{ scale: 0.85 }} onClick={onClose} style={{ cursor: 'pointer', opacity: 0.3 }}><X size={20} /></motion.div>
-        </div>
-        <div style={{ padding: '16px 20px 52px' }}>{children}</div>
-      </motion.div>
-    </motion.div>
   )
 }
 
@@ -200,57 +133,100 @@ function AddChildSheet({ onClose, onSave }: { onClose: () => void; onSave: (d: a
   }
 
   return (
-    <BottomSheet onClose={onClose} title="添加孩子">
-      <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 20 }}>
-        <div style={{ position: 'relative' }}>
-          <div onClick={() => photoInputRef.current?.click()} style={{ width: 72, height: 72, borderRadius: '50%', background: avatarUrl ? 'transparent' : 'rgba(176,141,87,0.08)', border: '2px dashed rgba(176,141,87,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', overflow: 'hidden', flexShrink: 0 }}>
-            {avatarUrl ? <img src={avatarUrl} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-              : uploading ? <Loader size={20} color={THEME.gold} />
-              : <div style={{ textAlign: 'center' }}><Camera size={20} color={THEME.gold} /><div style={{ fontSize: 9, color: THEME.gold, marginTop: 3 }}>上传照片</div></div>}
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      style={{ position: 'fixed', inset: 0, zIndex: 300, background: 'rgba(0,0,0,0.38)',
+        backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}
+      onClick={e => { if (e.target === e.currentTarget) onClose() }}>
+      <motion.div initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
+        transition={{ type: 'spring', damping: 28, stiffness: 300 }}
+        style={{ width: '100%', maxWidth: 480, background: 'rgba(255,255,255,0.93)',
+          backdropFilter: 'blur(40px)', borderRadius: '28px 28px 0 0',
+          maxHeight: '88vh', overflowY: 'auto', boxShadow: '0 -10px 60px rgba(0,0,0,0.14)' }}>
+        <div style={{ display: 'flex', justifyContent: 'center', paddingTop: 14 }}>
+          <div style={{ width: 40, height: 4, borderRadius: 2, background: 'rgba(0,0,0,0.1)' }} />
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 20px 0' }}>
+          <h2 style={{ margin: 0, fontSize: 20, fontWeight: 600, color: THEME.text }}>添加孩子</h2>
+          <motion.div whileTap={{ scale: 0.85 }} onClick={onClose} style={{ cursor: 'pointer', opacity: 0.3 }}>
+            <X size={20} />
+          </motion.div>
+        </div>
+        <div style={{ padding: '16px 20px 52px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 20 }}>
+            <div style={{ position: 'relative' }}>
+              <div onClick={() => photoInputRef.current?.click()}
+                style={{ width: 72, height: 72, borderRadius: '50%',
+                  background: avatarUrl ? 'transparent' : 'rgba(176,141,87,0.08)',
+                  border: '2px dashed rgba(176,141,87,0.4)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  cursor: 'pointer', overflow: 'hidden', flexShrink: 0 }}>
+                {avatarUrl ? <img src={avatarUrl} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  : uploading ? <Loader size={20} color={THEME.gold} />
+                  : <div style={{ textAlign: 'center' }}>
+                      <Camera size={20} color={THEME.gold} />
+                      <div style={{ fontSize: 9, color: THEME.gold, marginTop: 3 }}>上传照片</div>
+                    </div>}
+              </div>
+              <input ref={photoInputRef} type="file" accept="image/*"
+                style={{ display: 'none' }} onChange={handlePhotoUpload} />
+            </div>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 12, color: THEME.muted, marginBottom: 8, fontWeight: 600 }}>或选择头像</div>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                {emojis.map(e => (
+                  <motion.div key={e} whileTap={{ scale: 0.88 }}
+                    onClick={() => { setEmoji(e); setAvatarUrl(null) }}
+                    style={{ width: 36, height: 36, borderRadius: '50%', fontSize: 20,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      background: emoji === e && !avatarUrl ? 'rgba(176,141,87,0.14)' : 'rgba(0,0,0,0.04)',
+                      border: emoji === e && !avatarUrl ? '2px solid rgba(176,141,87,0.5)' : '2px solid transparent',
+                      cursor: 'pointer' }}>
+                    {e}
+                  </motion.div>
+                ))}
+              </div>
+            </div>
           </div>
-          <input ref={photoInputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handlePhotoUpload} />
-        </div>
-        <div style={{ flex: 1 }}>
-          <div style={{ fontSize: 12, color: THEME.muted, marginBottom: 8, fontWeight: 600 }}>或选择头像</div>
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-            {emojis.map(e => (
-              <motion.div key={e} whileTap={{ scale: 0.88 }} onClick={() => { setEmoji(e); setAvatarUrl(null) }}
-                style={{ width: 36, height: 36, borderRadius: '50%', fontSize: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', background: emoji === e && !avatarUrl ? 'rgba(176,141,87,0.14)' : 'rgba(0,0,0,0.04)', border: emoji === e && !avatarUrl ? '2px solid rgba(176,141,87,0.5)' : '2px solid transparent', cursor: 'pointer' }}>
-                {e}
-              </motion.div>
-            ))}
+          {[
+            { label: '孩子名字 *', val: name, set: setName, ph: '英文名或中文名' },
+            { label: '学校名称',   val: school, set: setSchool, ph: 'Lanna International School' },
+            { label: '年级班级',   val: grade,  set: setGrade,  ph: 'Grade 2 / 小学二年级' },
+          ].map(f => (
+            <div key={f.label} style={{ marginBottom: 14 }}>
+              <div style={{ fontSize: 12, color: THEME.muted, marginBottom: 6, fontWeight: 600 }}>{f.label}</div>
+              <input value={f.val} onChange={e => f.set(e.target.value)} placeholder={f.ph}
+                style={{ width: '100%', padding: '12px 14px', borderRadius: 12,
+                  border: '1px solid rgba(0,0,0,0.1)', background: 'rgba(255,255,255,0.55)',
+                  fontSize: 14, color: THEME.text, outline: 'none', boxSizing: 'border-box' }} />
+            </div>
+          ))}
+          <motion.button whileTap={{ scale: 0.97 }} disabled={!name.trim() || saving}
+            onClick={async () => {
+              setSaving(true)
+              await onSave({ name: name.trim(), emoji, school_name: school, grade, avatar_url: avatarUrl })
+              setSaving(false)
+              onClose()
+            }}
+            style={{ width: '100%', padding: '14px', borderRadius: 16, border: 'none',
+              background: name.trim() ? THEME.navy : 'rgba(0,0,0,0.08)',
+              color: name.trim() ? '#fff' : THEME.muted,
+              fontSize: 14, fontWeight: 600,
+              cursor: name.trim() ? 'pointer' : 'default',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+            {saving ? <Loader size={16} /> : null}{saving ? '保存中…' : '添加孩子'}
+          </motion.button>
+          <div style={{ textAlign: 'center', marginTop: 12, fontSize: 12, color: THEME.muted }}>
+            保存后可前往「孩子资料」补充课程表和健康信息
           </div>
         </div>
-      </div>
-      {[
-        { label: '孩子名字 *', val: name, set: setName, ph: '英文名或中文名' },
-        { label: '学校名称', val: school, set: setSchool, ph: 'Lanna International School' },
-        { label: '年级班级', val: grade, set: setGrade, ph: 'Grade 2 / 小学二年级' },
-      ].map(f => (
-        <div key={f.label} style={{ marginBottom: 14 }}>
-          <div style={{ fontSize: 12, color: THEME.muted, marginBottom: 6, fontWeight: 600 }}>{f.label}</div>
-          <input value={f.val} onChange={e => f.set(e.target.value)} placeholder={f.ph}
-            style={{ width: '100%', padding: '12px 14px', borderRadius: 12, border: '1px solid rgba(0,0,0,0.1)', background: 'rgba(255,255,255,0.55)', fontSize: 14, color: THEME.text, outline: 'none', boxSizing: 'border-box' }} />
-        </div>
-      ))}
-      <motion.button whileTap={{ scale: 0.97 }} disabled={!name.trim() || saving}
-        onClick={async () => {
-          setSaving(true)
-          await onSave({ name: name.trim(), emoji, school_name: school, grade, avatar_url: avatarUrl })
-          setSaving(false)
-          onClose()
-        }}
-        style={{ width: '100%', padding: '14px', borderRadius: 16, border: 'none', background: name.trim() ? THEME.navy : 'rgba(0,0,0,0.08)', color: name.trim() ? '#fff' : THEME.muted, fontSize: 14, fontWeight: 600, cursor: name.trim() ? 'pointer' : 'default', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-        {saving ? <Loader size={16} /> : null}{saving ? '保存中…' : '添加孩子'}
-      </motion.button>
-      <div style={{ textAlign: 'center', marginTop: 12, fontSize: 12, color: THEME.muted }}>
-        保存后可前往「孩子资料」补充课程表和健康信息
-      </div>
-    </BottomSheet>
+      </motion.div>
+    </motion.div>
   )
 }
 
-function InputSheet({ onClose, userId, onProcessing }: { onClose: () => void; userId: string; onProcessing?: () => void }) {
+function InputSheet({ onClose, userId, onProcessing }: {
+  onClose: () => void; userId: string; onProcessing?: () => void
+}) {
   const [text, setText] = useState('')
   const [sending, setSending] = useState(false)
   const handleSend = async () => {
@@ -268,61 +244,64 @@ function InputSheet({ onClose, userId, onProcessing }: { onClose: () => void; us
     setSending(false)
   }
   return (
-    <BottomSheet onClose={onClose} title="告诉根">
-      <textarea value={text} onChange={e => setText(e.target.value)} placeholder="说什么都行，根来帮你整理…"
-        style={{ width: '100%', minHeight: 120, padding: '12px 14px', borderRadius: 12, border: '1px solid rgba(0,0,0,0.1)', background: 'rgba(255,255,255,0.55)', fontSize: 14, color: THEME.text, outline: 'none', resize: 'none', boxSizing: 'border-box', fontFamily: 'sans-serif' }} />
-      <motion.button whileTap={{ scale: 0.97 }} disabled={!text.trim() || sending} onClick={handleSend}
-        style={{ width: '100%', marginTop: 12, padding: '14px', borderRadius: 16, border: 'none', background: text.trim() ? THEME.navy : 'rgba(0,0,0,0.08)', color: text.trim() ? '#fff' : THEME.muted, fontSize: 14, fontWeight: 600, cursor: text.trim() ? 'pointer' : 'default' }}>
-        {sending ? '发送中…' : '发送给根 →'}
-      </motion.button>
-    </BottomSheet>
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      style={{ position: 'fixed', inset: 0, zIndex: 300, background: 'rgba(0,0,0,0.38)',
+        backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}
+      onClick={e => { if (e.target === e.currentTarget) onClose() }}>
+      <motion.div initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
+        transition={{ type: 'spring', damping: 28, stiffness: 300 }}
+        style={{ width: '100%', maxWidth: 480, background: 'rgba(255,255,255,0.93)',
+          backdropFilter: 'blur(40px)', borderRadius: '28px 28px 0 0',
+          maxHeight: '88vh', overflowY: 'auto', boxShadow: '0 -10px 60px rgba(0,0,0,0.14)' }}>
+        <div style={{ display: 'flex', justifyContent: 'center', paddingTop: 14 }}>
+          <div style={{ width: 40, height: 4, borderRadius: 2, background: 'rgba(0,0,0,0.1)' }} />
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 20px 0' }}>
+          <h2 style={{ margin: 0, fontSize: 20, fontWeight: 600, color: THEME.text }}>告诉根</h2>
+          <motion.div whileTap={{ scale: 0.85 }} onClick={onClose} style={{ cursor: 'pointer', opacity: 0.3 }}>
+            <X size={20} />
+          </motion.div>
+        </div>
+        <div style={{ padding: '16px 20px 52px' }}>
+          <textarea value={text} onChange={e => setText(e.target.value)}
+            placeholder="说什么都行，根来帮你整理…"
+            style={{ width: '100%', minHeight: 120, padding: '12px 14px', borderRadius: 12,
+              border: '1px solid rgba(0,0,0,0.1)', background: 'rgba(255,255,255,0.55)',
+              fontSize: 14, color: THEME.text, outline: 'none', resize: 'none',
+              boxSizing: 'border-box', fontFamily: 'sans-serif' }} />
+          <motion.button whileTap={{ scale: 0.97 }} disabled={!text.trim() || sending} onClick={handleSend}
+            style={{ width: '100%', marginTop: 12, padding: '14px', borderRadius: 16, border: 'none',
+              background: text.trim() ? THEME.navy : 'rgba(0,0,0,0.08)',
+              color: text.trim() ? '#fff' : THEME.muted,
+              fontSize: 14, fontWeight: 600, cursor: text.trim() ? 'pointer' : 'default' }}>
+            {sending ? '发送中…' : '发送给根 →'}
+          </motion.button>
+        </div>
+      </motion.div>
+    </motion.div>
   )
 }
 
 export default function BasePage() {
-  const { userId, kids, todos, hotspots, loading, sync: ctxSync, processStatus, setProcessStatus, activeKid, setActiveKid } = useApp()
+  const { userId, kids, todos, hotspots, loading, sync: ctxSync,
+    processStatus, setProcessStatus, activeKid, setActiveKid } = useApp()
   const [time, setTime] = useState(new Date())
   const [modal, setModal] = useState<'child' | 'todo' | 'hotspot' | 'addChild' | 'oneTap' | 'input' | null>(null)
-  const [enrichedKids, setEnrichedKids] = useState<Child[]>([])
   const [oneTapTodo, setOneTapTodo] = useState<TodoItem | null>(null)
   const [patrolling, setPatrolling] = useState(false)
   const [mounted, setMounted] = useState(false)
   const [keyboardOpen, setKeyboardOpen] = useState(false)
-  const enrichCacheRef = useRef<Record<string, Child>>({})
 
-  const enrichKids = useCallback(async (uid: string) => {
-    const _cachedId = localStorage.getItem('active_child_id')
-    const cached = enrichCacheRef.current[_cachedId || '']
-    if (cached) setActiveKid(cached)
-    const today = new Date().toISOString().split('T')[0]
-    const dow = new Date().getDay()
-    const { data: childData } = await supabase.from('children').select('*').eq('user_id', uid)
-    if (!childData?.length) return
-    const enriched: Child[] = await Promise.all(childData.map(async (c: any) => {
-      const [logRes, evtRes] = await Promise.all([
-        supabase.from('child_daily_log').select('*').eq('child_id', c.id).eq('user_id', uid).eq('date', today).maybeSingle(),
-        supabase.from('child_school_calendar').select('*').eq('child_id', c.id).eq('user_id', uid).eq('date_start', today),
-      ])
-      const log = logRes.data
-      const energy = c.energy || inferEnergy(log?.health_status, log?.mood_status)
-      const today_schedule: ScheduleItem[] = [
-        ...(evtRes.data || []).map((e: any) => ({ time: '', title: e.title, requires_action: e.requires_action }))
-      ].sort((a, b) => a.time.localeCompare(b.time))
-      return {
-        id: c.id, name: c.name || c.nickname || '孩子', emoji: c.emoji || '👶🏻',
-        avatar_url: c.avatar_url || null,
-        energy, health_status: log?.health_status || 'normal', mood_status: log?.mood_status || 'calm',
-        school_name: c.school_name, grade: c.grade, today_schedule,
-      }
-    }))
-    setEnrichedKids(enriched)
-    enriched.forEach(c => { enrichCacheRef.current[c.id] = c })
-    const storedId = localStorage.getItem('active_child_id')
-    const current = enriched.find(c => c.id === storedId) || enriched[0]
-    setActiveKid(current)
-  }, [setActiveKid])
+  const { enrichedKids, refresh: refreshKids } = useChildData(userId)
+  const { markDone, snooze } = useTodoActions(todos, ctxSync)
 
-  useEffect(() => { if (userId) enrichKids(userId) }, [userId, enrichKids])
+  useEffect(() => {
+    if (enrichedKids.length) {
+      const storedId = localStorage.getItem('active_child_id')
+      const current = enrichedKids.find((c: any) => c.id === storedId) || enrichedKids[0]
+      setActiveKid(current)
+    }
+  }, [enrichedKids, setActiveKid])
 
   useEffect(() => {
     setMounted(true)
@@ -333,37 +312,30 @@ export default function BasePage() {
   useEffect(() => {
     const handleResize = () => {
       const currentHeight = window.visualViewport?.height || window.innerHeight
-      const screenHeight = window.screen.height
-      setKeyboardOpen(currentHeight < screenHeight * 0.75)
+      setKeyboardOpen(currentHeight < window.screen.height * 0.75)
     }
     window.visualViewport?.addEventListener('resize', handleResize)
     return () => window.visualViewport?.removeEventListener('resize', handleResize)
   }, [])
 
-  const markDone = async (id: string) => {
-    await supabase.from('todo_items').update({ status: 'done', completed_at: new Date().toISOString() }).eq('id', id)
-    ctxSync()
+  const handleMarkDone = async (id: string) => {
+    await markDone(id)
+    setModal(null)
   }
 
-  const snooze = async (id: string) => {
-    const tomorrow = new Date()
-    tomorrow.setDate(tomorrow.getDate() + 1)
-    await supabase.from('todo_items').update({ due_date: tomorrow.toISOString().split('T')[0] }).eq('id', id)
-    ctxSync()
+  const handleSnooze = async (id: string) => {
+    await snooze(id)
+    setModal(null)
   }
 
   const handleAddChild = async (d: any) => {
     const { data: { session } } = await supabase.auth.getSession()
     const uid = session?.user?.id
     if (!uid) return
-    const { data: newChild } = await supabase.from('children').insert({
-      user_id: uid, name: d.name, emoji: d.emoji || '👶🏻',
-      avatar_url: d.avatar_url || null,
-      energy: 75, status: 'active', school_name: d.school_name, grade: d.grade
-    }).select().single()
+    const newId = await addChild(uid, d)
     await ctxSync()
     setModal(null)
-    if (newChild?.id) window.location.href = `/children/${newChild.id}?from=quick`
+    if (newId) window.location.href = `/children/${newId}?from=quick`
   }
 
   const handleRead = async (id: string) => {
@@ -385,71 +357,92 @@ export default function BasePage() {
   const cState = dropState('child', activeKid)
   const tState = dropState('todo', todos)
   const hState = dropState('hotspot', hotspots)
-  const redCount = todos.filter(t => t.priority === 'red').length
-  const unread = hotspots.filter(h => h.status === 'unread').length
-  const childUrgent = (activeKid?.urgent_items || []).filter((i: { level: string }) => i.level === 'red').length
+  const redCount = todos.filter((t: TodoItem) => t.priority === 'red').length
+  const unread = hotspots.filter((h: HotspotItem) => h.status === 'unread').length
+  const childUrgent = (activeKid?.urgent_items || [])
+    .filter((i: { level: string }) => i.level === 'red').length
   const hour = time.getHours()
   const greeting = hour < 6 ? '夜深了' : hour < 12 ? '早上好' : hour < 18 ? '下午好' : '晚上好'
 
   return (
-    <main style={{ position: 'fixed', inset: 0, width: '100vw', height: '100vh', overflow: 'hidden', background: THEME.bg, fontFamily: 'sans-serif' }}>
-      <div style={{ position: 'absolute', top: '12%', right: '-4%', fontSize: 'clamp(60px, 18vw, 130px)', fontWeight: 'bold', color: THEME.text, opacity: 0.07, pointerEvents: 'none', fontStyle: 'italic', whiteSpace: 'nowrap', lineHeight: 1, userSelect: 'none' }}>根·陪伴</div>
+    <main style={{ position: 'fixed', inset: 0, width: '100vw', height: '100vh',
+      overflow: 'hidden', background: THEME.bg, fontFamily: 'sans-serif' }}>
+
+      <div style={{ position: 'absolute', top: '12%', right: '-4%',
+        fontSize: 'clamp(60px, 18vw, 130px)', fontWeight: 'bold',
+        color: THEME.text, opacity: 0.07, pointerEvents: 'none',
+        fontStyle: 'italic', whiteSpace: 'nowrap', lineHeight: 1, userSelect: 'none' }}>
+        根·陪伴
+      </div>
 
       <ChildAvatar />
 
-      <header style={{ position: 'fixed', top: 'max(48px, env(safe-area-inset-top, 48px))', right: '6%', zIndex: 50, textAlign: 'right' }}>
-        <h1 style={{ fontSize: 'clamp(48px, 15vw, 76px)', fontWeight: 100, color: THEME.text, opacity: 0.9, lineHeight: 1, margin: 0 }}>
-          {mounted ? `${time.getHours()}:${time.getMinutes() < 10 ? `0${time.getMinutes()}` : time.getMinutes()}` : '--:--'}
+      <header style={{ position: 'fixed',
+        top: 'max(48px, env(safe-area-inset-top, 48px))',
+        right: '6%', zIndex: 50, textAlign: 'right' }}>
+        <h1 style={{ fontSize: 'clamp(48px, 15vw, 76px)', fontWeight: 100,
+          color: THEME.text, opacity: 0.9, lineHeight: 1, margin: 0 }}>
+          {mounted
+            ? `${time.getHours()}:${time.getMinutes() < 10 ? `0${time.getMinutes()}` : time.getMinutes()}`
+            : '--:--'}
         </h1>
-        <p style={{ fontSize: 10, color: THEME.text, opacity: 0.35, letterSpacing: '0.25em', marginTop: 3 }}>
+        <p style={{ fontSize: 10, color: THEME.text, opacity: 0.35,
+          letterSpacing: '0.25em', marginTop: 3 }}>
           {mounted ? greeting : ''}
         </p>
       </header>
 
       {loading ? (
-        <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ position: 'absolute', inset: 0,
+          display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <motion.div animate={{ opacity: [0.3, 1, 0.3] }} transition={{ duration: 1.5, repeat: Infinity }}
-            style={{ fontSize: 13, color: THEME.text, opacity: 0.4, letterSpacing: '0.2em' }}>根·启动中…</motion.div>
+            style={{ fontSize: 13, color: THEME.text, opacity: 0.4, letterSpacing: '0.2em' }}>
+            根·启动中…
+          </motion.div>
         </div>
       ) : (
-        <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'clamp(20px, 5vw, 36px)' }}>
-          <WaterDrop state={cState} icon={<Heart size={24} />} label="孩子" value={activeKid ? `${activeKid.energy ?? 75}%` : '—'} badge={childUrgent} pulse={childUrgent > 0} onClick={() => setModal('child')} size={124} delay={0} />
+        <div style={{ position: 'absolute', top: '50%', left: '50%',
+          transform: 'translate(-50%, -50%)',
+          display: 'flex', flexDirection: 'column', alignItems: 'center',
+          gap: 'clamp(20px, 5vw, 36px)' }}>
+          <WaterDrop state={cState} icon={<Heart size={24} />} label="孩子"
+            value={activeKid ? `${activeKid.energy ?? 75}%` : '—'}
+            badge={childUrgent} pulse={childUrgent > 0}
+            onClick={() => setModal('child')} size={124} delay={0} />
           <div style={{ display: 'flex', gap: 'clamp(28px, 8vw, 52px)', alignItems: 'center' }}>
-            <WaterDrop state={tState} icon={<Bell size={20} />} label="待办" value={todos.filter(t => t.status !== 'done').length > 0 ? `${todos.filter(t => t.status !== 'done').length}条` : '静默'} badge={redCount} pulse={redCount > 0} onClick={() => setModal('todo')} size={98} delay={1.8} />
-            <WaterDrop state={hState} icon={patrolling ? <Loader size={20} /> : <Zap size={20} />} label="热点" value={unread > 0 ? `${unread}条` : '根'} badge={unread} pulse={unread > 0} onClick={() => setModal('hotspot')} size={98} delay={3.4} />
+            <WaterDrop state={tState} icon={<Bell size={20} />} label="待办"
+              value={todos.filter((t: TodoItem) => t.status !== 'done').length > 0
+                ? `${todos.filter((t: TodoItem) => t.status !== 'done').length}条` : '静默'}
+              badge={redCount} pulse={redCount > 0}
+              onClick={() => setModal('todo')} size={98} delay={1.8} />
+            <WaterDrop state={hState}
+              icon={patrolling ? <Loader size={20} /> : <Zap size={20} />}
+              label="热点" value={unread > 0 ? `${unread}条` : '根'}
+              badge={unread} pulse={unread > 0}
+              onClick={() => setModal('hotspot')} size={98} delay={3.4} />
           </div>
         </div>
       )}
 
       <AnimatePresence>
         {modal === 'child' && (
-          <ChildSheet
-            key="child"
+          <ChildSheet key="child"
             children={enrichedKids.length ? enrichedKids : kids}
             sel={activeKid}
-            onSel={c => setActiveKid(c)}
+            onSel={(c: any) => setActiveKid(c)}
             onClose={() => setModal(null)}
             onAdd={() => setModal('addChild')}
-            userId={userId}
-          />
+            userId={userId} />
         )}
         {modal === 'todo' && (
-          <TodoSheet key="todo" todos={todos} onClose={() => setModal(null)} onAction={t => {
-            setOneTapTodo(t)
-            setModal('oneTap')
-          }} />
+          <TodoSheet key="todo" todos={todos} onClose={() => setModal(null)}
+            onAction={(t: TodoItem) => { setOneTapTodo(t); setModal('oneTap') }} />
         )}
         {modal === 'hotspot' && (
-          <HotspotSheet
-            key="hotspot"
-            hotspots={hotspots}
+          <HotspotSheet key="hotspot" hotspots={hotspots}
             onClose={() => setModal(null)}
-            onPatrol={handlePatrol}
-            patrolling={patrolling}
-            onRead={handleRead}
-            userId={userId}
-            onSync={ctxSync}
-          />
+            onPatrol={handlePatrol} patrolling={patrolling}
+            onRead={handleRead} userId={userId} onSync={ctxSync} />
         )}
         {modal === 'addChild' && (
           <AddChildSheet key="add" onClose={() => setModal(null)} onSave={handleAddChild} />
@@ -457,35 +450,26 @@ export default function BasePage() {
         {modal === 'oneTap' && oneTapTodo && (
           <TodoDetailModal
             reminder={{
-              id: oneTapTodo.id,
-              title: oneTapTodo.title,
+              id: oneTapTodo.id, title: oneTapTodo.title,
               category: oneTapTodo.category,
               urgency_level: oneTapTodo.priority === 'red' ? 3 : oneTapTodo.priority === 'orange' ? 2 : 1,
-              due_date: oneTapTodo.due_date,
-              status: oneTapTodo.status,
+              due_date: oneTapTodo.due_date, status: oneTapTodo.status,
               ai_action_data: oneTapTodo.ai_action_data,
             }}
             userId={userId}
             onClose={() => { setOneTapTodo(null); setModal('todo') }}
-            onDone={async (id) => { await markDone(id); setModal(null) }}
-            onSnooze={async (id) => { await snooze(id); setModal(null) }}
-          />
+            onDone={handleMarkDone}
+            onSnooze={handleSnooze} />
         )}
         {modal === 'input' && (
-          <InputSheet
-            key="input"
-            onClose={() => setModal(null)}
-            userId={userId}
-            onProcessing={() => setProcessStatus({ status: 'processing', message: '根正在整理中...' })}
-          />
+          <InputSheet key="input" onClose={() => setModal(null)} userId={userId}
+            onProcessing={() => setProcessStatus({ status: 'processing', message: '根正在整理中...' })} />
         )}
       </AnimatePresence>
 
       <AnimatePresence>
         {processStatus && (
-          <motion.div
-            initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
+          <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 30 }}
             onClick={() => {
               if (processStatus.status === 'done') {
@@ -493,17 +477,17 @@ export default function BasePage() {
                 setProcessStatus(null)
               }
             }}
-            style={{
-              position: 'fixed', bottom: 90, left: 16, right: 16, zIndex: 500,
-              background: processStatus.status === 'done' ? 'rgba(29,158,117,0.95)' : processStatus.status === 'failed' ? 'rgba(220,38,38,0.95)' : 'rgba(26,60,94,0.95)',
+            style={{ position: 'fixed', bottom: 90, left: 16, right: 16, zIndex: 500,
+              background: processStatus.status === 'done' ? 'rgba(29,158,117,0.95)'
+                : processStatus.status === 'failed' ? 'rgba(220,38,38,0.95)'
+                : 'rgba(26,60,94,0.95)',
               backdropFilter: 'blur(20px)', padding: '14px 20px', borderRadius: 16,
               display: 'flex', alignItems: 'center', gap: 10,
               boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
-              cursor: processStatus.status === 'done' ? 'pointer' : 'default',
-            }}
-          >
+              cursor: processStatus.status === 'done' ? 'pointer' : 'default' }}>
             {processStatus.status === 'processing' && (
-              <motion.div animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}>🌱</motion.div>
+              <motion.div animate={{ rotate: 360 }}
+                transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}>🌱</motion.div>
             )}
             {processStatus.status === 'done' && <span>✓</span>}
             {processStatus.status === 'failed' && <span>⚠</span>}
