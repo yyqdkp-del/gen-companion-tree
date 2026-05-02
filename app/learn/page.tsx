@@ -85,23 +85,64 @@ function Accordion({
 }
 
 // ══ 词组弹窗 ══
-function WordPopup({ word, onClose }: { word: string; onClose: () => void }) {
+function WordPopup({ word, onClose, childLevel }: { word: string; onClose: () => void; childLevel?: string }) {
+  const [loading, setLoading] = useState(true)
+  const [data, setData] = useState<any>(null)
+
+  useEffect(() => {
+    async function load() {
+      setLoading(true)
+      try {
+        const char = [...word].find(c => /\p{Script=Han}/u.test(c)) || word[0]
+        // 先查缓存
+        const { data: cached } = await supabase
+          .from('hanzi_library').select('*').eq('char', char).maybeSingle()
+        if (cached?.result) {
+          const result = typeof cached.result === 'string' ? JSON.parse(cached.result) : cached.result
+          setData(result); setLoading(false); return
+        }
+        // 没有缓存则调用 API
+        const res = await fetch('/api/chinese/decode', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ mode: 'hanzi', char, child_level: childLevel || 'R2' }),
+        })
+        const json = await res.json()
+        setData(json.error ? null : json)
+      } catch { setData(null) }
+      setLoading(false)
+    }
+    load()
+  }, [word])
+
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
       style={{ position: 'fixed', inset: 0, background: 'rgba(26,18,8,0.5)', zIndex: 300, display: 'flex', alignItems: 'flex-end', justifyContent: 'center', padding: '0 0 80px' }}
       onClick={onClose}>
       <motion.div initial={{ y: 60, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 60, opacity: 0 }}
         transition={{ type: 'spring', damping: 28, stiffness: 300 }}
-        style={{ background: THEME.white, borderRadius: 20, padding: '22px 20px', width: '100%', maxWidth: 440, margin: '0 16px', boxShadow: '0 -8px 40px rgba(26,18,8,0.12)' }}
+        style={{ background: THEME.white, borderRadius: 20, padding: '20px', width: '100%', maxWidth: 440, margin: '0 16px', maxHeight: '70vh', overflowY: 'auto', boxShadow: '0 -8px 40px rgba(26,18,8,0.12)' }}
         onClick={e => e.stopPropagation()}>
-        <div style={{ textAlign: 'center', marginBottom: 16 }}>
-          <div style={{ fontSize: 36, fontFamily: "'Noto Serif SC', serif", color: THEME.text, marginBottom: 6 }}>{word}</div>
-          <div style={{ fontSize: 11, color: THEME.textDim, fontFamily: 'sans-serif' }}>点击空白处关闭</div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+          <div style={{ fontSize: 32, fontFamily: "'Noto Serif SC', serif", color: THEME.text }}>{word}</div>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 18, color: THEME.textDim, cursor: 'pointer' }}>✕</button>
         </div>
-        <div style={{ background: THEME.paper, borderRadius: 12, padding: '14px', fontSize: 13, color: THEME.textMid, lineHeight: 1.8, fontFamily: 'sans-serif', textAlign: 'center' }}>
-          正在加载词义说明…<br />
-          <span style={{ fontSize: 11, color: THEME.textDim }}>（可接入字典 API 扩展）</span>
-        </div>
+        {loading ? (
+          <div style={{ textAlign: 'center', padding: '20px 0', color: THEME.textDim, fontFamily: 'sans-serif', fontSize: 13 }}>正在查询…</div>
+        ) : data ? (
+          <div style={{ fontFamily: 'sans-serif' }}>
+            {data.pinyin && <div style={{ fontSize: 13, color: THEME.textDim, marginBottom: 8 }}>{data.pinyin}</div>}
+            {data.meaning && <div style={{ fontSize: 15, fontWeight: 600, color: THEME.text, marginBottom: 10, fontFamily: "'Noto Serif SC', serif" }}>{data.meaning}</div>}
+            {data.story && <div style={{ fontSize: 13, color: THEME.textMid, lineHeight: 1.85, marginBottom: 10 }}>{data.story}</div>}
+            {data.scene && <div style={{ fontSize: 12, color: THEME.textMid, lineHeight: 1.75, fontStyle: 'italic', padding: '9px 12px', borderRadius: 10, background: 'rgba(200,160,96,0.07)', marginBottom: 10 }}>{data.scene}</div>}
+            {data.mom_script && (
+              <div style={{ padding: '12px', borderRadius: 12, background: 'rgba(200,160,96,0.08)', border: '1px solid rgba(200,160,96,0.2)', fontSize: 13, color: THEME.text, lineHeight: 1.8, fontStyle: 'italic' }}>
+                👩 {data.mom_script}
+              </div>
+            )}
+          </div>
+        ) : (
+          <div style={{ textAlign: 'center', padding: '20px 0', color: THEME.textDim, fontFamily: 'sans-serif', fontSize: 13 }}>暂无数据</div>
+        )}
       </motion.div>
     </motion.div>
   )
