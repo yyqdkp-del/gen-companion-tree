@@ -569,23 +569,7 @@ function WritingResult({ data, onMomCopy }: { data: any; onMomCopy: () => void }
         </div>
       )}
 
-      {/* 文化根脉 */}
-      {data.cultural_sentence && (
-        <div style={{ background: THEME.white, borderRadius: 16, padding: '16px', marginBottom: 8, border: '2px solid rgba(200,160,96,0.3)' }}>
-          <div style={{ fontSize: 10, letterSpacing: 3, color: THEME.gold, marginBottom: 10, fontFamily: 'sans-serif' }}>📜 文化根脉</div>
-          <div style={{ fontSize: 19, fontFamily: "'Noto Serif SC', serif", fontWeight: 700, color: THEME.text, lineHeight: 1.8, marginBottom: 6 }}>{data.cultural_sentence}</div>
-          {data.cultural_author && <div style={{ fontSize: 12, color: THEME.textDim, marginBottom: 8, fontFamily: 'sans-serif' }}>—— {data.cultural_author}</div>}
-          {data.cultural_meaning && <div style={{ fontSize: 13, color: THEME.textMid, lineHeight: 1.75, fontFamily: 'sans-serif', borderTop: '1px dashed rgba(200,160,96,0.3)', paddingTop: 8 }}>{data.cultural_meaning}</div>}
-          {(data.ancient_connection || data.overseas_connection) && (
-            <div style={{ marginTop: 8 }}>
-              {data.ancient_connection && <div style={{ padding: '9px 12px', borderRadius: 10, background: 'rgba(200,160,96,0.07)', fontSize: 12, color: THEME.textMid, lineHeight: 1.75, fontFamily: 'sans-serif', marginBottom: 6 }}>🌊 {data.ancient_connection}</div>}
-              {data.overseas_connection && <div style={{ padding: '9px 12px', borderRadius: 10, background: 'rgba(26,60,94,0.05)', fontSize: 12, color: THEME.navy, lineHeight: 1.75, fontFamily: 'sans-serif' }}>🌍 {data.overseas_connection}</div>}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* 妈妈台词（默认展开） */}
+      {/* 妈妈台词（默认展开，在文化根脉前） */}
       {data.mom_script && (
         <Accordion title="妈妈三步台词" emoji="👩" defaultOpen={true} borderColor="rgba(200,160,96,0.35)">
           <div style={{ paddingTop: 12 }}>
@@ -597,6 +581,19 @@ function WritingResult({ data, onMomCopy }: { data: any; onMomCopy: () => void }
             <button onClick={onMomCopy} style={{ width: '100%', padding: '9px', borderRadius: 10, border: `1px solid ${THEME.gold}`, background: 'transparent', fontSize: 12, color: THEME.gold, fontWeight: 600, cursor: 'pointer', fontFamily: 'sans-serif' }}>
               📋 复制台词
             </button>
+          </div>
+        </Accordion>
+      )}
+
+      {/* 文化根脉（手风琴，默认关闭） */}
+      {data.cultural_sentence && (
+        <Accordion title="文化根脉" emoji="📜" defaultOpen={false} borderColor="rgba(200,160,96,0.3)">
+          <div style={{ paddingTop: 10 }}>
+            <div style={{ fontSize: 19, fontFamily: "'Noto Serif SC', serif", fontWeight: 700, color: THEME.text, lineHeight: 1.8, marginBottom: 6 }}>{data.cultural_sentence}</div>
+            {data.cultural_author && <div style={{ fontSize: 12, color: THEME.textDim, marginBottom: 8, fontFamily: 'sans-serif' }}>—— {data.cultural_author}</div>}
+            {data.cultural_meaning && <div style={{ fontSize: 13, color: THEME.textMid, lineHeight: 1.75, fontFamily: 'sans-serif', borderTop: '1px dashed rgba(200,160,96,0.3)', paddingTop: 8, marginBottom: 8 }}>{data.cultural_meaning}</div>}
+            {data.ancient_connection && <div style={{ padding: '9px 12px', borderRadius: 10, background: 'rgba(200,160,96,0.07)', fontSize: 12, color: THEME.textMid, lineHeight: 1.75, fontFamily: 'sans-serif', marginBottom: 6 }}>🌊 {data.ancient_connection}</div>}
+            {data.overseas_connection && <div style={{ padding: '9px 12px', borderRadius: 10, background: 'rgba(26,60,94,0.05)', fontSize: 12, color: THEME.navy, lineHeight: 1.75, fontFamily: 'sans-serif' }}>🌍 {data.overseas_connection}</div>}
           </div>
         </Accordion>
       )}
@@ -806,7 +803,7 @@ export default function DecodePage() {
   const writingCount = learnedItems.filter(i => i.type === 'writing').length
 
   const QUICK_CHENGYU = ['very many people', '突然下好大的雨', '今天作业多到写不完']
-  const QUICK_WRITING = ['今天去夜市，人超多，好开心', '下雨天在家，有点无聊', '今天考试考得很好']
+  const QUICK_WRITING = ['We went to the night market, so many people!', 'It was raining so we stayed home, a bit bored', 'I did really well on my test today']
 
   return (
     <main style={{ minHeight: '100dvh', background: THEME.bg, fontFamily: "'Noto Serif SC', Georgia, serif", paddingBottom: 80, backgroundImage: 'radial-gradient(circle at 15% 15%, rgba(200,160,96,0.1) 0%, transparent 55%), radial-gradient(circle at 85% 85%, rgba(192,57,43,0.07) 0%, transparent 55%)' }}>
