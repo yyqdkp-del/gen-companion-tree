@@ -1,46 +1,20 @@
 'use client'
 import React, { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, Navigation, Phone, ExternalLink, RefreshCw, ChevronDown, AlertTriangle, Plus } from 'lucide-react'
+import { X, ExternalLink, RefreshCw, ChevronDown, AlertTriangle, Plus } from 'lucide-react'
+import { THEME, URGENCY_CFG } from '@/app/_shared/_constants/theme'
+import { CAT_EMOJI } from '@/app/_shared/_constants/categories'
+import { useHotspotSheet, isConsumed } from '@/app/_shared/_hooks/useHotspotSheet'
+import type { HotspotItem } from '@/app/_shared/_types'
 import ActionModal from '@/app/components/ActionModal'
 
-const THEME = { text: '#2C3E50', gold: '#B08D57', muted: '#6B8BAA', navy: '#1A3C5E' }
-
-type HotspotItem = {
-  id: string; title: string; summary: string
-  urgency: 'urgent' | 'important' | 'lifestyle'
-  category: string; relevance_reason?: string
-  action_available: boolean; action_type?: string
-  action_data?: any; status: string; created_at: string
-}
-
-type Props = {
-  hotspots: HotspotItem[]
-  onClose: () => void
-  onPatrol: () => void
-  patrolling: boolean
-  onRead: (id: string) => void
-  userId: string
-  onSync?: () => void
-}
-
-const URGENCY_CFG: Record<string, { label: string; color: string; bg: string; border: string }> = {
-  urgent:    { label: '紧急', color: '#CC3333', bg: 'rgba(255,100,100,0.08)', border: '#FF6B6B' },
-  important: { label: '重要', color: '#E07B2A', bg: 'rgba(255,160,60,0.08)', border: '#FF8C00' },
-  lifestyle: { label: '生活', color: '#3B82F6', bg: 'rgba(154,183,232,0.08)', border: '#60A5FA' },
-}
-
-const CAT_EMOJI: Record<string, string> = {
-  safety: '🚨', education: '📚', visa: '📋', finance: '💰',
-  health: '🏥', shopping: '🛍', mom: '💆', weather: '🌤', default: '📌',
-}
-
-function timeAgo(dateStr: string) {
-  const diff = Date.now() - new Date(dateStr).getTime()
+function timeAgo(dateStr: string): string {
+  const diff = Math.max(0, Date.now() - new Date(dateStr).getTime())
   const mins = Math.floor(diff / 60000)
+  if (mins < 1)  return '刚刚'
   if (mins < 60) return `${mins}分钟前`
   const hrs = Math.floor(mins / 60)
-  if (hrs < 24) return `${hrs}小时前`
+  if (hrs < 24)  return `${hrs}小时前`
   return `${Math.floor(hrs / 24)}天前`
 }
 
@@ -48,36 +22,43 @@ function HotspotCard({ item, onRead, onActionModal, onConvertTodo }: {
   item: HotspotItem
   onRead: () => void
   onActionModal: () => void
-  onConvertTodo: () => void
+  onConvertTodo: () => Promise<void>
 }) {
   const [expanded, setExpanded] = useState(false)
   const [converting, setConverting] = useState(false)
-  const cfg = URGENCY_CFG[item.urgency] || URGENCY_CFG.lifestyle
-  const isRead = item.status === 'read' || item.status === 'dismissed'
+  const [convertError, setConvertError] = useState(false)
+  const cfg = URGENCY_CFG[item.urgency]
+  const consumed = isConsumed(item.status)
   const isUrgent = item.urgency === 'urgent'
   const isImportant = item.urgency === 'important'
+  const showActionButton = (isUrgent || isImportant) && item.action_available
 
   const handleExpand = (e: React.MouseEvent) => {
     e.stopPropagation()
     setExpanded(p => !p)
-    if (!isRead) onRead()
+    if (!consumed) onRead()
   }
 
   const handleConvert = async (e: React.MouseEvent) => {
     e.stopPropagation()
     setConverting(true)
-    await onConvertTodo()
-    setConverting(false)
+    setConvertError(false)
+    try {
+      await onConvertTodo()
+    } catch {
+      setConvertError(true)
+    } finally {
+      setConverting(false)
+    }
   }
 
   return (
     <motion.div layout
       style={{ borderRadius: 12, marginBottom: 10, overflow: 'hidden',
         border: `0.5px solid ${cfg.border}40`,
-        background: isRead ? 'rgba(255,255,255,0.4)' : cfg.bg,
-        opacity: isRead ? 0.6 : 1, transition: 'opacity 0.3s' }}>
+        background: consumed ? 'rgba(255,255,255,0.4)' : cfg.bg,
+        opacity: consumed ? 0.6 : 1, transition: 'opacity 0.3s' }}>
 
-      {/* 头部 */}
       <div onClick={handleExpand} style={{ padding: '12px 14px', cursor: 'pointer' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, flex: 1, minWidth: 0 }}>
@@ -88,7 +69,9 @@ function HotspotCard({ item, onRead, onActionModal, onConvertTodo }: {
                   background: `${cfg.color}18`, color: cfg.color, fontWeight: 600, flexShrink: 0 }}>
                   {cfg.label}
                 </span>
-                <span style={{ fontSize: 13, fontWeight: 500, color: THEME.text, lineHeight: 1.3 }}>{item.title}</span>
+                <span style={{ fontSize: 13, fontWeight: 500, color: THEME.text, lineHeight: 1.3 }}>
+                  {item.title}
+                </span>
               </div>
               {item.relevance_reason && (
                 <div style={{ fontSize: 12, color: THEME.gold, fontWeight: 500,
@@ -108,20 +91,23 @@ function HotspotCard({ item, onRead, onActionModal, onConvertTodo }: {
         </div>
       </div>
 
-      {/* 展开内容 */}
       <AnimatePresence>
         {expanded && (
           <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }}
             exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.2 }}
             style={{ overflow: 'hidden' }}>
             <div style={{ padding: '0 14px 14px', borderTop: `0.5px solid ${cfg.border}30` }}>
-              <p style={{ fontSize: 13, color: THEME.text, lineHeight: 1.7, margin: '10px 0 12px',
-                whiteSpace: 'pre-wrap' }}>{item.summary}</p>
-
+              <p style={{ fontSize: 13, color: THEME.text, lineHeight: 1.7,
+                margin: '10px 0 12px', whiteSpace: 'pre-wrap' }}>
+                {item.summary}
+              </p>
+              {convertError && (
+                <p style={{ fontSize: 11, color: '#CC3333', marginBottom: 8 }}>添加失败，请重试</p>
+              )}
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                {/* 紧急/重要热点：一键办按钮 */}
-                {(isUrgent || isImportant) && (
-                  <motion.button whileTap={{ scale: 0.92 }} onClick={e => { e.stopPropagation(); onActionModal() }}
+                {showActionButton && (
+                  <motion.button whileTap={{ scale: 0.92 }}
+                    onClick={e => { e.stopPropagation(); onActionModal() }}
                     style={{ display: 'flex', alignItems: 'center', gap: 5,
                       padding: '8px 14px', borderRadius: 20, border: 'none',
                       background: isUrgent ? '#FF6B6B' : '#FF8C00',
@@ -129,21 +115,18 @@ function HotspotCard({ item, onRead, onActionModal, onConvertTodo }: {
                     ⚡ 一键处理
                   </motion.button>
                 )}
-
-                {/* 转为待办 */}
                 <motion.button whileTap={{ scale: 0.92 }}
-                  onClick={handleConvert}
-                  disabled={converting}
+                  onClick={handleConvert} disabled={converting}
                   style={{ display: 'flex', alignItems: 'center', gap: 5,
                     padding: '8px 14px', borderRadius: 20,
                     border: `0.5px solid ${THEME.gold}`,
                     background: 'rgba(176,141,87,0.08)',
-                    color: THEME.gold, fontSize: 12, fontWeight: 500, cursor: converting ? 'default' : 'pointer' }}>
+                    color: THEME.gold, fontSize: 12, fontWeight: 500,
+                    cursor: converting ? 'default' : 'pointer',
+                    opacity: converting ? 0.6 : 1 }}>
                   {converting ? '添加中…' : <><Plus size={12} /> 加入待办</>}
                 </motion.button>
-
-                {/* 生活类：简单外链 */}
-                {!isUrgent && !isImportant && item.action_data?.url && (
+                {!item.action_available && item.action_data?.url && (
                   <motion.button whileTap={{ scale: 0.92 }}
                     onClick={e => { e.stopPropagation(); window.open(item.action_data?.url, '_blank'); onRead() }}
                     style={{ display: 'flex', alignItems: 'center', gap: 5,
@@ -163,30 +146,20 @@ function HotspotCard({ item, onRead, onActionModal, onConvertTodo }: {
   )
 }
 
+type Props = {
+  hotspots: HotspotItem[]
+  onClose: () => void
+  onPatrol: () => void
+  patrolling: boolean
+  onRead: (id: string) => void
+  userId: string
+  onSync?: () => void
+}
+
 export default function HotspotSheet({ hotspots, onClose, onPatrol, patrolling, onRead, userId, onSync }: Props) {
   const [selectedHotspot, setSelectedHotspot] = useState<HotspotItem | null>(null)
-
-  const sorted = [...hotspots].sort((a, b) => {
-    const order: Record<string, number> = { urgent: 0, important: 1, lifestyle: 2 }
-    return (order[a.urgency] ?? 2) - (order[b.urgency] ?? 2)
-  })
-
-  const urgentCount = hotspots.filter(h => h.urgency === 'urgent').length
-  const unreadCount = hotspots.filter(h => h.status !== 'read' && h.status !== 'dismissed').length
-
-  const handleConvertTodo = async (hotspot: HotspotItem) => {
-    await fetch('/api/action/perform', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        action_type: 'convert_to_todo',
-        hotspot_id: hotspot.id,
-        user_id: userId,
-      }),
-    })
-    onRead(hotspot.id)
-    onSync?.()
-  }
+  const { sorted, urgentCount, unreadCount, handleConvertTodo } =
+    useHotspotSheet(hotspots, userId, onRead, onSync)
 
   return (
     <>
@@ -209,7 +182,8 @@ export default function HotspotSheet({ hotspots, onClose, onPatrol, patrolling, 
             background: urgentCount > 0
               ? 'linear-gradient(90deg,#FF6B6B,#FF8E53)'
               : 'linear-gradient(90deg,#4A9EFF,#7BC4FF)' }} />
-          <div style={{ width: 32, height: 4, background: 'rgba(0,0,0,0.1)', borderRadius: 2, margin: '10px auto 0' }} />
+          <div style={{ width: 32, height: 4, background: 'rgba(0,0,0,0.1)',
+            borderRadius: 2, margin: '10px auto 0' }} />
 
           <div style={{ padding: '10px 14px 0', flexShrink: 0,
             display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -239,7 +213,8 @@ export default function HotspotSheet({ hotspots, onClose, onPatrol, patrolling, 
             </div>
           )}
 
-          <div style={{ overflowY: 'auto', flex: 1, WebkitOverflowScrolling: 'touch' as any, padding: '10px 14px 0' }}>
+          <div style={{ overflowY: 'auto', flex: 1,
+            WebkitOverflowScrolling: 'touch' as any, padding: '10px 14px 0' }}>
             {sorted.length === 0 ? (
               <div style={{ textAlign: 'center', opacity: 0.35, padding: '40px 0' }}>
                 <div style={{ fontSize: 36, marginBottom: 12 }}>🌸</div>
@@ -257,8 +232,10 @@ export default function HotspotSheet({ hotspots, onClose, onPatrol, patrolling, 
           <div style={{ flexShrink: 0, borderTop: '0.5px solid rgba(0,0,0,0.06)',
             padding: '10px 14px 14px', display: 'flex', justifyContent: 'flex-end' }}>
             <motion.button whileTap={{ scale: 0.93 }} onClick={onPatrol}
-              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 16px', borderRadius: 20,
-                border: '0.5px solid rgba(176,141,87,0.3)', background: 'rgba(176,141,87,0.08)',
+              style={{ display: 'flex', alignItems: 'center', gap: 6,
+                padding: '8px 16px', borderRadius: 20,
+                border: '0.5px solid rgba(176,141,87,0.3)',
+                background: 'rgba(176,141,87,0.08)',
                 fontSize: 12, color: THEME.gold, fontWeight: 500, cursor: 'pointer' }}>
               <motion.div animate={patrolling ? { rotate: 360 } : { rotate: 0 }}
                 transition={patrolling ? { duration: 1, repeat: Infinity, ease: 'linear' } : {}}>
@@ -270,7 +247,6 @@ export default function HotspotSheet({ hotspots, onClose, onPatrol, patrolling, 
         </motion.div>
       </motion.div>
 
-      {/* 热点一键办 */}
       <AnimatePresence>
         {selectedHotspot && (
           <ActionModal

@@ -1,57 +1,36 @@
 'use client'
 import { createClient } from '@/lib/supabase/client'
 const supabase = createClient()
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, Plus, ChevronDown, ChevronRight } from 'lucide-react'
+import { X, Plus, ChevronRight } from 'lucide-react'
 import VoiceBtn from '@/app/components/VoiceBtn'
 import PackCheckItem from '@/app/components/PackCheckItem'
 import ChildActionSheet, { ChildEvent } from '@/app/rian/ChildActionSheet'
-
-
-const THEME = { text: '#2C3E50', gold: '#B08D57', muted: '#6B8BAA', navy: '#1A3C5E' }
-const G = { bg: '#E1F5EE', border: '#9FE1CB', mid: '#5DCAA5', deep: '#1D9E75', dark: '#0F6E56' }
-
-type Child = {
-  id: string; name: string; emoji: string; energy: number
-  health_status?: string; mood_status?: string
-  school_name?: string; grade?: string
-  urgent_items?: { title: string; level: 'red' | 'orange' | 'yellow' }[]
-}
-type TimelineItem = {
-  id: string; time: string; end_time?: string; title: string
-  type: 'class' | 'activity' | 'medical' | 'special' | 'extracurricular'
-  source: 'schedule' | 'calendar' | 'health' | 'profile'
-  event?: any
-}
-type DailyLog = { id?: string; health_status: string; mood_status: string }
-type Props = {
-  children: Child[]; sel: Child | null; onSel: (c: Child) => void
-  onClose: () => void; onAdd: () => void; userId: string
-  todos?: any[]; onOneTap?: (todo: any) => void
-}
+import Accordion from '@/app/_shared/_components/Accordion'
+import { THEME, GREEN } from '@/app/_shared/_constants/theme'
+import { EVENT_TYPE_EMOJI } from '@/app/_shared/_constants/categories'
+import { useChildSchedule } from '@/app/_shared/_hooks/useChildSchedule'
+import { useChildDailyLog } from '@/app/_shared/_hooks/useChildDailyLog'
+import type { Child, TimelineItem, HealthStatus, MoodStatus } from '@/app/_shared/_types'
 
 const healthOptions = [
-  { value: 'normal',     label: '健康',   color: G.dark,    bg: G.bg },
+  { value: 'normal',     label: '健康',   color: GREEN.dark, bg: GREEN.bg },
   { value: 'recovering', label: '恢复中', color: '#D97706', bg: 'rgba(217,119,6,0.08)' },
   { value: 'sick',       label: '生病中', color: '#DC2626', bg: 'rgba(220,38,38,0.08)' },
 ]
 const moodOptions = [
   { value: 'happy',   label: '开心', emoji: '😊', color: '#D97706' },
-  { value: 'calm',    label: '平静', emoji: '😌', color: G.dark },
+  { value: 'calm',    label: '平静', emoji: '😌', color: GREEN.dark },
   { value: 'anxious', label: '焦虑', emoji: '😟', color: '#7C3AED' },
   { value: 'upset',   label: '低落', emoji: '😔', color: '#6B8BAA' },
 ]
-const eventTypeEmoji: Record<string, string> = {
-  activity: '🎯', exam: '📝', holiday: '🎉', meeting: '👨‍👩‍👧',
-  class: '📚', trip: '🚌', medical: '🏥', extracurricular: '🎨', other: '📌',
-}
 
 function getTodayKey() { return new Date().toISOString().split('T')[0] }
 function getTomorrow() { return new Date(Date.now() + 86400000).toISOString().split('T')[0] }
-function getIn7Days() { return new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0] }
+function getIn7Days()  { return new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0] }
 function getIn30Days() { return new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0] }
-function getEnergyColor(v: number) { return v > 70 ? G.deep : v > 40 ? '#FACC15' : '#FB7185' }
+function getEnergyColor(v: number) { return v > 70 ? GREEN.deep : v > 40 ? '#FACC15' : '#FB7185' }
 function formatDate(d: string) {
   const date = new Date(d), today = new Date(), tmr = new Date(today)
   tmr.setDate(today.getDate() + 1)
@@ -59,7 +38,6 @@ function formatDate(d: string) {
   if (date.toDateString() === tmr.toDateString()) return '明天'
   return ['周日','周一','周二','周三','周四','周五','周六'][date.getDay()] + ` ${date.getMonth()+1}/${date.getDate()}`
 }
-
 function inferEnergy(health: string, mood: string, items: TimelineItem[]): number {
   const hour = new Date().getHours()
   let base = hour < 7 ? 50 : hour < 10 ? 80 : hour < 12 ? 75
@@ -76,57 +54,6 @@ function inferEnergy(health: string, mood: string, items: TimelineItem[]): numbe
   return Math.max(10, Math.min(100, Math.round(base)))
 }
 
-// ── 手风琴 ──
-function Accordion({ title, count, children, defaultOpen = false, badge }: {
-  title: string; count?: number; children: React.ReactNode
-  defaultOpen?: boolean; badge?: string
-}) {
-  const [open, setOpen] = useState(defaultOpen)
-  return (
-    <div style={{ marginBottom: 8 }}>
-      <motion.div whileTap={{ scale: 0.98 }} onClick={() => setOpen(p => !p)}
-        style={{
-          display: 'flex', alignItems: 'center', gap: 8,
-          padding: '10px 12px', cursor: 'pointer',
-          borderRadius: open ? '12px 12px 0 0' : 12,
-          background: open ? 'rgba(176,141,87,0.06)' : 'rgba(0,0,0,0.02)',
-          border: `0.5px solid ${open ? 'rgba(176,141,87,0.2)' : 'rgba(0,0,0,0.06)'}`,
-          transition: 'all 0.18s',
-        }}>
-        <span style={{ fontSize: 12, fontWeight: 600, color: open ? THEME.gold : THEME.text, flex: 1 }}>
-          {title}
-        </span>
-        {badge && (
-          <span style={{ fontSize: 10, padding: '2px 7px', borderRadius: 10,
-            background: 'rgba(255,100,100,0.1)', color: '#DC2626', fontWeight: 600 }}>
-            {badge}
-          </span>
-        )}
-        {count !== undefined && (
-          <span style={{ fontSize: 10, color: THEME.muted }}>{count}项</span>
-        )}
-        <motion.div animate={{ rotate: open ? 180 : 0 }} transition={{ duration: 0.18 }}>
-          <ChevronDown size={14} color={open ? THEME.gold : THEME.muted} />
-        </motion.div>
-      </motion.div>
-      <AnimatePresence>
-        {open && (
-          <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.2 }}
-            style={{
-              overflow: 'hidden', background: 'rgba(255,255,255,0.8)',
-              border: '0.5px solid rgba(176,141,87,0.15)',
-              borderTop: 'none', borderRadius: '0 0 12px 12px',
-            }}>
-            <div style={{ padding: '10px 12px' }}>{children}</div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
-  )
-}
-
-// ── 时间轴 ──
 function Timeline({ items }: { items: TimelineItem[] }) {
   const now = new Date()
   const nowMin = now.getHours() * 60 + now.getMinutes()
@@ -146,28 +73,24 @@ function Timeline({ items }: { items: TimelineItem[] }) {
       {sorted.map((item, i) => {
         const [h, m] = item.time.split(':').map(Number)
         const itemMin = h * 60 + (m || 0)
-        const isPast = itemMin + 45 < nowMin
+        const isPast    = itemMin + 45 < nowMin
         const isCurrent = itemMin <= nowMin && itemMin + 45 > nowMin
         return (
           <div key={item.id} style={{ position: 'relative', marginBottom: i < sorted.length - 1 ? 8 : 0 }}>
-            <div style={{
-              position: 'absolute', left: -24, top: 4,
-              width: 10, height: 10, borderRadius: '50%',
-              background: isCurrent ? THEME.gold : isPast ? 'rgba(0,0,0,0.15)' : G.mid,
-              boxShadow: isCurrent ? `0 0 0 4px rgba(176,141,87,0.2)` : 'none',
-            }} />
-            <div style={{
-              padding: '6px 10px', borderRadius: 9,
+            <div style={{ position: 'absolute', left: -24, top: 4, width: 10, height: 10,
+              borderRadius: '50%',
+              background: isCurrent ? THEME.gold : isPast ? 'rgba(0,0,0,0.15)' : GREEN.mid,
+              boxShadow: isCurrent ? `0 0 0 4px rgba(176,141,87,0.2)` : 'none' }} />
+            <div style={{ padding: '6px 10px', borderRadius: 9,
               background: isCurrent ? 'rgba(176,141,87,0.08)' : isPast ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.7)',
               border: `0.5px solid ${isCurrent ? 'rgba(176,141,87,0.25)' : 'rgba(0,0,0,0.05)'}`,
-              opacity: isPast ? 0.55 : 1,
-            }}>
+              opacity: isPast ? 0.55 : 1 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                 <span style={{ fontSize: 10, color: isCurrent ? THEME.gold : THEME.muted,
                   fontWeight: isCurrent ? 600 : 400, minWidth: 32, flexShrink: 0 }}>
                   {item.time}
                 </span>
-                <span style={{ fontSize: 13 }}>{eventTypeEmoji[item.type] || '📌'}</span>
+                <span style={{ fontSize: 13 }}>{EVENT_TYPE_EMOJI[item.type] || '📌'}</span>
                 <span style={{ fontSize: 12, fontWeight: isCurrent ? 600 : 400,
                   color: isCurrent ? THEME.text : isPast ? THEME.muted : THEME.text, flex: 1 }}>
                   {item.title}
@@ -187,7 +110,6 @@ function Timeline({ items }: { items: TimelineItem[] }) {
   )
 }
 
-// ── 携带物品+习惯 ──
 function PackingSection({ childId, userId, events, eventType }: {
   childId: string; userId: string; events: any[]; eventType: string
 }) {
@@ -196,11 +118,8 @@ function PackingSection({ childId, userId, events, eventType }: {
   const [extraInput, setExtraInput] = useState('')
   const [extraItems, setExtraItems] = useState<string[]>([])
   const [askHabit, setAskHabit] = useState<string | null>(null)
-
-  const baseItems = [...new Set(events.flatMap(e =>
-    Array.isArray(e.requires_items) ? e.requires_items : []
-  ))]
-  const allItems = [...new Set([...baseItems, ...extraItems])]
+  const baseItems = [...new Set(events.flatMap(e => Array.isArray(e.requires_items) ? e.requires_items : []))]
+  const allItems  = [...new Set([...baseItems, ...extraItems])]
 
   const saveHabit = async (item: string, pref: 'always' | 'never') => {
     try {
@@ -225,7 +144,6 @@ function PackingSection({ childId, userId, events, eventType }: {
       今天没有需要携带的物品
     </div>
   )
-
   return (
     <div>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
@@ -243,26 +161,29 @@ function PackingSection({ childId, userId, events, eventType }: {
             color: THEME.text, outline: 'none' }} />
         <motion.button whileTap={{ scale: 0.88 }} onClick={addExtra}
           style={{ padding: '6px 12px', borderRadius: 8, border: 'none',
-            background: G.dark, color: '#fff', fontSize: 12, cursor: 'pointer' }}>
+            background: GREEN.dark, color: '#fff', fontSize: 12, cursor: 'pointer' }}>
           添加
         </motion.button>
       </div>
       <AnimatePresence>
         {askHabit && (
           <motion.div initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
-            style={{ marginTop: 8, padding: '8px 10px', borderRadius: 10, background: G.bg, border: `0.5px solid ${G.border}` }}>
-            <div style={{ fontSize: 11, color: G.dark, marginBottom: 6 }}>
+            style={{ marginTop: 8, padding: '8px 10px', borderRadius: 10,
+              background: GREEN.bg, border: `0.5px solid ${GREEN.border}` }}>
+            <div style={{ fontSize: 11, color: GREEN.dark, marginBottom: 6 }}>
               「{askHabit}」下次也要提醒吗？
             </div>
             <div style={{ display: 'flex', gap: 6 }}>
               <motion.button whileTap={{ scale: 0.88 }} onClick={() => saveHabit(askHabit, 'always')}
-                style={{ flex: 1, padding: '5px', borderRadius: 7, border: `0.5px solid ${G.mid}`,
-                  background: G.bg, color: G.dark, fontSize: 11, cursor: 'pointer', fontWeight: 500 }}>
+                style={{ flex: 1, padding: '5px', borderRadius: 7,
+                  border: `0.5px solid ${GREEN.mid}`, background: GREEN.bg,
+                  color: GREEN.dark, fontSize: 11, cursor: 'pointer', fontWeight: 500 }}>
                 是，下次提醒
               </motion.button>
               <motion.button whileTap={{ scale: 0.88 }} onClick={() => saveHabit(askHabit, 'never')}
-                style={{ flex: 1, padding: '5px', borderRadius: 7, border: '0.5px solid rgba(0,0,0,0.1)',
-                  background: 'transparent', color: THEME.muted, fontSize: 11, cursor: 'pointer' }}>
+                style={{ flex: 1, padding: '5px', borderRadius: 7,
+                  border: '0.5px solid rgba(0,0,0,0.1)', background: 'transparent',
+                  color: THEME.muted, fontSize: 11, cursor: 'pointer' }}>
                 只用这次
               </motion.button>
             </div>
@@ -273,7 +194,6 @@ function PackingSection({ childId, userId, events, eventType }: {
   )
 }
 
-// ── 日程摘要列表 ──
 function EventList({ events, onSelect }: { events: any[]; onSelect: (e: any) => void }) {
   if (!events.length) return (
     <div style={{ fontSize: 12, color: THEME.muted, opacity: 0.6, textAlign: 'center', padding: '8px 0' }}>
@@ -287,7 +207,7 @@ function EventList({ events, onSelect }: { events: any[]; onSelect: (e: any) => 
           style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px',
             borderRadius: 10, background: 'rgba(255,255,255,0.7)',
             border: '0.5px solid rgba(0,0,0,0.06)', cursor: 'pointer' }}>
-          <span style={{ fontSize: 16, flexShrink: 0 }}>{eventTypeEmoji[event.event_type] || '📌'}</span>
+          <span style={{ fontSize: 16, flexShrink: 0 }}>{EVENT_TYPE_EMOJI[event.event_type] || '📌'}</span>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: 12, fontWeight: 500, color: THEME.text,
               overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -296,7 +216,7 @@ function EventList({ events, onSelect }: { events: any[]; onSelect: (e: any) => 
             <div style={{ fontSize: 10, color: THEME.muted, marginTop: 1 }}>
               {event.date_start && formatDate(event.date_start)}
               {event.requires_payment ? ` · 💰฿${event.requires_payment}` : ''}
-              {event.requires_action ? ' · ⚠需行动' : ''}
+              {event.requires_action  ? ' · ⚠需行动' : ''}
             </div>
           </div>
           <ChevronRight size={13} color={THEME.muted} style={{ flexShrink: 0 }} />
@@ -306,12 +226,13 @@ function EventList({ events, onSelect }: { events: any[]; onSelect: (e: any) => 
   )
 }
 
-// ── 健康心情编辑器（居中弹出）──
 function StatusEditor({ log, onSave, onClose }: {
-  log: DailyLog; onSave: (h: string, m: string) => void; onClose: () => void
+  log: { health_status: string; mood_status: string }
+  onSave: (h: HealthStatus, m: MoodStatus) => void
+  onClose: () => void
 }) {
   const [health, setHealth] = useState(log.health_status || 'normal')
-  const [mood, setMood] = useState(log.mood_status || 'calm')
+  const [mood,   setMood]   = useState(log.mood_status   || 'calm')
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
       style={{ position: 'fixed', inset: 0, zIndex: 500,
@@ -356,7 +277,8 @@ function StatusEditor({ log, onSave, onClose }: {
             </motion.div>
           ))}
         </div>
-        <motion.button whileTap={{ scale: 0.97 }} onClick={() => onSave(health, mood)}
+        <motion.button whileTap={{ scale: 0.97 }}
+          onClick={() => onSave(health as HealthStatus, mood as MoodStatus)}
           style={{ width: '100%', padding: '14px', borderRadius: 14, border: 'none',
             background: THEME.navy, color: '#fff', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
           保存
@@ -366,126 +288,47 @@ function StatusEditor({ log, onSave, onClose }: {
   )
 }
 
-// ══ 主组件 ══
+type Props = {
+  children: Child[]; sel: Child | null; onSel: (c: Child) => void
+  onClose: () => void; onAdd: () => void; userId: string
+  todos?: any[]; onOneTap?: (todo: any) => void
+}
+
 export default function ChildSheet({ children, sel, onSel, onClose, onAdd, userId }: Props) {
-  const today = getTodayKey()
+  const today    = getTodayKey()
   const tomorrow = getTomorrow()
-  const in7days = getIn7Days()
+  const in7days  = getIn7Days()
   const in30days = getIn30Days()
 
-  const [timeline, setTimeline] = useState<TimelineItem[]>([])
-  const [calendar, setCalendar] = useState<any[]>([])
-  const [scheduleLoading, setScheduleLoading] = useState(false)
-  const [dailyLog, setDailyLog] = useState<DailyLog>({ health_status: 'normal', mood_status: 'calm' })
-  const [computedEnergy, setComputedEnergy] = useState(75)
+  const { timeline, calendar, loading } = useChildSchedule(sel?.id, today)
+  const { dailyLog, saveStatus }        = useChildDailyLog(
+    sel?.id, userId, today,
+    sel?.health_status as HealthStatus,
+    sel?.mood_status   as MoodStatus,
+  )
+
   const [showStatusEditor, setShowStatusEditor] = useState(false)
-  const [selectedEvent, setSelectedEvent] = useState<ChildEvent | null>(null)
+  const [selectedEvent,    setSelectedEvent]    = useState<ChildEvent | null>(null)
 
-  const handleSel = useCallback((c: Child) => {
-    onSel(c)
-    setTimeline([])
-    setCalendar([])
-    setDailyLog({ health_status: c.health_status || 'normal', mood_status: c.mood_status || 'calm' })
-  }, [onSel])
-
-  useEffect(() => {
-    if (!sel?.id) return
-    supabase.from('child_daily_log').select('id, health_status, mood_status')
-      .eq('child_id', sel.id).eq('date', today).maybeSingle()
-      .then(({ data }) => {
-        if (data) setDailyLog(data)
-        else setDailyLog({ health_status: sel.health_status || 'normal', mood_status: sel.mood_status || 'calm' })
-      })
-  }, [sel?.id])
-
-  useEffect(() => {
-    if (!sel?.id) return
-    setScheduleLoading(true)
-    const dow = new Date().getDay()
-    const yearEnd = new Date(new Date().getFullYear(), 11, 31).toISOString().split('T')[0]
-
-    Promise.all([
-  supabase.from('child_profiles').select('class_schedule, activities').eq('child_id', sel.id).single(),  // ← 新第一个
-  supabase.from('child_school_calendar').select('*').eq('child_id', sel.id).gte('date_start', today).lte('date_start', yearEnd).order('date_start'),
-  supabase.from('child_health_records').select('*').eq('child_id', sel.id).eq('follow_up_date', today),
-]).then(([profileRes, calRes, healthRes]) => {
-  const schedData = profileRes.data
-  const calData = calRes.data || []
-  const healthData = healthRes.data || []
-  const activities = schedData?.activities || []
-
-      const items: TimelineItem[] = []
-
-     const dow = new Date().getDay()
-const dowKey = ['sun','mon','tue','wed','thu','fri','sat'][dow]
-const daySchedule = schedData?.class_schedule?.[dowKey] || []
-daySchedule.forEach((item: any, i: number) => {
-  const isObject = typeof item === 'object'
-  items.push({
-    id: `sched_${i}`,
-    time: isObject ? item.time : '08:00',
-    title: isObject ? item.subject : item,
-    type: 'class',
-    source: 'schedule',
-    event: item,
-  })
-})
-
-      calData.filter((e: any) => e.date_start === today).forEach((e: any) => {
-        const timeMatch = (e.description || e.title || '').match(/(\d{1,2}):(\d{2})/)
-        items.push({ id: `cal_${e.id}`,
-          time: timeMatch ? `${timeMatch[1].padStart(2,'0')}:${timeMatch[2]}` : '08:00',
-          title: e.title, type: 'special', source: 'calendar', event: e })
-      })
-
-      healthData.forEach((h: any) => {
-        items.push({ id: `health_${h.id}`, time: '09:00',
-          title: `复诊：${h.description || h.type}`,
-          type: 'medical', source: 'health', event: h })
-      })
-
-      if (Array.isArray(activities)) {
-        activities.forEach((a: any, i: number) => {
-          if (a.day_of_week === dow || a.day === dow) {
-            items.push({ id: `act_${i}`, time: a.time || a.start_time || '15:00',
-              end_time: a.end_time, title: a.name || a.title,
-              type: 'extracurricular', source: 'profile', event: a })
-          }
-        })
-      }
-
-      setTimeline(items)
-      setCalendar(calData)
-      setComputedEnergy(inferEnergy(dailyLog.health_status, dailyLog.mood_status, items))
-      setScheduleLoading(false)
-    })
-  }, [sel?.id, dailyLog.health_status, dailyLog.mood_status])
-
-  const saveStatus = useCallback(async (health: string, mood: string) => {
-    if (!sel?.id) return
-    const payload = { child_id: sel.id, date: today, health_status: health, mood_status: mood, updated_at: new Date().toISOString() }
-    if (dailyLog.id) {
-      await supabase.from('child_daily_log').update(payload).eq('id', dailyLog.id)
-    } else {
-      const { data } = await supabase.from('child_daily_log').insert({ ...payload, user_id: userId }).select().single()
-      if (data) setDailyLog(d => ({ ...d, id: data.id }))
-    }
-    setDailyLog(prev => ({ ...prev, health_status: health, mood_status: mood }))
+  const computedEnergy = inferEnergy(dailyLog.health_status, dailyLog.mood_status, timeline)
+  const handleSel = useCallback((c: Child) => { onSel(c) }, [onSel])
+  const handleSaveStatus = async (h: HealthStatus, m: MoodStatus) => {
+    await saveStatus(h, m)
     setShowStatusEditor(false)
-  }, [sel?.id, dailyLog.id, userId, today])
+  }
 
-  const todayEvents = calendar.filter(e => e.date_start === today)
-  const todayPackEvents = [...todayEvents, ...timeline.filter(t => t.source === 'schedule').map(t => t.event || {})]
-  const eveningEvents = calendar.filter(e => e.date_start === tomorrow)
-  const tomorrowPack = [...new Set(eveningEvents.flatMap(e => Array.isArray(e.requires_items) ? e.requires_items : []))]
-  const weekEvents = calendar.filter(e => e.date_start > tomorrow && e.date_start <= in7days)
-  const monthEvents = calendar.filter(e => e.date_start > in7days && e.date_start <= in30days)
-  const yearEvents = calendar.filter(e => e.date_start > in30days)
+  const todayEvents      = calendar.filter(e => e.date_start === today)
+  const eveningEvents    = calendar.filter(e => e.date_start === tomorrow)
+  const weekEvents       = calendar.filter(e => e.date_start > tomorrow  && e.date_start <= in7days)
+  const monthEvents      = calendar.filter(e => e.date_start > in7days   && e.date_start <= in30days)
+  const yearEvents       = calendar.filter(e => e.date_start > in30days)
+  const todayPackEvents  = [...todayEvents, ...timeline.filter(t => t.source === 'schedule').map(t => t.event || {})]
+  const tomorrowPack     = [...new Set(eveningEvents.flatMap(e => Array.isArray(e.requires_items) ? e.requires_items : []))]
   const todayMainEventType = todayEvents[0]?.event_type || 'class'
-  const todayPackCount = [...new Set(todayPackEvents.flatMap(e => Array.isArray(e.requires_items) ? e.requires_items : []))].length
+  const todayPackCount   = [...new Set(todayPackEvents.flatMap(e => Array.isArray(e.requires_items) ? e.requires_items : []))].length
 
   const currentHealth = healthOptions.find(o => o.value === dailyLog.health_status) || healthOptions[0]
-  const currentMood = moodOptions.find(o => o.value === dailyLog.mood_status) || moodOptions[1]
+  const currentMood   = moodOptions.find(o => o.value === dailyLog.mood_status)     || moodOptions[1]
 
   return (
     <>
@@ -506,21 +349,22 @@ daySchedule.forEach((item: any, i: number) => {
           <div style={{ height: 4, background: 'linear-gradient(90deg,#A7D7D9,#D9A7B4)', flexShrink: 0 }} />
           <div style={{ width: 32, height: 4, background: 'rgba(0,0,0,0.1)', borderRadius: 2, margin: '10px auto 0' }} />
 
-          <div style={{ padding: '8px 14px 0', flexShrink: 0, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ padding: '8px 14px 0', flexShrink: 0,
+            display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 15, fontWeight: 600, color: THEME.text }}>孩子</span>
             <motion.div whileTap={{ scale: 0.86 }} onClick={onClose} style={{ cursor: 'pointer', padding: 4 }}>
               <X size={18} color={THEME.muted} />
             </motion.div>
           </div>
 
-          <div style={{ overflowY: 'auto', flex: 1, padding: '8px 12px 20px', WebkitOverflowScrolling: 'touch' as any }}>
-
-            {/* 孩子头像横排 */}
+          <div style={{ overflowY: 'auto', flex: 1, padding: '8px 12px 20px',
+            WebkitOverflowScrolling: 'touch' as any }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12,
               overflowX: 'auto', paddingBottom: 4, scrollbarWidth: 'none' }}>
               {children.map(c => (
                 <motion.div key={c.id} whileTap={{ scale: 0.88 }} onClick={() => handleSel(c)}
-                  style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, cursor: 'pointer', flexShrink: 0 }}>
+                  style={{ display: 'flex', flexDirection: 'column', alignItems: 'center',
+                    gap: 3, cursor: 'pointer', flexShrink: 0 }}>
                   <div style={{ width: c.id === sel?.id ? 52 : 40, height: c.id === sel?.id ? 52 : 40,
                     borderRadius: '50%', background: 'rgba(176,141,87,0.08)',
                     border: `2px solid ${c.id === sel?.id ? THEME.gold : 'transparent'}`,
@@ -545,16 +389,17 @@ daySchedule.forEach((item: any, i: number) => {
             </div>
 
             {!sel ? (
-              <div style={{ textAlign: 'center', opacity: 0.35, padding: '30px 0', fontSize: 14, color: THEME.text }}>
+              <div style={{ textAlign: 'center', opacity: 0.35, padding: '30px 0',
+                fontSize: 14, color: THEME.text }}>
                 选择孩子查看状态
               </div>
             ) : (
               <>
-                {/* 状态行 */}
                 <motion.div whileTap={{ scale: 0.98 }} onClick={() => setShowStatusEditor(true)}
                   style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12,
                     padding: '9px 11px', borderRadius: 12,
-                    background: 'rgba(0,0,0,0.02)', border: '0.5px solid rgba(0,0,0,0.06)', cursor: 'pointer' }}>
+                    background: 'rgba(0,0,0,0.02)', border: '0.5px solid rgba(0,0,0,0.06)',
+                    cursor: 'pointer' }}>
                   <div style={{ flex: 1 }}>
                     <div style={{ fontSize: 13, fontWeight: 600, color: THEME.text }}>{sel.name}</div>
                     <div style={{ fontSize: 9, color: THEME.gold, marginTop: 1 }}>点击更新状态</div>
@@ -576,37 +421,33 @@ daySchedule.forEach((item: any, i: number) => {
                   </div>
                 </motion.div>
 
-                {scheduleLoading ? (
-                  <div style={{ textAlign: 'center', padding: '20px 0', opacity: 0.4, fontSize: 12, color: THEME.muted }}>
+                {loading ? (
+                  <div style={{ textAlign: 'center', padding: '20px 0',
+                    opacity: 0.4, fontSize: 12, color: THEME.muted }}>
                     加载中...
                   </div>
                 ) : (
                   <>
-                    {/* 1. 今日日程时间轴 */}
                     <Accordion title="📅 今日日程" count={timeline.length} defaultOpen={true}>
                       <Timeline items={timeline} />
                     </Accordion>
-
-                    {/* 2. 今日携带 */}
-                    <Accordion title="🎒 今日携带"
-                      count={todayPackCount}
+                    <Accordion title="🎒 今日携带" count={todayPackCount}
                       badge={todayPackCount > 0 ? '需确认' : undefined}
                       defaultOpen={todayPackCount > 0}>
                       <PackingSection childId={sel.id} userId={userId}
                         events={todayPackEvents} eventType={todayMainEventType} />
                     </Accordion>
-
-                    {/* 3. 今日安排 */}
-                    <Accordion title="📋 今日安排" count={todayEvents.length} defaultOpen={todayEvents.length > 0}>
+                    <Accordion title="📋 今日安排" count={todayEvents.length}
+                      defaultOpen={todayEvents.length > 0}>
                       <EventList events={todayEvents} onSelect={setSelectedEvent} />
                     </Accordion>
-
-                    {/* 4. 今晚准备（明天携带+明天安排合并）*/}
                     <Accordion title="🌙 今晚准备"
                       count={eveningEvents.length + tomorrowPack.length} defaultOpen={false}>
                       {eveningEvents.length > 0 && (
                         <div style={{ marginBottom: tomorrowPack.length > 0 ? 12 : 0 }}>
-                          <div style={{ fontSize: 10, color: THEME.muted, marginBottom: 6, fontWeight: 600 }}>明天的安排</div>
+                          <div style={{ fontSize: 10, color: THEME.muted, marginBottom: 6, fontWeight: 600 }}>
+                            明天的安排
+                          </div>
                           <EventList events={eveningEvents} onSelect={setSelectedEvent} />
                         </div>
                       )}
@@ -625,32 +466,25 @@ daySchedule.forEach((item: any, i: number) => {
                         </div>
                       )}
                       {eveningEvents.length === 0 && tomorrowPack.length === 0 && (
-                        <div style={{ fontSize: 12, color: THEME.muted, opacity: 0.6, textAlign: 'center', padding: '8px 0' }}>
+                        <div style={{ fontSize: 12, color: THEME.muted, opacity: 0.6,
+                          textAlign: 'center', padding: '8px 0' }}>
                           明天没有特别安排
                         </div>
                       )}
                     </Accordion>
-
-                    {/* 5. 本周安排 */}
                     <Accordion title="📆 本周安排" count={weekEvents.length} defaultOpen={false}>
                       <EventList events={weekEvents} onSelect={setSelectedEvent} />
                     </Accordion>
-
-                    {/* 6. 本月安排 */}
                     {monthEvents.length > 0 && (
                       <Accordion title="🗓 本月安排" count={monthEvents.length} defaultOpen={false}>
                         <EventList events={monthEvents} onSelect={setSelectedEvent} />
                       </Accordion>
                     )}
-
-                    {/* 7. 学年大事 */}
                     {yearEvents.length > 0 && (
                       <Accordion title="🎓 学年大事" count={yearEvents.length} defaultOpen={false}>
                         <EventList events={yearEvents} onSelect={setSelectedEvent} />
                       </Accordion>
                     )}
-
-                    {/* 空状态 */}
                     {timeline.length === 0 && calendar.length === 0 && (
                       <div style={{ textAlign: 'center', padding: '20px 0' }}>
                         <div style={{ opacity: 0.32, fontSize: 13, color: THEME.text, marginBottom: 12 }}>
@@ -665,8 +499,8 @@ daySchedule.forEach((item: any, i: number) => {
                         </motion.button>
                       </div>
                     )}
-
-                    <motion.button whileTap={{ scale: 0.97 }} onClick={() => window.location.href = '/rian'}
+                    <motion.button whileTap={{ scale: 0.97 }}
+                      onClick={() => window.location.href = '/rian'}
                       style={{ width: '100%', marginTop: 10, padding: '11px', borderRadius: 14,
                         border: '1px solid rgba(176,141,87,0.25)', background: 'rgba(176,141,87,0.06)',
                         fontSize: 13, color: THEME.gold, fontWeight: 500, cursor: 'pointer',
@@ -683,7 +517,8 @@ daySchedule.forEach((item: any, i: number) => {
 
       <AnimatePresence>
         {showStatusEditor && (
-          <StatusEditor log={dailyLog} onSave={saveStatus} onClose={() => setShowStatusEditor(false)} />
+          <StatusEditor log={dailyLog} onSave={handleSaveStatus}
+            onClose={() => setShowStatusEditor(false)} />
         )}
       </AnimatePresence>
 

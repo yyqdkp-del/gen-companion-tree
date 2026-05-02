@@ -387,7 +387,7 @@ export default function BasePage() {
   const hState = dropState('hotspot', hotspots)
   const redCount = todos.filter(t => t.priority === 'red').length
   const unread = hotspots.filter(h => h.status === 'unread').length
-  const childUrgent = (activeKid?.urgent_items || []).filter(i => i.level === 'red').length
+  const childUrgent = (activeKid?.urgent_items || []).filter((i: { level: string }) => i.level === 'red').length
   const hour = time.getHours()
   const greeting = hour < 6 ? '夜深了' : hour < 12 ? '早上好' : hour < 18 ? '下午好' : '晚上好'
 
