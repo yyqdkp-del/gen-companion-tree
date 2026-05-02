@@ -47,7 +47,7 @@ const LOAD_MSGS: Record<string, string[]> = {
 }
 
 type TabType = 'hanzi' | 'chengyu' | 'writing'
-type ChildInfo = { name: string; grade: string; level: string; school: string }
+type ChildInfo = { id?: string; name: string; grade: string; level: string; school: string }
 type LearnedItem = { char?: string; chengyu?: string; type: TabType; mastery: number; learned_at: string }
 
 // ══ 手风琴组件 ══
@@ -710,7 +710,7 @@ export default function DecodePage() {
   const [error, setError] = useState('')
   const [copied, setCopied] = useState(false)
   const [userId, setUserId] = useState('')
-  const [childInfo, setChildInfo] = useState<ChildInfo>({ name: '', grade: '', level: 'R2', school: '' })
+  const [childInfo, setChildInfo] = useState<ChildInfo>({ id: '', name: '', grade: '', level: 'R2', school: '' })
   const [learnedItems, setLearnedItems] = useState<LearnedItem[]>([])
   const [showProgress, setShowProgress] = useState(false)
   const [locationScene, setLocationScene] = useState('海外华人家庭')
@@ -724,7 +724,7 @@ export default function DecodePage() {
       const raw = localStorage.getItem('child_assessment') || localStorage.getItem('active_child')
       if (raw) {
         const info = JSON.parse(raw)
-        setChildInfo({ name: info.name || '', grade: info.grade || '', level: info.level || 'R2', school: info.school || '' })
+        setChildInfo({ id: info.id || '', name: info.name || '', grade: info.grade || '', level: info.level || 'R2', school: info.school || '' })
       }
     } catch {}
     try {
@@ -782,7 +782,7 @@ export default function DecodePage() {
       if (json.error) throw new Error(json.error)
       setData(json)
       if (userId) {
-        await supabase.from('chinese_sessions').insert({ user_id: userId, input_text: query, input_type: activeTab, result: json, location_scene: locationScene, learned_at: new Date().toISOString() })
+        await supabase.from('chinese_sessions').insert({ user_id: userId, child_id: childInfo.id || null, input_text: query, input_type: activeTab, result: json, location_scene: locationScene, learned_at: new Date().toISOString() })
         await supabase.from('family_learning_dna').upsert({ user_id: userId, last_input_type: activeTab, last_learned_at: new Date().toISOString(), total_sessions: learnedItems.length + 1, preferred_scene: locationScene, updated_at: new Date().toISOString() }, { onConflict: 'user_id' })
         setLearnedItems(prev => [{ char: json.char, chengyu: json.chengyu, type: activeTab, mastery: 80, learned_at: new Date().toISOString() }, ...prev])
       }
@@ -803,7 +803,7 @@ export default function DecodePage() {
   const writingCount = learnedItems.filter(i => i.type === 'writing').length
 
   const QUICK_CHENGYU = ['very many people', '突然下好大的雨', '今天作业多到写不完']
-  const QUICK_WRITING = ['We went to the night market, so many people!', 'It was raining so we stayed home, a bit bored', 'I did really well on my test today']
+  const QUICK_WRITING = ['We went to the night market, so many people!', '下雨天在家，有点无聊', '今天考试考得很好']
 
   return (
     <main style={{ minHeight: '100dvh', background: THEME.bg, fontFamily: "'Noto Serif SC', Georgia, serif", paddingBottom: 80, backgroundImage: 'radial-gradient(circle at 15% 15%, rgba(200,160,96,0.1) 0%, transparent 55%), radial-gradient(circle at 85% 85%, rgba(192,57,43,0.07) 0%, transparent 55%)' }}>
