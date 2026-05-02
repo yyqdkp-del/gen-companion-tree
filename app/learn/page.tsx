@@ -281,7 +281,7 @@ function FamilyWords({ family, extension, chengyu, cy_story }: { family?: string
 }
 
 // ══ 汉字结果 ══
-function HanziResult({ data, char, onMomCopy }: { data: any; char: string; onMomCopy: () => void }) {
+function HanziResult({ data, char, onMomCopy, childLevel }: { data: any; char: string; onMomCopy: () => void; childLevel?: string }) {
   const lv = data?.level || 'R2'
   const lvCfg = LEVELS[lv] || LEVELS.R2
   const exts = Array.isArray(data?.extension) ? data.extension : []
