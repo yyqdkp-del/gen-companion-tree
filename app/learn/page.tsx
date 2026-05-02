@@ -231,54 +231,142 @@ function PartsDisplay({ parts, char, evolution }: { parts: any[]; char: string; 
   )
 }
 
-// ══ 字族 + 延伸词汇（合并，点击弹窗）══
-function FamilyWords({ family, extension, chengyu, cy_story }: { family?: string[]; extension?: string[]; chengyu?: string; cy_story?: string }) {
-  const [popup, setPopup] = useState<string | null>(null)
+// ══ 字族 + 延伸词汇 ══
+type PopupItem = { word: string; type: 'word' | 'chengyu' | 'cultural'; extra?: any }
 
-  const allWords = [
-    ...(family || []).map(w => ({ word: w, type: 'family' as const })),
-    ...(extension || []).map(w => ({ word: w.split('：')[0] || w, desc: w.split('：')[1], type: 'ext' as const })),
-  ]
-
-  if (!allWords.length && !chengyu) return null
+function FamilyWords({ family, extension, chengyu, cy_story, cultural_sentence, cultural_author, cultural_meaning, overseas_connection, childLevel }: {
+  family?: string[]; extension?: string[]; chengyu?: string; cy_story?: string
+  cultural_sentence?: string; cultural_author?: string; cultural_meaning?: string; overseas_connection?: string
+  childLevel?: string
+}) {
+  const [popup, setPopup] = useState<PopupItem | null>(null)
+  const familyWords = (family || []).slice(0, 3)
+  if (!familyWords.length && !chengyu && !cultural_sentence) return null
 
   return (
     <>
       <div style={{ background: THEME.white, borderRadius: 16, padding: '16px', marginBottom: 8, border: '1px solid rgba(200,160,96,0.15)' }}>
-        {allWords.length > 0 && (
-          <>
-            <div style={{ fontSize: 10, letterSpacing: 3, color: THEME.red, marginBottom: 10, fontFamily: 'sans-serif' }}>🌳 字族 · 延伸</div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7 }}>
-              {allWords.map((item, i) => (
-                <button key={i} onClick={() => setPopup(item.word)}
-                  style={{ padding: '6px 13px', borderRadius: 20, background: item.type === 'family' ? 'rgba(45,106,79,0.08)' : 'rgba(200,160,96,0.1)', border: `1px solid ${item.type === 'family' ? 'rgba(45,106,79,0.2)' : 'rgba(200,160,96,0.25)'}`, fontSize: 14, fontFamily: "'Noto Serif SC', serif", color: item.type === 'family' ? THEME.green : THEME.textMid, cursor: 'pointer', transition: 'all 0.15s' }}>
-                  {item.word}
-                </button>
-              ))}
-            </div>
-          </>
-        )}
-
-        {chengyu && (
-          <div style={{ marginTop: allWords.length ? 14 : 0 }}>
-            <div style={{ fontSize: 10, letterSpacing: 3, color: THEME.red, marginBottom: 8, fontFamily: 'sans-serif' }}>🌟 相关成语</div>
-            <button onClick={() => setPopup(chengyu)}
-              style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', background: THEME.paper, border: '1px solid rgba(200,160,96,0.25)', borderRadius: 12, padding: '10px 14px', cursor: 'pointer', textAlign: 'left' }}>
-              <span style={{ fontSize: 20, fontFamily: "'Noto Serif SC', serif", color: THEME.text }}>{chengyu}</span>
-              {cy_story && <span style={{ fontSize: 11, color: THEME.textDim, fontFamily: 'sans-serif', flex: 1, lineHeight: 1.5 }}>{cy_story.slice(0, 30)}…</span>}
+        <div style={{ fontSize: 10, letterSpacing: 3, color: THEME.red, marginBottom: 10, fontFamily: 'sans-serif' }}>🌳 字族 · 成语 · 文化句</div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7 }}>
+          {familyWords.map((w, i) => (
+            <button key={i} onClick={() => setPopup({ word: w, type: 'word' })}
+              style={{ padding: '6px 13px', borderRadius: 20, background: 'rgba(45,106,79,0.08)', border: '1px solid rgba(45,106,79,0.2)', fontSize: 14, fontFamily: "'Noto Serif SC', serif", color: THEME.green, cursor: 'pointer' }}>
+              {w}
             </button>
-          </div>
-        )}
+          ))}
+          {chengyu && (
+            <button onClick={() => setPopup({ word: chengyu, type: 'chengyu', extra: { cy_story } })}
+              style={{ padding: '6px 13px', borderRadius: 20, background: 'rgba(200,160,96,0.1)', border: '1px solid rgba(200,160,96,0.3)', fontSize: 14, fontFamily: "'Noto Serif SC', serif", color: THEME.gold, cursor: 'pointer' }}>
+              🌟 {chengyu}
+            </button>
+          )}
+          {cultural_sentence && (
+            <button onClick={() => setPopup({ word: '文化句', type: 'cultural', extra: { cultural_sentence, cultural_author, cultural_meaning, overseas_connection } })}
+              style={{ padding: '6px 13px', borderRadius: 20, background: 'rgba(26,60,94,0.07)', border: '1px solid rgba(26,60,94,0.2)', fontSize: 12, fontFamily: 'sans-serif', color: THEME.navy, cursor: 'pointer' }}>
+              📜 文化句
+            </button>
+          )}
+        </div>
       </div>
 
       <AnimatePresence>
         {popup && (
-          <WordPopup word={popup} onClose={() => setPopup(null)} />
+          <FamilyPopup item={popup} onClose={() => setPopup(null)} childLevel={childLevel} />
         )}
       </AnimatePresence>
     </>
   )
 }
+
+function FamilyPopup({ item, onClose, childLevel }: { item: PopupItem; onClose: () => void; childLevel?: string }) {
+  const [loading, setLoading] = useState(item.type === 'word')
+  const [wordData, setWordData] = useState<any>(null)
+
+  useEffect(() => {
+    if (item.type !== 'word') return
+    async function load() {
+      setLoading(true)
+      try {
+        const char = [...item.word].find(c => /\p{Script=Han}/u.test(c)) || item.word[0]
+        const { data: cached } = await supabase.from('hanzi_library').select('*').eq('char', char).maybeSingle()
+        if (cached?.result) {
+          setWordData(typeof cached.result === 'string' ? JSON.parse(cached.result) : cached.result)
+          setLoading(false); return
+        }
+        const res = await fetch('/api/chinese/decode', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ mode: 'hanzi', char, child_level: childLevel || 'R2' }),
+        })
+        const json = await res.json()
+        setWordData(json.error ? null : json)
+      } catch { setWordData(null) }
+      setLoading(false)
+    }
+    load()
+  }, [item.word])
+
+  return (
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      style={{ position: 'fixed', inset: 0, background: 'rgba(26,18,8,0.5)', zIndex: 300, display: 'flex', alignItems: 'flex-end', justifyContent: 'center', padding: '0 0 80px' }}
+      onClick={onClose}>
+      <motion.div initial={{ y: 60, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 60, opacity: 0 }}
+        transition={{ type: 'spring', damping: 28, stiffness: 300 }}
+        style={{ background: THEME.white, borderRadius: 20, padding: '20px', width: '100%', maxWidth: 440, margin: '0 16px', maxHeight: '72vh', overflowY: 'auto' }}
+        onClick={e => e.stopPropagation()}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+          <div style={{ fontSize: 26, fontFamily: "'Noto Serif SC', serif", color: THEME.text }}>{item.word}</div>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 18, color: THEME.textDim, cursor: 'pointer' }}>✕</button>
+        </div>
+
+        {item.type === 'word' && (
+          loading ? (
+            <div style={{ textAlign: 'center', padding: '20px 0', color: THEME.textDim, fontFamily: 'sans-serif', fontSize: 13 }}>正在查询…</div>
+          ) : wordData ? (
+            <div style={{ fontFamily: 'sans-serif' }}>
+              {wordData.pinyin && <div style={{ fontSize: 13, color: THEME.textDim, marginBottom: 8 }}>{wordData.pinyin}</div>}
+              {wordData.meaning && <div style={{ fontSize: 15, fontWeight: 600, color: THEME.text, marginBottom: 10, fontFamily: "'Noto Serif SC', serif" }}>{wordData.meaning}</div>}
+              {wordData.story && <div style={{ fontSize: 13, color: THEME.textMid, lineHeight: 1.85, marginBottom: 10 }}>{wordData.story}</div>}
+              {wordData.scene && <div style={{ fontSize: 12, color: THEME.textMid, lineHeight: 1.75, fontStyle: 'italic', padding: '9px 12px', borderRadius: 10, background: 'rgba(200,160,96,0.07)', marginBottom: 10 }}>🌍 {wordData.scene}</div>}
+              {(wordData.mom_questions || []).length > 0 && (
+                <div style={{ padding: '12px', borderRadius: 12, background: 'rgba(192,57,43,0.05)', border: '1px solid rgba(192,57,43,0.1)' }}>
+                  <div style={{ fontSize: 11, color: THEME.red, marginBottom: 8 }}>💬 聊天引导</div>
+                  {wordData.mom_questions.slice(0, 2).map((q: string, i: number) => (
+                    <div key={i} style={{ fontSize: 12, color: THEME.textMid, lineHeight: 1.75, marginBottom: 6 }}>· {q}</div>
+                  ))}
+                </div>
+              )}
+            </div>
+          ) : (
+            <div style={{ textAlign: 'center', padding: '20px 0', color: THEME.textDim, fontFamily: 'sans-serif', fontSize: 13 }}>暂无数据</div>
+          )
+        )}
+
+        {item.type === 'chengyu' && (
+          <div style={{ fontFamily: 'sans-serif' }}>
+            {item.extra?.cy_story && <div style={{ fontSize: 14, color: THEME.textMid, lineHeight: 1.85, marginBottom: 12 }}>{item.extra.cy_story}</div>}
+            <div style={{ padding: '10px 13px', borderRadius: 10, background: 'rgba(200,160,96,0.07)', fontSize: 12, color: THEME.textMid, lineHeight: 1.7 }}>
+              💡 试着今天跟孩子用一次这个成语
+            </div>
+          </div>
+        )}
+
+        {item.type === 'cultural' && item.extra && (
+          <div style={{ fontFamily: 'sans-serif' }}>
+            <div style={{ fontSize: 18, fontFamily: "'Noto Serif SC', serif", fontWeight: 700, color: THEME.text, lineHeight: 1.8, marginBottom: 8 }}>{item.extra.cultural_sentence}</div>
+            {item.extra.cultural_author && <div style={{ fontSize: 12, color: THEME.textDim, marginBottom: 10 }}>—— {item.extra.cultural_author}</div>}
+            {item.extra.cultural_meaning && <div style={{ fontSize: 13, color: THEME.textMid, lineHeight: 1.75, marginBottom: 10, borderTop: '1px dashed rgba(200,160,96,0.3)', paddingTop: 10 }}>{item.extra.cultural_meaning}</div>}
+            {item.extra.overseas_connection && (
+              <div style={{ padding: '9px 12px', borderRadius: 10, background: 'rgba(26,60,94,0.05)', fontSize: 12, color: THEME.navy, lineHeight: 1.75 }}>
+                🌍 {item.extra.overseas_connection}
+              </div>
+            )}
+          </div>
+        )}
+      </motion.div>
+    </motion.div>
+  )
+}
+
 
 // ══ 汉字结果 ══
 function HanziResult({ data, char, onMomCopy, childLevel }: { data: any; char: string; onMomCopy: () => void; childLevel?: string }) {
