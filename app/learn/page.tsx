@@ -361,7 +361,7 @@ function HanziResult({ data, char, onMomCopy }: { data: any; char: string; onMom
       )}
 
       {/* 字族 + 延伸词汇（合并，点击弹窗） */}
-      <FamilyWords family={data.family} extension={exts} chengyu={data.chengyu} cy_story={data.cy_story} />
+      <FamilyWords family={data.family} extension={exts} chengyu={data.chengyu} cy_story={data.cy_story} cultural_sentence={data.cultural_sentence} cultural_author={data.cultural_author} cultural_meaning={data.cultural_meaning} overseas_connection={data.overseas_connection} childLevel={childLevel} />
 
     </motion.div>
   )
