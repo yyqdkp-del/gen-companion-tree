@@ -246,7 +246,7 @@ function FamilyWords({ family, extension, chengyu, cy_story, cultural_sentence, 
   return (
     <>
       <div style={{ background: THEME.white, borderRadius: 16, padding: '16px', marginBottom: 8, border: '1px solid rgba(200,160,96,0.15)' }}>
-        <div style={{ fontSize: 10, letterSpacing: 3, color: THEME.red, marginBottom: 10, fontFamily: 'sans-serif' }}>🌳 字族 · 成语 · 文化句</div>
+        <div style={{ fontSize: 10, letterSpacing: 3, color: THEME.red, marginBottom: 10, fontFamily: 'sans-serif' }}>🌳 字族 · 延伸</div>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7 }}>
           {familyWords.map((w, i) => (
             <button key={i} onClick={() => setPopup({ word: w, type: 'word' })}
