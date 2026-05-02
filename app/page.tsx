@@ -293,6 +293,7 @@ export default function BasePage() {
   const handleRead = async (id: string) => {
     const { error } = await supabase.from('hotspot_items').update({ status: 'read' }).eq('id', id)
     if (error) console.error('handleRead failed:', error)
+    ctxSync()
   }
 
   const handlePatrol = async () => {
