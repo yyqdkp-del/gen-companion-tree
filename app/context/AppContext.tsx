@@ -2,6 +2,7 @@
 import { createClient } from '@/lib/supabase/client'
 const supabase = createClient()
 import { createContext, useContext, useState, useEffect, useRef, useCallback, ReactNode } from 'react'
+import { fetchAppData } from '@/app/_shared/_services/syncService'
 import { useRouter } from 'next/navigation'
 
 
@@ -88,14 +89,10 @@ const setActiveKid = useCallback((kid: any) => {
     try {
       const uid = forceUid || userIdRef.current || (typeof window !== 'undefined' ? localStorage.getItem('app_user_id') : '') || ''
       if (!uid) return
-      const [childRes, todoRes, hotRes] = await Promise.all([
-        supabase.from('children').select('*').eq('user_id', uid),
-        supabase.from('todo_items').select('*').eq('user_id', uid).neq('status', 'done').order('created_at', { ascending: false }).limit(50),
-        supabase.from('hotspot_items').select('*').neq('status', 'dismissed').eq('user_id', uid).order('created_at', { ascending: false }).limit(20),
-      ])
-      if (childRes.data?.length) setKids(childRes.data)
-      if (todoRes.data) setTodos(todoRes.data)
-      setHotspots(hotRes.data || [])
+      const { kids, todos, hotspots } = await fetchAppData(uid)
+      if (kids.length) setKids(kids)
+      setTodos(todos)
+      setHotspots(hotspots)
     } catch (e) { console.error('sync error', e) }
     finally { setLoading(false) }
   }, [])
