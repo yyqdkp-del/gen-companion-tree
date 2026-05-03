@@ -5,11 +5,6 @@ export const dynamic = 'force-dynamic'
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-  process.env.SUPABASE_SERVICE_ROLE_KEY || ''
-)
-
 const MAKE_WEBHOOK_URL = process.env.NEXT_PUBLIC_MAKE_WEBHOOK_URL || ''
 
 // ══ 发送邮件（Gmail MCP）════════════════════════════════════
@@ -123,6 +118,10 @@ async function makeBooking(todo: any): Promise<string> {
 
 // ══ 主处理函数 ════════════════════════════════════════════════
 export async function POST(req: NextRequest) {
+  const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+  process.env.SUPABASE_SERVICE_ROLE_KEY || ''
+)
   try {
     const { todoId, actionType } = await req.json()
 

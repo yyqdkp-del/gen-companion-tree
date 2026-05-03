@@ -42,7 +42,7 @@ export default function BottomSheet({ children, onClose, title, zIndex = 300 }: 
             <X size={20} />
           </motion.div>
         </div>
-        <div style={{ padding: `16px 20px ${SHEET_BOTTOM_PADDING}` }}>{children}</div>
+        <div style={{ padding: '16px 20px 16px', paddingBottom: SHEET_BOTTOM_PADDING }}>{children}</div>
       </motion.div>
     </motion.div>
   )

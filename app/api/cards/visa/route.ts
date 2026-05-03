@@ -3,11 +3,6 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { getUserLocation } from '@/lib/geofence'
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-  process.env.SUPABASE_SERVICE_ROLE_KEY || ''
-)
-
 // ══ 各国签证表格配置 ══
 type FormField = { label_local: string; label_en: string; key: string }
 type VisaForm = { id: string; name: string; purpose: string; url: string; fields: FormField[] }
@@ -185,6 +180,10 @@ function getFieldValue(key: string, p: any, address: string): string {
 }
 
 export async function GET(req: NextRequest) {
+  const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+  process.env.SUPABASE_SERVICE_ROLE_KEY || ''
+)
   const { searchParams } = new URL(req.url)
   const userId = searchParams.get('user_id')
   if (!userId) return new NextResponse('Missing user_id', { status: 400 })

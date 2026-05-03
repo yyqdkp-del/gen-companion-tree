@@ -3,11 +3,6 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { PDFDocument, rgb, StandardFonts } from 'pdf-lib'
 
-const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-    process.env.SUPABASE_SERVICE_ROLE_KEY || ''
-  )
-
 function formatDate(dateStr: string | null): { day: string; month: string; year: string } {
     if (!dateStr) return { day: '___', month: '___', year: '______' }
     const d = new Date(dateStr)
@@ -194,6 +189,10 @@ async function generateTM7PDF(profile: any, address: string, visaType: string): 
 }
 
 export async function POST(req: NextRequest) {
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+    process.env.SUPABASE_SERVICE_ROLE_KEY || ''
+  )
     try {
           const { user_id, todo_id, form_type = 'tm7' } = await req.json()
 

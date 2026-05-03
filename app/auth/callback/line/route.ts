@@ -1,12 +1,12 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
 
-const adminSupabase = createClient(
+
+export async function GET(req: NextRequest) {
+  const adminSupabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
-
-export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)
   const code = searchParams.get('code')
   const error = searchParams.get('error')

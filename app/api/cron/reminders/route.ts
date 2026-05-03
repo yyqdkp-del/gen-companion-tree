@@ -5,11 +5,6 @@ export const dynamic = 'force-dynamic'
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-  process.env.SUPABASE_SERVICE_ROLE_KEY || ''
-)
-
 const familyId = 'default'
 
 // ══ 提醒级别文案（根的语气）══════════════════════════════════
@@ -51,6 +46,10 @@ function buildReminderMessage(chain: any, todo: any): {
 }
 
 export async function GET(req: NextRequest) {
+  const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+  process.env.SUPABASE_SERVICE_ROLE_KEY || ''
+)
   // 验证Vercel Cron
   const authHeader = req.headers.get('authorization')
   if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
@@ -155,5 +154,9 @@ export async function GET(req: NextRequest) {
 
 // 支持手动触发
 export async function POST(req: NextRequest) {
+  const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+  process.env.SUPABASE_SERVICE_ROLE_KEY || ''
+)
   return GET(req)
 }

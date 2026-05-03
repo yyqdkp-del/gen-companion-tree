@@ -4,11 +4,6 @@ export const maxDuration = 60
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-  process.env.SUPABASE_SERVICE_ROLE_KEY || ''
-)
-
 const MAKE_WEBHOOK_URL = process.env.NEXT_PUBLIC_MAKE_WEBHOOK_URL || ''
 
 // ══ event_type → dimension 映射 ══
@@ -289,6 +284,10 @@ function enrichActions(actions: any[], familyData: any): any[] {
 
 // ══ 主处理函数 ══
 export async function POST(req: NextRequest) {
+  const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+  process.env.SUPABASE_SERVICE_ROLE_KEY || ''
+)
   try {
     const body = await req.json()
     const { todo_id, user_id, execute_action, schedule_event, child_name } = body

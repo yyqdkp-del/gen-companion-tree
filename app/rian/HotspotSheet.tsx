@@ -167,7 +167,8 @@ export default function HotspotSheet({ hotspots, onClose, onPatrol, patrolling, 
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
         style={{ position: 'fixed', inset: 0, zIndex: 200,
           display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
-          padding: `0 0 ${FLOAT_SHEET_BOTTOM}`,
+          padding: '0 0 16px',
+          paddingBottom: FLOAT_SHEET_BOTTOM,
           background: 'rgba(180,200,210,0.35)', backdropFilter: 'blur(6px)' }}
         onClick={onClose}>
         <motion.div initial={{ y: 100, opacity: 0 }} animate={{ y: 0, opacity: 1 }}

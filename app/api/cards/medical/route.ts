@@ -3,11 +3,6 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { getUserLocation } from '@/lib/geofence'
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-  process.env.SUPABASE_SERVICE_ROLE_KEY || ''
-)
-
 // ══ 各国语言配置 ══
 type LangConfig = {
   languages: { code: string; flag: string; label: string }[]
@@ -140,6 +135,10 @@ function formatDate(dateStr: string): string {
 }
 
 export async function GET(req: NextRequest) {
+  const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+  process.env.SUPABASE_SERVICE_ROLE_KEY || ''
+)
   const { searchParams } = new URL(req.url)
   const userId = searchParams.get('user_id')
   const childId = searchParams.get('child_id')
