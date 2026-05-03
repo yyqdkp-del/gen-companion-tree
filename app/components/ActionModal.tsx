@@ -83,10 +83,12 @@ function VoiceBtn({ text }: { text: string }) {
 }
 
 // ── 材料清单单项 ──
-function CheckItem({ item, note }: { item: string; note?: string }) {
-  const [done, setDone] = useState(false)
+function CheckItem({ item, note, checked, onToggle }: {
+  item: string; note?: string; checked?: boolean; onToggle?: () => void
+}) {
+  const done = checked ?? false
   return (
-    <div onClick={() => setDone(p => !p)}
+    <div onClick={onToggle}
       style={{ display: 'flex', alignItems: 'flex-start', gap: 9, padding: '8px 0',
         borderBottom: '0.5px solid rgba(0,0,0,0.05)', cursor: 'pointer' }}>
       <motion.div whileTap={{ scale: 0.8 }} style={{ width: 19, height: 19, borderRadius: '50%', flexShrink: 0, marginTop: 1,
@@ -113,10 +115,12 @@ function CheckItem({ item, note }: { item: string; note?: string }) {
 }
 
 // ── 携带物品 tag ──
-function CarryTag({ label }: { label: string }) {
-  const [done, setDone] = useState(false)
+function CarryTag({ label, checked, onToggle }: {
+  label: string; checked?: boolean; onToggle?: () => void
+}) {
+  const done = checked ?? false
   return (
-    <motion.div whileTap={{ scale: 0.86 }} onClick={() => setDone(p => !p)}
+    <motion.div whileTap={{ scale: 0.86 }} onClick={onToggle}
       style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12,
         padding: '6px 11px', borderRadius: 20,
         background: done ? G.bg : 'rgba(255,255,255,0.6)',
@@ -189,7 +193,11 @@ function AiSummaryCard({ pack }: { pack: ExecutionPack }) {
 }
 
 // ── 标签页内容 ──
-function TabContent({ tabKey, pack }: { tabKey: TabKey; pack: ExecutionPack }) {
+function TabContent({ tabKey, pack, onToggleChecklist, onToggleCarry }: {
+  tabKey: TabKey; pack: ExecutionPack
+  onToggleChecklist: (i: number) => void
+  onToggleCarry: (i: number) => void
+}) {
   const [copied, setCopied] = useState(false)
   const checklistText = pack.checklist?.map(c => c.item + (c.note ? `（${c.note}）` : '')).join('、') || ''
   const carryText = pack.carry_items?.join('、') || ''
@@ -212,7 +220,7 @@ function TabContent({ tabKey, pack }: { tabKey: TabKey; pack: ExecutionPack }) {
           <span style={{ fontSize: 10, color: THEME.muted }}>点击勾选</span>
           <VoiceBtn text={`材料清单：${checklistText}`} />
         </div>
-        {pack.checklist.map((c, i) => <CheckItem key={i} item={c.item} note={c.note} />)}
+        {pack.checklist.map((c, i) => <CheckItem key={i} item={c.item} note={c.note} checked={c.status === 'done'} onToggle={() => onToggleChecklist(i)} />)}
       </div>
     )
   }
@@ -548,6 +556,36 @@ export default function ActionModal({
       .finally(() => setLoading(false))
   }, [source_id])
 
+  const savePack = async (newPack: ExecutionPack) => {
+    setPack(newPack)
+    try {
+      await fetch('/api/action/update-pack', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ source_id, execution_pack: newPack }),
+      })
+    } catch (e) { console.error('savePack error:', e) }
+  }
+
+  const toggleChecklist = (i: number) => {
+    if (!pack) return
+    const newChecklist = pack.checklist?.map((c, idx) =>
+      idx === i ? { ...c, status: c.status === 'done' ? 'missing' : 'done' } : c
+    )
+    savePack({ ...pack, checklist: newChecklist })
+  }
+
+  const toggleCarry = (i: number) => {
+    if (!pack) return
+    const newCarry = (pack.carry_items || []).map((item: any, idx: number) => {
+      if (typeof item === 'string') {
+        return idx === i ? { label: item, checked: true } : item
+      }
+      return idx === i ? { ...item, checked: !item.checked } : item
+    })
+    savePack({ ...pack, carry_items: newCarry })
+  }
+
   const urgencyGradient =
     urgency_level === 3 ? 'linear-gradient(90deg,#FF6B6B,#FF8E53)'
     : urgency_level === 2 ? 'linear-gradient(90deg,#F0A500,#F0C040)'
@@ -659,7 +697,7 @@ export default function ActionModal({
                   exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.22 }}
                   style={{ overflow: 'hidden', margin: '6px 12px 0', borderRadius: 10,
                     border: `0.5px solid ${G.border}`, background: 'rgba(255,255,255,0.7)' }}>
-                  <TabContent tabKey={activeTab} pack={pack} />
+                  <TabContent tabKey={activeTab} pack={pack} onToggleChecklist={toggleChecklist} onToggleCarry={toggleCarry} />
                 </motion.div>
               )}
             </AnimatePresence>
