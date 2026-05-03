@@ -243,7 +243,7 @@ export default function BasePage() {
   const [modal, setModal] = useState<'child' | 'todo' | 'hotspot' | 'addChild' | 'oneTap' | 'input' | null>(null)
 
   const openModal = (m: typeof modal) => { setModal(m); setModalOpen(true) }
-  const closeModal = () => { closeModal(); setModalOpen(false) }
+  const closeModal = () => { setModal(null); setModalOpen(false) }
   const [oneTapTodo, setOneTapTodo] = useState<TodoItem | null>(null)
   const [patrolling, setPatrolling] = useState(false)
   const [mounted, setMounted] = useState(false)
