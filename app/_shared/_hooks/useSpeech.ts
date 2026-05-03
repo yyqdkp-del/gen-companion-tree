@@ -54,8 +54,8 @@ export function useSpeech() {
             // [原有逻辑] 完全保留你的音调、语速和 Ting-Ting/Mei-Jia 筛选逻辑
             const utterance = new window.SpeechSynthesisUtterance(text) // 仅补充了 window. 前缀
             utterance.lang = 'zh-CN'
-            utterance.rate = 0.95
-            utterance.pitch = 1.0
+            utterance.rate = 0.85
+            utterance.pitch = 1.05
             utterance.volume = 0.9
             
             const voices = window.speechSynthesis.getVoices()
