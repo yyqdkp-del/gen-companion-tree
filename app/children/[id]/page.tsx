@@ -7,10 +7,7 @@ import { ArrowLeft, ArrowRight, Check, Loader, Save, Camera, Plus, X } from 'luc
 
 const supabase = createClient()
 
-const THEME = {
-  bg: 'linear-gradient(180deg, #A7D7D9 0%, #D9A7B4 100%)',
-  text: '#2C3E50', gold: '#B08D57', navy: '#1A3C5E', muted: '#6B8BAA',
-}
+import { THEME } from '@/app/_shared/_constants/theme'
 
 const STEPS = [
   { id: 'basic', label: '基本信息' },
@@ -629,9 +626,12 @@ function ChildEditContent() {
   })
   const [scheduleData, setScheduleData] = useState({
   class_schedule: {} as Record<string, any[]>,
+  activities: [] as any[],
 })
   const [healthData, setHealthData] = useState({
     blood_type: '不知道',
+    usual_bedtime: '21:30',
+    weekend_bedtime: '22:30',
     allergies: ['无'] as string[],
     medical_conditions: ['无'] as string[],
     medications_current: ['无'] as string[],
@@ -686,6 +686,8 @@ function ChildEditContent() {
     })
     setHealthData({
       blood_type: child.blood_type || '不知道',
+      usual_bedtime: child.usual_bedtime || '21:30',
+      weekend_bedtime: child.weekend_bedtime || '22:30',
       allergies: parseArray(child.allergies),
       medical_conditions: parseArray(child.medical_conditions),
       medications_current: parseArray(child.medications_current),
@@ -725,6 +727,8 @@ function ChildEditContent() {
         school_end_time: schoolData.school_end_time || null,
         transport_method: schoolData.transport_method,
         blood_type: healthData.blood_type,
+        usual_bedtime: healthData.usual_bedtime,
+        weekend_bedtime: healthData.weekend_bedtime,
         allergies: healthData.allergies,
 medical_conditions: healthData.medical_conditions,
 medications_current: healthData.medications_current,
