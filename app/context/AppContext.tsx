@@ -20,8 +20,6 @@ type AppContextType = {
   setProcessStatus: (status: { status: 'processing' | 'done' | 'failed' | null; message: string; tools?: any[] } | null) => void
   activeKid: any | null
   setActiveKid: (kid: any) => void
-  modalOpen: boolean
-  setModalOpen: (open: boolean) => void
 }
 const AppContext = createContext<AppContextType | null>(null)
 
@@ -41,7 +39,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
 } | null>(null)
 
 const [activeKid, setActiveKidState] = useState<any | null>(null)
-const [modalOpen, setModalOpen] = useState(false)
 const setActiveKid = useCallback((kid: any) => {
   setActiveKidState(kid)
   if (kid && typeof window !== 'undefined') {
@@ -220,7 +217,7 @@ if ('Notification' in window && 'serviceWorker' in navigator) {
   return () => { supabase.removeChannel(channel) }
 }, [userId])
   return (
-   <AppContext.Provider value={{ userId, userIdRef, kids, todos, hotspots, loading, sync, setUserIdSafe, addTempTodo, removeTempTodo, processStatus, setProcessStatus, activeKid, setActiveKid, modalOpen, setModalOpen }}>
+   <AppContext.Provider value={{ userId, userIdRef, kids, todos, hotspots, loading, sync, setUserIdSafe, addTempTodo, removeTempTodo, processStatus, setProcessStatus, activeKid, setActiveKid }}>
       {children}
     </AppContext.Provider>
   )

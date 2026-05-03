@@ -29,7 +29,7 @@ const NAV_ITEMS = [
 export default function InputBar() {
   const router = useRouter()
   const pathname = usePathname()
- const { userId, sync: ctxSync, addTempTodo, removeTempTodo, modalOpen } = useApp()
+ const { userId, sync: ctxSync, addTempTodo, removeTempTodo } = useApp()
 
   const [inputMode, setInputMode] = useState<'none' | 'audio_text' | 'vision_file'>('none')
   const [inputText, setInputText] = useState('')
@@ -136,10 +136,7 @@ if (!SHOW_PATHS.includes(pathname)) return null
         bottom: 'calc(max(env(safe-area-inset-bottom), 36px) + var(--keyboard-height, 0px))',
         left: 0, right: 0, zIndex: 110,
         display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '0 16px',
-        transition: 'bottom 0.15s ease-out, opacity 0.2s ease, transform 0.2s ease',
-        opacity: modalOpen ? 0 : 1,
-        transform: modalOpen ? 'translateY(100%)' : 'translateY(0)',
-        pointerEvents: modalOpen ? 'none' : 'auto',
+      transition: 'bottom 0.15s ease-out',
       }}>
 
         {/* 展开的输入面板 */}

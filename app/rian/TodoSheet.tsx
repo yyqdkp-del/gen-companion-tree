@@ -27,6 +27,14 @@ export default function TodoSheet({ todos, onClose, onAction, onDone }: {
         onDone={onDone}
       />
 
+      <motion.button whileTap={{ scale: 0.97 }}
+        onClick={() => window.location.href = '/rian'}
+        style={{ width: '100%', marginTop: 18, padding: '13px', borderRadius: 16,
+          border: '1px solid rgba(176,141,87,0.25)', background: 'rgba(176,141,87,0.08)',
+          fontSize: 13, color: THEME.gold, fontWeight: 600, cursor: 'pointer',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+        去日安添加新事项 <ChevronRight size={14} />
+      </motion.button>
     </BottomSheet>
   )
 }

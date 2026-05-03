@@ -237,13 +237,9 @@ function InputSheet({ onClose, userId, onProcessing }: {
 
 export default function BasePage() {
   const { userId, kids, todos, hotspots, loading, sync: ctxSync,
-    processStatus, setProcessStatus, activeKid, setActiveKid,
-    modalOpen, setModalOpen } = useApp()
+    processStatus, setProcessStatus, activeKid, setActiveKid } = useApp()
   const [time, setTime] = useState(new Date())
   const [modal, setModal] = useState<'child' | 'todo' | 'hotspot' | 'addChild' | 'oneTap' | 'input' | null>(null)
-
-  const openModal = (m: typeof modal) => { setModal(m); setModalOpen(true) }
-  const closeModal = () => { closeModal(); setModalOpen(false) }
   const [oneTapTodo, setOneTapTodo] = useState<TodoItem | null>(null)
   const [patrolling, setPatrolling] = useState(false)
   const [mounted, setMounted] = useState(false)
@@ -278,12 +274,12 @@ export default function BasePage() {
 
   const handleMarkDone = async (id: string) => {
     await markDone(id)
-    closeModal()
+    setModal(null)
   }
 
   const handleSnooze = async (id: string) => {
     await snooze(id)
-    closeModal()
+    setModal(null)
   }
 
   const handleAddChild = async (d: any) => {
@@ -292,7 +288,7 @@ export default function BasePage() {
     if (!uid) return
     const newId = await addChild(uid, d)
     await ctxSync()
-    closeModal()
+    setModal(null)
     if (newId) window.location.href = `/children/${newId}?from=quick`
   }
 
@@ -368,17 +364,17 @@ export default function BasePage() {
           <WaterDrop state={cState} icon={<Heart size={24} />} label="孩子"
             value={activeKid ? `${activeKid.energy ?? 75}%` : '—'}
             badge={childUrgent} pulse={childUrgent > 0}
-            onClick={() => openModal('child')} size={124} delay={0} />
+            onClick={() => setModal('child')} size={124} delay={0} />
           <div style={{ display: 'flex', gap: 'clamp(28px, 8vw, 52px)', alignItems: 'center' }}>
             <WaterDrop state={todoEngine.state} icon={<Bell size={20} />} label="待办"
               value={todoEngine.badge > 0 ? `${todoEngine.badge}条` : '静默'}
               badge={todoEngine.badge} pulse={todoEngine.badge > 0}
-              onClick={() => openModal('todo')} size={98} delay={1.8} />
+              onClick={() => setModal('todo')} size={98} delay={1.8} />
             <WaterDrop state={hState}
               icon={patrolling ? <Loader size={20} /> : <Zap size={20} />}
               label="热点" value={unread > 0 ? `${unread}条` : '根'}
               badge={unread} pulse={unread > 0}
-              onClick={() => openModal('hotspot')} size={98} delay={3.4} />
+              onClick={() => setModal('hotspot')} size={98} delay={3.4} />
           </div>
         </div>
       )}
@@ -389,23 +385,23 @@ export default function BasePage() {
             children={enrichedKids.length ? enrichedKids : kids}
             sel={activeKid}
             onSel={(c: any) => setActiveKid(c)}
-            onClose={() => closeModal()}
-            onAdd={() => openModal('addChild')}
+            onClose={() => setModal(null)}
+            onAdd={() => setModal('addChild')}
             userId={userId} />
         )}
         {modal === 'todo' && (
-          <TodoSheet key="todo" todos={todos} onClose={() => closeModal()}
-            onAction={(t: TodoItem) => { setOneTapTodo(t); openModal('oneTap') }}
+          <TodoSheet key="todo" todos={todos} onClose={() => setModal(null)}
+            onAction={(t: TodoItem) => { setOneTapTodo(t); setModal('oneTap') }}
             onDone={async (id: string) => { await markDone(id) }} />
         )}
         {modal === 'hotspot' && (
           <HotspotSheet key="hotspot" hotspots={hotspots}
-            onClose={() => closeModal()}
+            onClose={() => setModal(null)}
             onPatrol={handlePatrol} patrolling={patrolling}
             onRead={handleRead} userId={userId} onSync={ctxSync} />
         )}
         {modal === 'addChild' && (
-          <AddChildSheet key="add" onClose={() => closeModal()} onSave={handleAddChild} />
+          <AddChildSheet key="add" onClose={() => setModal(null)} onSave={handleAddChild} />
         )}
         {modal === 'oneTap' && oneTapTodo && (
           <TodoDetailModal
@@ -417,12 +413,12 @@ export default function BasePage() {
               ai_action_data: oneTapTodo.ai_action_data,
             }}
             userId={userId}
-            onClose={() => { setOneTapTodo(null); openModal('todo') }}
+            onClose={() => { setOneTapTodo(null); setModal('todo') }}
             onDone={handleMarkDone}
             onSnooze={handleSnooze} />
         )}
         {modal === 'input' && (
-          <InputSheet key="input" onClose={() => closeModal()} userId={userId}
+          <InputSheet key="input" onClose={() => setModal(null)} userId={userId}
             onProcessing={() => setProcessStatus({ status: 'processing', message: '根正在整理中...' })} />
         )}
       </AnimatePresence>
@@ -433,7 +429,7 @@ export default function BasePage() {
             exit={{ opacity: 0, y: 30 }}
             onClick={() => {
               if (processStatus.status === 'done') {
-                openModal('todo')
+                setModal('todo')
                 setProcessStatus(null)
               }
             }}
