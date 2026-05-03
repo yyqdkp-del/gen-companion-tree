@@ -1,12 +1,11 @@
 'use client'
-import { createClient } from '@/lib/supabase/client'
-const supabase = createClient()
 import React, { useState, useRef, useCallback } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Home as HomeIcon, Mic, Camera, Send, Square, Loader, Upload } from 'lucide-react'
 import { useApp } from '@/app/context/AppContext'
-import { uploadAndProcess } from '@/app/_shared/_services/uploadService'
+import { useRecorder } from '@/app/_shared/_hooks/useRecorder'
+import { useUpload, UPLOAD_STATUS_TEXT } from '@/app/_shared/_hooks/useUpload'
 import SettingsButton from '@/app/components/SettingsButton'
 
 import { THEME } from '@/app/_shared/_constants/theme'
@@ -25,12 +24,7 @@ const NAV_ITEMS = [
   { label: '日栖', path: '/treehouse' },
 ]
 
-const uploadStatusText: Record<string, string> = {
-  idle: '',
-  uploading: '处理中…',
-  done: '✓ 已添加',
-  error: '处理失败',
-}
+
 
 export default function InputBar() {
   const router = useRouter()
@@ -40,15 +34,10 @@ export default function InputBar() {
   const [inputMode, setInputMode] = useState<'none' | 'audio_text' | 'vision_file'>('none')
   const [inputText, setInputText] = useState('')
   const [sending, setSending] = useState(false)
-  const [isRecording, setIsRecording] = useState(false)
-  const [recordingSeconds, setRecordingSeconds] = useState(0)
-  const [uploading, setUploading] = useState(false)
-  const [uploadStatus, setUploadStatus] = useState<'idle' | 'uploading' | 'done' | 'error'>('idle')
+
   const [showMenu, setShowMenu] = useState(false)
 
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null)
-  const audioChunksRef = useRef<Blob[]>([])
-  const recordingTimerRef = useRef<NodeJS.Timeout | null>(null)
+
   const fileInputRef = useRef<HTMLInputElement>(null)
   const cameraInputRef = useRef<HTMLInputElement>(null)
 
@@ -59,6 +48,17 @@ const isTreehouse = pathname === '/treehouse'
 const getUid = useCallback(() => {
   return userId || (typeof window !== 'undefined' ? localStorage.getItem('app_user_id') : '') || ''
 }, [userId])
+
+  const uid = getUid()
+
+  const { uploading, uploadStatus, upload } = useUpload(uid, () => {
+    ctxSync()
+    setInputMode('none')
+  })
+
+  const { isRecording, recordingSeconds, startRecording, stopRecording } = useRecorder(
+    async (blob, filename) => { await upload(blob, 'audio', filename) }
+  )
 
 const SHOW_PATHS = ['/', '/rian', '/growth', '/treehouse']
 if (!SHOW_PATHS.includes(pathname)) return null
@@ -113,59 +113,16 @@ if (!SHOW_PATHS.includes(pathname)) return null
     setSending(false)
   }
 }
-  // ── 文件上传 ── 使用 _shared/uploadService
-  const uploadFile = async (file: Blob | File, category: string, filename?: string) => {
-    const uid = getUid()
-    if (!uid) return
-    setUploading(true)
-    setUploadStatus('uploading')
-    try {
-      await uploadAndProcess(file, category, uid, filename)
-      setUploadStatus('done')
-      ctxSync()
-      setTimeout(() => { setUploadStatus('idle'); setInputMode('none') }, 1500)
-    } catch (e) {
-      console.error(e)
-      setUploadStatus('error')
-      setTimeout(() => setUploadStatus('idle'), 2000)
-    } finally {
-      setUploading(false)
-    }
-  }
 
-  // ── 录音 ──
-  const startRecording = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-      const mediaRecorder = new MediaRecorder(stream)
-      mediaRecorderRef.current = mediaRecorder
-      audioChunksRef.current = []
-      mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) audioChunksRef.current.push(e.data) }
-      mediaRecorder.onstop = async () => {
-        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' })
-        stream.getTracks().forEach(t => t.stop())
-        await uploadFile(audioBlob, 'audio', `voice_${Date.now()}.webm`)
-      }
-      mediaRecorder.start()
-      setIsRecording(true)
-      setRecordingSeconds(0)
-      recordingTimerRef.current = setInterval(() => setRecordingSeconds(s => s + 1), 1000)
-    } catch { alert('请允许麦克风权限') }
-  }
 
-  const stopRecording = () => {
-    if (mediaRecorderRef.current && isRecording) {
-      mediaRecorderRef.current.stop()
-      setIsRecording(false)
-      if (recordingTimerRef.current) clearInterval(recordingTimerRef.current)
-    }
-  }
+
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
-    const category = file.type.startsWith('image/') ? 'image' : file.type === 'application/pdf' ? 'document' : 'other'
-    await uploadFile(file, category)
+    const category = file.type.startsWith('image/') ? 'image'
+      : file.type === 'application/pdf' ? 'document' : 'other'
+    await upload(file, category)
   }
 
   return (
@@ -230,7 +187,7 @@ if (!SHOW_PATHS.includes(pathname)) return null
                   </div>
                   {uploadStatus !== 'idle' && (
                     <p style={{ fontSize: 11, textAlign: 'center', margin: 0, color: uploadStatus === 'done' ? '#4ADE80' : uploadStatus === 'error' ? '#FB7185' : THEME.gold }}>
-                      {uploadStatusText[uploadStatus]}
+                      {UPLOAD_STATUS_TEXT[uploadStatus]}
                     </p>
                   )}
                 </div>
@@ -258,7 +215,7 @@ if (!SHOW_PATHS.includes(pathname)) return null
                   </div>
                   {uploadStatus !== 'idle' && (
                     <p style={{ fontSize: 11, textAlign: 'center', margin: 0, color: uploadStatus === 'done' ? '#4ADE80' : uploadStatus === 'error' ? '#FB7185' : THEME.gold }}>
-                      {uploadStatusText[uploadStatus]}
+                      {UPLOAD_STATUS_TEXT[uploadStatus]}
                     </p>
                   )}
                 </div>
