@@ -68,6 +68,31 @@ function ProgressBar({ current }: { current: number }) {
   )
 }
 
+// ── 笔画生活比喻 ──
+const STROKE_METAPHOR: Record<string, { icon: string; desc: string; direction: string }> = {
+  '横': { icon: '→', desc: '一条平稳的路，从左走到右', direction: '左 → 右' },
+  '竖': { icon: '↓', desc: '一棵树，直直站好', direction: '上 → 下' },
+  '撇': { icon: '↙', desc: '风来了，往左下飘', direction: '右上 → 左下' },
+  '捺': { icon: '↘', desc: '脚踩下去，收尾有力', direction: '左上 → 右下' },
+  '点': { icon: '·', desc: '一滴水落下来', direction: '右上 → 左下' },
+  '折': { icon: '↳', desc: '走路转了个弯', direction: '先横再竖' },
+  '钩': { icon: '↩', desc: '钓鱼钩，最后一甩', direction: '最后往左钩' },
+  '横折': { icon: '⌐', desc: '先走一段路，再转弯', direction: '先横再折' },
+  '横撇': { icon: '⌐', desc: '走一段路再往左飘', direction: '先横再撇' },
+  '竖弯钩': { icon: '↙', desc: '像一个问号，最后甩出去', direction: '竖下再弯钩' },
+  '撇折': { icon: '↗', desc: '先飘下来再转回去', direction: '先撇再折' },
+}
+
+function getStrokeInfo(stroke: string) {
+  // 精确匹配
+  if (STROKE_METAPHOR[stroke]) return STROKE_METAPHOR[stroke]
+  // 模糊匹配
+  for (const key of Object.keys(STROKE_METAPHOR)) {
+    if (stroke.includes(key)) return STROKE_METAPHOR[key]
+  }
+  return { icon: '✏️', desc: '跟着感觉写', direction: '按笔顺来' }
+}
+
 // ── 第一步：字的前世 ──
 function StepOrigin({ data, char, onNext }: {
   data: any; char: string; onNext: () => void
@@ -374,7 +399,7 @@ function StepStructure({ data, char, onNext }: {
   )
 }
 
-// ── 第三步：描红练字（Canvas真实手写）──
+// ── 第三步：描红练字（逐画引导 + Canvas手写）──
 function StepWrite({ data, char, canvasRef, onNext }: {
   data: any; char: string
   canvasRef: React.RefObject<HTMLCanvasElement | null>
@@ -385,11 +410,35 @@ function StepWrite({ data, char, canvasRef, onNext }: {
   const [hasDrawn, setHasDrawn] = useState(false)
   const [showGuide, setShowGuide] = useState(true)
   const [activeStroke, setActiveStroke] = useState(0)
+  const [completedStrokes, setCompletedStrokes] = useState<number[]>([])
+  const [showCelebration, setShowCelebration] = useState(false)
   const lastPos = useRef<{ x: number; y: number } | null>(null)
+  const { speak } = useApp()
 
-  const voiceText = data.writing_guide
-    ? data.writing_guide
-    : `${char}这个字，${data.stroke_count ? `共${data.stroke_count}画` : ''}，跟着来写一遍。`
+  const strokes = data.stroke_order || []
+  const strokeCount = data.stroke_count || strokes.length
+  const currentStroke = strokes[activeStroke]
+  const strokeInfo = currentStroke ? getStrokeInfo(currentStroke) : null
+  const allDone = completedStrokes.length >= strokes.length && strokes.length > 0
+
+  // 每次切换笔画时语音播报
+  useEffect(() => {
+    if (currentStroke && strokeInfo) {
+      speak(`第${activeStroke + 1}画，${currentStroke}，${strokeInfo.desc}`)
+    }
+  }, [activeStroke])
+
+  const handleStrokeDone = () => {
+    const newCompleted = [...completedStrokes, activeStroke]
+    setCompletedStrokes(newCompleted)
+    if (activeStroke < strokes.length - 1) {
+      setActiveStroke(s => s + 1)
+    } else {
+      setShowCelebration(true)
+      speak(`太棒了！${char}这个字你写完了，共${strokeCount}画！`)
+    }
+  }
+
 
   // 初始化 Canvas
   useEffect(() => {
@@ -508,71 +557,103 @@ function StepWrite({ data, char, canvasRef, onNext }: {
     setShowGuide(true)
   }
 
+  const voiceText = data.writing_guide || `${char}，共${strokeCount}画`
+
   return (
     <div style={{ padding: '0 24px' }}>
 
-      {/* 顶部：笔顺引导 + 语音（孩子抬头看） */}
-      <div style={{ display: 'flex', alignItems: 'flex-start',
-        justifyContent: 'space-between', marginBottom: 10, gap: 10 }}>
-        <div style={{ flex: 1 }}>
-          {/* 当前笔画高亮引导 */}
-          <div style={{ padding: '10px 14px', borderRadius: 12,
-            background: 'rgba(192,57,43,0.06)',
-            border: '1px solid rgba(192,57,43,0.15)',
-            marginBottom: 8 }}>
+      {/* 当前笔画大卡（孩子抬头看）*/}
+      <AnimatePresence mode="wait">
+        {!allDone && !showCelebration ? (
+          <motion.div key={activeStroke}
+            initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 10 }}
+            style={{ padding: '14px 16px', borderRadius: 16,
+              background: 'rgba(192,57,43,0.06)',
+              border: '1px solid rgba(192,57,43,0.2)',
+              marginBottom: 12 }}>
             <div style={{ display: 'flex', alignItems: 'center',
-              gap: 8, marginBottom: 4 }}>
-              <span style={{ fontSize: 11, color: T.red,
-                fontFamily: 'sans-serif', fontWeight: 700 }}>
-                笔顺引导
-              </span>
-              {data.stroke_count && (
-                <span style={{ fontSize: 11, color: T.textDim,
-                  fontFamily: 'sans-serif' }}>
-                  共 {data.stroke_count} 画
+              justifyContent: 'space-between', marginBottom: 8 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: 11, color: T.red,
+                  fontFamily: 'sans-serif', fontWeight: 700 }}>
+                  第 {activeStroke + 1} 画 / 共 {strokeCount || strokes.length} 画
                 </span>
-              )}
+                <span style={{ fontSize: 18, fontFamily: "'Noto Serif SC', serif",
+                  color: T.red, fontWeight: 700 }}>
+                  {currentStroke}
+                </span>
+              </div>
+              <VoiceControl text={voiceText} />
             </div>
-            {(data.stroke_order || []).length > 0 ? (
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
-                {data.stroke_order.map((s: string, i: number) => (
-                  <span key={i} style={{ padding: '3px 10px', borderRadius: 20,
-                    background: i === activeStroke
-                      ? T.red : 'rgba(200,160,96,0.08)',
-                    border: `1px solid ${i === activeStroke
-                      ? T.red : 'rgba(200,160,96,0.2)'}`,
-                    fontSize: 11, color: i === activeStroke
-                      ? '#fff' : T.textMid,
-                    fontFamily: 'sans-serif',
-                    cursor: 'pointer',
-                    transition: 'all 0.2s',
-                    fontWeight: i === activeStroke ? 700 : 400 }}
-                    onClick={() => setActiveStroke(i)}>
-                    {i + 1}. {s}
-                  </span>
-                ))}
-              </div>
-            ) : (
-              <div style={{ fontSize: 13, color: T.textMid,
-                fontFamily: 'sans-serif', lineHeight: 1.7 }}>
-                {data.writing_guide || `跟着描红，一笔一画写清楚`}
-              </div>
+            {strokeInfo && (
+              <>
+                <div style={{ fontSize: 15, color: T.text, fontFamily: 'sans-serif',
+                  marginBottom: 4, fontWeight: 500 }}>
+                  {strokeInfo.icon} {strokeInfo.desc}
+                </div>
+                <div style={{ fontSize: 12, color: T.textDim,
+                  fontFamily: 'sans-serif' }}>
+                  方向：{strokeInfo.direction}
+                </div>
+              </>
             )}
-          </div>
-
-          {/* 书写提示 */}
-          {data.writing_guide && (data.stroke_order || []).length > 0 && (
-            <div style={{ fontSize: 12, color: T.textDim,
-              fontFamily: 'sans-serif', lineHeight: 1.6,
-              marginBottom: 4 }}>
-              ✍️ {data.writing_guide}
+            {/* 进度条 */}
+            <div style={{ marginTop: 10, height: 4, borderRadius: 2,
+              background: 'rgba(192,57,43,0.1)', overflow: 'hidden' }}>
+              <motion.div
+                animate={{ width: `${(completedStrokes.length / Math.max(strokes.length, 1)) * 100}%` }}
+                style={{ height: '100%', background: T.red, borderRadius: 2 }} />
             </div>
-          )}
-        </div>
-        <VoiceControl text={voiceText} />
-      </div>
+          </motion.div>
+        ) : showCelebration ? (
+          <motion.div key="celebration"
+            initial={{ scale: 0.8, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            style={{ padding: '16px', borderRadius: 16, textAlign: 'center',
+              background: 'rgba(45,106,79,0.08)',
+              border: '1px solid rgba(45,106,79,0.3)',
+              marginBottom: 12 }}>
+            <div style={{ fontSize: 32, marginBottom: 6 }}>🌟</div>
+            <div style={{ fontSize: 16, fontWeight: 700, color: '#2D6A4F',
+              fontFamily: "'Noto Serif SC', serif" }}>
+              写完了！共 {strokeCount} 画
+            </div>
+            <div style={{ fontSize: 12, color: T.textDim,
+              fontFamily: 'sans-serif', marginTop: 4 }}>
+              你的手迹会出现在学习卡片上
+            </div>
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
 
-      {/* Canvas 田字格（下方，孩子低头写） */}
+      {/* 所有笔画小标签 */}
+      {strokes.length > 0 && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginBottom: 10 }}>
+          {strokes.map((s: string, i: number) => (
+            <span key={i}
+              onClick={() => { setActiveStroke(i); setShowCelebration(false) }}
+              style={{ padding: '3px 10px', borderRadius: 20, cursor: 'pointer',
+                background: completedStrokes.includes(i)
+                  ? 'rgba(45,106,79,0.1)'
+                  : i === activeStroke
+                    ? T.red : 'rgba(200,160,96,0.08)',
+                border: `1px solid ${completedStrokes.includes(i)
+                  ? 'rgba(45,106,79,0.3)'
+                  : i === activeStroke ? T.red : 'rgba(200,160,96,0.2)'}`,
+                fontSize: 11,
+                color: completedStrokes.includes(i)
+                  ? '#2D6A4F'
+                  : i === activeStroke ? '#fff' : T.textMid,
+                fontFamily: 'sans-serif', transition: 'all 0.2s',
+                fontWeight: i === activeStroke ? 700 : 400 }}>
+              {completedStrokes.includes(i) ? '✓' : i + 1}. {s}
+            </span>
+          ))}
+        </div>
+      )}
+
+      {/* Canvas 田字格（下方，孩子低头写）*/}
       <div ref={containerRef} style={{ display: 'flex',
         justifyContent: 'center', marginBottom: 12, position: 'relative' }}>
         <canvas ref={canvasRef}
@@ -598,8 +679,8 @@ function StepWrite({ data, char, canvasRef, onNext }: {
         )}
       </div>
 
-      {/* 重写按钮 */}
-      <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+      {/* 按钮区 */}
+      <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
         <motion.button whileTap={{ scale: 0.95 }} onClick={clearCanvas}
           style={{ flex: 1, padding: '12px', borderRadius: 12,
             border: `1px solid rgba(200,160,96,0.3)`,
@@ -608,16 +689,29 @@ function StepWrite({ data, char, canvasRef, onNext }: {
             fontFamily: 'sans-serif' }}>
           🗑 重写
         </motion.button>
+
+        {strokes.length > 0 && !allDone && !showCelebration && (
+          <motion.button whileTap={{ scale: 0.96 }} onClick={handleStrokeDone}
+            style={{ flex: 2, padding: '12px', borderRadius: 12,
+              border: 'none', background: T.gold,
+              color: '#fff', fontSize: 13, fontWeight: 700,
+              cursor: 'pointer', fontFamily: 'sans-serif',
+              boxShadow: '0 3px 12px rgba(200,160,96,0.3)' }}>
+            这画写好了 ✓
+          </motion.button>
+        )}
+
         <motion.button whileTap={{ scale: 0.96 }} onClick={onNext}
           style={{ flex: 2, padding: '12px', borderRadius: 12,
             border: 'none',
-            background: hasDrawn ? T.red : 'rgba(192,57,43,0.3)',
-            color: '#fff', fontSize: 14, fontWeight: 700,
-            cursor: hasDrawn ? 'pointer' : 'default',
+            background: (hasDrawn || showCelebration) ? T.red : 'rgba(192,57,43,0.3)',
+            color: '#fff', fontSize: 13, fontWeight: 700,
+            cursor: (hasDrawn || showCelebration) ? 'pointer' : 'default',
             fontFamily: "'Noto Serif SC', serif",
-            boxShadow: hasDrawn ? '0 4px 16px rgba(192,57,43,0.3)' : 'none',
+            boxShadow: (hasDrawn || showCelebration)
+              ? '0 4px 16px rgba(192,57,43,0.3)' : 'none',
             transition: 'all 0.3s' }}>
-          {hasDrawn ? '写好了 →' : '跳过 →'}
+          {showCelebration ? '继续 →' : hasDrawn ? '写好了 →' : '跳过 →'}
         </motion.button>
       </div>
     </div>
