@@ -116,10 +116,47 @@ export async function enrichChildren(
           .eq('user_id', uid).eq('date', today).maybeSingle(),
         supabase.from('child_school_calendar')
           .select('*').eq('child_id', c.id)
-          .eq('user_id', uid).eq('date_start', today),
+          .eq('user_id', uid)
+          .gte('date_start', today)
+          .lte('date_start', new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0])
+          .order('date_start'),
       ])
       const log  = logRes.status === 'fulfilled' ? logRes.value.data : null
       const evts = evtRes.status === 'fulfilled' ? (evtRes.value.data || []) : []
+
+      // 推导 urgent_items
+      const todayEvts = evts.filter((e: any) => e.date_start === today)
+      const weekEvts  = evts.filter((e: any) => e.date_start > today)
+      const urgent_items: { title: string; level: 'red' | 'orange' | 'yellow' }[] = []
+
+      // 生病 → red
+      if (log?.health_status === 'sick') {
+        urgent_items.push({ title: '生病中，注意休息', level: 'red' })
+      }
+
+      // 今日需要行动 → orange
+      todayEvts.filter((e: any) => e.requires_action).forEach((e: any) => {
+        urgent_items.push({ title: e.title, level: 'orange' })
+      })
+
+      // 今日需要付款 → orange
+      todayEvts.filter((e: any) => e.requires_payment).forEach((e: any) => {
+        urgent_items.push({ title: `💰 ${e.title} ฿${e.requires_payment}`, level: 'orange' })
+      })
+
+      // 今日考试或体检 → orange
+      todayEvts.filter((e: any) => ['exam', 'medical'].includes(e.event_type)).forEach((e: any) => {
+        if (!urgent_items.find(u => u.title === e.title)) {
+          urgent_items.push({ title: e.title, level: 'orange' })
+        }
+      })
+
+      // 7天内需要行动 → yellow
+      weekEvts.filter((e: any) => e.requires_action || e.requires_payment).forEach((e: any) => {
+        urgent_items.push({ title: e.title, level: 'yellow' })
+      })
+
+      // energy 计算
       const hour = new Date().getHours()
       let base = hour >= 7 && hour <= 9 ? 80 : hour >= 12 && hour <= 14 ? 65
         : hour >= 15 && hour <= 17 ? 85 : hour >= 20 ? 45 : 75
@@ -128,16 +165,21 @@ export async function enrichChildren(
       if (log?.mood_status === 'upset') base -= 20
       if (log?.mood_status === 'anxious') base -= 10
       if (log?.mood_status === 'happy') base += 10
+      if (todayEvts.some((e: any) => e.event_type === 'exam')) base -= 15
+      if (todayEvts.some((e: any) => e.event_type === 'medical')) base -= 5
+      if (todayEvts.filter((e: any) => e.event_type === 'class').length > 5) base -= 10
       const energy = Math.max(10, Math.min(100, base))
+
       return {
         id: c.id, name: c.name || '孩子',
         emoji: c.emoji || '👶🏻',
         avatar_url: c.avatar_url || null,
-        energy: c.energy || energy,
+        energy: energy,
         health_status: log?.health_status || 'normal',
         mood_status: log?.mood_status || 'calm',
         school_name: c.school_name, grade: c.grade,
-        today_schedule: evts.map((e: any) => ({
+        urgent_items,
+        today_schedule: todayEvts.map((e: any) => ({
           time: '', title: e.title,
           requires_action: e.requires_action,
         })),
