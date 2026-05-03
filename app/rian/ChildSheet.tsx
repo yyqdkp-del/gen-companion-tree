@@ -12,6 +12,8 @@ import { THEME, GREEN } from '@/app/_shared/_constants/theme'
 import { EVENT_TYPE_EMOJI } from '@/app/_shared/_constants/categories'
 import { useChildSchedule } from '@/app/_shared/_hooks/useChildSchedule'
 import { useChildDailyLog } from '@/app/_shared/_hooks/useChildDailyLog'
+import { calculateEnergy, getEnergyColor } from '@/app/_shared/_engine/energy'
+import ChildEnergyCard from '@/app/_shared/_components/ChildEnergyCard'
 import type { Child, TimelineItem, HealthStatus, MoodStatus } from '@/app/_shared/_types'
 
 const healthOptions = [
@@ -30,7 +32,7 @@ function getTodayKey() { return new Date().toISOString().split('T')[0] }
 function getTomorrow() { return new Date(Date.now() + 86400000).toISOString().split('T')[0] }
 function getIn7Days()  { return new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0] }
 function getIn30Days() { return new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0] }
-function getEnergyColor(v: number) { return v > 70 ? GREEN.deep : v > 40 ? '#FACC15' : '#FB7185' }
+// getEnergyColor 来自 _engine/energy
 function formatDate(d: string) {
   const date = new Date(d), today = new Date(), tmr = new Date(today)
   tmr.setDate(today.getDate() + 1)
@@ -38,22 +40,6 @@ function formatDate(d: string) {
   if (date.toDateString() === tmr.toDateString()) return '明天'
   return ['周日','周一','周二','周三','周四','周五','周六'][date.getDay()] + ` ${date.getMonth()+1}/${date.getDate()}`
 }
-function inferEnergy(health: string, mood: string, items: TimelineItem[]): number {
-  const hour = new Date().getHours()
-  let base = hour < 7 ? 50 : hour < 10 ? 80 : hour < 12 ? 75
-    : hour < 14 ? 60 : hour < 17 ? 85 : hour < 20 ? 70 : 45
-  if (health === 'sick') base -= 35
-  else if (health === 'recovering') base -= 15
-  if (mood === 'upset') base -= 20
-  else if (mood === 'anxious') base -= 10
-  else if (mood === 'happy') base += 10
-  if (items.filter(i => i.type === 'class').length > 5) base -= 10
-  if (items.some(i => i.title.includes('考试') || i.title.includes('exam'))) base -= 15
-  if (items.some(i => i.type === 'medical')) base -= 5
-  if (items.some(i => i.title.includes('体育') || i.title.includes('PE'))) base += 5
-  return Math.max(10, Math.min(100, Math.round(base)))
-}
-
 function Timeline({ items }: { items: TimelineItem[] }) {
   const now = new Date()
   const nowMin = now.getHours() * 60 + now.getMinutes()
@@ -310,7 +296,17 @@ export default function ChildSheet({ children, sel, onSel, onClose, onAdd, userI
   const [showStatusEditor, setShowStatusEditor] = useState(false)
   const [selectedEvent,    setSelectedEvent]    = useState<ChildEvent | null>(null)
 
-  const computedEnergy = inferEnergy(dailyLog.health_status, dailyLog.mood_status, timeline)
+  const energyResult = calculateEnergy({
+    healthStatus: dailyLog.health_status,
+    moodStatus:   dailyLog.mood_status,
+    todayEvents:  timeline.map(t => ({
+      event_type:      t.type,
+      requires_action: t.event?.requires_action,
+      requires_payment: t.event?.requires_payment,
+      title:           t.title,
+    })),
+  })
+  const computedEnergy = energyResult.score
   const handleSel = useCallback((c: Child) => { onSel(c) }, [onSel])
   const handleSaveStatus = async (h: HealthStatus, m: MoodStatus) => {
     await saveStatus(h, m)
@@ -395,31 +391,11 @@ export default function ChildSheet({ children, sel, onSel, onClose, onAdd, userI
               </div>
             ) : (
               <>
-                <motion.div whileTap={{ scale: 0.98 }} onClick={() => setShowStatusEditor(true)}
-                  style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12,
-                    padding: '9px 11px', borderRadius: 12,
-                    background: 'rgba(0,0,0,0.02)', border: '0.5px solid rgba(0,0,0,0.06)',
-                    cursor: 'pointer' }}>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: THEME.text }}>{sel.name}</div>
-                    <div style={{ fontSize: 9, color: THEME.gold, marginTop: 1 }}>点击更新状态</div>
-                  </div>
-                  <div style={{ display: 'flex', gap: 4 }}>
-                    <span style={{ fontSize: 10, padding: '3px 7px', borderRadius: 8,
-                      background: currentHealth.bg, color: currentHealth.color, fontWeight: 500 }}>
-                      {currentHealth.label}
-                    </span>
-                    <span style={{ fontSize: 10, padding: '3px 7px', borderRadius: 8,
-                      background: `${currentMood.color}15`, color: currentMood.color, fontWeight: 500 }}>
-                      {currentMood.emoji}
-                    </span>
-                    <span style={{ fontSize: 10, padding: '3px 7px', borderRadius: 8,
-                      background: `${getEnergyColor(computedEnergy)}18`,
-                      color: getEnergyColor(computedEnergy), fontWeight: 500 }}>
-                      {computedEnergy}%
-                    </span>
-                  </div>
-                </motion.div>
+                <ChildEnergyCard
+                  name={sel.name}
+                  energy={energyResult}
+                  onClick={() => setShowStatusEditor(true)}
+                />
 
                 {loading ? (
                   <div style={{ textAlign: 'center', padding: '20px 0',

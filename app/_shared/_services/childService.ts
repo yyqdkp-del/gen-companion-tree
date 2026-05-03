@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/client'
+import { calculateEnergy, getEnergyColor } from '../_engine/energy'
 import type { TimelineItem, HealthStatus, MoodStatus } from '../_types'
 
 const supabase = createClient()
@@ -156,19 +157,13 @@ export async function enrichChildren(
         urgent_items.push({ title: e.title, level: 'yellow' })
       })
 
-      // energy 计算
-      const hour = new Date().getHours()
-      let base = hour >= 7 && hour <= 9 ? 80 : hour >= 12 && hour <= 14 ? 65
-        : hour >= 15 && hour <= 17 ? 85 : hour >= 20 ? 45 : 75
-      if (log?.health_status === 'sick') base -= 35
-      if (log?.health_status === 'recovering') base -= 15
-      if (log?.mood_status === 'upset') base -= 20
-      if (log?.mood_status === 'anxious') base -= 10
-      if (log?.mood_status === 'happy') base += 10
-      if (todayEvts.some((e: any) => e.event_type === 'exam')) base -= 15
-      if (todayEvts.some((e: any) => e.event_type === 'medical')) base -= 5
-      if (todayEvts.filter((e: any) => e.event_type === 'class').length > 5) base -= 10
-      const energy = Math.max(10, Math.min(100, base))
+      // energy 计算 — 使用精力引擎
+      const energyResult = calculateEnergy({
+        healthStatus: log?.health_status,
+        moodStatus:   log?.mood_status,
+        todayEvents:  todayEvts,
+      })
+      const energy = energyResult.score
 
       return {
         id: c.id, name: c.name || '孩子',
