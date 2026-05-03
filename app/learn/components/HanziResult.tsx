@@ -204,7 +204,65 @@ export default function HanziResult({ data, char, onMomCopy, childLevel }: Props
           fontFamily: "'Noto Serif SC', serif", marginTop: 4 }}>{data.meaning}</div>
       </div>
 
+      {/* 视觉钩子 */}
+      {data.visual_hook && (
+        <div style={{ background: 'rgba(192,57,43,0.04)', borderRadius: 14,
+          padding: '14px 16px', marginBottom: 8,
+          border: '1px solid rgba(192,57,43,0.12)' }}>
+          <div style={{ fontSize: 10, letterSpacing: 3, color: T.red,
+            marginBottom: 6, fontFamily: 'sans-serif' }}>👁 看见这个字</div>
+          <div style={{ fontSize: 14, color: T.text, lineHeight: 1.8,
+            fontFamily: "'Noto Serif SC', serif" }}>{data.visual_hook}</div>
+          {data.memory_trick && (
+            <div style={{ marginTop: 8, padding: '8px 12px', borderRadius: 10,
+              background: 'rgba(200,160,96,0.08)', fontSize: 13,
+              color: T.gold, fontStyle: 'italic', fontFamily: 'sans-serif' }}>
+              🎵 {data.memory_trick}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* 孩子互动问题 */}
+      {data.child_prompt && (
+        <div style={{ background: 'rgba(45,106,79,0.05)', borderRadius: 14,
+          padding: '12px 16px', marginBottom: 8,
+          border: '1px solid rgba(45,106,79,0.15)',
+          display: 'flex', alignItems: 'center', gap: 10 }}>
+          <span style={{ fontSize: 22 }}>🙋</span>
+          <div style={{ fontSize: 13, color: T.green, lineHeight: 1.7,
+            fontFamily: 'sans-serif', fontWeight: 500 }}>{data.child_prompt}</div>
+        </div>
+      )}
+
       <PartsDisplay parts={data.parts || []} char={char} evolution={data.evolution} />
+
+      {/* 书写引导 */}
+      {data.writing_guide && (
+        <div style={{ background: T.white, borderRadius: 14, padding: '14px 16px',
+          marginBottom: 8, border: '1px solid rgba(200,160,96,0.15)' }}>
+          <div style={{ fontSize: 10, letterSpacing: 3, color: T.gold,
+            marginBottom: 8, fontFamily: 'sans-serif' }}>
+            ✍️ 学着写 · {data.stroke_count ? `${data.stroke_count}画` : ''}
+          </div>
+          <div style={{ fontSize: 13, color: T.textMid, lineHeight: 1.8,
+            fontFamily: 'sans-serif', marginBottom: data.stroke_order?.length ? 10 : 0 }}>
+            {data.writing_guide}
+          </div>
+          {data.stroke_order?.length > 0 && (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+              {data.stroke_order.map((s: string, i: number) => (
+                <span key={i} style={{ padding: '3px 10px', borderRadius: 20,
+                  background: 'rgba(200,160,96,0.08)',
+                  border: '1px solid rgba(200,160,96,0.2)',
+                  fontSize: 12, color: T.textMid, fontFamily: 'sans-serif' }}>
+                  {i + 1}. {s}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {(data.english_link || data.phonics_bridge) && (
         <ChineseAccordion title="中英互通" emoji="🔗">
