@@ -760,7 +760,27 @@ function StepWrite({ data, char, canvasRef, onNext }: {
   )
 }
 
-// ── 分享卡片生成 ──
+// ── 城市水墨装饰 ──
+function drawCityElement(ctx: CanvasRenderingContext2D, city: string, W: number, H: number) {
+  ctx.save()
+  ctx.globalAlpha = 0.06
+  ctx.fillStyle = '#C8A060'
+  ctx.font = `${H * 0.35}px serif`
+  ctx.textAlign = 'right'
+  ctx.textBaseline = 'bottom'
+  // 用文字符号模拟城市元素
+  const symbol: Record<string, string> = {
+    '清迈': '🍃', '曼谷': '🙏', '新加坡': '🦁',
+    '悉尼': '🌊', '墨尔本': '🌊', '英国': '🌿',
+    '美国': '🍁', '加拿大': '🍁', '默认': '☁️',
+  }
+  const key = Object.keys(symbol).find(k => city.includes(k)) || '默认'
+  ctx.font = `${H * 0.28}px serif`
+  ctx.fillText(symbol[key], W - 40, H - 40)
+  ctx.restore()
+}
+
+// ── 分享卡片生成（家书版）──
 function generateCard(
   char: string,
   pinyin: string,
@@ -768,161 +788,168 @@ function generateCard(
   sentence: string,
   childName: string,
   canvasRef: React.RefObject<HTMLCanvasElement | null>,
+  city?: string,
+  childAge?: string,
 ): string {
   const cardCanvas = document.createElement('canvas')
-  const W = 750; const H = 1050
+  const W = 750; const H = 1200
   cardCanvas.width = W; cardCanvas.height = H
   const ctx = cardCanvas.getContext('2d')!
 
-  // 背景 - 宣纸质感
-  ctx.fillStyle = '#F5F0E8'
+  // ── 背景：深夜墨色，像妈妈陪孩子的那一刻 ──
+  const bgGrad = ctx.createLinearGradient(0, 0, 0, H)
+  bgGrad.addColorStop(0, '#0D0A06')
+  bgGrad.addColorStop(0.4, '#1A1208')
+  bgGrad.addColorStop(1, '#241608')
+  ctx.fillStyle = bgGrad
   ctx.fillRect(0, 0, W, H)
 
-  // 水墨晕染效果
-  const grad1 = ctx.createRadialGradient(150, 150, 0, 150, 150, 300)
-  grad1.addColorStop(0, 'rgba(200,160,96,0.08)')
-  grad1.addColorStop(1, 'transparent')
-  ctx.fillStyle = grad1
+  // 微光晕染
+  const glow1 = ctx.createRadialGradient(W/2, 300, 0, W/2, 300, 400)
+  glow1.addColorStop(0, 'rgba(200,160,96,0.06)')
+  glow1.addColorStop(1, 'transparent')
+  ctx.fillStyle = glow1
   ctx.fillRect(0, 0, W, H)
 
-  const grad2 = ctx.createRadialGradient(600, 900, 0, 600, 900, 350)
-  grad2.addColorStop(0, 'rgba(192,57,43,0.06)')
-  grad2.addColorStop(1, 'transparent')
-  ctx.fillStyle = grad2
-  ctx.fillRect(0, 0, W, H)
+  // 城市水墨元素
+  drawCityElement(ctx, city || '', W, H)
 
-  // 外框 - 朱砂红细线
-  ctx.strokeStyle = 'rgba(192,57,43,0.6)'
-  ctx.lineWidth = 3
-  ctx.strokeRect(30, 30, W - 60, H - 60)
-  ctx.strokeStyle = 'rgba(192,57,43,0.2)'
-  ctx.lineWidth = 1
-  ctx.strokeRect(40, 40, W - 80, H - 80)
-
-  // 四角印章装饰
-  const corners = [[55, 55], [W - 55, 55], [55, H - 55], [W - 55, H - 55]]
-  corners.forEach(([x, y]) => {
-    ctx.fillStyle = 'rgba(192,57,43,0.15)'
-    ctx.fillRect(x - 12, y - 12, 24, 24)
-    ctx.strokeStyle = 'rgba(192,57,43,0.4)'
-    ctx.lineWidth = 1
-    ctx.strokeRect(x - 12, y - 12, 24, 24)
-  })
-
-  // 顶部标题
-  ctx.fillStyle = 'rgba(192,57,43,0.5)'
-  ctx.font = '500 26px "Noto Serif SC", serif'
-  ctx.textAlign = 'center'
-  ctx.fillText('根 · 中文', W / 2, 95)
-
-  // 分隔线
-  ctx.strokeStyle = 'rgba(200,160,96,0.4)'
-  ctx.lineWidth = 1
-  ctx.setLineDash([6, 4])
+  // ── 顶部细金线 ──
+  const lineGrad = ctx.createLinearGradient(60, 0, W - 60, 0)
+  lineGrad.addColorStop(0, 'transparent')
+  lineGrad.addColorStop(0.3, 'rgba(200,160,96,0.6)')
+  lineGrad.addColorStop(0.7, 'rgba(200,160,96,0.6)')
+  lineGrad.addColorStop(1, 'transparent')
+  ctx.strokeStyle = lineGrad
+  ctx.lineWidth = 0.8
   ctx.beginPath()
-  ctx.moveTo(80, 115); ctx.lineTo(W - 80, 115)
+  ctx.moveTo(60, 70); ctx.lineTo(W - 60, 70)
   ctx.stroke()
-  ctx.setLineDash([])
 
-  // 大字
-  ctx.font = `900 280px "Noto Serif SC", serif`
-  ctx.fillStyle = '#1A1208'
+  // ── 那个字：巨大，金色，发光 ──
+  // 发光效果
+  ctx.shadowColor = 'rgba(200,160,96,0.4)'
+  ctx.shadowBlur = 60
+  ctx.font = `900 260px "Noto Serif SC", serif`
+  ctx.fillStyle = '#C8A060'
   ctx.textAlign = 'center'
-  ctx.fillText(char, W / 2, 420)
+  ctx.fillText(char, W / 2, 340)
+  ctx.shadowBlur = 0
 
-  // 拼音
-  ctx.font = '300 36px sans-serif'
-  ctx.fillStyle = 'rgba(74,55,40,0.6)'
-  ctx.fillText(pinyin, W / 2, 470)
+  // 拼音（极小，低调）
+  ctx.font = '300 28px sans-serif'
+  ctx.fillStyle = 'rgba(200,160,96,0.4)'
+  ctx.fillText(pinyin, W / 2, 385)
 
-  // 含义
-  ctx.font = '600 32px "Noto Serif SC", serif'
-  ctx.fillStyle = '#4A3728'
-  ctx.fillText(meaning, W / 2, 520)
-
-  // 孩子手写的字（从 canvas 截图）
+  // ── 孩子手迹（如有）──
   const writingCanvas = canvasRef.current
   if (writingCanvas && writingCanvas.width > 0) {
-    const wSize = 160
+    const wSize = 120
     const wx = W / 2 - wSize / 2
-    const wy = 550
-    // 手写背景
-    ctx.fillStyle = 'rgba(253,251,247,0.8)'
-    ctx.beginPath()
-    const r = 16, x0 = wx - 8, y0 = wy - 8, w0 = wSize + 16, h0 = wSize + 16
-    ctx.moveTo(x0 + r, y0)
-    ctx.lineTo(x0 + w0 - r, y0); ctx.arcTo(x0 + w0, y0, x0 + w0, y0 + r, r)
-    ctx.lineTo(x0 + w0, y0 + h0 - r); ctx.arcTo(x0 + w0, y0 + h0, x0 + w0 - r, y0 + h0, r)
-    ctx.lineTo(x0 + r, y0 + h0); ctx.arcTo(x0, y0 + h0, x0, y0 + h0 - r, r)
-    ctx.lineTo(x0, y0 + r); ctx.arcTo(x0, y0, x0 + r, y0, r)
-    ctx.closePath()
-    ctx.fill()
-    ctx.strokeStyle = 'rgba(200,160,96,0.3)'
-    ctx.lineWidth = 1
-    ctx.stroke()
+    const wy = 420
+    ctx.globalAlpha = 0.15
+    ctx.fillStyle = '#C8A060'
+    ctx.fillRect(wx, wy, wSize, wSize)
+    ctx.globalAlpha = 0.6
     ctx.drawImage(writingCanvas, wx, wy, wSize, wSize)
-    // 标注
-    ctx.font = '400 20px sans-serif'
-    ctx.fillStyle = 'rgba(122,92,72,0.6)'
-    ctx.textAlign = 'center'
-    ctx.fillText(`${childName || '孩子'} 的手迹`, W / 2, wy + wSize + 28)
+    ctx.globalAlpha = 1
+    ctx.font = '300 18px sans-serif'
+    ctx.fillStyle = 'rgba(200,160,96,0.3)'
+    ctx.fillText('手迹', W / 2, wy + wSize + 22)
   }
 
-  // 分隔线
-  ctx.strokeStyle = 'rgba(200,160,96,0.3)'
-  ctx.lineWidth = 1
-  ctx.setLineDash([4, 3])
-  ctx.beginPath()
-  ctx.moveTo(80, 770); ctx.lineTo(W - 80, 770)
-  ctx.stroke()
-  ctx.setLineDash([])
-
-  // 孩子造的句子
-  if (sentence && sentence.length > 0) {
-    ctx.font = '500 34px "Noto Serif SC", serif'
-    ctx.fillStyle = '#1A1208'
+  // ── 孩子的句子：主角，最大 ──
+  const sentenceY = writingCanvas?.width ? 630 : 460
+  if (sentence && sentence.trim()) {
+    ctx.font = '500 42px "Noto Serif SC", serif'
+    ctx.fillStyle = 'rgba(255,255,255,0.92)'
     ctx.textAlign = 'center'
-    const maxWidth = W - 160
-    const words = sentence.split('')
-    let line = '「'; let y = 825
-    words.forEach(w => {
-      const test = line + w
-      if (ctx.measureText(test + '」').width > maxWidth && line !== '「') {
-        ctx.fillText(line, W / 2, y)
-        line = w; y += 48
-      } else { line += w }
+
+    // 自动换行
+    const maxW = W - 160
+    const chars = sentence.split('')
+    const lines: string[] = []
+    let current = ''
+    chars.forEach(c => {
+      const test = current + c
+      if (ctx.measureText(test).width > maxW && current) {
+        lines.push(current)
+        current = c
+      } else { current = test }
     })
-    ctx.fillText(line + '」', W / 2, y)
+    if (current) lines.push(current)
+
+    // 最多3行
+    const displayLines = lines.slice(0, 3)
+    const lineH = 62
+    const totalH = displayLines.length * lineH
+    const startY = sentenceY - totalH / 2 + lineH / 2
+
+    // 句子前的引号装饰
+    ctx.font = '300 60px "Noto Serif SC", serif'
+    ctx.fillStyle = 'rgba(200,160,96,0.3)'
+    ctx.fillText('「', 60, startY + 10)
+    ctx.fillText('」', W - 60, startY + (displayLines.length - 1) * lineH + 20)
+
+    // 正文
+    ctx.font = '500 42px "Noto Serif SC", serif'
+    ctx.fillStyle = 'rgba(255,255,255,0.92)'
+    displayLines.forEach((line, i) => {
+      ctx.fillText(line, W / 2, startY + i * lineH)
+    })
+  } else {
+    // 没有造句时显示含义
+    ctx.font = '400 36px "Noto Serif SC", serif'
+    ctx.fillStyle = 'rgba(255,255,255,0.5)'
+    ctx.fillText(meaning, W / 2, sentenceY)
   }
 
-  // 成就标签
-  const achievements = ['字源溯源', '六书解构', '笔顺临摹', '情境造句']
-  const tagW = 140; const tagH = 36
-  const startX = (W - (tagW * 2 + 16)) / 2
-  achievements.forEach((tag, i) => {
-    const x = startX + (i % 2) * (tagW + 16)
-    const y = H - 200 + Math.floor(i / 2) * (tagH + 8)
-    ctx.fillStyle = 'rgba(192,57,43,0.08)'
-    ctx.beginPath()
-    ctx.roundRect ? ctx.roundRect(x, y, tagW, tagH, 18)
-      : (ctx.rect(x, y, tagW, tagH))
-    ctx.fill()
-    ctx.strokeStyle = 'rgba(192,57,43,0.25)'
-    ctx.lineWidth = 1
-    ctx.stroke()
-    ctx.font = '500 20px "Noto Serif SC", serif'
-    ctx.fillStyle = T.red
-    ctx.textAlign = 'center'
-    ctx.fillText(`✅ ${tag}`, x + tagW / 2, y + tagH / 2 + 7)
-  })
+  // ── 底部分隔线 ──
+  const line2Grad = ctx.createLinearGradient(60, 0, W - 60, 0)
+  line2Grad.addColorStop(0, 'transparent')
+  line2Grad.addColorStop(0.3, 'rgba(200,160,96,0.3)')
+  line2Grad.addColorStop(0.7, 'rgba(200,160,96,0.3)')
+  line2Grad.addColorStop(1, 'transparent')
+  ctx.strokeStyle = line2Grad
+  ctx.lineWidth = 0.8
+  ctx.beginPath()
+  ctx.moveTo(60, H - 240); ctx.lineTo(W - 60, H - 240)
+  ctx.stroke()
 
-  // 底部信息
+  // ── 孩子信息：名字·城市·年龄 ──
+  const cityStr = city ? city.replace('华人陪读家庭', '').replace('华人家庭', '').trim() : ''
+  const infoLine = [childName, cityStr, childAge ? `${childAge}岁` : '']
+    .filter(Boolean).join(' · ')
+  ctx.font = '300 28px sans-serif'
+  ctx.fillStyle = 'rgba(200,160,96,0.6)'
+  ctx.textAlign = 'center'
+  ctx.fillText(infoLine, W / 2, H - 195)
+
+  // 日期
   const today = new Date().toLocaleDateString('zh-CN',
     { year: 'numeric', month: 'long', day: 'numeric' })
   ctx.font = '300 22px sans-serif'
-  ctx.fillStyle = 'rgba(122,92,72,0.5)'
+  ctx.fillStyle = 'rgba(200,160,96,0.3)'
+  ctx.fillText(today, W / 2, H - 160)
+
+  // ── 成就标签（极小，像诗的注脚）──
+  const tags = ['字源溯源', '六书解构', '笔顺临摹', '情境造句']
+  ctx.font = '400 18px sans-serif'
+  ctx.fillStyle = 'rgba(200,160,96,0.25)'
   ctx.textAlign = 'center'
-  ctx.fillText(`${childName || '孩子'} · ${today} · 根·中文`, W / 2, H - 55)
+  ctx.fillText(tags.map(t => `✦ ${t}`).join('  '), W / 2, H - 110)
+
+  // ── 品牌落款 ──
+  ctx.font = '300 22px "Noto Serif SC", serif'
+  ctx.fillStyle = 'rgba(200,160,96,0.35)'
+  ctx.fillText('根 · 中文', W / 2, H - 70)
+
+  // 底部细金线
+  ctx.strokeStyle = line2Grad
+  ctx.lineWidth = 0.8
+  ctx.beginPath()
+  ctx.moveTo(60, H - 50); ctx.lineTo(W - 60, H - 50)
+  ctx.stroke()
 
   return cardCanvas.toDataURL('image/png')
 }
@@ -1005,6 +1032,8 @@ function StepUse({ data, char, childName, canvasRef, onComplete }: {
         sentence,
         childName || '孩子',
         canvasRef,
+        data.scene || '',
+        '',
       )
       setCardUrl(url)
     } catch {
