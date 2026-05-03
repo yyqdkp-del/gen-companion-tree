@@ -29,6 +29,7 @@ export type TodoItem = {
   delegated_to?: string
   status: string
   ai_action_data?: any
+  _isTemp?: boolean
 }
 
 export type Reminder = {

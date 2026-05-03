@@ -22,6 +22,7 @@ import WaterDrop from '@/app/_shared/_components/WaterDrop'
 import type { Child, TodoItem, HotspotItem } from '@/app/_shared/_types'
 import { useChildData } from '@/app/_shared/_hooks/useChildData'
 import { useTodoActions } from '@/app/_shared/_hooks/useTodoActions'
+import { useTodoEngine } from '@/app/_shared/_hooks/useTodoEngine'
 import { addChild } from '@/app/_shared/_services/childService'
 
 const ChildAvatar = nextDynamic(() => import('@/app/components/ChildAvatar'), { ssr: false })
@@ -246,6 +247,7 @@ export default function BasePage() {
 
   const { enrichedKids, refresh: refreshKids } = useChildData(userId)
   const { markDone, snooze } = useTodoActions(todos, ctxSync)
+  const todoEngine = useTodoEngine(todos)
 
   useEffect(() => {
     if (enrichedKids.length) {
@@ -364,10 +366,9 @@ export default function BasePage() {
             badge={childUrgent} pulse={childUrgent > 0}
             onClick={() => setModal('child')} size={124} delay={0} />
           <div style={{ display: 'flex', gap: 'clamp(28px, 8vw, 52px)', alignItems: 'center' }}>
-            <WaterDrop state={tState} icon={<Bell size={20} />} label="待办"
-              value={todos.filter((t: TodoItem) => t.status !== 'done').length > 0
-                ? `${todos.filter((t: TodoItem) => t.status !== 'done').length}条` : '静默'}
-              badge={redCount} pulse={redCount > 0}
+            <WaterDrop state={todoEngine.state} icon={<Bell size={20} />} label="待办"
+              value={todoEngine.badge > 0 ? `${todoEngine.badge}条` : '静默'}
+              badge={todoEngine.badge} pulse={todoEngine.badge > 0}
               onClick={() => setModal('todo')} size={98} delay={1.8} />
             <WaterDrop state={hState}
               icon={patrolling ? <Loader size={20} /> : <Zap size={20} />}
@@ -390,7 +391,8 @@ export default function BasePage() {
         )}
         {modal === 'todo' && (
           <TodoSheet key="todo" todos={todos} onClose={() => setModal(null)}
-            onAction={(t: TodoItem) => { setOneTapTodo(t); setModal('oneTap') }} />
+            onAction={(t: TodoItem) => { setOneTapTodo(t); setModal('oneTap') }}
+            onDone={async (id: string) => { await markDone(id) }} />
         )}
         {modal === 'hotspot' && (
           <HotspotSheet key="hotspot" hotspots={hotspots}
