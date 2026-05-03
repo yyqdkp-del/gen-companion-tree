@@ -29,7 +29,7 @@ function gradeToApplyYear(grade: string, path: string): number {
 }
 
 // ── 路线图节点定义（全球通用，不写死城市）──
-function buildRoadmapTemplate(grade: string, path: string, currentYear: number) {
+function buildRoadmapTemplate(grade: string, path: string, currentYear: number): any[] {
   const gradeMap: Record<string, number> = {
     'K1': 1, 'K2': 2, 'K3': 3,
     'G1': 4, 'G2': 5, 'G3': 6, 'G4': 7, 'G5': 8,
@@ -213,7 +213,7 @@ function buildRoadmapTemplate(grade: string, path: string, currentYear: number) 
     // 多路并进：取美高+英校的关键节点
     return buildRoadmapTemplate(grade, 'us_boarding', currentYear)
       .concat(buildRoadmapTemplate(grade, 'uk_school', currentYear))
-      .filter((n, i, arr) => arr.findIndex(x => x.id === n.id) === i)
+      .filter((n: any, i: number, arr: any[]) => arr.findIndex((x: any) => x.id === n.id) === i)
   }
 
   return nodes
