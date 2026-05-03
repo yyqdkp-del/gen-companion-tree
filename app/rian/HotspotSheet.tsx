@@ -5,7 +5,9 @@ import { X, ExternalLink, RefreshCw, ChevronDown, AlertTriangle, Plus } from 'lu
 import { THEME, URGENCY_CFG } from '@/app/_shared/_constants/theme'
 import { FLOAT_SHEET_BOTTOM } from '@/app/_shared/_constants/layout'
 import { CAT_EMOJI } from '@/app/_shared/_constants/categories'
-import { useHotspotSheet, isConsumed } from '@/app/_shared/_hooks/useHotspotSheet'
+import { useHotspotEngine } from '@/app/_shared/_hooks/useHotspotEngine'
+import { isConsumed } from '@/app/_shared/_engine/hotspot'
+import { useHotspotSheet } from '@/app/_shared/_hooks/useHotspotSheet'
 import type { HotspotItem } from '@/app/_shared/_types'
 import ActionModal from '@/app/components/ActionModal'
 import HotspotPreferences from '@/app/_shared/_components/HotspotPreferences'
@@ -161,8 +163,8 @@ type Props = {
 export default function HotspotSheet({ hotspots, onClose, onPatrol, patrolling, onRead, userId, onSync }: Props) {
   const [selectedHotspot, setSelectedHotspot] = useState<HotspotItem | null>(null)
   const [showPrefs, setShowPrefs] = useState(false)
-  const { sorted, urgentCount, unreadCount, handleConvertTodo } =
-    useHotspotSheet(hotspots, userId, onRead, onSync)
+  const { sorted, urgentCount, unreadCount } = useHotspotEngine(hotspots)
+  const { handleConvertTodo } = useHotspotSheet(hotspots, userId, onRead, onSync)
 
   return (
     <>

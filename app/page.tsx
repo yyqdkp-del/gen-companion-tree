@@ -23,6 +23,7 @@ import type { Child, TodoItem, HotspotItem } from '@/app/_shared/_types'
 import { useChildData } from '@/app/_shared/_hooks/useChildData'
 import { useTodoActions } from '@/app/_shared/_hooks/useTodoActions'
 import { useTodoEngine } from '@/app/_shared/_hooks/useTodoEngine'
+import { useHotspotEngine } from '@/app/_shared/_hooks/useHotspotEngine'
 import { addChild } from '@/app/_shared/_services/childService'
 
 const ChildAvatar = nextDynamic(() => import('@/app/components/ChildAvatar'), { ssr: false })
@@ -252,6 +253,7 @@ export default function BasePage() {
   const { enrichedKids, refresh: refreshKids } = useChildData(userId)
   const { markDone, snooze } = useTodoActions(todos, ctxSync)
   const todoEngine = useTodoEngine(todos)
+  const hotspotEngine = useHotspotEngine(hotspots)
 
   useEffect(() => {
     if (enrichedKids.length) {
@@ -374,10 +376,10 @@ export default function BasePage() {
               value={todoEngine.badge > 0 ? `${todoEngine.badge}条` : '静默'}
               badge={todoEngine.badge} pulse={todoEngine.badge > 0}
               onClick={() => openModal('todo')} size={98} delay={1.8} />
-            <WaterDrop state={hState}
+            <WaterDrop state={hotspotEngine.state}
               icon={patrolling ? <Loader size={20} /> : <Zap size={20} />}
-              label="热点" value={unread > 0 ? `${unread}条` : '根'}
-              badge={unread} pulse={unread > 0}
+              label="热点" value={hotspotEngine.badge > 0 ? `${hotspotEngine.badge}条` : '根'}
+              badge={hotspotEngine.badge} pulse={hotspotEngine.badge > 0}
               onClick={() => openModal('hotspot')} size={98} delay={3.4} />
           </div>
         </div>
