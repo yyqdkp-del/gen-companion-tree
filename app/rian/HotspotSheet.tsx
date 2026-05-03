@@ -8,6 +8,7 @@ import { CAT_EMOJI } from '@/app/_shared/_constants/categories'
 import { useHotspotSheet, isConsumed } from '@/app/_shared/_hooks/useHotspotSheet'
 import type { HotspotItem } from '@/app/_shared/_types'
 import ActionModal from '@/app/components/ActionModal'
+import HotspotPreferences from '@/app/_shared/_components/HotspotPreferences'
 
 function timeAgo(dateStr: string): string {
   const diff = Math.max(0, Date.now() - new Date(dateStr).getTime())
@@ -159,6 +160,7 @@ type Props = {
 
 export default function HotspotSheet({ hotspots, onClose, onPatrol, patrolling, onRead, userId, onSync }: Props) {
   const [selectedHotspot, setSelectedHotspot] = useState<HotspotItem | null>(null)
+  const [showPrefs, setShowPrefs] = useState(false)
   const { sorted, urgentCount, unreadCount, handleConvertTodo } =
     useHotspotSheet(hotspots, userId, onRead, onSync)
 
@@ -191,6 +193,12 @@ export default function HotspotSheet({ hotspots, onClose, onPatrol, patrolling, 
             display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <span style={{ fontSize: 16, fontWeight: 600, color: THEME.text }}>热点</span>
+              <motion.div whileTap={{ scale: 0.88 }} onClick={() => setShowPrefs(true)}
+                style={{ fontSize: 10, padding: '2px 8px', borderRadius: 8,
+                  background: 'rgba(176,141,87,0.1)', color: THEME.gold,
+                  cursor: 'pointer', fontWeight: 500 }}>
+                设置关注
+              </motion.div>
               {unreadCount > 0 && (
                 <span style={{ fontSize: 10, padding: '2px 7px', borderRadius: 10,
                   background: urgentCount > 0 ? 'rgba(255,100,100,0.12)' : 'rgba(154,183,232,0.15)',
@@ -262,6 +270,16 @@ export default function HotspotSheet({ hotspots, onClose, onPatrol, patrolling, 
             onDone={() => { onRead(selectedHotspot.id); setSelectedHotspot(null) }}
             onSnooze={() => setSelectedHotspot(null)}
             onSync={onSync}
+          />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {showPrefs && (
+          <HotspotPreferences
+            userId={userId}
+            onClose={() => setShowPrefs(false)}
+            onSave={() => { onSync?.(); setShowPrefs(false) }}
           />
         )}
       </AnimatePresence>
