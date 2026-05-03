@@ -9,6 +9,9 @@ export function useChildSchedule(childId: string | undefined, today: string) {
 
   useEffect(() => {
     if (!childId) return
+    // 切换孩子时先清空，避免短暂显示上一个孩子的数据
+    setTimeline([])
+    setCalendar([])
     setLoading(true)
     fetchChildSchedule(childId, today)
       .then(({ timeline, calendar }) => {

@@ -16,6 +16,11 @@ export function useChildDailyLog(
 
   useEffect(() => {
     if (!childId) return
+    // 切换孩子时先重置，避免短暂显示上一个孩子的状态
+    setDailyLog({
+      health_status: defaultHealth ?? 'normal',
+      mood_status:   defaultMood   ?? 'calm',
+    })
     fetchDailyLog(childId, today).then(data => {
       setDailyLog(data ?? {
         health_status: defaultHealth ?? 'normal',
