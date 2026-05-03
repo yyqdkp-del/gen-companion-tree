@@ -9,7 +9,7 @@ import { useHotspotEngine } from '@/app/_shared/_hooks/useHotspotEngine'
 import { isConsumed } from '@/app/_shared/_engine/hotspot'
 import { useHotspotSheet } from '@/app/_shared/_hooks/useHotspotSheet'
 import { useApp } from '@/app/context/AppContext'
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import type { HotspotItem } from '@/app/_shared/_types'
 import ActionModal from '@/app/components/ActionModal'
 import HotspotPreferences from '@/app/_shared/_components/HotspotPreferences'
@@ -166,13 +166,18 @@ export default function HotspotSheet({ hotspots, onClose, onPatrol, patrolling, 
   const [selectedHotspot, setSelectedHotspot] = useState<HotspotItem | null>(null)
   const [showPrefs, setShowPrefs] = useState(false)
   const { sorted, urgentCount, unreadCount } = useHotspotEngine(hotspots)
-  const { speak } = useApp()
+  const { speak, stop } = useApp()
+  const spokenRef = useRef<string | null>(null)
 
-  // 有紧急内容时自动朗读
+  // 有紧急内容时自动朗读一次
   useEffect(() => {
     if (urgentCount > 0) {
       const urgent = sorted.find(h => h.urgency === 'urgent')
-      if (urgent) speak(`紧急提醒：${urgent.title}`)
+      if (urgent && spokenRef.current !== urgent.id) {
+        spokenRef.current = urgent.id
+        stop()
+        speak(`紧急提醒：${urgent.title}`)
+      }
     }
   }, [urgentCount])
   const { handleConvertTodo } = useHotspotSheet(hotspots, userId, onRead, onSync)
