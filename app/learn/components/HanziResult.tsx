@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { CHINESE_THEME as T, CHINESE_LEVELS } from '@/app/_shared/_constants/chineseTheme'
 import { useApp } from '@/app/context/AppContext'
 import ChineseAccordion from './ChineseAccordion'
+import LearnSession from './LearnSession'
 import { WordPopup, FamilyPopup, type PopupItem } from './WordPopup'
 
 type Props = {
@@ -171,15 +172,35 @@ function FamilyWords({ family, extension, chengyu, cy_story, cultural_sentence,
   )
 }
 
-export default function HanziResult({ data, char, onMomCopy, childLevel }: Props) {
+export default function HanziResult({ data, char, onMomCopy, childLevel, childName, onSentenceSaved }: Props & { childName?: string; onSentenceSaved?: (s: string) => void }) {
   const { speak } = useApp()
+  const [learning, setLearning] = useState(false)
   const lv = data?.level || 'R2'
   const lvCfg = CHINESE_LEVELS[lv] || CHINESE_LEVELS.R2
   const exts = Array.isArray(data?.extension) ? data.extension : []
 
   return (
+    <>
+    {learning && (
+      <LearnSession
+        data={data} char={char} childName={childName}
+        onComplete={(s) => { setLearning(false); onSentenceSaved?.(s) }}
+        onClose={() => setLearning(false)}
+      />
+    )}
     <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4 }}>
+
+      {/* 开始学习按钮 */}
+      <motion.button whileTap={{ scale: 0.97 }} onClick={() => setLearning(true)}
+        style={{ width: '100%', padding: '16px', borderRadius: 16, border: 'none',
+          background: T.red, color: '#fff', fontSize: 16, fontWeight: 700,
+          cursor: 'pointer', fontFamily: "'Noto Serif SC', serif",
+          boxShadow: '0 4px 16px rgba(192,57,43,0.25)', marginBottom: 12,
+          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+        <span style={{ fontSize: 20 }}>🌟</span>
+        和孩子一起学「{char}」· 5分钟
+      </motion.button>
 
       <div style={{ background: T.white, borderRadius: 16, padding: '14px 16px',
         marginBottom: 8, border: '1px solid rgba(200,160,96,0.15)',
@@ -355,5 +376,6 @@ export default function HanziResult({ data, char, onMomCopy, childLevel }: Props
         cultural_author={data.cultural_author} cultural_meaning={data.cultural_meaning}
         overseas_connection={data.overseas_connection} childLevel={childLevel} />
     </motion.div>
+    </>
   )
 }
