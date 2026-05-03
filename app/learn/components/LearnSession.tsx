@@ -191,6 +191,16 @@ function StepOrigin({ data, char, onNext }: {
   )
 }
 
+// ── 六书颜色 ──
+const LIUSHU_CFG: Record<string, { color: string; bg: string; desc: string }> = {
+  '象形': { color: '#C03A2B', bg: 'rgba(192,57,43,0.08)', desc: '照着东西的样子画出来' },
+  '指事': { color: '#BA6A00', bg: 'rgba(186,106,0,0.08)', desc: '用符号指示抽象概念' },
+  '会意': { color: '#2D6A4F', bg: 'rgba(45,106,79,0.08)', desc: '两个或多个部件合起来表意' },
+  '形声': { color: '#1A3C5E', bg: 'rgba(26,60,94,0.08)', desc: '一部分表意，一部分表音' },
+  '转注': { color: '#7A5C48', bg: 'rgba(122,92,72,0.08)', desc: '意义相通的字互相解释' },
+  '假借': { color: '#5C6E00', bg: 'rgba(92,110,0,0.08)', desc: '借用同音字表达新意思' },
+}
+
 // ── 第二步：字的身体（含妈妈台词）──
 function StepStructure({ data, char, onNext }: {
   data: any; char: string; onNext: () => void
@@ -214,6 +224,33 @@ function StepStructure({ data, char, onNext }: {
           color: T.text, lineHeight: 1 }}>{char}</div>
         <VoiceControl text={voiceText} />
       </div>
+
+      {/* 六书分类 */}
+      {data.liushu && (
+        <div style={{ marginBottom: 14 }}>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8,
+            padding: '6px 14px', borderRadius: 20,
+            background: LIUSHU_CFG[data.liushu.type]?.bg || 'rgba(200,160,96,0.08)',
+            border: `1px solid ${LIUSHU_CFG[data.liushu.type]?.color || T.gold}44`,
+            marginBottom: 8 }}>
+            <span style={{ fontSize: 15, fontWeight: 700,
+              color: LIUSHU_CFG[data.liushu.type]?.color || T.gold,
+              fontFamily: "'Noto Serif SC', serif" }}>
+              {data.liushu.type}
+            </span>
+            <span style={{ fontSize: 11, color: T.textDim, fontFamily: 'sans-serif' }}>
+              {LIUSHU_CFG[data.liushu.type]?.desc || ''}
+            </span>
+          </div>
+          <div style={{ padding: '12px 14px', borderRadius: 12,
+            background: LIUSHU_CFG[data.liushu.type]?.bg || 'rgba(200,160,96,0.06)',
+            borderLeft: `3px solid ${LIUSHU_CFG[data.liushu.type]?.color || T.gold}`,
+            fontSize: 13, color: T.text, lineHeight: 1.9,
+            fontFamily: 'sans-serif' }}>
+            {data.liushu.explanation}
+          </div>
+        </div>
+      )}
 
       <div style={{ fontSize: 12, color: T.textDim, fontFamily: 'sans-serif',
         marginBottom: 12 }}>点击部件，了解它的含义</div>
@@ -646,7 +683,13 @@ function generateCard(
     // 手写背景
     ctx.fillStyle = 'rgba(253,251,247,0.8)'
     ctx.beginPath()
-    ctx.roundRect(wx - 8, wy - 8, wSize + 16, wSize + 16, 16)
+    const r = 16, x0 = wx - 8, y0 = wy - 8, w0 = wSize + 16, h0 = wSize + 16
+    ctx.moveTo(x0 + r, y0)
+    ctx.lineTo(x0 + w0 - r, y0); ctx.arcTo(x0 + w0, y0, x0 + w0, y0 + r, r)
+    ctx.lineTo(x0 + w0, y0 + h0 - r); ctx.arcTo(x0 + w0, y0 + h0, x0 + w0 - r, y0 + h0, r)
+    ctx.lineTo(x0 + r, y0 + h0); ctx.arcTo(x0, y0 + h0, x0, y0 + h0 - r, r)
+    ctx.lineTo(x0, y0 + r); ctx.arcTo(x0, y0, x0 + r, y0, r)
+    ctx.closePath()
     ctx.fill()
     ctx.strokeStyle = 'rgba(200,160,96,0.3)'
     ctx.lineWidth = 1
@@ -752,28 +795,20 @@ function StepUse({ data, char, childName, canvasRef, onComplete }: {
     }
     setLoading(true)
     try {
-      // AI 评价
-      const res = await fetch('https://api.anthropic.com/v1/messages', {
+      // AI 评价 - 走后端
+      const res = await fetch('/api/rian/chat', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'anthropic-version': '2023-06-01',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          model: 'claude-sonnet-4-20250514',
-          max_tokens: 300,
-          system: '你是温暖的中文老师，给海外华人孩子的造句给出鼓励性评价。只输出JSON：{"comment": "温暖评价（2句话，先鼓励，再指出亮点）", "used_correctly": true/false}',
-          messages: [{
-            role: 'user',
-            content: `孩子名字：${childName || '小朋友'}，学的字：「${char}」，造的句子：「${sentence}」，请给出评价。`,
-          }],
+          question: `请评价这个造句：孩子名字「${childName || '小朋友'}」，学的字「${char}」，造的句子「${sentence}」。用2句话：先鼓励，再指出亮点。温暖口语化，像邻居大姐说话。只输出评价文字，不要其他格式。`,
+          context: `中文学习造句评价`,
+          history: [],
         }),
       })
       const aiData = await res.json()
-      const raw = aiData.content?.[0]?.text || '{}'
-      const parsed = JSON.parse(raw.match(/\{[\s\S]*\}/)?.[0] || '{}')
-      setAiComment(parsed.comment || '你的造句很棒！继续加油！')
-      speak(parsed.comment || '你的造句很棒！')
+      const comment = aiData.reply || '你的造句很棒！继续加油！'
+      setAiComment(comment)
+      speak(comment)
 
       // 生成卡片
       const url = generateCard(
