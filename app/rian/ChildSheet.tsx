@@ -468,23 +468,10 @@ export default function ChildSheet({ children, sel, onSel, onClose, onAdd, userI
                         <div style={{ opacity: 0.32, fontSize: 13, color: THEME.text, marginBottom: 12 }}>
                           还没有日程安排 🌸
                         </div>
-                        <motion.button whileTap={{ scale: 0.95 }}
-                          onClick={() => window.location.href = '/rian'}
-                          style={{ padding: '8px 20px', borderRadius: 20,
-                            border: `1px solid ${THEME.gold}`, background: 'rgba(176,141,87,0.08)',
-                            color: THEME.gold, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
-                          + 告诉根孩子的日程安排
-                        </motion.button>
+
                       </div>
                     )}
-                    <motion.button whileTap={{ scale: 0.97 }}
-                      onClick={() => window.location.href = '/rian'}
-                      style={{ width: '100%', marginTop: 10, padding: '11px', borderRadius: 14,
-                        border: '1px solid rgba(176,141,87,0.25)', background: 'rgba(176,141,87,0.06)',
-                        fontSize: 13, color: THEME.gold, fontWeight: 500, cursor: 'pointer',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-                      + 添加日程 / 备注 <ChevronRight size={14} />
-                    </motion.button>
+
                   </>
                 )}
               </>
