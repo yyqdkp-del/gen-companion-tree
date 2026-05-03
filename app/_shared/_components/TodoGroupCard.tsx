@@ -5,6 +5,7 @@ import { Clock, FileText, ShoppingCart, Plane, Pill, Building2, BookOpen } from 
 import Accordion from './Accordion'
 import { THEME, PRIORITY_CFG } from '../_constants/theme'
 import type { TodoItem } from '../_types'
+import { useApp } from '@/app/context/AppContext'
 
 const catIcon: Record<string, React.ReactNode> = {
   compliance: <FileText size={13} />, medical: <Pill size={13} />,
@@ -82,15 +83,23 @@ function TodoRow({ todo, onAction, onDone }: {
 }
 
 export default function TodoGroupCard({ today, soon, later, advice, onAction, onDone }: Props) {
+  const { speak } = useApp()
   return (
     <div>
       {/* 给妈妈的建议 */}
       {advice && (
-        <div style={{ padding: '8px 12px', borderRadius: 10, marginBottom: 12,
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6,
+          padding: '8px 12px', borderRadius: 10, marginBottom: 12,
           background: 'rgba(176,141,87,0.07)',
-          border: '0.5px solid rgba(176,141,87,0.2)',
-          fontSize: 12, color: THEME.gold, fontWeight: 500, lineHeight: 1.5 }}>
-          {advice}
+          border: '0.5px solid rgba(176,141,87,0.2)' }}>
+          <div style={{ flex: 1, fontSize: 12, color: THEME.gold,
+            fontWeight: 500, lineHeight: 1.5 }}>
+            {advice}
+          </div>
+          <button onClick={() => speak(advice)}
+            style={{ background: 'none', border: 'none', cursor: 'pointer',
+              fontSize: 14, opacity: 0.5, padding: '2px', flexShrink: 0 }}
+            title="朗读">🔊</button>
         </div>
       )}
 

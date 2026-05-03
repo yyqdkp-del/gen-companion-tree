@@ -3,6 +3,7 @@ import React from 'react'
 import { motion } from 'framer-motion'
 import { THEME } from '../_constants/theme'
 import type { EnergyResult } from '../_engine/energy'
+import { useApp } from '@/app/context/AppContext'
 
 const LEVEL_COLOR = {
   green:  { border: 'rgba(74,222,128,0.35)',  bg: 'rgba(74,222,128,0.06)',  text: '#16a34a' },
@@ -25,6 +26,7 @@ type Props = {
 }
 
 export default function ChildEnergyCard({ name, energy, onClick }: Props) {
+  const { speak } = useApp()
   const c = LEVEL_COLOR[energy.level]
   const isAlert = energy.level === 'orange' || energy.level === 'red'
 
@@ -59,9 +61,15 @@ export default function ChildEnergyCard({ name, energy, onClick }: Props) {
         )}
       </div>
 
-      {/* 第二行：建议 */}
-      <div style={{ fontSize: 12, color: THEME.gold, lineHeight: 1.5, fontWeight: 500 }}>
-        {energy.advice}
+      {/* 第二行：建议 + 朗读 */}
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6 }}>
+        <div style={{ flex: 1, fontSize: 12, color: THEME.gold, lineHeight: 1.5, fontWeight: 500 }}>
+          {energy.advice}
+        </div>
+        <button onClick={e => { e.stopPropagation(); speak(energy.advice) }}
+          style={{ background: 'none', border: 'none', cursor: 'pointer',
+            fontSize: 14, opacity: 0.5, padding: '2px', flexShrink: 0 }}
+          title="朗读">🔊</button>
       </div>
 
       {/* 第三行：取消活动原因（仅橙/红显示）*/}

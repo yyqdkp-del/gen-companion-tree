@@ -13,7 +13,7 @@ const SHOW_PATHS = ['/', '/rian', '/growth', '/treehouse']
 
 export default function BottomInput() {
   const pathname  = usePathname()
-  const { userId, sync: ctxSync, addTempTodo, removeTempTodo } = useApp()
+  const { userId, sync: ctxSync, addTempTodo, removeTempTodo, speak } = useApp()
 
   const [inputMode, setInputMode] = useState<'none' | 'audio_text' | 'vision_file'>('none')
   const [inputText, setInputText]  = useState('')
@@ -46,14 +46,7 @@ export default function BottomInput() {
     setInputText('')
     setInputMode('none')
 
-    if (typeof window !== 'undefined' && window.speechSynthesis) {
-      const stored = localStorage.getItem('speech_enabled')
-      if (stored !== 'false') {
-        const u2 = new SpeechSynthesisUtterance('已收到，根正在处理')
-        u2.lang = 'zh-CN'; u2.rate = 0.95
-        window.speechSynthesis.speak(u2)
-      }
-    }
+    speak('已收到，根正在处理')
 
     try {
       const res = await fetch('/api/rian/process', {

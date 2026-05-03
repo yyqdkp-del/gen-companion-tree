@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/client'
 const supabase = createClient()
 import { createContext, useContext, useState, useEffect, useRef, useCallback, ReactNode } from 'react'
 import { fetchAppData } from '@/app/_shared/_services/syncService'
+import { useSpeech } from '@/app/_shared/_hooks/useSpeech'
 import { useRouter } from 'next/navigation'
 
 
@@ -23,6 +24,10 @@ type AppContextType = {
   setActiveKid: (kid: any) => void
   modalOpen: boolean
   setModalOpen: (open: boolean) => void
+  speak: (text: string) => void
+  stop: () => void
+  speechEnabled: boolean
+  toggleSpeech: () => void
 }
 const AppContext = createContext<AppContextType | null>(null)
 
@@ -43,6 +48,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
 const [activeKid, setActiveKidState] = useState<any | null>(null)
 const [modalOpen, setModalOpen] = useState(false)
+const { speak, stop, enabled: speechEnabled, toggle: toggleSpeech } = useSpeech()
 const setActiveKid = useCallback((kid: any) => {
   setActiveKidState(kid)
   if (kid && typeof window !== 'undefined') {
@@ -225,7 +231,7 @@ if ('Notification' in window && 'serviceWorker' in navigator) {
   return () => { supabase.removeChannel(channel) }
 }, [userId])
   return (
-   <AppContext.Provider value={{ userId, userIdRef, kids, todos, hotspots, loading, sync, setUserIdSafe, addTempTodo, removeTempTodo, processStatus, setProcessStatus, activeKid, setActiveKid, modalOpen, setModalOpen }}>
+   <AppContext.Provider value={{ userId, userIdRef, kids, todos, hotspots, loading, sync, setUserIdSafe, addTempTodo, removeTempTodo, processStatus, setProcessStatus, activeKid, setActiveKid, modalOpen, setModalOpen, speak, stop, speechEnabled, toggleSpeech }}>
       {children}
     </AppContext.Provider>
   )

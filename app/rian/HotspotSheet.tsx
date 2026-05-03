@@ -8,6 +8,8 @@ import { CAT_EMOJI } from '@/app/_shared/_constants/categories'
 import { useHotspotEngine } from '@/app/_shared/_hooks/useHotspotEngine'
 import { isConsumed } from '@/app/_shared/_engine/hotspot'
 import { useHotspotSheet } from '@/app/_shared/_hooks/useHotspotSheet'
+import { useApp } from '@/app/context/AppContext'
+import { useEffect } from 'react'
 import type { HotspotItem } from '@/app/_shared/_types'
 import ActionModal from '@/app/components/ActionModal'
 import HotspotPreferences from '@/app/_shared/_components/HotspotPreferences'
@@ -164,6 +166,15 @@ export default function HotspotSheet({ hotspots, onClose, onPatrol, patrolling, 
   const [selectedHotspot, setSelectedHotspot] = useState<HotspotItem | null>(null)
   const [showPrefs, setShowPrefs] = useState(false)
   const { sorted, urgentCount, unreadCount } = useHotspotEngine(hotspots)
+  const { speak } = useApp()
+
+  // 有紧急内容时自动朗读
+  useEffect(() => {
+    if (urgentCount > 0) {
+      const urgent = sorted.find(h => h.urgency === 'urgent')
+      if (urgent) speak(`紧急提醒：${urgent.title}`)
+    }
+  }, [urgentCount])
   const { handleConvertTodo } = useHotspotSheet(hotspots, userId, onRead, onSync)
 
   return (
