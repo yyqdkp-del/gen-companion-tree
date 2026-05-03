@@ -5,8 +5,12 @@
 // ─────────────────────────────────────────
 
 export type EnergyInput = {
-  sleepStart?: string        // "22:30" 昨晚入睡时间
-  sleepEnd?: string          // "07:00" 今早起床时间
+  sleepStart?: string        // "22:30" 昨晚入睡时间（手动录入）
+  sleepEnd?: string          // "07:00" 今早起床时间（手动录入）
+  usualBedtime?: string      // "21:30" 孩子资料里的平时入睡时间
+  schoolStartTime?: string   // "08:00" 上课时间（用于推算起床时间）
+  isWeekend?: boolean        // 是否周末
+  weekendBedtime?: string    // "22:30" 周末入睡时间
   healthStatus?: string      // 'normal' | 'recovering' | 'sick'
   moodStatus?: string        // 'happy' | 'calm' | 'anxious' | 'upset'
   todayEvents?: {
@@ -30,19 +34,46 @@ export type EnergyResult = {
 }
 
 // ── 睡眠时长计算 ──────────────────────────
+function timeToMinutes(t: string): number {
+  const [h, m] = t.split(':').map(Number)
+  return h * 60 + (m || 0)
+}
+
 function calcSleepHours(start?: string, end?: string): number {
   if (!start || !end) return 9  // 无数据默认正常
-
-  const [sh, sm] = start.split(':').map(Number)
-  const [eh, em] = end.split(':').map(Number)
-
-  let startMin = sh * 60 + sm
-  let endMin   = eh * 60 + em
-
-  // 跨午夜处理
+  let startMin = timeToMinutes(start)
+  let endMin   = timeToMinutes(end)
   if (endMin < startMin) endMin += 24 * 60
-
   return (endMin - startMin) / 60
+}
+
+// 从孩子资料推算睡眠时长
+function inferSleepHours(input: EnergyInput): number {
+  // 优先用手动录入的数据
+  if (input.sleepStart && input.sleepEnd) {
+    return calcSleepHours(input.sleepStart, input.sleepEnd)
+  }
+
+  // 用孩子资料推算
+  const isWeekend = input.isWeekend ?? [0, 6].includes(new Date().getDay())
+  const bedtime = isWeekend
+    ? (input.weekendBedtime || input.usualBedtime || '22:00')
+    : (input.usualBedtime || '21:30')
+
+  if (!input.schoolStartTime) {
+    // 没有上课时间，用入睡时间+9小时估算
+    return 9
+  }
+
+  // 推算起床时间：上课时间 - 45分钟（准备时间）
+  const schoolStartMin  = timeToMinutes(input.schoolStartTime)
+  const wakeUpMin       = schoolStartMin - 45
+  const bedtimeMin      = timeToMinutes(bedtime)
+
+  let sleepMin = wakeUpMin - bedtimeMin
+  if (sleepMin < 0) sleepMin += 24 * 60
+
+  return sleepMin / 60
 }
 
 // ── 睡眠得分（权重50）─────────────────────
@@ -124,7 +155,7 @@ function shouldSkip(
 
 // ── 主函数 ────────────────────────────────
 export function calculateEnergy(input: EnergyInput): EnergyResult {
-  const sleepHours = calcSleepHours(input.sleepStart, input.sleepEnd)
+  const sleepHours = inferSleepHours(input)
   const events     = input.todayEvents || []
 
   const sl = sleepScore(sleepHours)

@@ -15,6 +15,10 @@ export type Child = {
   mood_status?: MoodStatus
   school_name?: string
   grade?: string
+  school_start_time?: string
+  school_end_time?: string
+  usual_bedtime?: string
+  weekend_bedtime?: string
   urgent_items?: { title: string; level: 'red' | 'orange' | 'yellow' }[]
 }
 

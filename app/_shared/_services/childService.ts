@@ -158,10 +158,15 @@ export async function enrichChildren(
       })
 
       // energy 计算 — 使用精力引擎
+      const isWeekend = [0, 6].includes(new Date().getDay())
       const energyResult = calculateEnergy({
-        healthStatus: log?.health_status,
-        moodStatus:   log?.mood_status,
-        todayEvents:  todayEvts,
+        healthStatus:    log?.health_status,
+        moodStatus:      log?.mood_status,
+        todayEvents:     todayEvts,
+        usualBedtime:    c.usual_bedtime,
+        weekendBedtime:  c.weekend_bedtime,
+        schoolStartTime: c.school_start_time,
+        isWeekend,
       })
       const energy = energyResult.score
 

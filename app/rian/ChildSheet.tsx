@@ -297,14 +297,19 @@ export default function ChildSheet({ children, sel, onSel, onClose, onAdd, userI
   const [showStatusEditor, setShowStatusEditor] = useState(false)
   const [selectedEvent,    setSelectedEvent]    = useState<ChildEvent | null>(null)
 
+  const isWeekend = [0, 6].includes(new Date().getDay())
   const energyResult = calculateEnergy({
-    healthStatus: dailyLog.health_status,
-    moodStatus:   dailyLog.mood_status,
+    healthStatus:    dailyLog.health_status,
+    moodStatus:      dailyLog.mood_status,
+    usualBedtime:    sel?.usual_bedtime,
+    weekendBedtime:  sel?.weekend_bedtime,
+    schoolStartTime: sel?.school_start_time,
+    isWeekend,
     todayEvents:  timeline.map(t => ({
-      event_type:      t.type,
-      requires_action: t.event?.requires_action,
+      event_type:       t.type,
+      requires_action:  t.event?.requires_action,
       requires_payment: t.event?.requires_payment,
-      title:           t.title,
+      title:            t.title,
     })),
   })
   const computedEnergy = energyResult.score
