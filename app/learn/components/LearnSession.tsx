@@ -251,31 +251,73 @@ function StepStructure({ data, char, onNext }: {
       </div>
 
       {/* 六书分类 */}
-      {data.liushu && (
-        <div style={{ marginBottom: 14 }}>
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8,
-            padding: '6px 14px', borderRadius: 20,
-            background: LIUSHU_CFG[data.liushu.type]?.bg || 'rgba(200,160,96,0.08)',
-            border: `1px solid ${LIUSHU_CFG[data.liushu.type]?.color || T.gold}44`,
-            marginBottom: 8 }}>
-            <span style={{ fontSize: 15, fontWeight: 700,
-              color: LIUSHU_CFG[data.liushu.type]?.color || T.gold,
-              fontFamily: "'Noto Serif SC', serif" }}>
-              {data.liushu.type}
-            </span>
-            <span style={{ fontSize: 11, color: T.textDim, fontFamily: 'sans-serif' }}>
-              {LIUSHU_CFG[data.liushu.type]?.desc || ''}
-            </span>
+      {data.liushu && (() => {
+        const cfg = LIUSHU_CFG[data.liushu.type] || { color: T.gold, bg: 'rgba(200,160,96,0.08)', desc: '' }
+        const [showMomExplain, setShowMomExplain] = React.useState(false)
+        return (
+          <div style={{ marginBottom: 14 }}>
+            {/* 类型标签 */}
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8,
+              padding: '6px 14px', borderRadius: 20,
+              background: cfg.bg,
+              border: `1px solid ${cfg.color}44`,
+              marginBottom: 10 }}>
+              <span style={{ fontSize: 15, fontWeight: 700,
+                color: cfg.color, fontFamily: "'Noto Serif SC', serif" }}>
+                {data.liushu.type}
+              </span>
+              <span style={{ fontSize: 11, color: T.textDim, fontFamily: 'sans-serif' }}>
+                {cfg.desc}
+              </span>
+            </div>
+
+            {/* 孩子版（默认展示）*/}
+            <div style={{ padding: '14px', borderRadius: 12,
+              background: cfg.bg,
+              borderLeft: `3px solid ${cfg.color}`,
+              fontSize: 14, color: T.text, lineHeight: 2,
+              fontFamily: 'sans-serif', marginBottom: 8 }}>
+              {data.liushu.child_explain || data.liushu.explanation}
+            </div>
+
+            {/* 妈妈版（折叠）*/}
+            <motion.div whileTap={{ scale: 0.98 }}
+              onClick={() => setShowMomExplain((o: boolean) => !o)}
+              style={{ padding: '10px 14px', borderRadius: 12,
+                background: showMomExplain ? 'rgba(26,60,94,0.06)' : 'transparent',
+                border: '1px solid rgba(26,60,94,0.15)',
+                cursor: 'pointer', marginBottom: 6,
+                display: 'flex', justifyContent: 'space-between',
+                alignItems: 'center' }}>
+              <span style={{ fontSize: 12, color: T.navy,
+                fontFamily: 'sans-serif', fontWeight: 600 }}>
+                📚 妈妈版学术解释
+              </span>
+              <motion.span animate={{ rotate: showMomExplain ? 180 : 0 }}
+                style={{ fontSize: 12, color: T.navy, display: 'inline-block' }}>
+                ⌄
+              </motion.span>
+            </motion.div>
+
+            <AnimatePresence>
+              {showMomExplain && data.liushu.mom_explain && (
+                <motion.div initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  exit={{ opacity: 0, height: 0 }}
+                  style={{ overflow: 'hidden', marginBottom: 8 }}>
+                  <div style={{ padding: '14px', borderRadius: 12,
+                    background: 'rgba(26,60,94,0.05)',
+                    borderLeft: '3px solid rgba(26,60,94,0.3)',
+                    fontSize: 13, color: T.navy, lineHeight: 1.9,
+                    fontFamily: 'sans-serif' }}>
+                    {data.liushu.mom_explain}
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
-          <div style={{ padding: '12px 14px', borderRadius: 12,
-            background: LIUSHU_CFG[data.liushu.type]?.bg || 'rgba(200,160,96,0.06)',
-            borderLeft: `3px solid ${LIUSHU_CFG[data.liushu.type]?.color || T.gold}`,
-            fontSize: 13, color: T.text, lineHeight: 1.9,
-            fontFamily: 'sans-serif' }}>
-            {data.liushu.explanation}
-          </div>
-        </div>
-      )}
+        )
+      })()}
 
       <div style={{ fontSize: 12, color: T.textDim, fontFamily: 'sans-serif',
         marginBottom: 12 }}>点击部件，了解它的含义</div>
