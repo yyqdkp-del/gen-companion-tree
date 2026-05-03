@@ -164,10 +164,18 @@ if ('Notification' in window && 'serviceWorker' in navigator) {
   }, [])
   useEffect(() => {
   if (!userId) return
-  const interval = setInterval(() => {
-    sync(userId)
-  }, 30000)
-  return () => clearInterval(interval)
+  const interval = setInterval(() => sync(userId), 30000)
+
+  // 页面重新激活时立刻 sync
+  const handleVisibility = () => {
+    if (document.visibilityState === 'visible') sync(userId)
+  }
+  document.addEventListener('visibilitychange', handleVisibility)
+
+  return () => {
+    clearInterval(interval)
+    document.removeEventListener('visibilitychange', handleVisibility)
+  }
 }, [userId])
   useEffect(() => {
   if (!userId) return
