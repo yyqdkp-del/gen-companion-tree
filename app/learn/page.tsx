@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { createClient } from '@/lib/supabase/client'
 import type { UserLocation } from '@/lib/geofence/types'
 import { CHINESE_THEME as THEME, CHINESE_LEVELS as LEVELS, LOAD_MSGS, QUICK_CHENGYU, QUICK_WRITING } from '@/app/_shared/_constants/chineseTheme'
+import { useApp } from '@/app/context/AppContext'
 import { fetchLearnedItems, saveSession } from '@/app/_shared/_services/chineseService'
 import HanziResult from './components/HanziResult'
 import ChengYuResult from './components/ChengYuResult'
@@ -30,6 +31,7 @@ type PopupItem = { word: string; type: 'word' | 'chengyu' | 'cultural'; extra?: 
 // ══ 主页面 ══
 export default function DecodePage() {
   const router = useRouter()
+  const { activeKid } = useApp()
   const [activeTab, setActiveTab] = useState<TabType>('hanzi')
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
@@ -301,7 +303,7 @@ export default function DecodePage() {
         <AnimatePresence>
           {data && !loading && (
             <>
-              {activeTab === 'hanzi' && <HanziResult data={data} char={input} onMomCopy={handleMomCopy} childLevel={childInfo.level} />}
+              {activeTab === 'hanzi' && <HanziResult data={data} char={input} onMomCopy={handleMomCopy} childLevel={childInfo.level} childName={activeKid?.name || childInfo.name} onSentenceSaved={(s) => console.log('sentence saved:', s)} />}
               {activeTab === 'chengyu' && <ChengYuResult data={data} onMomCopy={handleMomCopy} />}
               {activeTab === 'writing' && <WritingResult data={data} onMomCopy={handleMomCopy} />}
 

@@ -384,6 +384,7 @@ function StepWrite({ data, char, canvasRef, onNext }: {
   const [isDrawing, setIsDrawing] = useState(false)
   const [hasDrawn, setHasDrawn] = useState(false)
   const [showGuide, setShowGuide] = useState(true)
+  const [activeStroke, setActiveStroke] = useState(0)
   const lastPos = useRef<{ x: number; y: number } | null>(null)
 
   const voiceText = data.writing_guide
@@ -510,39 +511,68 @@ function StepWrite({ data, char, canvasRef, onNext }: {
   return (
     <div style={{ padding: '0 24px' }}>
 
-      {/* 顶部：书写引导 + 语音 */}
+      {/* 顶部：笔顺引导 + 语音（孩子抬头看） */}
       <div style={{ display: 'flex', alignItems: 'flex-start',
-        justifyContent: 'space-between', marginBottom: 12, gap: 10 }}>
+        justifyContent: 'space-between', marginBottom: 10, gap: 10 }}>
         <div style={{ flex: 1 }}>
-          {data.writing_guide && (
-            <div style={{ fontSize: 13, color: T.textMid, lineHeight: 1.8,
-              fontFamily: 'sans-serif' }}>
-              ✍️ {data.writing_guide}
+          {/* 当前笔画高亮引导 */}
+          <div style={{ padding: '10px 14px', borderRadius: 12,
+            background: 'rgba(192,57,43,0.06)',
+            border: '1px solid rgba(192,57,43,0.15)',
+            marginBottom: 8 }}>
+            <div style={{ display: 'flex', alignItems: 'center',
+              gap: 8, marginBottom: 4 }}>
+              <span style={{ fontSize: 11, color: T.red,
+                fontFamily: 'sans-serif', fontWeight: 700 }}>
+                笔顺引导
+              </span>
               {data.stroke_count && (
-                <span style={{ color: T.gold, fontWeight: 600,
-                  marginLeft: 6 }}>共{data.stroke_count}画</span>
+                <span style={{ fontSize: 11, color: T.textDim,
+                  fontFamily: 'sans-serif' }}>
+                  共 {data.stroke_count} 画
+                </span>
               )}
+            </div>
+            {(data.stroke_order || []).length > 0 ? (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+                {data.stroke_order.map((s: string, i: number) => (
+                  <span key={i} style={{ padding: '3px 10px', borderRadius: 20,
+                    background: i === activeStroke
+                      ? T.red : 'rgba(200,160,96,0.08)',
+                    border: `1px solid ${i === activeStroke
+                      ? T.red : 'rgba(200,160,96,0.2)'}`,
+                    fontSize: 11, color: i === activeStroke
+                      ? '#fff' : T.textMid,
+                    fontFamily: 'sans-serif',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                    fontWeight: i === activeStroke ? 700 : 400 }}
+                    onClick={() => setActiveStroke(i)}>
+                    {i + 1}. {s}
+                  </span>
+                ))}
+              </div>
+            ) : (
+              <div style={{ fontSize: 13, color: T.textMid,
+                fontFamily: 'sans-serif', lineHeight: 1.7 }}>
+                {data.writing_guide || `跟着描红，一笔一画写清楚`}
+              </div>
+            )}
+          </div>
+
+          {/* 书写提示 */}
+          {data.writing_guide && (data.stroke_order || []).length > 0 && (
+            <div style={{ fontSize: 12, color: T.textDim,
+              fontFamily: 'sans-serif', lineHeight: 1.6,
+              marginBottom: 4 }}>
+              ✍️ {data.writing_guide}
             </div>
           )}
         </div>
         <VoiceControl text={voiceText} />
       </div>
 
-      {/* 笔顺 */}
-      {(data.stroke_order || []).length > 0 && (
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 12 }}>
-          {data.stroke_order.map((s: string, i: number) => (
-            <span key={i} style={{ padding: '3px 10px', borderRadius: 20,
-              background: 'rgba(200,160,96,0.08)',
-              border: '1px solid rgba(200,160,96,0.2)',
-              fontSize: 11, color: T.textMid, fontFamily: 'sans-serif' }}>
-              {i + 1}. {s}
-            </span>
-          ))}
-        </div>
-      )}
-
-      {/* Canvas 田字格 */}
+      {/* Canvas 田字格（下方，孩子低头写） */}
       <div ref={containerRef} style={{ display: 'flex',
         justifyContent: 'center', marginBottom: 12, position: 'relative' }}>
         <canvas ref={canvasRef}
@@ -729,13 +759,34 @@ function generateCard(
     ctx.fillText(line + '」', W / 2, y)
   }
 
+  // 成就标签
+  const achievements = ['字源溯源', '六书解构', '笔顺临摹', '情境造句']
+  const tagW = 140; const tagH = 36
+  const startX = (W - (tagW * 2 + 16)) / 2
+  achievements.forEach((tag, i) => {
+    const x = startX + (i % 2) * (tagW + 16)
+    const y = H - 200 + Math.floor(i / 2) * (tagH + 8)
+    ctx.fillStyle = 'rgba(192,57,43,0.08)'
+    ctx.beginPath()
+    ctx.roundRect ? ctx.roundRect(x, y, tagW, tagH, 18)
+      : (ctx.rect(x, y, tagW, tagH))
+    ctx.fill()
+    ctx.strokeStyle = 'rgba(192,57,43,0.25)'
+    ctx.lineWidth = 1
+    ctx.stroke()
+    ctx.font = '500 20px "Noto Serif SC", serif'
+    ctx.fillStyle = T.red
+    ctx.textAlign = 'center'
+    ctx.fillText(`✅ ${tag}`, x + tagW / 2, y + tagH / 2 + 7)
+  })
+
   // 底部信息
   const today = new Date().toLocaleDateString('zh-CN',
     { year: 'numeric', month: 'long', day: 'numeric' })
-  ctx.font = '300 24px sans-serif'
+  ctx.font = '300 22px sans-serif'
   ctx.fillStyle = 'rgba(122,92,72,0.5)'
   ctx.textAlign = 'center'
-  ctx.fillText(`${childName || '孩子'} · ${today}`, W / 2, H - 80)
+  ctx.fillText(`${childName || '孩子'} · ${today} · 根·中文`, W / 2, H - 55)
 
   return cardCanvas.toDataURL('image/png')
 }
@@ -837,6 +888,28 @@ function StepUse({ data, char, childName, canvasRef, onComplete }: {
     a.click()
   }
 
+  // 分享卡片（微信/相册）
+  const shareCard = async () => {
+    if (!cardUrl) return
+    try {
+      const blob = await (await fetch(cardUrl)).blob()
+      const file = new File([blob],
+        `${childName || '孩子'}_学会了_${char}.png`,
+        { type: 'image/png' })
+      if (navigator.share && navigator.canShare({ files: [file] })) {
+        await navigator.share({
+          files: [file],
+          title: `${childName || '孩子'}今天学会了「${char}」！`,
+          text: `用根·中文，${childName || '孩子'}今天完成了「${char}」的字源溯源、六书解构、笔顺临摹和情境造句！`,
+        })
+      } else {
+        downloadCard()
+      }
+    } catch (e) {
+      downloadCard()
+    }
+  }
+
   if (cardUrl) {
     return (
       <div style={{ padding: '0 24px', textAlign: 'center' }}>
@@ -862,23 +935,35 @@ function StepUse({ data, char, childName, canvasRef, onComplete }: {
         )}
 
         {/* 操作按钮 */}
-        <div style={{ display: 'flex', gap: 8 }}>
-          <motion.button whileTap={{ scale: 0.96 }} onClick={downloadCard}
-            style={{ flex: 1, padding: '14px', borderRadius: 14,
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <motion.button whileTap={{ scale: 0.96 }} onClick={shareCard}
+            style={{ width: '100%', padding: '14px', borderRadius: 14,
               border: 'none', background: T.red, color: '#fff',
-              fontSize: 14, fontWeight: 700, cursor: 'pointer',
+              fontSize: 15, fontWeight: 700, cursor: 'pointer',
               fontFamily: "'Noto Serif SC', serif",
-              boxShadow: '0 4px 16px rgba(192,57,43,0.3)' }}>
-            📥 保存卡片
+              boxShadow: '0 4px 16px rgba(192,57,43,0.3)',
+              display: 'flex', alignItems: 'center',
+              justifyContent: 'center', gap: 8 }}>
+            <span>📤</span> 分享给家人
           </motion.button>
-          <motion.button whileTap={{ scale: 0.96 }}
-            onClick={() => onComplete(sentence)}
-            style={{ flex: 1, padding: '14px', borderRadius: 14,
-              border: `1px solid ${T.gold}`, background: 'transparent',
-              fontSize: 14, color: T.gold, fontWeight: 600,
-              cursor: 'pointer', fontFamily: 'sans-serif' }}>
-            完成学习
-          </motion.button>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <motion.button whileTap={{ scale: 0.96 }} onClick={downloadCard}
+              style={{ flex: 1, padding: '12px', borderRadius: 12,
+                border: `1px solid rgba(200,160,96,0.4)`,
+                background: 'transparent', fontSize: 13,
+                color: T.textMid, cursor: 'pointer',
+                fontFamily: 'sans-serif' }}>
+              💾 保存到相册
+            </motion.button>
+            <motion.button whileTap={{ scale: 0.96 }}
+              onClick={() => onComplete(sentence)}
+              style={{ flex: 1, padding: '12px', borderRadius: 12,
+                border: `1px solid ${T.gold}`, background: 'transparent',
+                fontSize: 13, color: T.gold, fontWeight: 600,
+                cursor: 'pointer', fontFamily: 'sans-serif' }}>
+              完成学习
+            </motion.button>
+          </div>
         </div>
       </div>
     )
