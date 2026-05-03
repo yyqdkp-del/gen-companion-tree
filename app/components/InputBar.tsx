@@ -6,13 +6,10 @@ import { useRouter, usePathname } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Home as HomeIcon, Mic, Camera, Send, Square, Loader, Upload } from 'lucide-react'
 import { useApp } from '@/app/context/AppContext'
+import { uploadAndProcess } from '@/app/_shared/_services/uploadService'
 import SettingsButton from '@/app/components/SettingsButton'
 
-const THEME = {
-  text: '#2C3E50',
-  gold: '#B08D57',
-  muted: '#6B8BAA',
-}
+import { THEME } from '@/app/_shared/_constants/theme'
 
 const PAGE_MAP: Record<string, string> = {
   '/': '基地',
@@ -116,37 +113,17 @@ if (!SHOW_PATHS.includes(pathname)) return null
     setSending(false)
   }
 }
-  // ── 文件上传 ──
+  // ── 文件上传 ── 使用 _shared/uploadService
   const uploadFile = async (file: Blob | File, category: string, filename?: string) => {
     const uid = getUid()
     if (!uid) return
     setUploading(true)
     setUploadStatus('uploading')
     try {
-      const name = filename || (file instanceof File ? file.name : `file_${Date.now()}`)
-      const path = `uploads/${category}/${Date.now()}_${name}`
-      const { error } = await supabase.storage.from('companion-files').upload(path, file, { upsert: true })
-      if (error) throw error
-      const { data: urlData } = supabase.storage.from('companion-files').getPublicUrl(path)
-      const isImage = file.type.startsWith('image/')
-      const res = await fetch('/api/rian/process', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          content: isImage ? '请分析这张图片，提取所有需要跟进的事件' : `文件已上传：${name}，请提取关键事件`,
-          input_type: isImage ? 'image' : category,
-          file_url: urlData.publicUrl,
-          user_id: uid,
-        }),
-      })
-      const result = await res.json()
-      if (result.ok) {
-        setUploadStatus('done')
-        ctxSync()
-        setTimeout(() => { setUploadStatus('idle'); setInputMode('none') }, 1500)
-      } else {
-        throw new Error(result.error)
-      }
+      await uploadAndProcess(file, category, uid, filename)
+      setUploadStatus('done')
+      ctxSync()
+      setTimeout(() => { setUploadStatus('idle'); setInputMode('none') }, 1500)
     } catch (e) {
       console.error(e)
       setUploadStatus('error')

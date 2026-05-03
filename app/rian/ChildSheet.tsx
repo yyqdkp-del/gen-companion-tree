@@ -9,6 +9,7 @@ import PackCheckItem from '@/app/components/PackCheckItem'
 import ChildActionSheet, { ChildEvent } from '@/app/rian/ChildActionSheet'
 import Accordion from '@/app/_shared/_components/Accordion'
 import { THEME, GREEN } from '@/app/_shared/_constants/theme'
+import { FLOAT_SHEET_BOTTOM } from '@/app/_shared/_constants/layout'
 import { EVENT_TYPE_EMOJI } from '@/app/_shared/_constants/categories'
 import { useChildSchedule } from '@/app/_shared/_hooks/useChildSchedule'
 import { useChildDailyLog } from '@/app/_shared/_hooks/useChildDailyLog'
@@ -331,7 +332,7 @@ export default function ChildSheet({ children, sel, onSel, onClose, onAdd, userI
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
         style={{ position: 'fixed', inset: 0, zIndex: 200,
           display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
-          padding: '0 0 max(calc(env(safe-area-inset-bottom) + 80px), 90px)',
+          padding: `0 0 ${FLOAT_SHEET_BOTTOM}`,
           background: 'rgba(180,200,210,0.35)', backdropFilter: 'blur(6px)' }}
         onClick={onClose}>
         <motion.div initial={{ y: 100, opacity: 0 }} animate={{ y: 0, opacity: 1 }}

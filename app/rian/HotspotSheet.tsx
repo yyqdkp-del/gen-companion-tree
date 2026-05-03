@@ -3,6 +3,7 @@ import React, { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, ExternalLink, RefreshCw, ChevronDown, AlertTriangle, Plus } from 'lucide-react'
 import { THEME, URGENCY_CFG } from '@/app/_shared/_constants/theme'
+import { FLOAT_SHEET_BOTTOM } from '@/app/_shared/_constants/layout'
 import { CAT_EMOJI } from '@/app/_shared/_constants/categories'
 import { useHotspotSheet, isConsumed } from '@/app/_shared/_hooks/useHotspotSheet'
 import type { HotspotItem } from '@/app/_shared/_types'
@@ -166,7 +167,7 @@ export default function HotspotSheet({ hotspots, onClose, onPatrol, patrolling, 
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
         style={{ position: 'fixed', inset: 0, zIndex: 200,
           display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
-          padding: '0 0 max(calc(env(safe-area-inset-bottom) + 80px), 90px)',
+          padding: `0 0 ${FLOAT_SHEET_BOTTOM}`,
           background: 'rgba(180,200,210,0.35)', backdropFilter: 'blur(6px)' }}
         onClick={onClose}>
         <motion.div initial={{ y: 100, opacity: 0 }} animate={{ y: 0, opacity: 1 }}

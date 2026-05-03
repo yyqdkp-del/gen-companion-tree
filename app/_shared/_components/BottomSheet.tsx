@@ -3,6 +3,7 @@ import React from 'react'
 import { motion } from 'framer-motion'
 import { X } from 'lucide-react'
 import { THEME } from '../_constants/theme'
+import { SHEET_BOTTOM_PADDING } from '../_constants/layout'
 
 type Props = {
   children: React.ReactNode
@@ -41,7 +42,7 @@ export default function BottomSheet({ children, onClose, title, zIndex = 300 }: 
             <X size={20} />
           </motion.div>
         </div>
-        <div style={{ padding: '16px 20px 52px' }}>{children}</div>
+        <div style={{ padding: `16px 20px ${SHEET_BOTTOM_PADDING}` }}>{children}</div>
       </motion.div>
     </motion.div>
   )
