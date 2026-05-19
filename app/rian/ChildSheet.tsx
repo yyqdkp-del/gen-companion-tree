@@ -13,9 +13,11 @@ import { FLOAT_SHEET_BOTTOM } from '@/app/_shared/_constants/layout'
 import { EVENT_TYPE_EMOJI } from '@/app/_shared/_constants/categories'
 import { useChildSchedule } from '@/app/_shared/_hooks/useChildSchedule'
 import { useChildDailyLog } from '@/app/_shared/_hooks/useChildDailyLog'
+import { logOrAlertNetworkError } from '@/lib/errors/logOrAlertNetworkError'
 import { calculateEnergy, getEnergyColor } from '@/app/_shared/_engine/energy'
 import ChildEnergyCard from '@/app/_shared/_components/ChildEnergyCard'
 import type { Child, TimelineItem, HealthStatus, MoodStatus } from '@/app/_shared/_types'
+import { addDaysStr, getTodayStr } from '@/lib/date/localDate'
 
 const healthOptions = [
   { value: 'normal',     label: '健康',   color: GREEN.dark, bg: GREEN.bg },
@@ -29,10 +31,10 @@ const moodOptions = [
   { value: 'upset',   label: '低落', emoji: '😔', color: '#6B8BAA' },
 ]
 
-function getTodayKey() { return new Date().toISOString().split('T')[0] }
-function getTomorrow() { return new Date(Date.now() + 86400000).toISOString().split('T')[0] }
-function getIn7Days()  { return new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0] }
-function getIn30Days() { return new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0] }
+function getTodayKey() { return getTodayStr() }
+function getTomorrow() { return addDaysStr(new Date(), 1) }
+function getIn7Days() { return addDaysStr(new Date(), 7) }
+function getIn30Days() { return addDaysStr(new Date(), 30) }
 // getEnergyColor 来自 _engine/energy
 function formatDate(d: string) {
   const date = new Date(d), today = new Date(), tmr = new Date(today)
@@ -114,7 +116,7 @@ function PackingSection({ childId, userId, events, eventType }: {
         user_id: userId, child_id: childId,
         event_type: eventType, item_name: item, preference: pref,
       }, { onConflict: 'child_id,event_type,item_name' })
-    } catch {}
+    } catch (e) { logOrAlertNetworkError(e) }
     setAskHabit(null)
   }
 
@@ -362,6 +364,27 @@ export default function ChildSheet({ children, sel, onSel, onClose, onAdd, userI
 
           <div style={{ overflowY: 'auto', flex: 1, padding: '8px 12px 20px',
             WebkitOverflowScrolling: 'touch' as any }}>
+            {children.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '36px 16px 28px' }}>
+                <div style={{ fontSize: 14, color: THEME.muted, marginBottom: 16, lineHeight: 1.6 }}>
+                  暂无孩子档案，添加后即可查看日程与状态
+                </div>
+                <motion.button whileTap={{ scale: 0.97 }} onClick={onAdd}
+                  style={{
+                    padding: '12px 22px',
+                    borderRadius: 14,
+                    border: 'none',
+                    background: THEME.navy,
+                    color: '#fff',
+                    fontSize: 14,
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                  }}>
+                  添加孩子
+                </motion.button>
+              </div>
+            ) : (
+            <>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12,
               overflowX: 'auto', paddingBottom: 4, scrollbarWidth: 'none' }}>
               {children.map(c => (
@@ -480,6 +503,8 @@ export default function ChildSheet({ children, sel, onSel, onClose, onAdd, userI
                   </>
                 )}
               </>
+            )}
+            </>
             )}
           </div>
         </motion.div>

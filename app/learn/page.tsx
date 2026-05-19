@@ -7,7 +7,8 @@ import { createClient } from '@/lib/supabase/client'
 import type { UserLocation } from '@/lib/geofence/types'
 import { CHINESE_THEME as THEME, CHINESE_LEVELS as LEVELS, LOAD_MSGS, QUICK_CHENGYU, QUICK_WRITING } from '@/app/_shared/_constants/chineseTheme'
 import { useApp } from '@/app/context/AppContext'
-import { fetchLearnedItems, saveSession } from '@/app/_shared/_services/chineseService'
+import { fetchWithAuth } from '@/lib/auth/fetchWithAuth'
+import { logOrAlertNetworkError } from '@/lib/errors/logOrAlertNetworkError'
 import HanziResult from './components/HanziResult'
 import ChengYuResult from './components/ChengYuResult'
 import WritingResult from './components/WritingResult'
@@ -15,6 +16,8 @@ import SmartQuickChars from './components/SmartQuickChars'
 import TabBar, { type TabType } from './components/TabBar'
 
 const supabase = createClient()
+
+const HAN_RE = /\p{Script=Han}/u
 
 const LOCATION_SCENES: Record<string, string> = {
   TH: '清迈', SG: '新加坡', AU: '澳大利亚',
@@ -46,46 +49,63 @@ export default function DecodePage() {
   const [locationScene, setLocationScene] = useState('海外华人家庭')
   const [userLocation, setUserLocation] = useState<UserLocation | null>(null)
   const loadMsgRef = useRef<NodeJS.Timeout | null>(null)
+  const decodeAbortRef = useRef<AbortController | null>(null)
 
   const learnedChars = learnedItems.filter(i => i.type === 'hanzi' && i.char).map(i => i.char!)
 
-  const init = useCallback(async () => {
-    try {
-      const raw = localStorage.getItem('child_assessment') || localStorage.getItem('active_child')
-      if (raw) {
-        const info = JSON.parse(raw)
-        setChildInfo({ id: info.id || '', name: info.name || '', grade: info.grade || '', level: info.level || 'R2', school: info.school || '' })
-      }
-    } catch {}
+  // 与全局当前孩子一致（单一来源），不再从 localStorage 推断
+  useEffect(() => {
+    if (activeKid) {
+      setChildInfo({
+        id: activeKid.id,
+        name: activeKid.name || '',
+        grade: activeKid.grade || '',
+        level: activeKid.chinese_level || activeKid.level || 'R2',
+        school: activeKid.school_name || activeKid.school || '',
+      })
+    } else {
+      setChildInfo({ id: '', name: '', grade: '', level: 'R2', school: '' })
+    }
+  }, [activeKid])
+
+  const loadSessions = useCallback(async () => {
+    if (!childInfo.id) return
     try {
       const { data: { session } } = await supabase.auth.getSession()
       const uid = session?.user?.id
       if (!uid) return
       setUserId(uid)
-      let sessionQuery = supabase
-        .from('chinese_sessions').select('input_type, result, learned_at')
+      const { data: sessions } = await supabase
+        .from('chinese_sessions')
+        .select('input_type, result, learned_at')
         .eq('user_id', uid)
-      if (childInfo.id) sessionQuery = sessionQuery.eq('child_id', childInfo.id)
-      const { data: sessions } = await sessionQuery.order('learned_at', { ascending: false }).limit(200)
+        .eq('child_id', childInfo.id)
+        .order('learned_at', { ascending: false })
+        .limit(200)
       if (sessions) {
         setLearnedItems(sessions.filter((s: any) => s.result).map((s: any) => {
           const r = typeof s.result === 'string' ? JSON.parse(s.result) : s.result
           return { char: r?.char, chengyu: r?.chengyu, type: s.input_type as TabType, mastery: 75, learned_at: s.learned_at }
         }))
       }
-    } catch {}
-  }, [])
+    } catch { /* ignore */ }
+  }, [childInfo.id])
 
-  useEffect(() => { init() }, [init])
+  useEffect(() => {
+    void loadSessions()
+  }, [loadSessions])
 
   useEffect(() => {
     const uid = localStorage.getItem('anon_id') || crypto.randomUUID()
     localStorage.setItem('anon_id', uid)
     fetch('/api/geofence', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId: uid }) })
-      .then(r => r.json()).then(loc => { if (!loc.error) { setUserLocation(loc); setLocationScene(loc.city ? `${loc.city}华人陪读家庭` : '海外华人家庭') } }).catch(() => {})
+      .then(r => r.json()).then(loc => { if (!loc.error) { setUserLocation(loc); setLocationScene(loc.city ? `${loc.city}华人陪读家庭` : '海外华人家庭') } }).catch(logOrAlertNetworkError)
   }, [])
 
-  const handleTabChange = (t: TabType) => { setActiveTab(t); setData(null); setError(''); setInput('') }
+  const handleTabChange = (t: TabType) => {
+    decodeAbortRef.current?.abort()
+    setActiveTab(t); setData(null); setError(''); setInput('')
+  }
 
   const startLoadMsg = (tab: TabType) => {
     const msgs = LOAD_MSGS[tab]; let i = 0; setLoadMsg(msgs[0])
@@ -96,11 +116,26 @@ export default function DecodePage() {
   const generate = async (overrideInput?: string) => {
     const query = (overrideInput || input).trim()
     if (!query) return
-    setInput(query); setLoading(true); setData(null); setError('')
+
+    if (activeTab === 'hanzi' && !HAN_RE.test(query)) {
+      setError('请输入汉字')
+      return
+    }
+
+    decodeAbortRef.current?.abort()
+    const controller = new AbortController()
+    decodeAbortRef.current = controller
+    const timeoutId = setTimeout(() => controller.abort(), 20_000)
+
+    setInput(query)
+    setLoading(true)
+    setData(null)
+    setError('')
     startLoadMsg(activeTab)
     try {
-      const res = await fetch('/api/chinese/decode', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
+      const res = await fetchWithAuth('/api/chinese/decode', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           mode: activeTab,
           char: activeTab === 'hanzi' ? query : undefined,
@@ -109,19 +144,35 @@ export default function DecodePage() {
           location_scene: locationScene, learned_chars: learnedChars,
           geofence: userLocation ? { city: userLocation.city, country: userLocation.country, country_code: userLocation.country_code } : null,
         }),
+        signal: controller.signal,
       })
+      if (controller.signal.aborted) return
       const json = await res.json()
+      if (controller.signal.aborted) return
+      if (!res.ok) {
+        throw new Error(json.error || `请求失败 (${res.status})`)
+      }
       if (json.error) throw new Error(json.error)
       setData(json)
-      if (userId) {
-        await supabase.from('chinese_sessions').insert({ user_id: userId, child_id: childInfo.id || null, input_text: query, input_type: activeTab, result: json, location_scene: locationScene, learned_at: new Date().toISOString() })
-        await supabase.from('family_learning_dna').upsert({ user_id: userId, last_input_type: activeTab, last_learned_at: new Date().toISOString(), total_sessions: learnedItems.length + 1, preferred_scene: locationScene, updated_at: new Date().toISOString() }, { onConflict: 'user_id' })
+
+      let uid = userId
+      if (!uid) {
+        const { data: { session } } = await supabase.auth.getSession()
+        uid = session?.user?.id || ''
+        if (uid) setUserId(uid)
+      }
+      if (uid) {
+        await supabase.from('chinese_sessions').insert({ user_id: uid, child_id: childInfo.id || null, input_text: query, input_type: activeTab, result: json, location_scene: locationScene, learned_at: new Date().toISOString() })
+        await supabase.from('family_learning_dna').upsert({ user_id: uid, last_input_type: activeTab, last_learned_at: new Date().toISOString(), total_sessions: learnedItems.length + 1, preferred_scene: locationScene, updated_at: new Date().toISOString() }, { onConflict: 'user_id' })
         setLearnedItems(prev => [{ char: json.char, chengyu: json.chengyu, type: activeTab, mastery: 80, learned_at: new Date().toISOString() }, ...prev])
       }
-    } catch (e: any) {
-      setError(e.message || '生成失败，请重试')
+    } catch (e: unknown) {
+      if ((e as Error)?.name === 'AbortError') return
+      setError((e as Error)?.message || '生成失败，请重试')
     } finally {
-      setLoading(false); stopLoadMsg()
+      clearTimeout(timeoutId)
+      stopLoadMsg()
+      setLoading(false)
     }
   }
 

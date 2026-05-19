@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { fetchChildSchedule } from '../_services/childService'
 import type { TimelineItem } from '../_types'
+import { logOrAlertNetworkError } from '@/lib/errors/logOrAlertNetworkError'
 
 export function useChildSchedule(childId: string | undefined, today: string) {
   const [timeline, setTimeline] = useState<TimelineItem[]>([])
@@ -18,7 +19,7 @@ export function useChildSchedule(childId: string | undefined, today: string) {
         setTimeline(timeline)
         setCalendar(calendar)
       })
-      .catch(console.error)
+      .catch(logOrAlertNetworkError)
       .finally(() => setLoading(false))
   }, [childId, today])
 

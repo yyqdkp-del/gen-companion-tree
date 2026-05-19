@@ -2,6 +2,7 @@ export const dynamic = 'force-dynamic'
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { getUserLocation } from '@/lib/geofence'
+import { verifySignedUserId } from '@/lib/auth/signedUrl'
 
 // ══ 各国语言配置 ══
 type LangConfig = {
@@ -140,14 +141,18 @@ export async function GET(req: NextRequest) {
   process.env.SUPABASE_SERVICE_ROLE_KEY || ''
 )
   const { searchParams } = new URL(req.url)
-  const userId = searchParams.get('user_id')
+  const token = searchParams.get('token')
+  const userId = token ? verifySignedUserId(token) : null
+  if (!userId) {
+    return new NextResponse('Unauthorized', { status: 401 })
+  }
   const childId = searchParams.get('child_id')
-  if (!userId) return new NextResponse('Missing user_id', { status: 400 })
 
-  const queries: Promise<any>[] = [
+  // getUserLocation 与 Supabase 分开：避免 Promise.all 推断为 Postgrest 与 UserLocation 的联合类型
+  const locationPromise = getUserLocation(userId)
+  const queries = [
     supabase.from('family_profile').select('*').eq('user_id', userId).single(),
     supabase.from('children').select('*').eq('user_id', userId),
-    getUserLocation(userId),
   ]
   if (childId) {
     queries.push(
@@ -157,11 +162,11 @@ export async function GET(req: NextRequest) {
   }
 
   const results = await Promise.all(queries)
+  const location = await locationPromise
   const profile = results[0].data || {}
   const children = results[1].data || []
-  const location = results[2]
-  const healthRecords = childId ? (results[3]?.data || []) : []
-  const dailyLog = childId ? (results[4]?.data?.[0] || null) : null
+  const healthRecords = childId ? (results[2]?.data || []) : []
+  const dailyLog = childId ? (results[3]?.data?.[0] || null) : null
 
   const countryCode = location.country_code || 'TH'
   const langConfig = getLangConfig(countryCode)

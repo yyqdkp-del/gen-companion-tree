@@ -1,11 +1,18 @@
 'use client'
 import { createClient } from '@/lib/supabase/client'
 const supabase = createClient()
-import { createContext, useContext, useState, useEffect, useRef, useCallback, ReactNode } from 'react'
+import { createContext, useContext, useState, useEffect, useRef, useCallback, useMemo, ReactNode } from 'react'
 import { fetchAppData } from '@/app/_shared/_services/syncService'
 import { useSpeech } from '@/app/_shared/_hooks/useSpeech'
 import { useRouter } from 'next/navigation'
+import type { Session } from '@supabase/supabase-js'
+import { subscribePushIfPermitted } from '@/lib/push/subscribePushClient'
+import { signOutWithPushCleanup } from '@/lib/auth/signOutClient'
+import { logOrAlertNetworkError } from '@/lib/errors/logOrAlertNetworkError'
 
+async function subscribePush(session: Session) {
+  await subscribePushIfPermitted(session)
+}
 
 type AppContextType = {
   userId: string
@@ -28,6 +35,10 @@ type AppContextType = {
   stop: () => void
   speechEnabled: boolean
   toggleSpeech: () => void
+  sessionReady: boolean
+  showOnboarding: boolean
+  setShowOnboarding: (show: boolean) => void
+  signOut: () => Promise<void>
 }
 const AppContext = createContext<AppContextType | null>(null)
 
@@ -35,19 +46,23 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const router = useRouter()
   const [userId, setUserId] = useState('')
   const userIdRef = useRef('')
-  const lastSyncRef = useRef(0)
+  const syncDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const syncAbortRef = useRef<AbortController | null>(null)
+  const syncGenRef = useRef(0)
   const [kids, setKids] = useState<any[]>([])
   const [todos, setTodos] = useState<any[]>([])
   const [hotspots, setHotspots] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
- const [processStatus, setProcessStatus] = useState<{
-  status: 'processing' | 'done' | 'failed' | null
-  message: string
-  tools?: any[]
-} | null>(null)
+  const [processStatus, setProcessStatus] = useState<{
+    status: 'processing' | 'done' | 'failed' | null
+    message: string
+    tools?: any[]
+  } | null>(null)
 
-const [activeKid, setActiveKidState] = useState<any | null>(null)
+  const [activeKid, setActiveKidState] = useState<any | null>(null)
 const [modalOpen, setModalOpen] = useState(false)
+const [sessionReady, setSessionReady] = useState(false)
+const [showOnboarding, setShowOnboarding] = useState(false)
 const { speak, stop, enabled: speechEnabled, toggle: toggleSpeech } = useSpeech()
 const setActiveKid = useCallback((kid: any) => {
   setActiveKidState(kid)
@@ -61,19 +76,31 @@ const setActiveKid = useCallback((kid: any) => {
     }))
   }
 }, [])
-  const setUserIdSafe = (id: string) => {
+  const setUserIdSafe = useCallback((id: string) => {
     userIdRef.current = id
     setUserId(id)
     if (typeof window !== 'undefined') {
       localStorage.setItem('app_user_id', id)
     }
-  }
+  }, [])
 
   const addTempTodo = useCallback((content: string): string => {
     const tempId = 'temp_' + Date.now()
+    let titleShort = content
+    try {
+      if (typeof Intl !== 'undefined' && 'Segmenter' in Intl) {
+        const seg = new Intl.Segmenter('zh', { granularity: 'grapheme' })
+        const graphemes = [...seg.segment(content)].map(s => s.segment)
+        titleShort = graphemes.slice(0, 12).join('') + (graphemes.length > 12 ? '...' : '')
+      } else {
+        titleShort = content.slice(0, 12) + (content.length > 12 ? '...' : '')
+      }
+    } catch {
+      titleShort = content.slice(0, 12) + (content.length > 12 ? '...' : '')
+    }
     const tempTodo = {
       id: tempId,
-      title: content.slice(0, 12) + (content.length > 12 ? '...' : ''),
+      title: titleShort,
       priority: 'yellow',
       status: 'pending',
       category: 'other',
@@ -89,100 +116,124 @@ const setActiveKid = useCallback((kid: any) => {
   }, [])
 
   const sync = useCallback(async (forceUid?: string) => {
-    const now = Date.now()
-  if (now - lastSyncRef.current < 2000) return  // ← 加这行
-  lastSyncRef.current = now
+    const uid = forceUid || userIdRef.current || (typeof window !== 'undefined' ? localStorage.getItem('app_user_id') : '') || ''
+    if (!uid) {
+      setLoading(false)
+      return
+    }
+
+    syncAbortRef.current?.abort()
+    const controller = new AbortController()
+    syncAbortRef.current = controller
+    const gen = ++syncGenRef.current
+
     try {
-      const uid = forceUid || userIdRef.current || (typeof window !== 'undefined' ? localStorage.getItem('app_user_id') : '') || ''
-      if (!uid) return
-      const { kids, todos, hotspots } = await fetchAppData(uid)
-      if (kids.length) setKids(kids)
+      const { kids, todos, hotspots } = await fetchAppData(uid, controller.signal)
+      if (controller.signal.aborted) return
+      if (gen !== syncGenRef.current) return
+      setKids(kids)
       setTodos(todos)
       setHotspots(hotspots)
-    } catch (e) { console.error('sync error', e) }
-    finally { setLoading(false) }
+    } catch (e: unknown) {
+      if (controller.signal.aborted) return
+      const name = e instanceof Error ? e.name : ''
+      if (name === 'AbortError' || (e instanceof DOMException && e.name === 'AbortError')) return
+      logOrAlertNetworkError(e)
+    } finally {
+      if (gen === syncGenRef.current) setLoading(false)
+    }
+  }, [])
+
+  const debouncedSync = useCallback(() => {
+    if (syncDebounceRef.current) clearTimeout(syncDebounceRef.current)
+    syncDebounceRef.current = setTimeout(() => {
+      syncDebounceRef.current = null
+      void sync()
+    }, 800)
+  }, [sync])
+
+  const signOut = useCallback(async () => {
+    await signOutWithPushCleanup()
+  }, [])
+
+  useEffect(() => () => {
+    if (syncDebounceRef.current) clearTimeout(syncDebounceRef.current)
   }, [])
 
   useEffect(() => {
     const initSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession()
-      if (session?.user?.id) {
-        setUserIdSafe(session.user.id)
-        sync(session.user.id)
-        // 推送订阅
-if ('Notification' in window && 'serviceWorker' in navigator) {
-  try {
-    const permission = await Notification.requestPermission()
-    if (permission === 'granted') {
-      const reg = await navigator.serviceWorker.ready
-      const sub = await reg.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY,
-      })
-      await fetch('/api/push/subscribe', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ subscription: sub, user_id: session.user.id })
-      })
-    }
-  } catch (e) {
-    console.error('推送订阅失败:', e)
-  }
-}
-        return
-      }
-      if ('caches' in window) {
-        try {
-          const cache = await caches.open('auth-v1')
-          const response = await cache.match('/auth/user-id')
-          if (response) {
-            const uid = await response.text()
-            if (uid) {
-              const res = await fetch('/api/auth/refresh-pwa', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ user_id: uid })
-              })
-              const { access_token, refresh_token } = await res.json()
-              if (access_token) {
-                const { data: { session: s } } = await supabase.auth.setSession({ access_token, refresh_token })
-                if (s?.user?.id) { setUserIdSafe(s.user.id); sync(s.user.id); return }
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        if (session?.user?.id) {
+          setUserIdSafe(session.user.id)
+          sync(session.user.id)
+          await subscribePush(session)
+          return
+        }
+        if ('caches' in window) {
+          try {
+            const cache = await caches.open('auth-v1')
+            const sessionRes = await cache.match('/auth/session-bundle')
+            if (sessionRes) {
+              const bundle = await sessionRes.json() as { access_token?: string; refresh_token?: string }
+              if (bundle?.access_token && bundle?.refresh_token) {
+                const { data: { session: s } } = await supabase.auth.setSession({
+                  access_token: bundle.access_token,
+                  refresh_token: bundle.refresh_token,
+                })
+                if (s?.user?.id) {
+                  setUserIdSafe(s.user.id)
+                  sync(s.user.id)
+                  await subscribePush(s)
+                  return
+                }
               }
             }
-          }
-        } catch (e) { console.error(e) }
+          } catch (e) { logOrAlertNetworkError(e) }
+        }
+        const { data: refreshData } = await supabase.auth.refreshSession()
+        if (refreshData.session?.user?.id) {
+          setUserIdSafe(refreshData.session.user.id)
+          sync(refreshData.session.user.id)
+          await subscribePush(refreshData.session)
+          return
+        }
+        setTimeout(() => { if (!userIdRef.current) router.push('/auth') }, 3000)
+      } finally {
+        setSessionReady(true)
       }
-      const { data: refreshData } = await supabase.auth.refreshSession()
-      if (refreshData.session?.user?.id) {
-        setUserIdSafe(refreshData.session.user.id)
-        sync(refreshData.session.user.id)
-        return
-      }
-      setTimeout(() => { if (!userIdRef.current) router.push('/auth') }, 3000)
     }
     void initSession()
+  }, [])
+
+  useEffect(() => {
+    if (!sessionReady || loading || !userId) return
+    if (typeof window === 'undefined') return
+
+    const completed = localStorage.getItem('onboarding_completed')
+    if (!completed && kids.length === 0) {
+      const timer = setTimeout(() => setShowOnboarding(true), 500)
+      return () => clearTimeout(timer)
+    }
+  }, [sessionReady, loading, userId, kids.length])
+
+  useEffect(() => {
+    if (!userId) return
     const channel = supabase.channel('app_realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'todo_items' }, () => sync())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'hotspot_items' }, () => sync())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'children' }, () => sync())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'todo_items' }, () => debouncedSync())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'hotspot_items' }, () => debouncedSync())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'children' }, () => debouncedSync())
       .subscribe()
     return () => { supabase.removeChannel(channel) }
-  }, [])
+  }, [userId, debouncedSync])
   useEffect(() => {
-  if (!userId) return
-  const interval = setInterval(() => sync(userId), 30000)
-
-  // 页面重新激活时立刻 sync
-  const handleVisibility = () => {
-    if (document.visibilityState === 'visible') sync(userId)
-  }
-  document.addEventListener('visibilitychange', handleVisibility)
-
-  return () => {
-    clearInterval(interval)
-    document.removeEventListener('visibilitychange', handleVisibility)
-  }
-}, [userId])
+    if (!userId) return
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') void sync(userId)
+    }
+    document.addEventListener('visibilitychange', handleVisibility)
+    return () => document.removeEventListener('visibilitychange', handleVisibility)
+  }, [userId, sync])
   useEffect(() => {
   if (!userId) return
 
@@ -229,9 +280,61 @@ if ('Notification' in window && 'serviceWorker' in navigator) {
     .subscribe()
 
   return () => { supabase.removeChannel(channel) }
-}, [userId])
+}, [userId, sync])
+
+  const value = useMemo<AppContextType>(
+    () => ({
+      userId,
+      userIdRef,
+      kids,
+      todos,
+      hotspots,
+      loading,
+      sync,
+      setUserIdSafe,
+      addTempTodo,
+      removeTempTodo,
+      processStatus,
+      setProcessStatus,
+      activeKid,
+      setActiveKid,
+      modalOpen,
+      setModalOpen,
+      speak,
+      stop,
+      speechEnabled,
+      toggleSpeech,
+      sessionReady,
+      showOnboarding,
+      setShowOnboarding,
+      signOut,
+    }),
+    [
+      userId,
+      kids,
+      todos,
+      hotspots,
+      loading,
+      sync,
+      setUserIdSafe,
+      addTempTodo,
+      removeTempTodo,
+      processStatus,
+      activeKid,
+      setActiveKid,
+      modalOpen,
+      speak,
+      stop,
+      speechEnabled,
+      toggleSpeech,
+      sessionReady,
+      showOnboarding,
+      signOut,
+    ],
+  )
+
   return (
-   <AppContext.Provider value={{ userId, userIdRef, kids, todos, hotspots, loading, sync, setUserIdSafe, addTempTodo, removeTempTodo, processStatus, setProcessStatus, activeKid, setActiveKid, modalOpen, setModalOpen, speak, stop, speechEnabled, toggleSpeech }}>
+    <AppContext.Provider value={value}>
       {children}
     </AppContext.Provider>
   )

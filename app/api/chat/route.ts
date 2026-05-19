@@ -1,7 +1,13 @@
 export const dynamic = 'force-dynamic'
 import { NextRequest, NextResponse } from 'next/server'
+import { getAuthUser } from '@/lib/auth/getAuthUser'
 
 export async function POST(req: NextRequest) {
+  const { user, error: authError } = await getAuthUser(req)
+  if (authError || !user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
   const { messages, contextData } = await req.json()
 
   const response = await fetch('https://api.anthropic.com/v1/messages', {

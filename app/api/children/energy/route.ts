@@ -1,6 +1,8 @@
 export const dynamic = 'force-dynamic'
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { getUserLocation } from '@/lib/geofence'
+import { getDayOfWeekInTimeZone, getTodayStr, getTodayStrInTimeZone } from '@/lib/date/localDate'
 
 export async function POST(req: NextRequest) {
   const supabase = createClient(
@@ -9,8 +11,16 @@ export async function POST(req: NextRequest) {
 )
   const { child_id, user_id } = await req.json()
 
-  const today = new Date().toISOString().split('T')[0]
-  const dow = new Date().getDay()
+  let today: string
+  let dow: number
+  try {
+    const loc = await getUserLocation(user_id)
+    today = getTodayStrInTimeZone(loc.timezone)
+    dow = getDayOfWeekInTimeZone(loc.timezone)
+  } catch {
+    today = getTodayStr()
+    dow = new Date().getDay()
+  }
   const hour = new Date().getHours()
 
   const [{ data: child }, { data: logs }, { data: profile }, { data: events }] = await Promise.all([

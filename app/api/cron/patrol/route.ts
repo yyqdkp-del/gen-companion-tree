@@ -19,7 +19,12 @@ export async function GET() {
       try {
         const res = await fetch(`${appUrl}/api/base/patrol`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            ...(process.env.CRON_SECRET
+              ? { Authorization: `Bearer ${process.env.CRON_SECRET}` }
+              : {}),
+          },
           body: JSON.stringify({
             user_id: user.id,
             trigger_type: 'cron',

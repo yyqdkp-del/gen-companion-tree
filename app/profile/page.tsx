@@ -3,7 +3,7 @@ import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { motion, AnimatePresence } from 'framer-motion'
-import { ArrowLeft, ArrowRight, Check, Loader, Save, User, FileText, MapPin, Shield } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Check, Loader, Save, User, FileText, MapPin, Shield, Mail, Calendar } from 'lucide-react'
 import { THEME } from '@/app/_shared/_constants/theme'
 import { NAV_HEIGHT_CSS } from '@/app/_shared/_constants/layout'
 import { Field, SelectField } from '@/app/_shared/_components/FormField'
@@ -11,6 +11,8 @@ import { StepMember }    from './steps/StepMember'
 import { StepPassport }  from './steps/StepPassport'
 import { StepAddress }   from './steps/StepAddress'
 import { StepEmergency } from './steps/StepEmergency'
+import { useApp } from '@/app/context/AppContext'
+import { logOrAlertNetworkError } from '@/lib/errors/logOrAlertNetworkError'
 
 const supabase = createClient()
 
@@ -23,6 +25,7 @@ const STEPS = [
 
 function ProfileContent() {
   const router = useRouter()
+  const { signOut } = useApp()
   const searchParams = useSearchParams()
   const isEdit = searchParams.get('mode') === 'edit'
 
@@ -38,7 +41,9 @@ function ProfileContent() {
   })
   const [passportData, setPassportData] = useState({
     passport_number: '', passport_expiry: '', passport_issue_place: '',
+    passport_issue_date: '', passport_country: '',
     visa_type: '', visa_expiry: '', tm30_number: '',
+    insurance_number: '', insurance_company: '', insurance_expiry: '',
   })
   const [addressData, setAddressData] = useState({
     home_address_en: '', home_address_zh: '',
@@ -49,6 +54,11 @@ function ProfileContent() {
     emergency_name: '', emergency_relation: '', emergency_phone: '',
     blood_type: '', allergies: '', chronic_conditions: '',
   })
+
+  const [connectUserId, setConnectUserId] = useState<string | null>(null)
+  const [gmailConnected, setGmailConnected] = useState(false)
+  const [calendarConnected, setCalendarConnected] = useState(false)
+  const [oauthBanner, setOauthBanner] = useState<{ type: 'ok' | 'err'; text: string } | null>(null)
 
   useEffect(() => {
     const load = async () => {
@@ -71,9 +81,14 @@ function ProfileContent() {
           passport_number: data.passport_number || '',
           passport_expiry: data.passport_expiry || '',
           passport_issue_place: data.passport_issue_place || '',
+          passport_issue_date: data.passport_issue_date || '',
+          passport_country: data.passport_country || '',
           visa_type: data.visa_type || '',
           visa_expiry: data.visa_expiry || '',
           tm30_number: data.tm30_number || '',
+          insurance_number: data.insurance_number || '',
+          insurance_company: data.insurance_company || '',
+          insurance_expiry: data.insurance_expiry || '',
         })
         setAddressData({
           home_address_en: data.home_address_en || '',
@@ -95,6 +110,66 @@ function ProfileContent() {
     }
     load()
   }, [])
+
+  useEffect(() => {
+    let cancelled = false
+    const loadGoogle = async () => {
+      const { data: { session } } = await supabase.auth.getSession()
+      const uid = session?.user?.id
+      if (!uid || cancelled) return
+      setConnectUserId(uid)
+      const { data, error } = await supabase.from('user_google_tokens').select('service').eq('user_id', uid)
+      if (error) {
+        console.warn('user_google_tokens:', error.message)
+        return
+      }
+      if (cancelled) return
+      setGmailConnected(!!data?.some((r: { service: string }) => r.service === 'gmail'))
+      setCalendarConnected(!!data?.some((r: { service: string }) => r.service === 'calendar'))
+    }
+    void loadGoogle()
+    return () => { cancelled = true }
+  }, [searchParams])
+
+  useEffect(() => {
+    const err = searchParams.get('error')
+    const connected = searchParams.get('connected')
+    if (err) setOauthBanner({ type: 'err', text: decodeURIComponent(err.replace(/\+/g, ' ')) })
+    if (connected) {
+      setOauthBanner({
+        type: 'ok',
+        text: `已连接 ${connected === 'gmail' ? 'Gmail' : connected === 'calendar' ? 'Google 日历' : connected}`,
+      })
+    }
+  }, [searchParams])
+
+  const connectGmail = async () => {
+    if (!connectUserId) {
+      setOauthBanner({ type: 'err', text: '请先登录' })
+      return
+    }
+    try {
+      const { getAuthUrl, GMAIL_SCOPE } = await import('@/lib/google/oauth')
+      const state = Buffer.from(`gmail:${connectUserId}`).toString('base64')
+      window.location.href = getAuthUrl(GMAIL_SCOPE, state)
+    } catch (e: any) {
+      setOauthBanner({ type: 'err', text: e?.message || '无法启动 Gmail 授权' })
+    }
+  }
+
+  const connectCalendar = async () => {
+    if (!connectUserId) {
+      setOauthBanner({ type: 'err', text: '请先登录' })
+      return
+    }
+    try {
+      const { getAuthUrl, CALENDAR_SCOPE } = await import('@/lib/google/oauth')
+      const state = Buffer.from(`calendar:${connectUserId}`).toString('base64')
+      window.location.href = getAuthUrl(CALENDAR_SCOPE, state)
+    } catch (e: any) {
+      setOauthBanner({ type: 'err', text: e?.message || '无法启动日历授权' })
+    }
+  }
 
   const handleSave = async () => {
     setSaving(true)
@@ -146,8 +221,7 @@ function ProfileContent() {
       }, 1200)
 
     } catch (e) {
-      console.error('保存失败', e)
-      setSaveError('保存失败，请检查网络后重试')
+      if (!logOrAlertNetworkError(e)) setSaveError('保存失败，请检查网络后重试')
     }
     setSaving(false)
   }
@@ -240,10 +314,56 @@ function ProfileContent() {
 
         {/* 错误提示 */}
         {saveError && (
-          <div style={{ color: '#E07B2A', fontSize: 13, textAlign: 'center', marginBottom: 12, padding: '10px 14px', borderRadius: 12, background: 'rgba(224,123,42,0.08)', border: '1px solid rgba(224,123,42,0.2)' }}>
+          <div style={{ color: '#7a5a35', fontSize: 13, textAlign: 'center', marginBottom: 12, padding: '10px 14px', borderRadius: 12, background: '#fcf7ed', border: '1px solid #f2e2cd' }}>
             ⚠️ {saveError}
           </div>
         )}
+
+        {oauthBanner && (
+          <div style={{
+            fontSize: 13, textAlign: 'center', marginBottom: 14, padding: '10px 14px', borderRadius: 12,
+            color: oauthBanner.type === 'ok' ? '#166534' : '#B45309',
+            background: oauthBanner.type === 'ok' ? 'rgba(34,197,94,0.1)' : 'rgba(251,191,36,0.12)',
+            border: oauthBanner.type === 'ok' ? '1px solid rgba(34,197,94,0.25)' : '1px solid rgba(251,191,36,0.35)',
+          }}>
+            {oauthBanner.type === 'ok' ? '✅ ' : '⚠️ '}{oauthBanner.text}
+          </div>
+        )}
+
+        <div style={{
+          background: 'rgba(255,255,255,0.55)',
+          borderRadius: 20,
+          padding: '18px 16px',
+          border: '1px solid rgba(255,255,255,0.85)',
+          marginBottom: 18,
+        }}>
+          <div style={{ fontSize: 15, fontWeight: 600, color: THEME.navy, marginBottom: 6 }}>Google 服务连接</div>
+          <div style={{ fontSize: 12, color: THEME.muted, marginBottom: 14, lineHeight: 1.6 }}>
+            连接后可使用 Gmail 真正代发邮件；日历授权为后续一键写日程预留。
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <motion.button type="button" whileTap={{ scale: 0.98 }} onClick={() => void connectGmail()}
+              style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                padding: '12px 14px', borderRadius: 14, border: '1px solid rgba(0,0,0,0.08)',
+                background: gmailConnected ? 'rgba(34,197,94,0.12)' : 'rgba(255,255,255,0.75)',
+                color: THEME.navy, fontSize: 14, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit',
+              }}>
+              <Mail size={18} color={gmailConnected ? '#16a34a' : THEME.muted} />
+              {gmailConnected ? 'Gmail 已连接' : '连接 Gmail（一键发邮件）'}
+            </motion.button>
+            <motion.button type="button" whileTap={{ scale: 0.98 }} onClick={() => void connectCalendar()}
+              style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                padding: '12px 14px', borderRadius: 14, border: '1px solid rgba(0,0,0,0.08)',
+                background: calendarConnected ? 'rgba(34,197,94,0.12)' : 'rgba(255,255,255,0.75)',
+                color: THEME.navy, fontSize: 14, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit',
+              }}>
+              <Calendar size={18} color={calendarConnected ? '#16a34a' : THEME.muted} />
+              {calendarConnected ? 'Google 日历已连接' : '连接 Google 日历（预留）'}
+            </motion.button>
+          </div>
+        </div>
 
         {/* 底部按钮 */}
         <div style={{ display: 'flex', gap: 10, paddingBottom: `max(calc(env(safe-area-inset-bottom) + 20px), 24px)` }}>
@@ -290,6 +410,12 @@ function ProfileContent() {
 
         {/* 底部辅助文字 */}
         <div style={{ textAlign: 'center', marginBottom: 40 }}>
+          <button type="button" onClick={() => void signOut()}
+            style={{ display: 'block', width: '100%', marginBottom: 16, padding: '12px', background: 'transparent',
+              border: '1px solid #f2e2cd', borderRadius: 12, color: '#7a5a35', fontSize: 13,
+              cursor: 'pointer', fontFamily: "'Noto Sans SC', sans-serif" }}>
+            退出登录
+          </button>
           {isLastStep ? (
             <span onClick={() => router.back()}
               style={{ fontSize: 12, color: THEME.muted, cursor: 'pointer', textDecoration: 'underline', opacity: 0.7 }}>

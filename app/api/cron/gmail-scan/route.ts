@@ -4,6 +4,7 @@ export const dynamic = 'force-dynamic'
 // 使用fetch调用Anthropic API，无需额外安装SDK
 
 import { NextRequest, NextResponse } from 'next/server'
+import { getTodayStr } from '@/lib/date/localDate'
 
 const GMAIL_MCP_URL = 'https://gmail.mcp.claude.com/mcp'
 
@@ -20,7 +21,7 @@ const SCHOOL_FILTERS = [
 async function fetchRecentEmails(): Promise<any[]> {
   try {
     const since = new Date(Date.now() - 6 * 60 * 60 * 1000)
-    const sinceStr = since.toISOString().split('T')[0]
+    const sinceStr = getTodayStr(since)
 
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',

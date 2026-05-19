@@ -5,9 +5,13 @@ const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://gen-companion-tree.v
 
 async function trigger(path: string, method: 'GET' | 'POST' = 'GET', body?: any) {
   try {
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+    if (method === 'POST' && path === '/api/base/patrol' && process.env.CRON_SECRET) {
+      headers.Authorization = `Bearer ${process.env.CRON_SECRET}`
+    }
     const res = await fetch(`${APP_URL}${path}`, {
       method,
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: body ? JSON.stringify(body) : undefined,
     })
     console.log(`${path} → ${res.status}`)

@@ -55,6 +55,14 @@ const SHORT_LABEL: Record<string, string> = {
   buy: '购买', pay: '支付', whatsapp: '消息',
 }
 
+function resolveOpenUrl(url: string): string {
+  const u = url.trim()
+  if (/^https?:\/\//i.test(u)) return u
+  if (typeof window === 'undefined') return u
+  const path = u.startsWith('/') ? u : `/${u}`
+  return `${window.location.origin}${path}`
+}
+
 export async function executeAction(action: ActionData, userId: string): Promise<string> {
   const data = action.data || {}
   switch (action.type) {
@@ -89,7 +97,7 @@ export async function executeAction(action: ActionData, userId: string): Promise
       return '已打开表格'
     }
     case 'open_url':
-      if (data.url) window.open(data.url, '_blank')
+      if (data.url) window.open(resolveOpenUrl(data.url), '_blank')
       return '已打开'
     case 'pay':
       if (data.url) window.open(data.url, '_blank')

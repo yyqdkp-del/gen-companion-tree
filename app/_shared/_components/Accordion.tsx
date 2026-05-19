@@ -31,7 +31,7 @@ export default function Accordion({ title, count, children, defaultOpen = false,
         </span>
         {badge && (
           <span style={{ fontSize: 10, padding: '2px 7px', borderRadius: 10,
-            background: 'rgba(255,100,100,0.1)', color: '#DC2626', fontWeight: 600 }}>
+            background: '#fff2f0', color: '#7d3f37', fontWeight: 600 }}>
             {badge}
           </span>
         )}

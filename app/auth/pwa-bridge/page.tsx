@@ -2,6 +2,7 @@
 import { useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createBrowserClient } from '@supabase/ssr'
+import { saveSessionBundle } from '@/lib/auth/saveSessionBundle'
 
 const supabase = createBrowserClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || '',
@@ -36,14 +37,9 @@ function PWABridgeInner() {
 
       if (!session?.user?.id) { router.push('/auth'); return }
 
-      const uid = session.user.id
-
-      if ('caches' in window) {
-        try {
-          const cache = await caches.open('auth-v1')
-          await cache.put('/auth/user-id', new Response(uid))
-        } catch (e) { console.error('Cache write error:', e) }
-      }
+      try {
+        await saveSessionBundle(session)
+      } catch (e) { console.error('Cache write error:', e) }
 
       await supabase.from('auth_temp_codes').delete().eq('code', authCode)
 

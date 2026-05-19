@@ -15,28 +15,49 @@ export const GREEN = {
 } as const
 
 export const URGENCY_COLOR: Record<number, string> = {
-  1: 'rgba(154, 183, 232, 0.35)',
-  2: 'rgba(141, 200, 160, 0.50)',
-  3: 'rgba(255, 180, 100, 0.65)',
+  1: 'rgba(83, 123, 142, 0.22)',
+  2: 'rgba(184, 142, 94, 0.24)',
+  3: 'rgba(213, 128, 116, 0.28)',
 }
 
 export const URGENCY_BORDER: Record<number, string> = {
-  1: 'rgba(154,183,232,0.3)',
-  2: 'rgba(141,200,160,0.5)',
-  3: 'rgba(255,180,100,0.7)',
+  1: '#d0e1e5',
+  2: '#f2e2cd',
+  3: '#fad6d1',
 }
 
 export const URGENCY_CFG = {
-  urgent:    { label: '紧急', color: '#CC3333', bg: 'rgba(255,100,100,0.08)', border: '#FF6B6B' },
-  important: { label: '重要', color: '#E07B2A', bg: 'rgba(255,160,60,0.08)',  border: '#FF8C00' },
-  lifestyle: { label: '生活', color: '#3B82F6', bg: 'rgba(154,183,232,0.08)', border: '#60A5FA' },
+  urgent:    { label: '紧急', color: '#7d3f37', bg: '#fff2f0', border: '#fad6d1' },
+  important: { label: '重要', color: '#7a5a35', bg: '#fcf7ed', border: '#f2e2cd' },
+  lifestyle: { label: '生活', color: '#2b3942', bg: '#f0f5f6', border: '#d0e1e5' },
 } as const
 
-export const PRIORITY_CFG: Record<string, { label: string; bg: string; border: string }> = {
-  red:    { label: '今天必须', bg: 'rgba(255,100,100,0.09)', border: '#FF6B6B' },
-  orange: { label: '3天内',   bg: 'rgba(255,160,60,0.09)',  border: '#FF8C00' },
-  yellow: { label: '本周',    bg: 'rgba(255,210,80,0.09)',  border: '#FACC15' },
-  green:  { label: '本月',    bg: 'rgba(141,200,160,0.09)', border: '#4ADE80' },
-  blue:   { label: '长期',    bg: 'rgba(154,183,232,0.09)', border: '#60A5FA' },
-  grey:   { label: '等待中',  bg: 'rgba(0,0,0,0.03)',       border: 'rgba(0,0,0,0.1)' },
+export const PRIORITY_COLORS = {
+  red: {
+    bg: '#fff2f0',
+    border: '#fad6d1',
+    dot: '#d58074',
+    text: '#7d3f37',
+  },
+  orange: {
+    bg: '#fcf7ed',
+    border: '#f2e2cd',
+    dot: '#b88e5e',
+    text: '#7a5a35',
+  },
+  blue: {
+    bg: '#f0f5f6',
+    border: '#d0e1e5',
+    dot: '#537b8e',
+    text: '#2b3942',
+  },
+} as const
+
+export const PRIORITY_CFG: Record<string, { label: string; bg: string; border: string; dot: string; text: string }> = {
+  red:    { label: '今天必须', ...PRIORITY_COLORS.red },
+  orange: { label: '3天内',   ...PRIORITY_COLORS.orange },
+  yellow: { label: '本周',    bg: '#f8f5ea', border: '#e5dcc5', dot: '#8ca88d', text: '#2f4030' },
+  green:  { label: '本月',    bg: '#f0f6ef', border: '#d9e6da', dot: '#8ca88d', text: '#2f4030' },
+  blue:   { label: '长期',    ...PRIORITY_COLORS.blue },
+  grey:   { label: '等待中',  bg: '#f4f2ed', border: '#ebe8e2', dot: '#94a3b8', text: '#64748b' },
 }

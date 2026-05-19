@@ -15,6 +15,7 @@ export const dynamic = 'force-dynamic'
 import TodoDetailModal from '@/app/rian/TodoDetailModal'
 import ChildSheet from '@/app/rian/ChildSheet'
 import HotspotSheet from '@/app/rian/HotspotSheet'
+import Onboarding from '@/app/components/Onboarding'
 import { useApp } from '@/app/context/AppContext'
 import TodoSheet from '@/app/rian/TodoSheet'
 import { THEME } from '@/app/_shared/_constants/theme'
@@ -25,6 +26,9 @@ import { useTodoActions } from '@/app/_shared/_hooks/useTodoActions'
 import { useTodoEngine } from '@/app/_shared/_hooks/useTodoEngine'
 import { useHotspotEngine } from '@/app/_shared/_hooks/useHotspotEngine'
 import { addChild } from '@/app/_shared/_services/childService'
+import { getJsonAuthHeaders } from '@/lib/auth/clientAuthHeaders'
+import { fetchWithAuth } from '@/lib/auth/fetchWithAuth'
+import { logOrAlertNetworkError } from '@/lib/errors/logOrAlertNetworkError'
 
 const ChildAvatar = nextDynamic(() => import('@/app/components/ChildAvatar'), { ssr: false })
 
@@ -32,7 +36,7 @@ type ScheduleItem = { time: string; title: string; location?: string; requires_a
 type UrgentItem = { title: string; level: 'red' | 'orange' | 'yellow' }
 type PackingAlert = { item: string; level: 1 | 2 | 3 | 'today'; days_left?: number; need_buy: boolean }
 
-const getEnergyColor = (v: number) => v > 70 ? '#4ADE80' : v > 40 ? '#FACC15' : '#FB7185'
+const getEnergyColor = (v: number) => v > 70 ? '#8ca88d' : v > 40 ? '#b88e5e' : '#d58074'
 
 function dropState(type: string, data: any) {
   if (type === 'child') {
@@ -82,7 +86,7 @@ function AddChildSheet({ onClose, onSave }: { onClose: () => void; onSave: (d: a
       if (error) throw error
       const { data: urlData } = supabase.storage.from('companion-files').getPublicUrl(path)
       setAvatarUrl(urlData.publicUrl)
-    } catch (e) { console.error('上传失败', e) }
+    } catch (e) { logOrAlertNetworkError(e) }
     finally { setUploading(false) }
   }
 
@@ -187,14 +191,16 @@ function InputSheet({ onClose, userId, onProcessing }: {
     if (!text.trim()) return
     setSending(true)
     try {
-      fetch('/api/rian/process', {
+      const headers = await getJsonAuthHeaders()
+      if (!headers.Authorization) return
+      await fetch('/api/rian/process', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content: text.trim(), input_type: 'text', user_id: userId })
+        headers,
+        body: JSON.stringify({ content: text.trim(), input_type: 'text' }),
       })
       onClose()
       onProcessing?.()
-    } catch (e) { console.error(e) }
+    } catch (e) { logOrAlertNetworkError(e) }
     setSending(false)
   }
   return (
@@ -239,7 +245,7 @@ function InputSheet({ onClose, userId, onProcessing }: {
 export default function BasePage() {
   const { userId, kids, todos, hotspots, loading, sync: ctxSync,
     processStatus, setProcessStatus, activeKid, setActiveKid,
-    modalOpen, setModalOpen } = useApp()
+    modalOpen, setModalOpen, showOnboarding, setShowOnboarding } = useApp()
   const [time, setTime] = useState(new Date())
   const [modal, setModal] = useState<'child' | 'todo' | 'hotspot' | 'addChild' | 'oneTap' | 'input' | null>(null)
 
@@ -247,6 +253,7 @@ export default function BasePage() {
   const closeModal = () => { setModal(null); setModalOpen(false) }
   const [oneTapTodo, setOneTapTodo] = useState<TodoItem | null>(null)
   const [patrolling, setPatrolling] = useState(false)
+  const patrolTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [mounted, setMounted] = useState(false)
   const [keyboardOpen, setKeyboardOpen] = useState(false)
 
@@ -278,6 +285,10 @@ export default function BasePage() {
     return () => window.visualViewport?.removeEventListener('resize', handleResize)
   }, [])
 
+  useEffect(() => () => {
+    if (patrolTimerRef.current) clearTimeout(patrolTimerRef.current)
+  }, [])
+
   const handleMarkDone = async (id: string) => {
     await markDone(id)
     closeModal()
@@ -305,30 +316,96 @@ export default function BasePage() {
   }
 
   const handlePatrol = async () => {
+    if (patrolling) return
+    if (patrolTimerRef.current) {
+      clearTimeout(patrolTimerRef.current)
+      patrolTimerRef.current = null
+    }
     setPatrolling(true)
     try {
-      await fetch('/api/base/patrol', {
+      const res = await fetchWithAuth('/api/base/patrol', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ user_id: userId })
+        body: JSON.stringify({}),
+        signal: AbortSignal.timeout(15_000),
       })
-      setTimeout(() => { ctxSync(); setPatrolling(false) }, 3000)
-    } catch { setPatrolling(false) }
+      if (!res.ok) throw new Error('巡逻失败')
+    } catch (e) {
+      if ((e as Error).name !== 'AbortError') {
+        if (!logOrAlertNetworkError(e)) alert('刷新失败，请重试')
+      }
+    } finally {
+      patrolTimerRef.current = setTimeout(() => {
+        ctxSync()
+        setPatrolling(false)
+        patrolTimerRef.current = null
+      }, 1000)
+    }
   }
 
-  const cState = dropState('child', activeKid)
-  const tState = dropState('todo', todos)
-  const hState = dropState('hotspot', hotspots)
+  // 孩子水珠状态来自 dropState；待办/热点状态来自 todoEngine/hotspotEngine
+  const childState = dropState('child', activeKid)
   const redCount = todos.filter((t: TodoItem) => t.priority === 'red').length
   const unread = hotspots.filter((h: HotspotItem) => h.status === 'unread').length
   const childUrgent = (activeKid?.urgent_items || [])
     .filter((i: { level: string }) => i.level === 'red').length
-  const hour = time.getHours()
-  const greeting = hour < 6 ? '夜深了' : hour < 12 ? '早上好' : hour < 18 ? '下午好' : '晚上好'
+  const getGreeting = () => {
+    const h = new Date().getHours()
+    if (h < 6) return { text: '深夜了，好好休息', sub: '树洞随时为你亮着' }
+    if (h < 12) return { text: '早安', sub: '今天也是新的开始' }
+    if (h < 18) return { text: '下午好', sub: '喝杯水，歇一歇' }
+    if (h < 21) return { text: '晚上好', sub: '今天辛苦了' }
+    return { text: '夜深了', sub: '放下今天，好好睡觉' }
+  }
+  const greeting = getGreeting()
 
   return (
-    <main style={{ position: 'fixed', inset: 0, width: '100vw', height: '100vh',
-      overflow: 'hidden', background: THEME.bg, fontFamily: 'sans-serif' }}>
+    <main style={{
+      position: 'fixed',
+      inset: 0,
+      width: '100vw',
+      height: '100vh',
+      overflow: 'hidden',
+      backgroundColor: '#fbf9f6',
+      backgroundImage: `
+    radial-gradient(at 100% 0%, rgba(245,214,209,0.2) 0px, transparent 60%),
+    radial-gradient(at 0% 100%, rgba(217,230,218,0.15) 0px, transparent 60%)
+  `,
+    }}>
+      {showOnboarding && (
+        <Onboarding onComplete={() => {
+          setShowOnboarding(false)
+          localStorage.setItem('onboarding_completed', 'true')
+        }} />
+      )}
+
+      <div style={{
+        position: 'fixed',
+        top: 'max(52px, env(safe-area-inset-top, 52px))',
+        left: '6%',
+        zIndex: 10,
+      }}>
+        <div style={{
+          fontFamily: "'Noto Serif SC', serif",
+          fontWeight: 300,
+          fontSize: 'clamp(20px, 5vw, 26px)',
+          color: '#1e293b',
+          letterSpacing: '0.02em',
+          lineHeight: 1.3,
+        }}>
+          {greeting.text}
+        </div>
+        <div style={{
+          fontFamily: "'Montserrat', sans-serif",
+          fontWeight: 400,
+          fontSize: 12,
+          color: '#94a3b8',
+          letterSpacing: '0.15em',
+          marginTop: 4,
+          textTransform: 'uppercase',
+        }}>
+          {greeting.sub}
+        </div>
+      </div>
 
       <div style={{ position: 'absolute', top: '12%', right: '-4%',
         fontSize: 'clamp(60px, 18vw, 130px)', fontWeight: 'bold',
@@ -350,7 +427,7 @@ export default function BasePage() {
         </h1>
         <p style={{ fontSize: 10, color: THEME.text, opacity: 0.35,
           letterSpacing: '0.25em', marginTop: 3 }}>
-          {mounted ? greeting : ''}
+          {mounted ? `${time.getMonth() + 1}.${time.getDate()}` : ''}
         </p>
       </header>
 
@@ -367,20 +444,20 @@ export default function BasePage() {
           transform: 'translate(-50%, -50%)',
           display: 'flex', flexDirection: 'column', alignItems: 'center',
           gap: 'clamp(20px, 5vw, 36px)' }}>
-          <WaterDrop state={cState} icon={<Heart size={24} />} label="孩子"
+          <WaterDrop state={childState} icon={<Heart size={24} />} label="孩子"
             value={activeKid ? `${activeKid.energy ?? 75}%` : '—'}
             badge={childUrgent} pulse={childUrgent > 0}
-            onClick={() => openModal('child')} size={124} delay={0} />
+            onClick={() => openModal('child')} size={124} delay={0} index={0} />
           <div style={{ display: 'flex', gap: 'clamp(28px, 8vw, 52px)', alignItems: 'center' }}>
             <WaterDrop state={todoEngine.state} icon={<Bell size={20} />} label="待办"
               value={todoEngine.badge > 0 ? `${todoEngine.badge}条` : '静默'}
               badge={todoEngine.badge} pulse={todoEngine.badge > 0}
-              onClick={() => openModal('todo')} size={98} delay={1.8} />
+              onClick={() => openModal('todo')} size={98} delay={1.8} index={1} />
             <WaterDrop state={hotspotEngine.state}
               icon={patrolling ? <Loader size={20} /> : <Zap size={20} />}
               label="热点" value={hotspotEngine.badge > 0 ? `${hotspotEngine.badge}条` : '根'}
               badge={hotspotEngine.badge} pulse={hotspotEngine.badge > 0}
-              onClick={() => openModal('hotspot')} size={98} delay={3.4} />
+              onClick={() => openModal('hotspot')} size={98} delay={3.4} index={2} />
           </div>
         </div>
       )}

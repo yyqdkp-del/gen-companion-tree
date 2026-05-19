@@ -1,33 +1,109 @@
 export const dynamic = 'force-dynamic'
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { getAuthUser } from '@/lib/auth/getAuthUser'
 
-const CORS = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type',
+const rateLimit = new Map<string, { count: number; reset: number }>()
+
+function checkRateLimit(userId: string): boolean {
+  const now = Date.now()
+  const entry = rateLimit.get(userId)
+  if (!entry || now > entry.reset) {
+    rateLimit.set(userId, { count: 1, reset: now + 60_000 })
+    return true
+  }
+  if (entry.count >= 30) return false
+  entry.count++
+  return true
 }
 
-export async function OPTIONS() {
-  const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
-  return new NextResponse(null, { status: 200, headers: CORS })
+/** 将 hanzi_library 行映射为与 AI JSON 一致的形状（供 HanziResult 等使用） */
+function normalizeHanziLibraryRowToAiShape(cached: Record<string, unknown>, fallbackChar: string): Record<string, unknown> {
+  const cyRaw = cached.chengyu_connected
+  let chengyu = ''
+  let cy_story = ''
+  if (cyRaw && typeof cyRaw === 'object') {
+    const o = cyRaw as { chengyu?: string; story?: string }
+    chengyu = o.chengyu || ''
+    cy_story = o.story || ''
+  } else if (typeof cyRaw === 'string') {
+    try {
+      const o = JSON.parse(cyRaw) as { chengyu?: string; story?: string }
+      chengyu = o.chengyu || ''
+      cy_story = o.story || ''
+    } catch { /* ignore */ }
+  }
+
+  return {
+    char: (cached.char as string) || fallbackChar,
+    pinyin: cached.pinyin,
+    traditional: cached.traditional,
+    meaning: cached.meaning_short ?? (cached as { meaning?: string }).meaning,
+    level: cached.level_tag ?? (cached as { level?: string }).level,
+    liushu: (cached as { liushu?: unknown }).liushu,
+    parts: cached.parts,
+    evolution: cached.evolution,
+    english_link: (cached as { english_link?: string }).english_link,
+    phonics_bridge: cached.phonics_bridge,
+    family: cached.family,
+    story: (cached as { story?: string }).story,
+    scene: cached.scene_universal ?? (cached as { scene?: string }).scene,
+    mom_script: cached.mom_script,
+    mom_questions: (cached as { mom_questions?: string[] }).mom_questions,
+    chengyu: chengyu || (cached as { chengyu?: string }).chengyu,
+    cy_story: cy_story || (cached as { cy_story?: string }).cy_story,
+    extension: (cached as { extension?: string[] }).extension,
+    traditional_explain: (cached as { traditional_explain?: string }).traditional_explain,
+    visual_hook: (cached as { visual_hook?: string }).visual_hook,
+    memory_trick: (cached as { memory_trick?: string }).memory_trick,
+    child_prompt: (cached as { child_prompt?: string }).child_prompt,
+    writing_guide: (cached as { writing_guide?: string }).writing_guide,
+    stroke_count: (cached as { stroke_count?: number }).stroke_count,
+    stroke_order: (cached as { stroke_order?: string[] }).stroke_order,
+    cultural_sentence: (cached as { cultural_sentence?: string }).cultural_sentence,
+    cultural_author: (cached as { cultural_author?: string }).cultural_author,
+    cultural_meaning: (cached as { cultural_meaning?: string }).cultural_meaning,
+    overseas_connection: (cached as { overseas_connection?: string }).overseas_connection,
+  }
+}
+
+function hanziCachePayload(cached: Record<string, unknown>, requestedChar: string): Record<string, unknown> {
+  const raw = cached.result
+  let parsed: Record<string, unknown> | null = null
+  if (raw != null) {
+    try {
+      parsed = typeof raw === 'string' ? (JSON.parse(raw) as Record<string, unknown>) : (raw as Record<string, unknown>)
+    } catch {
+      parsed = null
+    }
+  }
+  if (parsed && typeof parsed === 'object' && Object.keys(parsed).length > 0) {
+    return { ...parsed, char: (parsed.char as string) || (cached.char as string) || requestedChar }
+  }
+  return normalizeHanziLibraryRowToAiShape(cached, requestedChar)
 }
 
 export async function POST(req: NextRequest) {
   const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
+
+  const { user, error: authError } = await getAuthUser(req)
+  if (authError || !user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+  if (!checkRateLimit(user.id)) {
+    return NextResponse.json({ error: '请求过于频繁，请一分钟后再试' }, { status: 429 })
+  }
+
   const {
     mode, char, sentence, keywords,
     child_name, child_grade, child_level,
     location_scene,
     // 修复四：接收地理围栏数据，不再写死清迈
     geofence,
-  } = await req.json()
+  } = await req.json().catch(() => ({}))
 
   // 修复四：优先用围栏城市，其次用 location_scene，最后降级
   const scene = geofence?.city
@@ -65,7 +141,7 @@ export async function POST(req: NextRequest) {
 
     // ══ 模式一：汉字拆解（逻辑不动） ══
     if (mode === 'hanzi') {
-      if (!char) return NextResponse.json({ error: '请输入汉字' }, { status: 400, headers: CORS })
+      if (!char) return NextResponse.json({ error: '请输入汉字' }, { status: 400 })
 
       try {
         const { data: cached } = await supabase
@@ -78,7 +154,7 @@ export async function POST(req: NextRequest) {
           await supabase.from('hanzi_library')
             .update({ hit_count: (cached.hit_count || 1) + 1 })
             .eq('id', cached.id)
-          return NextResponse.json(cached, { headers: CORS })
+          return NextResponse.json(hanziCachePayload(cached as Record<string, unknown>, char))
         }
       } catch {}
 
@@ -157,11 +233,11 @@ ${childCtx}
         console.warn('hanzi_library insert failed:', e)
       }
 
-      return NextResponse.json(result, { headers: CORS })
+      return NextResponse.json(result)
 
     // ══ 模式二：成语解读 ══
     } else if (mode === 'chengyu') {
-      if (!sentence) return NextResponse.json({ error: '请输入内容' }, { status: 400, headers: CORS })
+      if (!sentence) return NextResponse.json({ error: '请输入内容' }, { status: 400 })
 
       // 修复二：先读缓存（原来只写不读）
       // 用孩子说的话做关键词模糊匹配不现实，
@@ -188,9 +264,11 @@ ${childCtx}
               .update({ hit_count: (cached.hit_count || 1) + 1 })
               .eq('id', cached.id)
             // 把孩子的原话注入缓存结果再返回
+            const r = typeof cached.result === 'string'
+              ? JSON.parse(cached.result) as Record<string, unknown>
+              : (cached.result as Record<string, unknown>)
             return NextResponse.json(
-              { ...cached.result, original: sentence },
-              { headers: CORS }
+              { ...r, original: sentence },
             )
           }
         } catch {}
@@ -254,11 +332,11 @@ ${childCtx}
         console.warn('chengyu_library upsert failed:', e)
       }
 
-      return NextResponse.json(result, { headers: CORS })
+      return NextResponse.json(result)
 
     // ══ 模式三：文化句 ══
     } else if (mode === 'writing') {
-      if (!sentence) return NextResponse.json({ error: '请输入内容' }, { status: 400, headers: CORS })
+      if (!sentence) return NextResponse.json({ error: '请输入内容' }, { status: 400 })
 
       const kw = keywords ? `本周学的字/词：${keywords}` : ''
       const prompt = `
@@ -302,32 +380,25 @@ ${kw}
 
       // 修复三：存入 chinese_sessions，不丢失历史
       try {
-        // 从请求头取 user_id（前端调用时带 Authorization）
-        const authHeader = req.headers.get('authorization') || ''
-        const { data: { user } } = await supabase.auth.getUser(
-          authHeader.replace('Bearer ', '')
-        )
-        if (user?.id) {
-          await supabase.from('chinese_sessions').insert({
-            user_id:        user.id,
-            input_text:     sentence,
-            input_type:     'writing',
-            result:         result,
-            location_scene: scene,
-            learned_at:     new Date().toISOString(),
-          })
-        }
+        await supabase.from('chinese_sessions').insert({
+          user_id:        user.id,
+          input_text:     sentence,
+          input_type:     'writing',
+          result:         result,
+          location_scene: scene,
+          learned_at:     new Date().toISOString(),
+        })
       } catch (e) {
         console.warn('writing session insert failed:', e)
       }
 
-      return NextResponse.json(result, { headers: CORS })
+      return NextResponse.json(result)
 
     } else {
-      return NextResponse.json({ error: '未知模式' }, { status: 400, headers: CORS })
+      return NextResponse.json({ error: '未知模式' }, { status: 400 })
     }
 
   } catch (e: any) {
-    return NextResponse.json({ error: e.message || '服务器错误' }, { status: 500, headers: CORS })
+    return NextResponse.json({ error: e.message || '服务器错误' }, { status: 500 })
   }
 }

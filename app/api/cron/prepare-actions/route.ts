@@ -56,7 +56,10 @@ export async function GET(req: NextRequest) {
       batch.map(todo =>
         fetch(`${appUrl}/api/todo/smart-action`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${process.env.CRON_SECRET}`,
+          },
           body: JSON.stringify({
             todo_id: todo.id,
             user_id: todo.user_id,

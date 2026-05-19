@@ -4,21 +4,6 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { Check, X, Plus } from 'lucide-react'
 import { THEME } from '@/app/_shared/_constants/theme'
 
-const DAYS = [
-  { key: 'mon', label: '周一' },
-  { key: 'tue', label: '周二' },
-  { key: 'wed', label: '周三' },
-  { key: 'thu', label: '周四' },
-  { key: 'fri', label: '周五' },
-]
-
-const ACTIVITY_TYPES = [
-  { value: 'tutor', label: '补习课' },
-  { value: 'sport', label: '体育运动' },
-  { value: 'activity', label: '兴趣班' },
-  { value: 'other', label: '其他' },
-]
-
 // ── 清迈医院预设列表 ──
 const PRESET_HOSPITALS = [
   { category: '综合国际医院', hospitals: [
@@ -47,38 +32,8 @@ const PRESET_HOSPITALS = [
 ]
 
 // ── 健康选项 ──
-const BLOOD_TYPES = ['不知道', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-']
-const ALLERGY_OPTIONS = ['无', '青霉素', '头孢', '阿司匹林', '花生', '海鲜', '牛奶', '鸡蛋', '尘螨', '花粉', '猫狗毛', '乳胶', '其他']
 const CONDITION_OPTIONS = ['无', '哮喘', '湿疹', '过敏性鼻炎', '糖尿病', '癫痫', '心脏病', '其他']
 const MEDICATION_OPTIONS = ['无', '哮喘喷雾', '过敏药', '退烧药备用', '维生素', '其他']
-
-function Field({ label, value, onChange, placeholder, type = 'text' }: {
-  label: string; value: string; onChange: (v: string) => void
-  placeholder?: string; type?: string
-}) {
-  return (
-    <div style={{ marginBottom: 16 }}>
-      <div style={{ fontSize: 12, color: THEME.muted, fontWeight: 700, marginBottom: 6, letterSpacing: '0.08em' }}>{label}</div>
-      <input type={type} value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder}
-        style={{ width: '100%', padding: '12px 14px', borderRadius: 12, border: '1px solid rgba(0,0,0,0.1)', background: 'rgba(255,255,255,0.65)', fontSize: 14, color: THEME.text, outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit' }} />
-    </div>
-  )
-}
-
-function SelectField({ label, value, onChange, options }: {
-  label: string; value: string; onChange: (v: string) => void
-  options: { value: string; label: string }[]
-}) {
-  return (
-    <div style={{ marginBottom: 16 }}>
-      <div style={{ fontSize: 12, color: THEME.muted, fontWeight: 700, marginBottom: 6, letterSpacing: '0.08em' }}>{label}</div>
-      <select value={value} onChange={e => onChange(e.target.value)}
-        style={{ width: '100%', padding: '12px 14px', borderRadius: 12, border: '1px solid rgba(0,0,0,0.1)', background: 'rgba(255,255,255,0.65)', fontSize: 14, color: THEME.text, outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit', appearance: 'none' }}>
-        {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-      </select>
-    </div>
-  )
-}
 
 // ── 多选标签组件 ──
 function MultiSelect({ label, options, selected, onChange }: {
@@ -159,21 +114,6 @@ function StepHealth({ data, onChange }: { data: any; onChange: (d: any) => void 
       <div style={{ fontSize: 15, fontWeight: 600, color: THEME.navy, marginBottom: 4 }}>健康信息 🏥</div>
       <div style={{ fontSize: 12, color: THEME.muted, marginBottom: 20, lineHeight: 1.6 }}>用于就诊卡和紧急情况</div>
 
-      {/* 血型 */}
-      <div style={{ marginBottom: 16 }}>
-        <div style={{ fontSize: 12, color: THEME.muted, fontWeight: 700, marginBottom: 8, letterSpacing: '0.08em' }}>血型</div>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-          {BLOOD_TYPES.map(bt => (
-            <motion.div key={bt} whileTap={{ scale: 0.92 }}
-              onClick={() => onChange({ ...data, blood_type: bt })}
-              style={{ padding: '7px 14px', borderRadius: 20, fontSize: 13, cursor: 'pointer', background: data.blood_type === bt ? 'rgba(176,141,87,0.15)' : 'rgba(255,255,255,0.6)', border: data.blood_type === bt ? `1.5px solid ${THEME.gold}` : '1px solid rgba(0,0,0,0.1)', color: data.blood_type === bt ? THEME.gold : THEME.text, fontWeight: data.blood_type === bt ? 600 : 400 }}>
-              {bt}
-            </motion.div>
-          ))}
-        </div>
-      </div>
-
-      <MultiSelect label="过敏史" options={ALLERGY_OPTIONS} selected={parseArray(data.allergies)} onChange={v => onChange({ ...data, allergies: v })} />
       <MultiSelect label="慢性病 / 医疗状况" options={CONDITION_OPTIONS} selected={parseArray(data.medical_conditions)} onChange={v => onChange({ ...data, medical_conditions: v })} />
       <MultiSelect label="当前用药" options={MEDICATION_OPTIONS} selected={parseArray(data.medications_current)} onChange={v => onChange({ ...data, medications_current: v })} />
 
@@ -249,7 +189,7 @@ function StepHealth({ data, onChange }: { data: any; onChange: (d: any) => void 
       </div>
 
       <div style={{ padding: '12px 14px', borderRadius: 12, background: 'rgba(154,183,232,0.12)', fontSize: 12, color: THEME.muted, lineHeight: 1.7 }}>
-        💡 健康信息用于生成就诊卡和学校紧急联系表
+        💡 慢性病、用药与医院用于就诊卡；血型与过敏请在「基本信息」中填写
       </div>
     </div>
   )

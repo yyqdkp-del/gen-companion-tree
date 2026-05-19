@@ -221,7 +221,7 @@ function StepSchedule({ data, onChange }: { data: any; onChange: (d: any) => voi
       </div>
 
       {parseError && (
-        <div style={{ color: '#E07B2A', fontSize: 12, marginBottom: 12, padding: '8px 12px', borderRadius: 10, background: 'rgba(224,123,42,0.08)' }}>
+        <div style={{ color: '#7a5a35', fontSize: 12, marginBottom: 12, padding: '8px 12px', borderRadius: 10, background: '#fcf7ed' }}>
           ⚠️ {parseError}
         </div>
       )}

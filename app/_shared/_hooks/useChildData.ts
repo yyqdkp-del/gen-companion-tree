@@ -1,10 +1,11 @@
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { enrichChildren } from '../_services/childService'
+import { useLocalTodayStr } from '@/lib/date/useLocalTodayStr'
 
 export function useChildData(userId: string | null) {
   const [enrichedKids, setEnrichedKids] = useState<any[]>([])
   const cacheRef = useRef<Record<string, any>>({})
-  const today = useMemo(() => new Date().toISOString().split('T')[0], [])
+  const today = useLocalTodayStr()
 
   const refresh = useCallback(async () => {
     if (!userId) return

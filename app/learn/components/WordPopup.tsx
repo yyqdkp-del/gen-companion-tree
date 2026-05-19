@@ -1,8 +1,10 @@
 'use client'
 import React, { useEffect, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { fetchWithAuth } from '@/lib/auth/fetchWithAuth'
 import { CHINESE_THEME as T } from '@/app/_shared/_constants/chineseTheme'
 import { fetchHanziCache } from '@/app/_shared/_services/chineseService'
+import { logOrAlertNetworkError } from '@/lib/errors/logOrAlertNetworkError'
 
 type PopupItem = { word: string; type: 'word' | 'chengyu' | 'cultural'; extra?: any }
 
@@ -11,24 +13,40 @@ export function WordPopup({ word, onClose, childLevel }: {
 }) {
   const [loading, setLoading] = useState(true)
   const [data, setData] = useState<any>(null)
+  const [loadError, setLoadError] = useState('')
 
   useEffect(() => {
+    const ac = new AbortController()
     async function load() {
       setLoading(true)
+      setLoadError('')
       try {
         const char = [...word].find(c => /\p{Script=Han}/u.test(c)) || word[0]
         const cached = await fetchHanziCache(char)
         if (cached) { setData(cached); setLoading(false); return }
-        const res = await fetch('/api/chinese/decode', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
+        const res = await fetchWithAuth('/api/chinese/decode', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ mode: 'hanzi', char, child_level: childLevel || 'R2' }),
+          signal: ac.signal,
         })
+        if (ac.signal.aborted) return
         const json = await res.json()
+        if (ac.signal.aborted) return
+        if (!res.ok) { setData(null); setLoadError('暂时无法加载，请稍后再试'); return }
         setData(json.error ? null : json)
-      } catch { setData(null) }
-      setLoading(false)
+      } catch (e) {
+        if (!ac.signal.aborted) {
+          if (!logOrAlertNetworkError(e)) {
+            setLoadError('暂时无法加载，请稍后再试')
+          }
+          setData(null)
+        }
+      }
+      if (!ac.signal.aborted) setLoading(false)
     }
-    load()
+    void load()
+    return () => ac.abort()
   }, [word, childLevel])
 
   return (
@@ -72,6 +90,9 @@ export function WordPopup({ word, onClose, childLevel }: {
               </div>
             )}
           </div>
+        ) : loadError ? (
+          <div style={{ textAlign: 'center', padding: '20px 0', color: T.red,
+            fontFamily: 'sans-serif', fontSize: 13 }}>{loadError}</div>
         ) : (
           <div style={{ textAlign: 'center', padding: '20px 0', color: T.textDim,
             fontFamily: 'sans-serif', fontSize: 13 }}>暂无数据</div>
@@ -89,23 +110,32 @@ export function FamilyPopup({ item, onClose, childLevel }: {
 
   useEffect(() => {
     if (item.type !== 'word') return
+    const ac = new AbortController()
     async function load() {
       setLoading(true)
       try {
         const char = [...item.word].find(c => /\p{Script=Han}/u.test(c)) || item.word[0]
         const cached = await fetchHanziCache(char)
         if (cached) { setWordData(cached); setLoading(false); return }
-        const res = await fetch('/api/chinese/decode', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
+        const res = await fetchWithAuth('/api/chinese/decode', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ mode: 'hanzi', char, child_level: childLevel || 'R2' }),
+          signal: ac.signal,
         })
+        if (ac.signal.aborted) return
         const json = await res.json()
+        if (ac.signal.aborted) return
+        if (!res.ok) { setWordData(null); return }
         setWordData(json.error ? null : json)
-      } catch { setWordData(null) }
-      setLoading(false)
+      } catch {
+        if (!ac.signal.aborted) setWordData(null)
+      }
+      if (!ac.signal.aborted) setLoading(false)
     }
-    load()
-  }, [item.word, childLevel])
+    void load()
+    return () => ac.abort()
+  }, [item.word, item.type, childLevel])
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}

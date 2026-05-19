@@ -3,6 +3,8 @@ export const maxDuration = 60
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { getAuthUser } from '@/lib/auth/getAuthUser'
+import { fetchFormTemplates, enrichActionsWithFormTemplates } from '@/lib/action/enrichPDF'
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -22,8 +24,8 @@ const EVENT_TYPE_DIMENSION: Record<string, string> = {
 
 const DIMENSION_DATA_NEEDED: Record<string, string[]> = {
   education:  ['children', 'places'],
-  mobility:   ['children', 'places', 'passport'],
-  medical:    ['children', 'medical', 'places'],
+  mobility:   ['children', 'places', 'passport', 'vehicles'],
+  medical:    ['children', 'medical', 'places', 'health'],
   compliance: ['passport', 'visa', 'address'],
   wealth:     ['finance', 'places'],
   logistics:  ['places'],
@@ -37,7 +39,7 @@ const DIMENSION_GUIDES: Record<string, string> = {
   medical:    '医疗：推荐科室医院、地址电话导航、携带物品、三语问诊描述、过敏史用药、等待时间、预约电话',
   education:  '学校：学校联系方式、回复邮件草稿、材料清单、缴费方式、家长会日历、携带清单',
   wealth:     '财务：实时汇率、最优缴费渠道、缴费步骤、实际金额含手续费、截止风险',
-  mobility:   '出行：路况AQI、最优出发时间、导航直链、顺路事项、护照签证检查、交通方式',
+  mobility:   '出行：路况AQI、最优出发时间、导航直链、顺路事项、护照签证检查、交通方式；车辆：年检/车险到期、事故理赔电话与材料',
   logistics:  '采购：购买渠道价格对比、最近店铺导航、购物清单、代购渠道',
   estate:     '房产：物业联系方式、缴费账号、维修推荐、沟通模板',
   social:     '社交：餐厅活动推荐、礼品购买、三语祝福语、预算建议',
@@ -64,7 +66,12 @@ const EXECUTION_PACK_SCHEMA = `严格只输出JSON，不加任何其他文字：
         "calendar_title": "日历标题",
         "calendar_date": "YYYY-MM-DD",
         "calendar_time": "HH:MM",
+        "calendar_end_time": "HH:MM（可选，默认开始+2小时）",
         "calendar_location": "地点",
+        "start_time": "可选，ISO8601；若填则优先生效",
+        "end_time": "可选，ISO8601",
+        "description": "日程说明（可选）",
+        "recurrence": "RRULE:FREQ=WEEKLY;BYDAY=WE（重复日程时填写，如每周三；无重复则省略）",
         "message": "消息内容",
         "note": "说明",
         "item": "商品名",
@@ -78,7 +85,14 @@ const EXECUTION_PACK_SCHEMA = `严格只输出JSON，不加任何其他文字：
   "cost_estimate": "预估费用",
   "risk_warnings": ["风险提示"],
   "carry_items": ["携带物品"]
-}`
+}
+若日程为固定周期重复（如每周三游泳课），calendar 类 action 的 data 必须包含 recurrence（RRULE 单行字符串，如 RRULE:FREQ=WEEKLY;BYDAY=WE）。
+
+【车辆与事故】若待办/意图涉及车险、交通事故、理赔、车辆年检：checklist 应覆盖现场安全、取证、报警保险、理赔材料；actions 含 call（保险/救援电话）、navigate（维修厂或警局）、download_pdf（理赔表若有 form_type）；可在 brain_instruction.family_data_needed 中加入 "vehicles" 以拉取车辆档案。
+
+【旅行与机票】若涉及旅行、假期、酒店、机票：actions 应含 open_url，data.url 填 "/travel"（站内旅行规划页，相对路径即可）；checklist 含护照签证、机票酒店、保险等；可配合 calendar 记出行提醒。
+
+【热点航班】若热点标题或摘要涉及航班、机票比价、订票：actions 必须包含 open_url，data.url 为 "/travel"。`
 
 // ══ 读取家庭档案 ══
 async function getFamilyData(userId: string, needed: string[]) {
@@ -111,19 +125,24 @@ async function getFamilyData(userId: string, needed: string[]) {
         result.documents = data || []
         break
       }
+      case 'health': {
+        const { data } = await supabase
+          .from('child_health_records')
+          .select('*')
+          .eq('user_id', userId)
+          .order('date', { ascending: false })
+          .limit(5)
+        result.childHealth = data || []
+        break
+      }
+      case 'vehicles': {
+        const { data } = await supabase.from('vehicles').select('*').eq('user_id', userId)
+        result.vehicles = data || []
+        break
+      }
     }
   }))
   return result
-}
-
-// ══ 读取表格模板 ══
-async function getFormTemplates(formTypes: string[]) {
-  if (!formTypes.length) return []
-  const { data } = await supabase
-    .from('form_templates')
-    .select('*')
-    .in('form_type', formTypes)
-  return data || []
 }
 
 // ══ 调用 Claude ══
@@ -148,37 +167,6 @@ async function callClaude(prompt: string): Promise<any> {
     const match = cleaned.match(/\{[\s\S]*\}/)
     return match ? JSON.parse(match[0]) : {}
   } catch { return {} }
-}
-
-// ══ 补全 actions ══
-function enrichActions(actions: any[], familyData: any, formTemplates: any[]): any[] {
-  return (actions || []).map((action: any) => {
-    // 表格预填
-    if (action.type === 'download_pdf' && action.data?.form_type) {
-      const template = formTemplates.find(t => t.form_type === action.data.form_type)
-      if (template) {
-        const profile = familyData.profile?.[0] || {}
-        const prefilled: Record<string, string> = {}
-        for (const [field, source] of Object.entries(template.field_mapping || {})) {
-          const [table, col] = (source as string).split('.')
-          if (table === 'family_profile') prefilled[field] = profile[col] || ''
-          if (table === 'family_places') {
-            const primary = familyData.places?.find((p: any) => p.is_primary)
-            prefilled[field] = primary?.[col] || ''
-          }
-        }
-        action.data.form_name = template.form_name
-        action.data.official_url = template.official_url
-        action.data.download_url = template.download_url
-        action.data.prefilled_fields = prefilled
-      }
-    }
-    // 补全导航链接
-    if (action.type === 'navigate' && action.data?.destination && !action.data?.url) {
-      action.data.url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(action.data.destination)}`
-    }
-    return action
-  })
 }
 
 // ══ 写入 action_queue ══
@@ -245,6 +233,8 @@ function buildTodoPrompt(todo: any, brainInstruction: any, familyData: any): str
 
 ${EXECUTION_PACK_SCHEMA}
 
+补充：车险/事故/理赔/年检、旅行/机票/酒店等场景须遵守 schema 末尾【车辆与事故】【旅行与机票】规则；open_url 去 /travel 时用 data.url: "/travel"。
+
 今天日期：${new Date().toLocaleDateString('zh-CN')}
 actions最多5个。primary_action_index 是最该先做的那个的下标。
 primary_action_reason 用"你"称呼妈妈，口语化一句话。`
@@ -299,45 +289,152 @@ ${EXECUTION_PACK_SCHEMA}
 1. 查看详情/原文链接
 2. 如果紧急，生成对应待办的导航/电话
 3. 可以建议转为待办
+若热点涉及航班、机票、比价、订票，必须包含 open_url，data.url 为 "/travel"。
 actions最多3个，不要过度。
 如果这条热点需要妈妈采取行动，在summary末尾说明。`
 }
 
-// ══ 执行具体动作（Make.com）══
+function buildCalendarStartEnd(action: any): { startISO: string; endISO: string } | null {
+  const d = action?.data || {}
+  if (d.start_time) {
+    const startISO = String(d.start_time).trim()
+    let endISO = d.end_time ? String(d.end_time).trim() : ''
+    if (!endISO) {
+      const ts = Date.parse(startISO)
+      if (Number.isNaN(ts)) return null
+      endISO = new Date(ts + 2 * 60 * 60 * 1000).toISOString()
+    }
+    return { startISO, endISO }
+  }
+  const date = d.calendar_date ? String(d.calendar_date).trim() : ''
+  if (!date) return null
+  const hm = (() => {
+    const s = String(d.calendar_time ?? '09:00').trim()
+    const m = /^(\d{1,2}):(\d{2})$/.exec(s)
+    if (!m) return '09:00'
+    const h = Math.min(23, Math.max(0, parseInt(m[1], 10)))
+    const min = Math.min(59, Math.max(0, parseInt(m[2], 10)))
+    return `${String(h).padStart(2, '0')}:${String(min).padStart(2, '0')}`
+  })()
+  const startISO = `${date}T${hm}:00`
+  if (d.calendar_end_time) {
+    const em = (() => {
+      const s = String(d.calendar_end_time).trim()
+      const m = /^(\d{1,2}):(\d{2})$/.exec(s)
+      if (!m) return '11:00'
+      const h = Math.min(23, Math.max(0, parseInt(m[1], 10)))
+      const min = Math.min(59, Math.max(0, parseInt(m[2], 10)))
+      return `${String(h).padStart(2, '0')}:${String(min).padStart(2, '0')}`
+    })()
+    return { startISO, endISO: `${date}T${em}:00` }
+  }
+  if (d.end_time) {
+    return { startISO, endISO: String(d.end_time).trim() }
+  }
+  const naiveMs = Date.parse(`${startISO}+07:00`)
+  if (Number.isNaN(naiveMs)) return null
+  const endWall = new Date(naiveMs + 2 * 60 * 60 * 1000).toLocaleString('sv-SE', { timeZone: 'Asia/Bangkok' })
+  return { startISO, endISO: endWall.replace(' ', 'T') }
+}
+
+// ══ 执行具体动作（Gmail / Make.com）══
 async function performAction(action: any, userId: string) {
   const MAKE_WEBHOOK_URL = process.env.NEXT_PUBLIC_MAKE_WEBHOOK_URL || ''
-  if (!MAKE_WEBHOOK_URL) return { ok: false, error: 'No webhook' }
   try {
     switch (action.type) {
-      case 'email':
-        await fetch(MAKE_WEBHOOK_URL, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            type: 'email',
-            to: action.data?.email_to,
-            subject: action.data?.email_subject,
-            body: action.data?.email_body,
-            user_id: userId,
-          }),
+      case 'email': {
+        const to = action.data?.email_to ?? action.data?.to
+        const subject = action.data?.email_subject ?? action.data?.subject ?? ''
+        const body = action.data?.email_body ?? action.data?.body ?? ''
+        if (!to || !String(to).trim()) {
+          return { ok: false, error: '缺少收件人' }
+        }
+        const { sendGmail } = await import('@/lib/google/gmail')
+        const result = await sendGmail(userId, String(to).trim(), subject, body)
+        if (result.success) {
+          return { ok: true, message: '邮件已发送', messageId: result.messageId }
+        }
+        if (result.error?.includes('未授权')) {
+          if (!MAKE_WEBHOOK_URL) {
+            return { ok: false, error: result.error || 'Gmail 未授权且无 Make Webhook 可降级' }
+          }
+          await fetch(MAKE_WEBHOOK_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              type: 'email',
+              to,
+              subject,
+              body,
+              user_id: userId,
+            }),
+          })
+          return { ok: true, message: '邮件请求已提交', fallback: true }
+        }
+        return { ok: false, error: result.error || '邮件发送失败' }
+      }
+      case 'calendar': {
+        const se = buildCalendarStartEnd(action)
+        if (!se) {
+          return { ok: false, error: '缺少时间信息' }
+        }
+        const title = String(action.data?.calendar_title ?? action.data?.title ?? '日程').trim() || '日程'
+        const description = action.data?.description ?? action.data?.note
+        const location = action.data?.calendar_location ?? action.data?.location
+        const recurrenceRaw = action.data?.recurrence
+        const recurrence =
+          typeof recurrenceRaw === 'string' && recurrenceRaw.trim()
+            ? [recurrenceRaw.trim()]
+            : Array.isArray(recurrenceRaw)
+              ? recurrenceRaw.filter((x: unknown) => typeof x === 'string').map((x: string) => x.trim()).filter(Boolean)
+              : undefined
+
+        const { addCalendarEvent } = await import('@/lib/google/calendar')
+        const result = await addCalendarEvent(userId, {
+          title,
+          startTime: se.startISO,
+          endTime: se.endISO,
+          location: location ? String(location) : undefined,
+          description: description != null ? String(description) : undefined,
+          timeZone: 'Asia/Bangkok',
+          recurrence,
         })
-        return { ok: true, message: '邮件已发送' }
-      case 'calendar':
-        await fetch(MAKE_WEBHOOK_URL, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            type: 'calendar',
-            title: action.data?.calendar_title,
-            start_time: `${action.data?.calendar_date}T${action.data?.calendar_time || '09:00'}:00`,
-            end_time: `${action.data?.calendar_date}T${action.data?.calendar_time || '11:00'}:00`,
-            location: action.data?.calendar_location,
-            user_id: userId,
-          }),
-        })
-        return { ok: true, message: '已加入日历' }
+
+        if (result.success) {
+          return {
+            ok: true,
+            message: '已添加到 Google 日历',
+            eventLink: result.htmlLink,
+            eventId: result.eventId,
+          }
+        }
+        if (result.error?.includes('未授权')) {
+          if (!MAKE_WEBHOOK_URL) {
+            return { ok: false, error: result.error || '日历未授权且无 Make Webhook 可降级' }
+          }
+          await fetch(MAKE_WEBHOOK_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              type: 'calendar',
+              title,
+              start_time: se.startISO,
+              end_time: se.endISO,
+              location,
+              user_id: userId,
+            }),
+          })
+          return { ok: true, message: '日历请求已提交', fallback: true }
+        }
+        return { ok: false, error: result.error || '添加日历失败' }
+      }
       default:
-        return { ok: true, message: '动作已记录' }
+        console.warn('Unknown action type:', action?.type)
+        return {
+          ok: false,
+          skipped: true,
+          reason: `Unknown action type: ${action?.type ?? 'unknown'}`,
+        }
     }
   } catch (e: any) {
     return { ok: false, error: e.message }
@@ -346,17 +443,19 @@ async function performAction(action: any, userId: string) {
 
 // ══ 主入口 ══
 export async function POST(req: NextRequest) {
-  const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-  process.env.SUPABASE_SERVICE_ROLE_KEY || ''
-)
+  const { user, error: authError } = await getAuthUser(req)
+  if (authError || !user) {
+    return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+  }
+
+  const userId = user.id
+
   try {
     const body = await req.json()
     const {
       source_type,
       source_id,
-      user_id,
-      // 兼容旧版
+      // 兼容旧版（user_id 已忽略，一律使用 JWT 中的 user.id）
       todo_id,
       execute_action,
       perform_action,
@@ -365,14 +464,10 @@ export async function POST(req: NextRequest) {
       child_name,
     } = body
 
-    if (!user_id) {
-      return NextResponse.json({ ok: false, error: 'Missing user_id' }, { status: 400 })
-    }
-
     // ── 执行具体动作（Make.com）──
     if (execute_action || perform_action) {
       const action = execute_action || perform_action
-      const result = await performAction(action, user_id)
+      const result = await performAction(action, userId)
       return NextResponse.json(result)
     }
 
@@ -388,7 +483,7 @@ export async function POST(req: NextRequest) {
     const { data: cached } = await supabase
       .from('action_queue')
       .select('*')
-      .eq('user_id', user_id)
+      .eq('user_id', userId)
       .eq('source_type', resolvedSourceType)
       .eq('source_id', resolvedSourceId)
       .eq('status', 'pending')
@@ -417,7 +512,7 @@ export async function POST(req: NextRequest) {
         .from('todo_items')
         .select('*')
         .eq('id', resolvedSourceId)
-        .eq('user_id', user_id)
+        .eq('user_id', userId)
         .single()
 
       if (error || !todo) {
@@ -431,7 +526,7 @@ export async function POST(req: NextRequest) {
       const brainInstruction = todo.ai_action_data?.brain_instruction || {}
       const needed = brainInstruction.family_data_needed ||
         DIMENSION_DATA_NEEDED[brainInstruction.dimension || 'education'] || []
-      const familyData = await getFamilyData(user_id, needed)
+      const familyData = await getFamilyData(userId, needed)
       const prompt = buildTodoPrompt(todo, brainInstruction, familyData)
       executionPack = await callClaude(prompt)
 
@@ -439,8 +534,8 @@ export async function POST(req: NextRequest) {
       const formTypes = (executionPack.actions || [])
         .filter((a: any) => a.type === 'download_pdf' && a.data?.form_type)
         .map((a: any) => a.data.form_type)
-      const formTemplates = await getFormTemplates(formTypes)
-      executionPack.actions = enrichActions(executionPack.actions, familyData, formTemplates)
+      const formTemplates = await fetchFormTemplates(supabase, formTypes)
+      executionPack.actions = enrichActionsWithFormTemplates(executionPack.actions, familyData, formTemplates)
 
       // 同步更新 todo_items（向后兼容）
       await supabase.from('todo_items').update({
@@ -449,7 +544,7 @@ export async function POST(req: NextRequest) {
           execution_pack: executionPack,
           prepared_at: new Date().toISOString(),
         }
-      }).eq('id', resolvedSourceId).eq('user_id', user_id)
+      }).eq('id', resolvedSourceId).eq('user_id', userId)
     }
 
     // ── SCHEDULE 分支 ──
@@ -475,15 +570,20 @@ export async function POST(req: NextRequest) {
 
       const dimension = EVENT_TYPE_DIMENSION[event.event_type || 'other'] || 'education'
       const needed = DIMENSION_DATA_NEEDED[dimension] || ['children', 'places']
-      const familyData = await getFamilyData(user_id, needed)
+      const familyData = await getFamilyData(userId, needed)
       const prompt = buildSchedulePrompt(event, child_name || '孩子', dimension, familyData)
       executionPack = await callClaude(prompt)
 
       const formTypes = (executionPack.actions || [])
         .filter((a: any) => a.type === 'download_pdf' && a.data?.form_type)
         .map((a: any) => a.data.form_type)
-      const formTemplates = await getFormTemplates(formTypes)
-      executionPack.actions = enrichActions(executionPack.actions, familyData, formTemplates)
+      const formTemplates = await fetchFormTemplates(supabase, formTypes)
+      executionPack.actions = enrichActionsWithFormTemplates(
+        executionPack.actions,
+        familyData,
+        formTemplates,
+        child_name || undefined,
+      )
 
       // 存入 child_school_calendar
       await supabase.from('child_school_calendar').update({
@@ -491,7 +591,7 @@ export async function POST(req: NextRequest) {
           execution_pack: executionPack,
           prepared_at: new Date().toISOString(),
         }
-      }).eq('id', resolvedSourceId)
+      }).eq('id', resolvedSourceId).eq('user_id', userId)
     }
 
     // ── HOTSPOT 分支 ──
@@ -500,6 +600,7 @@ export async function POST(req: NextRequest) {
         .from('hotspot_items')
         .select('*')
         .eq('id', resolvedSourceId)
+        .eq('user_id', userId)
         .single()
 
       if (error || !hotspot) {
@@ -510,10 +611,10 @@ export async function POST(req: NextRequest) {
       category = hotspot.category || 'lifestyle'
       urgencyLevel = hotspot.urgency === 'urgent' ? 3 : hotspot.urgency === 'important' ? 2 : 1
 
-      const familyData = await getFamilyData(user_id, ['children', 'places'])
+      const familyData = await getFamilyData(userId, ['children', 'places'])
       const prompt = buildHotspotPrompt(hotspot, familyData)
       executionPack = await callClaude(prompt)
-      executionPack.actions = enrichActions(executionPack.actions || [], familyData, [])
+      executionPack.actions = enrichActionsWithFormTemplates(executionPack.actions || [], familyData, [])
     }
 
     else {
@@ -522,7 +623,7 @@ export async function POST(req: NextRequest) {
 
     // ── 写入 action_queue ──
     const actionQueueId = await upsertActionQueue(
-      user_id,
+      userId,
       resolvedSourceType,
       resolvedSourceId,
       title,

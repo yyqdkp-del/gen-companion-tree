@@ -1,6 +1,10 @@
 'use client'
 import React, { useEffect, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { getJsonAuthHeaders } from '@/lib/auth/clientAuthHeaders'
+import { fetchWithAuth } from '@/lib/auth/fetchWithAuth'
+import { logOrAlertNetworkError } from '@/lib/errors/logOrAlertNetworkError'
+import { useApp } from '@/app/context/AppContext'
 import {
   X, CheckCircle2, Navigation, Phone, Mail, Calendar,
   Download, ExternalLink, CreditCard, ShoppingBag,
@@ -57,6 +61,20 @@ type ActionData = {
 type ActionStatus = 'idle' | 'running' | 'done' | 'error'
 type TabKey = 'checklist' | 'carry' | 'draft'
 
+/** executeAction 返回值（含服务端 perform_action 的 skipped、eventLink） */
+type ExecuteClientResult = { message: string; skipped?: boolean; eventLink?: string }
+
+type ExecuteActionContext = { sourceType?: ActionSource; sourceId?: string }
+
+/** 站内相对路径（如 /travel）补全为绝对 URL，避免 window.open 对部分相对路径不生效 */
+function resolveOpenUrl(url: string): string {
+  const u = url.trim()
+  if (/^https?:\/\//i.test(u)) return u
+  if (typeof window === 'undefined') return u
+  const path = u.startsWith('/') ? u : `/${u}`
+  return `${window.location.origin}${path}`
+}
+
 // ── 语音播报（联动设置）──
 function speak(text: string) {
   if (typeof window === 'undefined' || !window.speechSynthesis) return
@@ -90,7 +108,7 @@ function CheckItem({ item, note, checked, onToggle }: {
   return (
     <div onClick={onToggle}
       style={{ display: 'flex', alignItems: 'flex-start', gap: 9, padding: '8px 0',
-        borderBottom: '0.5px solid rgba(0,0,0,0.05)', cursor: 'pointer' }}>
+        borderBottom: '0.5px solid rgba(0,0,0,0.05)', cursor: onToggle ? 'pointer' : 'default' }}>
       <motion.div whileTap={{ scale: 0.8 }} style={{ width: 19, height: 19, borderRadius: '50%', flexShrink: 0, marginTop: 1,
         border: done ? 'none' : `1.5px solid ${THEME.muted}`, background: done ? G.deep : 'transparent',
         display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'background 0.15s' }}>
@@ -193,14 +211,18 @@ function AiSummaryCard({ pack }: { pack: ExecutionPack }) {
 }
 
 // ── 标签页内容 ──
-function TabContent({ tabKey, pack, onToggleChecklist, onToggleCarry }: {
+function TabContent({ tabKey, pack, saving, onToggleChecklist, onToggleCarry }: {
   tabKey: TabKey; pack: ExecutionPack
+  saving: boolean
   onToggleChecklist: (i: number) => void
   onToggleCarry: (i: number) => void
 }) {
   const [copied, setCopied] = useState(false)
   const checklistText = pack.checklist?.map(c => c.item + (c.note ? `（${c.note}）` : '')).join('、') || ''
-  const carryText = pack.carry_items?.join('、') || ''
+  const carryText = (pack.carry_items || [])
+    .map((x: string | { label?: string }) => (typeof x === 'string' ? x : (x.label ?? '')))
+    .filter(Boolean)
+    .join('、') || ''
   const draftText = pack.draft || ''
 
   const copyDraft = () => {
@@ -220,7 +242,10 @@ function TabContent({ tabKey, pack, onToggleChecklist, onToggleCarry }: {
           <span style={{ fontSize: 10, color: THEME.muted }}>点击勾选</span>
           <VoiceBtn text={`材料清单：${checklistText}`} />
         </div>
-        {pack.checklist.map((c, i) => <CheckItem key={i} item={c.item} note={c.note} checked={c.status === 'done'} onToggle={() => onToggleChecklist(i)} />)}
+        {pack.checklist.map((c, i) => (
+          <CheckItem key={i} item={c.item} note={c.note} checked={c.status === 'done'}
+            onToggle={saving ? undefined : () => onToggleChecklist(i)} />
+        ))}
       </div>
     )
   }
@@ -234,7 +259,14 @@ function TabContent({ tabKey, pack, onToggleChecklist, onToggleCarry }: {
           <VoiceBtn text={`携带物品：${carryText}`} />
         </div>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-          {pack.carry_items.map((item, i) => <CarryTag key={i} label={item} />)}
+          {pack.carry_items.map((item: string | { label?: string; checked?: boolean }, i: number) => (
+            <CarryTag
+              key={i}
+              label={typeof item === 'string' ? item : (item.label ?? '')}
+              checked={typeof item === 'string' ? false : !!item.checked}
+              onToggle={saving ? undefined : () => onToggleCarry(i)}
+            />
+          ))}
         </div>
       </div>
     )
@@ -249,11 +281,12 @@ function TabContent({ tabKey, pack, onToggleChecklist, onToggleCarry }: {
       </div>
       <p style={{ fontSize: 12, color: THEME.text, lineHeight: 1.75, margin: '0 0 10px',
         fontStyle: 'italic', whiteSpace: 'pre-wrap' }}>{draftText}</p>
-      <motion.button whileTap={{ scale: 0.95 }} onClick={copyDraft}
+      <motion.button whileTap={{ scale: 0.95 }} onClick={copyDraft} disabled={saving}
         style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
           width: '100%', padding: '9px', borderRadius: 9, border: 'none',
           background: copied ? G.mid : G.bg, color: copied ? '#fff' : G.darkest,
-          fontSize: 13, fontWeight: 500, cursor: 'pointer', transition: 'all 0.15s' }}>
+          fontSize: 13, fontWeight: 500, cursor: saving ? 'not-allowed' : 'pointer', transition: 'all 0.15s',
+          opacity: saving ? 0.55 : 1 }}>
         {copied ? '已复制 ✓' : '复制内容'}
       </motion.button>
     </div>
@@ -287,7 +320,11 @@ const SHORT_LABEL: Record<string, string> = {
   buy: '购买', pay: '支付', whatsapp: '消息',
 }
 
-async function executeAction(action: ActionData, userId: string): Promise<string> {
+async function executeAction(
+  action: ActionData,
+  userId: string,
+  ctx?: ExecuteActionContext,
+): Promise<ExecuteClientResult> {
   const data = action.data || {}
   switch (action.type) {
     case 'navigate': {
@@ -295,48 +332,133 @@ async function executeAction(action: ActionData, userId: string): Promise<string
         ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(data.destination)}`
         : null)
       if (url) window.open(url, '_blank')
-      return '已打开导航'
+      return { message: '已打开导航' }
     }
     case 'call':
       if (data.phone) window.location.href = `tel:${data.phone.replace(/\s/g, '')}`
-      return `拨打 ${data.phone}`
-    case 'email':
+      return { message: `拨打 ${data.phone}` }
+    case 'email': {
       window.open(`mailto:${data.email_to}?subject=${encodeURIComponent(data.email_subject || '')}&body=${encodeURIComponent(data.email_body || '')}`)
-      fetch('/api/action/execute', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ perform_action: action, user_id: userId }) }).catch(() => {})
-      return '已打开邮件'
+      try {
+        const res = await fetchWithAuth('/api/action/execute', {
+          method: 'POST',
+          body: JSON.stringify({ perform_action: action }),
+        })
+        const json = await res.json().catch(() => ({})) as { skipped?: boolean; reason?: string }
+        if (json?.skipped) {
+          return { message: typeof json.reason === 'string' ? json.reason : '未执行', skipped: true }
+        }
+      } catch (e) {
+        logOrAlertNetworkError(e)
+      }
+      return { message: '已打开邮件' }
+    }
     case 'whatsapp':
       window.open(`https://wa.me/${(data.phone || '').replace(/\D/g, '')}?text=${encodeURIComponent(data.message || '')}`, '_blank')
-      return '已打开 WhatsApp'
+      return { message: '已打开 WhatsApp' }
     case 'calendar': {
+      try {
+        const res = await fetchWithAuth('/api/action/execute', {
+          method: 'POST',
+          body: JSON.stringify({ perform_action: action }),
+        })
+        const json = await res.json().catch(() => ({})) as {
+          skipped?: boolean
+          reason?: string
+          ok?: boolean
+          eventLink?: string
+          message?: string
+          fallback?: boolean
+        }
+        if (json?.skipped) {
+          return { message: typeof json.reason === 'string' ? json.reason : '未执行', skipped: true }
+        }
+        if (res.ok && json?.ok && json.eventLink) {
+          window.open(json.eventLink, '_blank')
+          return { message: typeof json.message === 'string' ? json.message : '已添加到 Google 日历', eventLink: json.eventLink }
+        }
+        if (res.ok && json?.ok && json.fallback) {
+          const title = encodeURIComponent(data.calendar_title || '')
+          const date = (data.calendar_date || '').replace(/-/g, '')
+          const time = (data.calendar_time || '09:00').replace(':', '')
+          const loc = encodeURIComponent(data.calendar_location || '')
+          window.open(`https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&dates=${date}T${time}00/${date}T${time}00&location=${loc}`, '_blank')
+          return { message: typeof json.message === 'string' ? json.message : '日历请求已提交' }
+        }
+      } catch (e) {
+        logOrAlertNetworkError(e)
+      }
       const title = encodeURIComponent(data.calendar_title || '')
       const date = (data.calendar_date || '').replace(/-/g, '')
       const time = (data.calendar_time || '09:00').replace(':', '')
       const loc = encodeURIComponent(data.calendar_location || '')
       window.open(`https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&dates=${date}T${time}00/${date}T${time}00&location=${loc}`, '_blank')
-      fetch('/api/action/execute', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ perform_action: action, user_id: userId }) }).catch(() => {})
-      return '已加入日历'
+      return { message: '已加入日历' }
     }
-      // 医疗卡
-if (data.form_type === 'medical_form') {
-  window.open(`/api/cards/medical?user_id=${userId}`, '_blank')
-  return '已打开就诊信息卡'
-}
-// 签证指引
-if (['TM7','TM47','TM8'].includes(data.form_type || '')) {
-  window.open(`/api/cards/visa?user_id=${userId}`, '_blank')
-  return '已打开签证填写指引'
-}
     case 'download_pdf': {
+      if (data.form_type === 'medical_form') {
+        const tokenRes = await fetchWithAuth('/api/auth/card-token', { method: 'POST' })
+        if (!tokenRes.ok) throw new Error('card token')
+        const tokenJson = await tokenRes.json()
+        const token = tokenJson.token as string | undefined
+        if (!token) throw new Error('missing token')
+        window.open(`/api/cards/medical?token=${encodeURIComponent(token)}`, '_blank')
+        return { message: '已打开就诊信息卡' }
+      }
+      if (['TM7', 'TM47', 'TM8'].includes(data.form_type || '')) {
+        const tokenRes = await fetchWithAuth('/api/auth/card-token', { method: 'POST' })
+        if (!tokenRes.ok) throw new Error('card token')
+        const tokenJson = await tokenRes.json()
+        const token = tokenJson.token as string | undefined
+        if (!token) throw new Error('missing token')
+        window.open(`/api/cards/visa?token=${encodeURIComponent(token)}`, '_blank')
+
+        let pdfDownloaded = false
+        try {
+          const pdfRes = await fetchWithAuth('/api/todo/generate-pdf', {
+            method: 'POST',
+            body: JSON.stringify({
+              user_id: userId,
+              ...(ctx?.sourceType === 'todo' && ctx?.sourceId ? { todo_id: ctx.sourceId } : {}),
+              form_type: data.form_type,
+              prefilled_fields: data.prefilled_fields ?? {},
+            }),
+          })
+          if (pdfRes.ok) {
+            const j = (await pdfRes.json()) as { ok?: boolean; pdf_url?: string; filename?: string }
+            if (j.ok && j.pdf_url) {
+              const dl = await fetch(j.pdf_url)
+              if (dl.ok) {
+                const blob = await dl.blob()
+                const url = URL.createObjectURL(blob)
+                const a = document.createElement('a')
+                a.href = url
+                a.download = j.filename || `${data.form_type}_prefilled.pdf`
+                a.click()
+                URL.revokeObjectURL(url)
+                pdfDownloaded = true
+              }
+            }
+          }
+        } catch (e) {
+          console.warn('PDF 预填生成失败，已打开指引页', e)
+        }
+        return {
+          message: pdfDownloaded
+            ? '已打开签证填写指引，预填 PDF 已下载'
+            : '已打开签证填写指引',
+        }
+      }
       // 有预填数据，调 perform API 生成 PDF
       if (data.prefilled_fields && data.form_type) {
         try {
-          const res = await fetch('/api/action/perform', {
+          const res = await fetchWithAuth('/api/action/perform', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ action_type: 'fill_pdf', form_type: data.form_type,
-              prefilled_fields: data.prefilled_fields, user_id: userId }),
+            body: JSON.stringify({
+              action_type: 'fill_pdf',
+              form_type: data.form_type,
+              prefilled_fields: data.prefilled_fields,
+            }),
           })
           if (res.ok) {
             const blob = await res.blob()
@@ -344,39 +466,41 @@ if (['TM7','TM47','TM8'].includes(data.form_type || '')) {
             const a = document.createElement('a')
             a.href = url; a.download = `${data.form_type}.pdf`; a.click()
             URL.revokeObjectURL(url)
-            return '已下载预填表格'
+            return { message: '已下载预填表格' }
           }
         } catch {}
       }
       // 降级：直接打开官方链接
       const pdfUrl = data.download_url || data.official_url || data.url
       if (pdfUrl) window.open(pdfUrl, '_blank')
-      return '已打开表格页面'
+      return { message: '已打开表格页面' }
     }
     case 'open_url':
-      if (data.url) window.open(data.url, '_blank')
-      return '已打开'
+      if (data.url) window.open(resolveOpenUrl(data.url), '_blank')
+      return { message: '已打开' }
     case 'pay':
       if (data.url) window.open(data.url, '_blank')
       else alert(data.note || data.channel || '请按提示方式缴费')
-      return '已查看缴费方式'
+      return { message: '已查看缴费方式' }
     case 'buy': {
       const ch = data.channel === 'shopee'
         ? 'https://shopee.co.th/search?keyword='
         : 'https://www.lazada.co.th/catalog/?q='
       window.open(ch + encodeURIComponent(data.item || ''), '_blank')
-      return '已打开购物'
+      return { message: '已打开购物' }
     }
-    default: return '已完成'
+    default:
+      return { message: '已完成' }
   }
 }
 
-function ActionsArea({ actions, userId, primaryIndex, primaryReason, sourceId, onAllDone }: {
+function ActionsArea({ actions, userId, primaryIndex, primaryReason, sourceId, sourceType, onAllDone }: {
   actions: ActionData[]
   userId: string
   primaryIndex?: number
   primaryReason?: string
   sourceId: string
+  sourceType?: ActionSource
   onAllDone: () => void
 }) {
   const [states, setStates] = useState<{ status: ActionStatus; message?: string }[]>(
@@ -395,8 +519,12 @@ function ActionsArea({ actions, userId, primaryIndex, primaryReason, sourceId, o
   const execOne = async (action: ActionData, i: number) => {
     setStates(prev => { const n = [...prev]; n[i] = { status: 'running' }; return n })
     try {
-      const msg = await executeAction(action, userId)
-      setStates(prev => { const n = [...prev]; n[i] = { status: 'done', message: msg }; return n })
+      const result = await executeAction(action, userId, { sourceType, sourceId })
+      if (result.skipped) {
+        setStates(prev => { const n = [...prev]; n[i] = { status: 'idle' }; return n })
+        return
+      }
+      setStates(prev => { const n = [...prev]; n[i] = { status: 'done', message: result.message }; return n })
     } catch {
       setStates(prev => { const n = [...prev]; n[i] = { status: 'error', message: '执行失败' }; return n })
     }
@@ -524,51 +652,79 @@ export default function ActionModal({
   due_date, event_data, child_name, userId,
   onClose, onDone, onSnooze, onSync,
 }: ActionModalProps) {
+  const { sessionReady } = useApp()
   const [pack, setPack] = useState<ExecutionPack | null>(null)
   const [loading, setLoading] = useState(false)
+  const [saving, setSaving] = useState(false)
   const [activeTab, setActiveTab] = useState<TabKey | null>(null)
 
   useEffect(() => {
     if (!source_id) return
     setActiveTab(null)
     setPack(null)
+
+    if (!sessionReady) {
+      setLoading(true)
+      return
+    }
+
     setLoading(true)
 
-    fetch('/api/action/execute', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        source_type,
-        source_id,
-        user_id: userId,
-        event_data,
-        child_name,
-      }),
-    })
-      .then(r => r.json())
-      .then(data => {
+    let cancelled = false
+    ;(async () => {
+      const headers = await getJsonAuthHeaders()
+      if (!headers.Authorization) {
+        if (!cancelled) {
+          window.alert('登录已过期，请重新登录')
+          window.location.href = '/auth'
+          setLoading(false)
+        }
+        return
+      }
+      try {
+        const res = await fetchWithAuth('/api/action/execute', {
+          method: 'POST',
+          body: JSON.stringify({
+            source_type,
+            source_id,
+            event_data,
+            child_name,
+          }),
+        })
+        const data = await res.json()
+        if (cancelled) return
         if (data.ok && data.execution_pack) {
           setPack(data.execution_pack)
           onSync?.()
         }
-      })
-      .catch(e => console.error('ActionModal error:', e))
-      .finally(() => setLoading(false))
-  }, [source_id])
+      } catch (e) {
+        if (!cancelled) logOrAlertNetworkError(e)
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    })()
+
+    return () => { cancelled = true }
+  }, [source_id, source_type, sessionReady])
 
   const savePack = async (newPack: ExecutionPack) => {
     setPack(newPack)
+    setSaving(true)
     try {
-      await fetch('/api/action/update-pack', {
+      const res = await fetchWithAuth('/api/action/update-pack', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ source_id, execution_pack: newPack }),
+        body: JSON.stringify({ source_type, source_id, execution_pack: newPack }),
       })
-    } catch (e) { console.error('savePack error:', e) }
+      if (!res.ok) throw new Error('save failed')
+    } catch (e) {
+      if (!logOrAlertNetworkError(e)) alert('保存失败，请重试')
+    } finally {
+      setSaving(false)
+    }
   }
 
   const toggleChecklist = (i: number) => {
-    if (!pack) return
+    if (saving || !pack) return
     const newChecklist = pack.checklist?.map((c, idx) =>
       idx === i ? { ...c, status: c.status === 'done' ? 'missing' : 'done' } : c
     )
@@ -576,7 +732,7 @@ export default function ActionModal({
   }
 
   const toggleCarry = (i: number) => {
-    if (!pack) return
+    if (saving || !pack) return
     const newCarry = (pack.carry_items || []).map((item: any, idx: number) => {
       if (typeof item === 'string') {
         return idx === i ? { label: item, checked: true } : item
@@ -587,9 +743,9 @@ export default function ActionModal({
   }
 
   const urgencyGradient =
-    urgency_level === 3 ? 'linear-gradient(90deg,#FF6B6B,#FF8E53)'
-    : urgency_level === 2 ? 'linear-gradient(90deg,#F0A500,#F0C040)'
-    : 'linear-gradient(90deg,#A7D7D9,#D9A7B4)'
+    urgency_level === 3 ? 'linear-gradient(90deg,#d58074,#e6a89e)'
+    : urgency_level === 2 ? 'linear-gradient(90deg,#b88e5e,#f2e2cd)'
+    : 'linear-gradient(90deg,#537b8e,#cddce5)'
 
   const tabs: { key: TabKey; icon: React.ReactNode; label: string }[] = [
     { key: 'checklist', icon: <ClipboardList size={15} />, label: '材料' },
@@ -658,7 +814,9 @@ export default function ActionModal({
                       style={{ width: 7, height: 7, borderRadius: '50%', background: THEME.gold }} />
                   ))}
                 </div>
-                <span style={{ fontSize: 12, color: THEME.muted }}>根正在为你准备…</span>
+                <span style={{ fontSize: 12, color: THEME.muted }}>
+                  {!sessionReady ? '正在恢复会话…' : '根正在为你准备…'}
+                </span>
               </div>
             )}
 
@@ -672,11 +830,13 @@ export default function ActionModal({
                   const isOpen = activeTab === tab.key
                   return (
                     <motion.button key={tab.key} whileTap={{ scale: 0.88 }}
-                      onClick={() => setActiveTab(prev => prev === tab.key ? null : tab.key)}
+                      disabled={saving}
+                      onClick={() => !saving && setActiveTab(prev => prev === tab.key ? null : tab.key)}
                       style={{ flex: 1, display: 'flex', flexDirection: 'column',
                         alignItems: 'center', gap: 3, padding: '7px 4px', borderRadius: 9,
                         border: `0.5px solid ${isOpen ? G.mid : 'rgba(0,0,0,0.07)'}`,
-                        background: isOpen ? G.bg : 'rgba(255,255,255,0.7)', cursor: 'pointer',
+                        background: isOpen ? G.bg : 'rgba(255,255,255,0.7)', cursor: saving ? 'not-allowed' : 'pointer',
+                        opacity: saving ? 0.55 : 1,
                         transition: 'all 0.15s' }}>
                       <span style={{ color: isOpen ? G.dark : THEME.muted, display: 'flex' }}>{tab.icon}</span>
                       <span style={{ fontSize: 10, fontWeight: isOpen ? 500 : 400,
@@ -697,7 +857,7 @@ export default function ActionModal({
                   exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.22 }}
                   style={{ overflow: 'hidden', margin: '6px 12px 0', borderRadius: 10,
                     border: `0.5px solid ${G.border}`, background: 'rgba(255,255,255,0.7)' }}>
-                  <TabContent tabKey={activeTab} pack={pack} onToggleChecklist={toggleChecklist} onToggleCarry={toggleCarry} />
+                  <TabContent tabKey={activeTab} pack={pack} saving={saving} onToggleChecklist={toggleChecklist} onToggleCarry={toggleCarry} />
                 </motion.div>
               )}
             </AnimatePresence>
@@ -711,6 +871,7 @@ export default function ActionModal({
                   primaryIndex={pack.primary_action_index}
                   primaryReason={pack.primary_action_reason}
                   sourceId={source_id}
+                  sourceType={source_type}
                   onAllDone={() => onDone(source_id)}
                 />
               </>
@@ -726,17 +887,19 @@ export default function ActionModal({
           {/* 底部 */}
           <div style={{ flexShrink: 0, borderTop: '0.5px solid rgba(0,0,0,0.06)',
             padding: '10px 12px 16px', display: 'flex', gap: 8 }}>
-            <motion.button whileTap={{ scale: 0.95 }} onClick={() => onDone(source_id)}
+            <motion.button whileTap={{ scale: 0.95 }} onClick={() => onDone(source_id)} disabled={saving}
               style={{ flex: 1, padding: '11px', borderRadius: 12,
                 background: 'rgba(141,200,160,0.35)', border: '0.5px solid rgba(141,200,160,0.5)',
-                fontSize: 13, fontWeight: 600, color: THEME.text, cursor: 'pointer',
+                fontSize: 13, fontWeight: 600, color: THEME.text, cursor: saving ? 'not-allowed' : 'pointer',
+                opacity: saving ? 0.55 : 1,
                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}>
               <CheckCircle2 size={14} /> 已处理
             </motion.button>
-            <motion.button whileTap={{ scale: 0.95 }} onClick={() => onSnooze(source_id)}
+            <motion.button whileTap={{ scale: 0.95 }} onClick={() => onSnooze(source_id)} disabled={saving}
               style={{ flex: 1, padding: '11px', borderRadius: 12,
                 background: 'rgba(255,255,255,0.4)', border: '0.5px solid rgba(0,0,0,0.08)',
-                fontSize: 13, color: THEME.muted, cursor: 'pointer' }}>
+                fontSize: 13, color: THEME.muted, cursor: saving ? 'not-allowed' : 'pointer',
+                opacity: saving ? 0.55 : 1 }}>
               明天再说
             </motion.button>
           </div>

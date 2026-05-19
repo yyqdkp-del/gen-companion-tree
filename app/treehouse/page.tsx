@@ -3,6 +3,8 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { fetchWithAuth } from '@/lib/auth/fetchWithAuth'
+import { logOrAlertNetworkError } from '@/lib/errors/logOrAlertNetworkError'
 import { motion, AnimatePresence } from 'framer-motion'
 
 export const dynamic = 'force-dynamic'
@@ -36,8 +38,21 @@ type LightFlash = { id: string; x: number; y: number }
 export default function TreehousePage() {
   const router = useRouter()
 
-  // ── 密码验证 ──
-  const [unlocked, setUnlocked] = useState(false)
+  // ── 密码验证（同一会话内免重复输入 PIN）──
+  const [unlocked, setUnlocked] = useState(() => {
+    if (typeof window === 'undefined') return false
+    try {
+      return sessionStorage.getItem('treehouse_unlocked') === '1'
+    } catch {
+      return false
+    }
+  })
+  const unlock = () => {
+    try {
+      sessionStorage.setItem('treehouse_unlocked', '1')
+    } catch { /* 隐私模式等 */ }
+    setUnlocked(true)
+  }
   const [pin, setPin] = useState('')
   const [pinError, setPinError] = useState(false)
   const [pinShaking, setPinShaking] = useState(false)
@@ -62,6 +77,10 @@ export default function TreehousePage() {
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const messagesRef = useRef<Message[]>([])
   const longPressTimer = useRef<NodeJS.Timeout | null>(null)
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const greetingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const endTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const sendTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const sessionId = useRef(crypto.randomUUID())
   const inputRef = useRef<HTMLInputElement>(null)
 
@@ -89,18 +108,31 @@ export default function TreehousePage() {
   }, [isLateNight, hour])
 
   // ── 逐字显示开场问候 ──
-  const showGreeting = useCallback(async () => {
+  const showGreeting = useCallback(() => {
     const greet = isLateNight
       ? '夜深了。孩子睡了吗？我在这里，想说什么都行。'
       : '妈妈，今天怎么样？我听着呢。'
 
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current)
+      intervalRef.current = null
+    }
+    if (endTimerRef.current) {
+      clearTimeout(endTimerRef.current)
+      endTimerRef.current = null
+    }
+
     let i = 0
-    const timer = setInterval(() => {
+    intervalRef.current = setInterval(() => {
       setGreetingText(greet.slice(0, i + 1))
       i++
       if (i >= greet.length) {
-        clearInterval(timer)
-        setTimeout(() => {
+        if (intervalRef.current) {
+          clearInterval(intervalRef.current)
+          intervalRef.current = null
+        }
+        endTimerRef.current = setTimeout(() => {
+          endTimerRef.current = null
           setGreetingDone(true)
           addMessage('assistant', greet)
           setGreetingText('')
@@ -110,19 +142,70 @@ export default function TreehousePage() {
   }, [isLateNight])
 
   useEffect(() => {
-    if (unlocked) {
-      loadContext()
-      setTimeout(showGreeting, 1800)
+    if (!unlocked) {
+      if (greetingTimerRef.current) {
+        clearTimeout(greetingTimerRef.current)
+        greetingTimerRef.current = null
+      }
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current)
+        intervalRef.current = null
+      }
+      if (endTimerRef.current) {
+        clearTimeout(endTimerRef.current)
+        endTimerRef.current = null
+      }
+      return
+    }
+    void loadContext()
+    greetingTimerRef.current = setTimeout(() => {
+      greetingTimerRef.current = null
+      showGreeting()
+    }, 1800)
+    return () => {
+      if (greetingTimerRef.current) {
+        clearTimeout(greetingTimerRef.current)
+        greetingTimerRef.current = null
+      }
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current)
+        intervalRef.current = null
+      }
+      if (endTimerRef.current) {
+        clearTimeout(endTimerRef.current)
+        endTimerRef.current = null
+      }
     }
   }, [unlocked, loadContext, showGreeting])
+
+  useEffect(() => {
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current)
+      if (greetingTimerRef.current) clearTimeout(greetingTimerRef.current)
+      if (endTimerRef.current) clearTimeout(endTimerRef.current)
+      if (sendTimerRef.current) clearTimeout(sendTimerRef.current)
+    }
+  }, [])
 
   // ── 密码验证 ──
   const verifyPin = async (currentPin?: string) => {
     const checkPin = currentPin ?? pin
-    const { data } = await supabase.from('riqi_access').select('password_hash').single()
-    if (data?.password_hash === checkPin) {
-      setUnlocked(true)
-    } else {
+    try {
+      const res = await fetchWithAuth('/api/treehouse/verify-pin', {
+        method: 'POST',
+        body: JSON.stringify({ pin: checkPin }),
+      })
+      const data = await res.json()
+      if (data?.ok) {
+        unlock()
+      } else {
+        setPinError(true)
+        setPinShaking(true)
+        setPin('')
+        setTimeout(() => { setPinError(false); setPinShaking(false) }, 600)
+      }
+    } catch (e) {
+      logOrAlertNetworkError(e)
       setPinError(true)
       setPinShaking(true)
       setPin('')
@@ -178,19 +261,31 @@ export default function TreehousePage() {
     const history = messagesRef.current.slice(-10).map(m => ({ role: m.role, content: m.content }))
 
     try {
-      const response = await fetch('/api/chat', {
+      const response = await fetchWithAuth('/api/chat', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           messages: [...history, { role: 'user', content: text }],
           contextData,
         }),
       })
 
+      if (!response.ok) throw new Error('请求失败')
+
       const data = await response.json()
       const reply = data.content?.[0]?.text || '我在。'
-      setTimeout(() => { setThinking(false); addMessage('assistant', reply) }, 600 + Math.random() * 800)
-    } catch {
+      const delay = 600 + Math.random() * 800
+      if (sendTimerRef.current) clearTimeout(sendTimerRef.current)
+      sendTimerRef.current = setTimeout(() => {
+        sendTimerRef.current = null
+        setThinking(false)
+        addMessage('assistant', reply)
+      }, delay)
+    } catch (e) {
+      logOrAlertNetworkError(e)
+      if (sendTimerRef.current) {
+        clearTimeout(sendTimerRef.current)
+        sendTimerRef.current = null
+      }
       setThinking(false)
       addMessage('assistant', '我在，只是信号不太好。再说一次？')
     }
@@ -349,8 +444,23 @@ export default function TreehousePage() {
       </div>
 
       {/* ── 顶部栏 ── */}
-      <div style={{ position: 'relative', zIndex: 10, padding: '52px 24px 8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
+      <div style={{ position: 'relative', zIndex: 10, padding: '52px 24px 8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0, gap: '12px' }}>
         <span style={{ fontSize: '11px', color: THEME.textDim, letterSpacing: '0.35em', opacity: 0.5 }}>日栖</span>
+        <motion.button whileTap={{ scale: 0.96 }} onClick={() => router.push('/treehouse/mom')}
+          style={{
+            background: 'rgba(232,213,184,0.08)',
+            border: '1px solid rgba(232,213,184,0.12)',
+            borderRadius: '999px',
+            color: THEME.gold,
+            fontSize: '12px',
+            cursor: 'pointer',
+            opacity: 0.78,
+            padding: '7px 12px',
+            letterSpacing: '0.08em',
+            fontFamily: "'Noto Serif SC', serif",
+          }}>
+          🌸 妈妈的树洞
+        </motion.button>
         <motion.button whileTap={{ scale: 0.85 }} onClick={() => router.push('/')}
           style={{ background: 'none', border: 'none', color: THEME.textDim, fontSize: '18px', cursor: 'pointer', opacity: 0.35, padding: '4px 8px' }}>
           ×

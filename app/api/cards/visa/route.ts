@@ -2,6 +2,7 @@ export const dynamic = 'force-dynamic'
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { getUserLocation } from '@/lib/geofence'
+import { verifySignedUserId } from '@/lib/auth/signedUrl'
 
 // ══ 各国签证表格配置 ══
 type FormField = { label_local: string; label_en: string; key: string }
@@ -185,8 +186,11 @@ export async function GET(req: NextRequest) {
   process.env.SUPABASE_SERVICE_ROLE_KEY || ''
 )
   const { searchParams } = new URL(req.url)
-  const userId = searchParams.get('user_id')
-  if (!userId) return new NextResponse('Missing user_id', { status: 400 })
+  const token = searchParams.get('token')
+  const userId = token ? verifySignedUserId(token) : null
+  if (!userId) {
+    return new NextResponse('Unauthorized', { status: 401 })
+  }
 
   const [profileRes, placesRes, locationRes] = await Promise.all([
     supabase.from('family_profile').select('*').eq('user_id', userId).single(),
@@ -236,7 +240,7 @@ export async function GET(req: NextRequest) {
   .form-body { padding: 12px 14px; }
   .field-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; padding: 8px 0; border-bottom: 0.5px solid #f5f5f5; align-items: start; }
   .field-row:last-child { border-bottom: none; }
-  .field-local { font-size: 11px; color: #E07B2A; }
+  .field-local { font-size: 11px; color: #7a5a35; }
   .field-en { font-size: 11px; color: #6B8BAA; }
   .field-value { font-size: 12px; font-weight: 600; color: #1A3C5E; background: #F5F9FC; padding: 4px 8px; border-radius: 6px; }
   .warning { background: #FEF3C7; border: 1px solid #F59E0B; border-radius: 10px; padding: 12px 14px; margin-bottom: 16px; font-size: 12px; color: #92400E; line-height: 1.6; }

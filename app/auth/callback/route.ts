@@ -18,7 +18,7 @@ export async function GET(req: NextRequest) {
     if (error) {
       return NextResponse.redirect(new URL('/auth?error=callback_failed', req.url))
     }
-    return NextResponse.redirect(new URL('/', req.url))
+    return NextResponse.redirect(new URL('/auth/callback-bridge', req.url))
   }
 
   // Line magiclink
@@ -30,7 +30,7 @@ export async function GET(req: NextRequest) {
     if (error) {
       return NextResponse.redirect(new URL('/auth?error=callback_failed', req.url))
     }
-    return NextResponse.redirect(new URL('/', req.url))
+    return NextResponse.redirect(new URL('/auth/callback-bridge', req.url))
   }
 
   return NextResponse.redirect(new URL('/auth?error=no_code', req.url))

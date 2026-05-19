@@ -1,8 +1,15 @@
 export const dynamic = 'force-dynamic'
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { getUserLocation } from '@/lib/geofence'
+import { getTodayStr, getTodayStrInTimeZone } from '@/lib/date/localDate'
 
 const MAKE_WEBHOOK_URL = process.env.NEXT_PUBLIC_MAKE_WEBHOOK_URL || ''
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+  process.env.SUPABASE_SERVICE_ROLE_KEY || '',
+)
 
 // ══ 工具定义 ══
 const TOOLS = [
@@ -16,6 +23,11 @@ const TOOLS = [
         dimension: { type: 'string', enum: ['compliance', 'estate', 'logistics', 'education', 'social', 'wealth', 'medical', 'mobility', 'selfcare'] },
         who: { type: 'string', description: '涉及的家庭成员' },
         due_date: { type: 'string', description: 'ISO格式截止日期' },
+        repeat: {
+          type: 'string',
+          enum: ['daily', 'weekly', 'monthly', 'weekdays'],
+          description: '周期性重复：每天/每周/每月/工作日；一次性待办不要填',
+        },
         priority: { type: 'number', enum: [1, 2, 3], description: '1=普通(30天以上) 2=重要(8-30天) 3=紧急(7天内)' },
         notes: { type: 'string' },
         claude_advice: { type: 'string', description: '日安的完整行动建议，具体可执行，站在妈妈角度' },
@@ -307,9 +319,9 @@ async function executeTool(
   input: any,
   userId: string,
   rawInputId: string,
-  childrenData: any[]
+  childrenData: any[],
+  today: string,
 ): Promise<string | null> {
-  const today = new Date().toISOString().split('T')[0]
 
   const findChildId = (name?: string) => {
     if (!name) return childrenData?.[0]?.id || null
@@ -321,6 +333,11 @@ async function executeTool(
 
     case 'add_todo': {
       const priority = input.priority === 3 ? 'red' : input.priority === 2 ? 'orange' : 'yellow'
+      const repeatAllowed = ['daily', 'weekly', 'monthly', 'weekdays'] as const
+      const repeat =
+        typeof input.repeat === 'string' && repeatAllowed.includes(input.repeat as (typeof repeatAllowed)[number])
+          ? input.repeat
+          : null
       const aiActionTypeMap: Record<string, string> = {
         compliance: 'fill_form', wealth: 'pay', medical: 'book',
         logistics: 'buy', mobility: 'navigate', social: 'whatsapp',
@@ -334,6 +351,7 @@ async function executeTool(
         category: input.dimension,
         priority,
         status: 'pending',
+        repeat,
         due_date: input.due_date || null,
         source: 'rian',
         source_ref_id: rawInputId,
@@ -495,13 +513,15 @@ async function executeTool(
     }
 
     case 'add_reminder': {
-      await supabase.from('reminders').insert({
-        user_id: userId,
-        title: input.title,
-        trigger_date: input.trigger_date,
-        message: input.message || input.title,
-        status: 'pending',
-      }).catch(() => {})
+      void Promise.resolve(
+        supabase.from('reminders').insert({
+          user_id: userId,
+          title: input.title,
+          trigger_date: input.trigger_date,
+          message: input.message || input.title,
+          status: 'pending',
+        }),
+      ).catch(() => {})
       return null
     }
 
@@ -574,10 +594,55 @@ async function preheatGrok(todoIds: string[], toolUses: any[]) {
   }
 }
 
+function isSchoolParsing(inputType: string, processedContent: string, toolUses: any[]) {
+  if (inputType !== 'image' && inputType !== 'document') return false
+
+  const text = `${processedContent || ''} ${toolUses.map((tool: any) => `${tool.name} ${tool.input?.title || ''} ${tool.input?.description || ''}`).join(' ')}`.toLowerCase()
+  return toolUses.some((tool: any) => tool.name === 'add_schedule') ||
+    ['school', 'academy', '校', '学校', '家长会', 'field trip', 'exam', 'term', 'class'].some((keyword) => text.includes(keyword))
+}
+
+function buildSchoolParsingSummary(toolUses: any[]) {
+  const titles = toolUses
+    .map((tool: any) => tool.input?.title || tool.input?.description)
+    .filter(Boolean)
+    .slice(0, 3)
+
+  return titles.length
+    ? `学校通知解析：${titles.join('、')}`
+    : '学校通知图片解析'
+}
+
+async function recordSchoolParsingHistory(userId: string, jobId: string, inputType: string, processedContent: string, toolUses: any[], todosCreated: number) {
+  if (!isSchoolParsing(inputType, processedContent, toolUses)) return
+
+  const { error } = await supabase.from('processed_emails').insert({
+    user_id: userId,
+    message_id: `raw_input_${jobId}`,
+    subject: buildSchoolParsingSummary(toolUses),
+    email_type: 'school',
+    is_school_related: true,
+    processed_at: new Date().toISOString(),
+    todos_created: todosCreated,
+    events_created: toolUses.filter((tool: any) => tool.name === 'add_schedule').length,
+    source: 'school_upload',
+  })
+
+  if (error) {
+    console.error('学校解析历史记录失败:', error.message)
+  }
+}
+
 // ══ 处理单个 job ══
 async function processJob(job: any) {
   const { id: jobId, user_id: userId, input_type, raw_content, file_url } = job
-  const today = new Date().toISOString().split('T')[0]
+  let today: string
+  try {
+    const loc = await getUserLocation(userId)
+    today = getTodayStrInTimeZone(loc.timezone)
+  } catch {
+    today = getTodayStr()
+  }
 
   try {
     // 标记处理中
@@ -652,7 +717,7 @@ ${grokInfo || '暂无'}
 - 账单：add_todo 设置缴费待办
 - 通知：判断是否需要回复或行动
 
-今天日期：${new Date().toLocaleDateString('zh-CN')}`,
+今天日期：${today}`,
         messages,
         tools: TOOLS,
         tool_choice: { type: 'auto' },
@@ -666,9 +731,11 @@ ${grokInfo || '暂无'}
     // 执行所有工具
     const todoIds: string[] = []
     for (const toolUse of toolUses) {
-      const todoId = await executeTool(toolUse.name, toolUse.input, userId, jobId, childrenData || [])
+      const todoId = await executeTool(toolUse.name, toolUse.input, userId, jobId, childrenData || [], today)
       if (todoId) todoIds.push(todoId)
     }
+
+    await recordSchoolParsingHistory(userId, jobId, input_type, processedContent || '', toolUses, todoIds.length)
 
     // 异步预热 Grok（后台跑，不阻塞完成标记）
     preheatGrok(todoIds, toolUses).catch(e => console.error('预热失败:', e))
@@ -697,10 +764,6 @@ ${grokInfo || '暂无'}
 
 // ══ Worker 主入口 ══
 export async function GET() {
-  const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-  process.env.SUPABASE_SERVICE_ROLE_KEY || ''
-)
   try {
     // 取待处理的 jobs（queued 状态，每次最多处理3个）
     const { data: jobs } = await supabase

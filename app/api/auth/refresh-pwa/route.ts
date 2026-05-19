@@ -1,21 +1,25 @@
 export const dynamic = 'force-dynamic'
 import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
-
+import { getAuthUser } from '@/lib/auth/getAuthUser'
 
 export async function POST(req: NextRequest) {
+  const { user, error: authError } = await getAuthUser(req)
+  if (authError || !user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  const userId = user.id
+
   const adminSupabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
   try {
-    const { user_id } = await req.json()
-    if (!user_id) return NextResponse.json({ error: 'no user_id' }, { status: 400 })
-
     const { data: cred, error: credError } = await adminSupabase
       .from('user_line_credentials')
       .select('fake_email, fake_password')
-      .eq('user_id', user_id)
+      .eq('user_id', userId)
       .single()
 
     if (credError || !cred) {

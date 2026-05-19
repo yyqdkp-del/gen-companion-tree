@@ -3,7 +3,14 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { sendPushToUser } from '@/lib/push'
 import { getUserLocation, isMorningReportTime, isEveningReportTime } from '@/lib/geofence'
-  const supabase = createClient(
+import {
+  addDaysStrInTimeZone,
+  getDayOfWeekInTimeZone,
+  getTodayStrInTimeZone,
+  zonedYmdHmToDate,
+} from '@/lib/date/localDate'
+
+const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || '',
   process.env.SUPABASE_SERVICE_ROLE_KEY || ''
 )
@@ -17,23 +24,26 @@ async function getAllSubscribedUsers(): Promise<string[]> {
   return [...new Set(data.map((r: any) => r.user_id))]
 }
 
-// ── 今天是星期几（0=周日） ──
-function todayDow(): number {
-  return new Date().getDay()
-}
-
-// ── 检查今天是否已推送过某类型 ──
-async function alreadySent(userId: string, pushType: string, eventId?: string): Promise<boolean> {
-  const today = new Date().toISOString().split('T')[0]
-  let query = supabase
+// ── 检查今天是否已推送过某类型（按用户时区的「日历日」） ──
+async function alreadySent(
+  userId: string,
+  pushType: string,
+  timeZone: string,
+  eventId?: string,
+): Promise<boolean> {
+  const userToday = getTodayStrInTimeZone(timeZone)
+  let q = supabase
     .from('push_logs')
-    .select('id')
+    .select('sent_at')
     .eq('user_id', userId)
     .eq('push_type', pushType)
-    .gte('sent_at', `${today}T00:00:00`)
-  if (eventId) query = query.eq('event_id', eventId)
-  const { data } = await query.single()
-  return !!data
+    .gte('sent_at', new Date(Date.now() - 48 * 3600000).toISOString())
+    .order('sent_at', { ascending: false })
+    .limit(1)
+  if (eventId) q = q.eq('event_id', eventId)
+  const { data } = await q.maybeSingle()
+  if (!data?.sent_at) return false
+  return getTodayStrInTimeZone(timeZone, new Date(data.sent_at)) === userToday
 }
 
 // ── 记录推送日志 ──
@@ -49,12 +59,11 @@ async function logPush(userId: string, pushType: string, eventId?: string) {
 // ────────────────────────────────────────
 // 晨报 06:30 — 今日全貌
 // ────────────────────────────────────────
-async function sendMorningReport(userId: string) {
-  const already = await alreadySent(userId, 'morning_report')
+async function sendMorningReport(userId: string, timeZone: string) {
+  const already = await alreadySent(userId, 'morning_report', timeZone)
   if (already) return
 
-  const today = new Date().toISOString().split('T')[0]
-  const dow = todayDow()
+  const today = getTodayStrInTimeZone(timeZone)
 
   // 查孩子
   const { data: children } = await supabase
@@ -107,7 +116,7 @@ async function sendMorningReport(userId: string) {
 
   if (!lines.length) return
 
-  await sendPushToUser(userId, {
+  const sentMorning = await sendPushToUser(userId, {
     title: '🌱 早安，今天的安排',
     body: lines.join('\n'),
     url: '/',
@@ -115,19 +124,19 @@ async function sendMorningReport(userId: string) {
     urgent: false,
   })
 
-  await logPush(userId, 'morning_report')
+  if (sentMorning > 0) {
+    await logPush(userId, 'morning_report')
+  }
 }
 
 // ────────────────────────────────────────
 // 晚报 21:00 — 次日预告 + 今晚准备
 // ────────────────────────────────────────
-async function sendEveningReminder(userId: string) {
-  const already = await alreadySent(userId, 'evening_reminder')
+async function sendEveningReminder(userId: string, timeZone: string) {
+  const already = await alreadySent(userId, 'evening_reminder', timeZone)
   if (already) return
 
-  const tomorrow = new Date(Date.now() + 86400000)
-  const tomorrowStr = tomorrow.toISOString().split('T')[0]
-  const tomorrowDow = tomorrow.getDay()
+  const tomorrowStr = addDaysStrInTimeZone(timeZone, new Date(), 1)
 
   const { data: children } = await supabase
     .from('children')
@@ -163,7 +172,7 @@ async function sendEveningReminder(userId: string) {
 
   if (!lines.length) return
 
-  await sendPushToUser(userId, {
+  const sentEvening = await sendPushToUser(userId, {
     title: '🌙 明天准备好了吗？',
     body: lines.join('\n'),
     url: '/',
@@ -171,17 +180,19 @@ async function sendEveningReminder(userId: string) {
     urgent: false,
   })
 
-  await logPush(userId, 'evening_reminder')
+  if (sentEvening > 0) {
+    await logPush(userId, 'evening_reminder')
+  }
 }
 
 // ────────────────────────────────────────
 // 出发提醒 — 每小时检查，60分钟 + 30分钟各一次
 // ────────────────────────────────────────
-async function sendDepartureReminders(userId: string) {
+async function sendDepartureReminders(userId: string, timeZone: string) {
   const now = new Date()
   const nowMs = now.getTime()
-  const dow = todayDow()
-  const today = now.toISOString().split('T')[0]
+  const dow = getDayOfWeekInTimeZone(timeZone, now)
+  const today = getTodayStrInTimeZone(timeZone, now)
 
   const { data: children } = await supabase
     .from('children')
@@ -236,17 +247,15 @@ async function sendDepartureReminders(userId: string) {
 
   for (const item of pushItems) {
     const [hh, mm] = item.timeStr.split(':').map(Number)
-    const eventDate = new Date(today)
-    eventDate.setHours(hh, mm, 0, 0)
-    const eventMs = eventDate.getTime()
+    const eventMs = zonedYmdHmToDate(timeZone, today, hh, mm).getTime()
     const minutesLeft = Math.round((eventMs - nowMs) / 60000)
     const childName = childMap[item.childId] || '孩子'
 
     // 60分钟提醒
     if (minutesLeft >= 55 && minutesLeft <= 65) {
-      const sent = await alreadySent(userId, 'depart_60', item.id)
+      const sent = await alreadySent(userId, 'depart_60', timeZone, item.id)
       if (!sent) {
-        await sendPushToUser(userId, {
+        const sent60 = await sendPushToUser(userId, {
           title: `🏃 ${childName} ${item.label} 1小时后`,
           body: item.items.length
             ? `记得带：${item.items.join('、')}`
@@ -255,15 +264,17 @@ async function sendDepartureReminders(userId: string) {
           tag: `depart_60_${item.id}`,
           urgent: false,
         })
-        await logPush(userId, 'depart_60', item.id)
+        if (sent60 > 0) {
+          await logPush(userId, 'depart_60', item.id)
+        }
       }
     }
 
     // 30分钟紧急提醒
     if (minutesLeft >= 25 && minutesLeft <= 35) {
-      const sent = await alreadySent(userId, 'depart_30', item.id)
+      const sent = await alreadySent(userId, 'depart_30', timeZone, item.id)
       if (!sent) {
-        await sendPushToUser(userId, {
+        const sent30 = await sendPushToUser(userId, {
           title: `⚡ ${childName} ${item.label} 30分钟后出发！`,
           body: item.items.length
             ? `最后确认：${item.items.map(i => `${i} □`).join('  ')}`
@@ -273,7 +284,9 @@ async function sendDepartureReminders(userId: string) {
           urgent: true,
           actions: [{ action: 'ready', title: '已经好了 ✓' }],
         })
-        await logPush(userId, 'depart_30', item.id)
+        if (sent30 > 0) {
+          await logPush(userId, 'depart_30', item.id)
+        }
       }
     }
   }
@@ -308,18 +321,18 @@ export async function GET() {
 
         // 晨报（用户时区 6:30）
         if (isMorning) {
-          await sendMorningReport(userId)
+          await sendMorningReport(userId, timezone)
           tasks.push(`morning:${userId.slice(0,8)}(${userLocation.city})`)
         }
 
         // 晚报（用户时区 21:00）
         if (isEvening) {
-          await sendEveningReminder(userId)
+          await sendEveningReminder(userId, timezone)
           tasks.push(`evening:${userId.slice(0,8)}(${userLocation.city})`)
         }
 
         // 出发提醒（每小时检查）
-        await sendDepartureReminders(userId)
+        await sendDepartureReminders(userId, timezone)
         tasks.push(`departure:${userId.slice(0,8)}`)
 
       } catch (e: any) {

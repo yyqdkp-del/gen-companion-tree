@@ -23,7 +23,7 @@ export function useUpload(userId: string, onSuccess: () => void) {
     setUploading(true)
     setUploadStatus('uploading')
     try {
-      await uploadAndProcess(file, category, userId, filename)
+      await uploadAndProcess(file, category, filename)
       setUploadStatus('done')
       onSuccess()
       setTimeout(() => setUploadStatus('idle'), 1500)

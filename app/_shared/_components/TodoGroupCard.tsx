@@ -7,6 +7,13 @@ import { THEME, PRIORITY_CFG } from '../_constants/theme'
 import type { TodoItem } from '../_types'
 import { useApp } from '@/app/context/AppContext'
 
+const REPEAT_LABEL: Record<string, string> = {
+  daily: '每天',
+  weekdays: '工作日',
+  weekly: '每周',
+  monthly: '每月',
+}
+
 const catIcon: Record<string, React.ReactNode> = {
   compliance: <FileText size={13} />, medical: <Pill size={13} />,
   education:  <BookOpen size={13} />, shopping: <ShoppingCart size={13} />,
@@ -36,7 +43,7 @@ function TodoRow({ todo, onAction, onDone }: {
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, x: 40, transition: { duration: 0.25 } }}
       style={{ padding: '10px 12px', borderRadius: 12, marginBottom: 8,
-        background: c.bg, borderLeft: `3px solid ${c.border}` }}>
+        background: c.bg, borderLeft: `3px solid ${c.dot}` }}>
       <div style={{ display: 'flex', justifyContent: 'space-between',
         alignItems: 'flex-start', gap: 8 }}>
         <div style={{ flex: 1 }}>
@@ -47,8 +54,13 @@ function TodoRow({ todo, onAction, onDone }: {
             <span style={{ fontSize: 13, fontWeight: 600, color: THEME.text }}>
               {todo.title}
             </span>
+            {todo.repeat ? (
+              <span style={{ fontSize: 12, color: THEME.muted, whiteSpace: 'nowrap' }}>
+                🔁 {REPEAT_LABEL[todo.repeat] ?? todo.repeat}
+              </span>
+            ) : null}
           </div>
-          <div style={{ fontSize: 10, color: c.border, fontWeight: 600 }}>
+          <div style={{ fontSize: 10, color: c.text, fontWeight: 600 }}>
             {c.label}
             {todo.due_date     ? ` · ${todo.due_date}`            : ''}
             {todo.delegated_to ? ` · 委托给${todo.delegated_to}` : ''}
@@ -65,14 +77,14 @@ function TodoRow({ todo, onAction, onDone }: {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 5, flexShrink: 0 }}>
           <motion.button whileTap={{ scale: 0.92 }} onClick={() => onAction(todo)}
             style={{ padding: '6px 12px', borderRadius: 9, border: 'none',
-              background: c.border, color: '#fff', fontSize: 11,
+              background: c.dot, color: '#fff', fontSize: 11,
               fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}>
             一键办
           </motion.button>
           <motion.button whileTap={{ scale: 0.92 }} onClick={() => onDone(todo.id)}
             style={{ padding: '6px 12px', borderRadius: 9,
               border: `0.5px solid ${c.border}`,
-              background: 'transparent', color: c.border,
+              background: 'transparent', color: c.text,
               fontSize: 11, fontWeight: 500, cursor: 'pointer', whiteSpace: 'nowrap' }}>
             已完成
           </motion.button>

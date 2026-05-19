@@ -19,11 +19,11 @@ const T = {
   gold: '#F0C040',
   goldDim: 'rgba(240,192,64,0.6)',
   teal: '#4ECDC4',
-  coral: '#FF6B6B',
+  coral: '#d58074',
   text: '#F5F0E8',
   textDim: 'rgba(245,240,232,0.5)',
   textFaint: 'rgba(245,240,232,0.25)',
-  green: '#4ADE80',
+  green: '#8ca88d',
 }
 
 const PERSON_TYPES = [
@@ -672,7 +672,7 @@ function RecordsSection({ childId, router }: any) {
     { icon: '🏆', label: '荣誉奖项', desc: '比赛 · 考级 · 竞赛 · 申请权重', color: T.gold, path: '/growth/academic/achievements' },
     { icon: '📊', label: '学术记录', desc: '成绩轨迹 · 考试 · 语言成绩', color: T.teal, path: '/growth/academic/records' },
     { icon: '🎯', label: '课外活动', desc: '兴趣班 · 参与年限 · Spike积累', color: '#A78BFA', path: childId ? `/children/${childId}/activities` : '/children' },
-    { icon: '📝', label: '文书素材库', desc: '故事碎片 · 申请角度 · 文书准备', color: '#FB923C', path: '/growth/academic/essays' },
+    { icon: '📝', label: '文书素材库', desc: '故事碎片 · 申请角度 · 文书准备', color: '#b88e5e', path: '/growth/academic/essays' },
   ]
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>

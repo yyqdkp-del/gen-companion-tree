@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { saveSessionBundle } from '@/lib/auth/saveSessionBundle'
 import { motion, AnimatePresence } from 'framer-motion'
 
 const supabase = createClient(
@@ -67,8 +68,9 @@ export default function AuthPage() {
       } else {
         const { data, error } = await supabase.auth.signInWithPassword({ email, password })
         if (error) { setError('邮箱或密码错误'); setLoading(false); return }
-       if (data.user) await saveChildData(data.user.id)
-window.location.href = '/'
+        if (data.user) await saveChildData(data.user.id)
+        if (data.session) await saveSessionBundle(data.session)
+        window.location.href = '/'
       }
     } catch {
       setError('网络错误，请重试')

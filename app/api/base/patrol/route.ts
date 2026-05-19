@@ -2,7 +2,10 @@ export const dynamic = 'force-dynamic'
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { getUserLocation } from '@/lib/geofence'
-  const supabase = createClient(
+import { getAuthUser } from '@/lib/auth/getAuthUser'
+import { getTodayStrInTimeZone } from '@/lib/date/localDate'
+
+const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || '',
   process.env.SUPABASE_SERVICE_ROLE_KEY || ''
 )
@@ -176,17 +179,15 @@ ${geminiData || '（无数据）'}
 }
 
 // ── 保存热点（按天去重）──
-async function saveHotspots(items: any[], userId: string): Promise<number> {
+async function saveHotspots(items: any[], userId: string, todayYmd: string): Promise<number> {
   if (!items.length) return 0
-
-  const today = new Date().toISOString().split('T')[0]
 
   // 今天已有的 category
   const { data: existing } = await supabase
     .from('hotspot_items')
     .select('category')
     .eq('user_id', userId)
-    .gte('created_at', `${today}T00:00:00`)
+    .gte('created_at', `${todayYmd}T00:00:00`)
     .neq('status', 'dismissed')
 
   const existingCategories = new Set(existing?.map((e: any) => e.category) || [])
@@ -218,14 +219,15 @@ async function saveHotspots(items: any[], userId: string): Promise<number> {
   return toInsert.length
 }
 
-// ── 归档昨天的热点 ──
+// ── 归档：仅处理已过期且带 expires_at 的热点（与客户端按 expires_at 过滤一致）──
 async function archiveOldHotspots(userId: string) {
-  const today = new Date().toISOString().split('T')[0]
+  const nowIso = new Date().toISOString()
   await supabase
     .from('hotspot_items')
     .update({ status: 'dismissed' })
     .eq('user_id', userId)
-    .lt('created_at', `${today}T00:00:00`)
+    .lt('expires_at', nowIso)
+    .not('expires_at', 'is', null)
     .neq('status', 'dismissed')
 }
 
@@ -240,13 +242,21 @@ export async function POST(req: NextRequest) {
     const patrolTime = hour < 10 ? '早安巡逻' : hour < 14 ? '午间巡逻' : hour < 18 ? '放学巡逻' : '晚间巡逻'
     console.log(`根开始${patrolTime}:`, new Date().toISOString())
 
-    // 指定用户 or 所有用户
+    const { user, error: authError } = await getAuthUser(req)
+    const cronSecret = process.env.CRON_SECRET
+    const cronOk = Boolean(cronSecret && req.headers.get('authorization') === `Bearer ${cronSecret}`)
+
     let userIds: string[] = []
-    if (body.user_id) {
-      userIds = [body.user_id]
+    if (user && !authError) {
+      userIds = [user.id]
+    } else if (cronOk) {
+      if (body.user_id) userIds = [body.user_id]
+      else {
+        const { data } = await supabase.auth.admin.listUsers({ perPage: 100 })
+        userIds = data?.users?.map((u: { id: string }) => u.id) || []
+      }
     } else {
-      const { data } = await supabase.auth.admin.listUsers({ perPage: 100 })
-      userIds = data?.users?.map((u: any) => u.id) || []
+      return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
     }
 
     if (!userIds.length) {
@@ -259,6 +269,7 @@ export async function POST(req: NextRequest) {
       try {
         // 获取用户位置（地理围栏）
         const userLocation = await getUserLocation(userId)
+        const todayYmd = getTodayStrInTimeZone(userLocation.timezone)
         const location = `${userLocation.city} ${userLocation.country}`
         const patrolPrompt = userLocation.local_config.patrol_prompt
 
@@ -274,7 +285,7 @@ export async function POST(req: NextRequest) {
         ])
 
         const hotspots = await callClaude(grokData, geminiData, snapshot, location)
-        const saved = await saveHotspots(hotspots, userId)
+        const saved = await saveHotspots(hotspots, userId, todayYmd)
 
         console.log(`${patrolTime} 用户${userId.slice(0,8)} ${location} 写入${saved}条热点`)
         results.push({ userId: userId.slice(0,8), location, generated: hotspots.length, saved })
@@ -300,7 +311,8 @@ export async function GET() {
   const userId = await getDefaultUserId()
   if (!userId) return NextResponse.json({ error: 'no user' }, { status: 400 })
 
-  const today = new Date().toISOString().split('T')[0]
+  const userLocation = await getUserLocation(userId)
+  const today = getTodayStrInTimeZone(userLocation.timezone)
 
   const { data: hotspots } = await supabase
     .from('hotspot_items')

@@ -4,8 +4,14 @@ export const dynamic = 'force-dynamic'
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { getAuthUser } from '@/lib/auth/getAuthUser'
 
 const MAKE_WEBHOOK_URL = process.env.NEXT_PUBLIC_MAKE_WEBHOOK_URL || ''
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+  process.env.SUPABASE_SERVICE_ROLE_KEY || '',
+)
 
 // ══ 发送邮件（Gmail MCP）════════════════════════════════════
 async function sendEmail(todo: any, actionData: any): Promise<string> {
@@ -106,23 +112,25 @@ async function notifySpouse(todo: any): Promise<boolean> {
 }
 
 // ══ 预约（发预约邮件）════════════════════════════════════════
-async function makeBooking(todo: any): Promise<string> {
+async function makeBooking(todo: any, userId: string): Promise<string> {
   // 生成预约草稿
   const draft = todo.ai_draft || `您好，我想预约${todo.title}相关事宜，请问最近的可用时间是什么时候？谢谢。`
   // 写入待办草稿，等妈妈确认发件人
   await supabase.from('todo_items')
     .update({ ai_draft: draft, one_tap_ready: true, ai_action_type: 'send_email' })
     .eq('id', todo.id)
+    .eq('user_id', userId)
   return 'draft_ready'
 }
 
 // ══ 主处理函数 ════════════════════════════════════════════════
 export async function POST(req: NextRequest) {
-  const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-  process.env.SUPABASE_SERVICE_ROLE_KEY || ''
-)
   try {
+    const { user, error: authError } = await getAuthUser(req)
+    if (authError || !user) {
+      return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+    }
+
     const { todoId, actionType } = await req.json()
 
     if (!todoId) {
@@ -134,6 +142,7 @@ export async function POST(req: NextRequest) {
       .from('todo_items')
       .select('*')
       .eq('id', todoId)
+      .eq('user_id', user.id)
       .single()
 
     if (error || !todo) {
@@ -179,7 +188,7 @@ export async function POST(req: NextRequest) {
         break
 
       case 'book':
-        result = await makeBooking(todo)
+        result = await makeBooking(todo, user.id)
         success = true
         message = result === 'draft_ready'
           ? '根已帮你起草预约邮件，确认后发送 ✅'
@@ -213,6 +222,14 @@ export async function POST(req: NextRequest) {
         message = '导航已启动'
         break
 
+      case 'fill_form':
+        return NextResponse.json({
+          ok: true,
+          action: 'open_action_modal',
+          message: '请在一键办里完成表格填写',
+          todo_id: todoId,
+        })
+
       default:
         // 没有特定类型，标记完成
         success = true
@@ -220,13 +237,14 @@ export async function POST(req: NextRequest) {
     }
 
     // 3. 成功后标记待办完成
-    if (success && action !== 'pay') {
+    if (success && action !== 'pay' && action !== 'fill_form') {
       await supabase.from('todo_items')
         .update({
           status: 'done',
           completed_at: new Date().toISOString(),
         })
         .eq('id', todoId)
+        .eq('user_id', user.id)
 
       // 关闭相关提醒链
       await supabase.from('reminder_chains')

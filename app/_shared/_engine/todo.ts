@@ -2,14 +2,16 @@
 // 待办引擎
 // 妈妈的全能智能处理引擎
 // 纯函数，零副作用，零UI
+// 日期分组使用本地日历日（见 lib/date/localDate）
 // ─────────────────────────────────────────
 
 import type { TodoItem } from '../_types'
+import { addDaysStr, getTodayStr } from '@/lib/date/localDate'
 
 export type TodoGroup = {
   today: TodoItem[]    // 今天必须办
   soon:  TodoItem[]    // 近期跟进（3天内）
-  later: TodoItem[]    // 放心里（本周本月）
+  later: TodoItem[]    // 放心里（3 天以后，无月末上限）
 }
 
 export type TodoEngineResult = {
@@ -20,32 +22,10 @@ export type TodoEngineResult = {
   totalPending: number // 全部未完成数量
 }
 
-// ── 日期工具 ──────────────────────────────
-function toDateStr(date: Date): string {
-  return date.toISOString().split('T')[0]
-}
-
-function addDays(date: Date, days: number): string {
-  return toDateStr(new Date(date.getTime() + days * 86400000))
-}
-
-function getWeekEnd(date: Date): string {
-  const day = date.getDay()
-  const daysToSunday = 7 - day
-  return addDays(date, daysToSunday)
-}
-
-function getMonthEnd(date: Date): string {
-  const lastDay = new Date(date.getFullYear(), date.getMonth() + 1, 0)
-  return toDateStr(lastDay)
-}
-
 // ── 분그룹 분류 ────────────────────────────
 export function groupTodos(todos: TodoItem[], now: Date = new Date()): TodoGroup {
-  const today     = toDateStr(now)
-  const in3days   = addDays(now, 3)
-  const weekEnd   = getWeekEnd(now)
-  const monthEnd  = getMonthEnd(now)
+  const today    = getTodayStr(now)
+  const in3days  = addDaysStr(now, 3)
 
   const pending = todos.filter(t =>
     t.status !== 'done' && t.status !== 'dismissed' && !t._isTemp
@@ -63,7 +43,7 @@ export function groupTodos(todos: TodoItem[], now: Date = new Date()): TodoGroup
   ).sort((a, b) => a.due_date!.localeCompare(b.due_date!))
 
   const later_items = pending.filter(t =>
-    t.due_date && t.due_date > in3days && t.due_date <= monthEnd
+    t.due_date && t.due_date > in3days
   ).sort((a, b) => a.due_date!.localeCompare(b.due_date!))
 
   return { today: today_items, soon: soon_items, later: later_items }
@@ -115,7 +95,7 @@ export function runTodoEngine(
   const advice       = getTodoAdvice(groups)
   const badge        = groups.today.length
   const totalPending = todos.filter(t =>
-    t.status !== 'done' && t.status !== 'dismissed'
+    t.status !== 'done' && t.status !== 'dismissed' && !t._isTemp
   ).length
 
   return { groups, badge, state, advice, totalPending }

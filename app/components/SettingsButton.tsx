@@ -2,7 +2,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Settings, Volume2, VolumeX, X, User, Baby } from 'lucide-react'
+import { Settings, Volume2, VolumeX, X, User, Baby, Car, Plane } from 'lucide-react'
 import { useApp } from '@/app/context/AppContext'
 import { THEME } from '@/app/_shared/_constants/theme'
 
@@ -112,6 +112,28 @@ export default function SettingsButton() {
                   <div>
                     <div style={{ fontSize: 13, fontWeight: 600, color: THEME.text }}>课外活动</div>
                     <div style={{ fontSize: 11, color: THEME.muted, marginTop: 1 }}>兴趣班 · 补习课管理</div>
+                  </div>
+                </motion.div>
+
+                <motion.div whileTap={{ scale: 0.98 }} onClick={() => goTo('/vehicles')}
+                  style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px',
+                    borderRadius: 12, cursor: 'pointer',
+                    background: 'rgba(0,0,0,0.03)', border: '1px solid rgba(0,0,0,0.06)' }}>
+                  <Car size={16} color={THEME.muted} />
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: THEME.text }}>车辆档案</div>
+                    <div style={{ fontSize: 11, color: THEME.muted, marginTop: 1 }}>保险 · 年检 · 事故备忘</div>
+                  </div>
+                </motion.div>
+
+                <motion.div whileTap={{ scale: 0.98 }} onClick={() => goTo('/travel')}
+                  style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px',
+                    borderRadius: 12, cursor: 'pointer',
+                    background: 'rgba(0,0,0,0.03)', border: '1px solid rgba(0,0,0,0.06)' }}>
+                  <Plane size={16} color={THEME.muted} />
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: THEME.text }}>旅行与机票</div>
+                    <div style={{ fontSize: 11, color: THEME.muted, marginTop: 1 }}>行程规划 · 比价与购票建议</div>
                   </div>
                 </motion.div>
 

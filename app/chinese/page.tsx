@@ -473,7 +473,7 @@ export default function ChinesePage() {
           </div>
 
           {/* 副 CTA */}
-          <button onClick={() => router.push('/chinese/decode')}
+          <button onClick={() => router.push('/learn')}
             style={{ width:'100%', marginTop:'10px', padding:'12px', background: THEME.bg, color: THEME.muted, border:`1.5px solid ${THEME.border}`, borderRadius:'8px', fontSize:'13px', fontWeight:500, cursor:'pointer', fontFamily:"'Noto Sans SC', sans-serif" }}>
             今晚试试：把「休」讲给孩子听 🌿
           </button>

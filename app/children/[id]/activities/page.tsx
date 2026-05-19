@@ -4,6 +4,7 @@ import { useRouter, useParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { motion, AnimatePresence } from 'framer-motion'
 import { ArrowLeft, Plus, X, Check, Loader, Camera, Pause, Play, Trash2 } from 'lucide-react'
+import { logOrAlertNetworkError } from '@/lib/errors/logOrAlertNetworkError'
 
 const supabase = createClient()
 
@@ -121,7 +122,7 @@ function ActivityForm({ form, setForm, onSave, onCancel, saving, childId }: {
       const { data: urlData } = supabase.storage.from('companion-files').getPublicUrl(path)
       setAttachmentUrl(urlData.publicUrl)
     } catch (e) {
-      console.error('上传失败', e)
+      logOrAlertNetworkError(e)
     }
     setUploadingAttachment(false)
   }

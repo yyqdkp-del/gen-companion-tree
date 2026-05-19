@@ -4,6 +4,7 @@ export const dynamic = 'force-dynamic'
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { addDaysToYmd, getTodayStr } from '@/lib/date/localDate'
 
 const MAKE_WEBHOOK_URL = process.env.NEXT_PUBLIC_MAKE_WEBHOOK_URL || ''
 
@@ -128,6 +129,7 @@ ${email.body}
 
 // ══ 类型定义 ═════════════════════════════════════════════════
 type EmailInput = {
+  user_id?: string
   from: string
   subject: string
   body: string
@@ -152,10 +154,11 @@ async function isAlreadyProcessed(supabase: any, messageId: string): Promise<boo
 // ══ 记录已处理邮件 ═══════════════════════════════════════════
 async function markAsProcessed(supabase: any, email: EmailInput, result: any) {
   await supabase.from('processed_emails').insert({
+    user_id: email.user_id || null,
     message_id: email.message_id || `${email.from}_${email.date}`,
     from_email: email.from,
-    subject: email.subject,
-    email_type: result.email_type,
+    subject: result.summary || email.subject,
+    email_type: result.is_school_related ? 'school' : result.email_type,
     is_school_related: result.is_school_related,
     processed_at: new Date().toISOString(),
     todos_created: result.todos?.length || 0,
@@ -228,7 +231,7 @@ async function triggerCalendar(event: any) {
 // ══ 核心：把解析结果写入三珠 ═════════════════════════════════
 async function syncEmailToThreeDrops(supabase: any, parsed: any, email: EmailInput) {
   const familyId = 'default'
-  const today = new Date().toISOString().split('T')[0]
+  const today = getTodayStr()
 
   // 获取孩子ID
   const { data: children } = await supabase.from('children').select('id, name').limit(5)
@@ -289,7 +292,7 @@ async function syncEmailToThreeDrops(supabase: any, parsed: any, email: EmailInp
         family_id: familyId,
         level: days >= 30 ? 1 : days >= 7 ? 2 : 3,
         trigger_days_before: days,
-        trigger_date: new Date(new Date(todo.due_date).getTime() - days * 86400000).toISOString().split('T')[0],
+        trigger_date: addDaysToYmd(todo.due_date, -days),
         status: 'pending',
         benefit_description: todo.benefit || '提前处理更从容',
       }))

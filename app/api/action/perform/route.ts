@@ -3,28 +3,32 @@ export const maxDuration = 30
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { getAuthUser } from '@/lib/auth/getAuthUser'
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+  process.env.SUPABASE_SERVICE_ROLE_KEY || '',
+)
 
 // ══ 主入口 ══
 export async function POST(req: NextRequest) {
-  const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-  process.env.SUPABASE_SERVICE_ROLE_KEY || ''
-)
+  const { user, error: authError } = await getAuthUser(req)
+  if (authError || !user) {
+    return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+  }
+  const userId = user.id
+
   try {
     const body = await req.json()
-    const { action_type, user_id } = body
-
-    if (!user_id) {
-      return NextResponse.json({ ok: false, error: 'Missing user_id' }, { status: 400 })
-    }
+    const { action_type } = body
 
     switch (action_type) {
       case 'fill_pdf':
         return await handleFillPDF(body)
       case 'mark_done':
-        return await handleMarkDone(body)
+        return await handleMarkDone(body, userId)
       case 'convert_to_todo':
-        return await handleConvertToTodo(body, user_id)
+        return await handleConvertToTodo(body, userId)
       default:
         return NextResponse.json({ ok: false, error: `Unknown action_type: ${action_type}` }, { status: 400 })
     }
@@ -36,7 +40,7 @@ export async function POST(req: NextRequest) {
 
 // ══ PDF 预填下载 ══
 async function handleFillPDF(body: any) {
-  const { form_type, prefilled_fields, user_id } = body
+  const { form_type, prefilled_fields } = body
 
   // 读取模板
   const { data: template } = await supabase
@@ -71,9 +75,25 @@ async function handleFillPDF(body: any) {
     for (const [fieldName, value] of Object.entries(fields)) {
       try {
         const field = form.getTextField(fieldName)
-        if (field && value) field.setText(String(value))
+        field.setText(String(value))
       } catch {
-        // 字段不存在，跳过
+        try {
+          const checkbox = form.getCheckBox(fieldName)
+          const checked =
+            value === true ||
+            value === 'true' ||
+            value === '1' ||
+            value === 1
+          if (checked) checkbox.check()
+          else checkbox.uncheck()
+        } catch {
+          try {
+            const dropdown = form.getDropdown(fieldName)
+            dropdown.select(String(value))
+          } catch {
+            console.warn(`PDF field "${fieldName}" not found or type mismatch`)
+          }
+        }
       }
     }
 
@@ -99,8 +119,8 @@ async function handleFillPDF(body: any) {
 }
 
 // ══ 标记完成 ══
-async function handleMarkDone(body: any) {
-  const { action_queue_id, source_type, source_id, user_id } = body
+async function handleMarkDone(body: any, userId: string) {
+  const { action_queue_id, source_type, source_id } = body
 
   // 更新 action_queue
   if (action_queue_id) {
@@ -108,7 +128,7 @@ async function handleMarkDone(body: any) {
       status: 'done',
       executed_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
-    }).eq('id', action_queue_id).eq('user_id', user_id)
+    }).eq('id', action_queue_id).eq('user_id', userId)
   }
 
   // 同步更新原始来源
@@ -116,13 +136,13 @@ async function handleMarkDone(body: any) {
     await supabase.from('todo_items').update({
       status: 'done',
       completed_at: new Date().toISOString(),
-    }).eq('id', source_id).eq('user_id', user_id)
+    }).eq('id', source_id).eq('user_id', userId)
   }
 
   if (source_type === 'hotspot' && source_id) {
     await supabase.from('hotspot_items').update({
       status: 'read',
-    }).eq('id', source_id).eq('user_id', user_id)
+    }).eq('id', source_id).eq('user_id', userId)
   }
 
   return NextResponse.json({ ok: true })
@@ -136,6 +156,7 @@ async function handleConvertToTodo(body: any, userId: string) {
     .from('hotspot_items')
     .select('*')
     .eq('id', hotspot_id)
+    .eq('user_id', userId)
     .single()
 
   if (!hotspot) {
@@ -173,7 +194,7 @@ async function handleConvertToTodo(body: any, userId: string) {
   }).select().single()
 
   // 标记热点已读
-  await supabase.from('hotspot_items').update({ status: 'read' }).eq('id', hotspot_id)
+  await supabase.from('hotspot_items').update({ status: 'read' }).eq('id', hotspot_id).eq('user_id', userId)
 
   return NextResponse.json({ ok: true, todo_id: todo?.id })
 }

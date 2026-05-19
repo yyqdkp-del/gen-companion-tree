@@ -3,8 +3,15 @@ export const maxDuration = 60
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { getAuthUser } from '@/lib/auth/getAuthUser'
+import { fetchFormTemplates, enrichActionsWithFormTemplates } from '@/lib/action/enrichPDF'
 
 const MAKE_WEBHOOK_URL = process.env.NEXT_PUBLIC_MAKE_WEBHOOK_URL || ''
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+  process.env.SUPABASE_SERVICE_ROLE_KEY || '',
+)
 
 // ══ event_type → dimension 映射 ══
 const EVENT_TYPE_DIMENSION: Record<string, string> = {
@@ -21,8 +28,8 @@ const EVENT_TYPE_DIMENSION: Record<string, string> = {
 // ══ dimension → 预设 family_data_needed ══
 const DIMENSION_DATA_NEEDED: Record<string, string[]> = {
   education:  ['children', 'places'],
-  mobility:   ['children', 'places', 'passport'],
-  medical:    ['children', 'medical', 'places'],
+  mobility:   ['children', 'places', 'passport', 'vehicles'],
+  medical:    ['children', 'medical', 'places', 'health'],
   compliance: ['passport', 'visa', 'address'],
   wealth:     ['finance', 'places'],
   logistics:  ['places'],
@@ -61,42 +68,37 @@ async function getFamilyData(userId: string, needed: string[]) {
         result.documents = data || []
         break
       }
+      case 'health': {
+        const { data } = await supabase
+          .from('child_health_records')
+          .select('*')
+          .eq('user_id', userId)
+          .order('date', { ascending: false })
+          .limit(5)
+        result.childHealth = data || []
+        break
+      }
+      case 'vehicles': {
+        const { data } = await supabase.from('vehicles').select('*').eq('user_id', userId)
+        result.vehicles = data || []
+        break
+      }
     }
   }))
   return result
 }
 
-// ══ PDF 预填数据 ══
-function buildPDFData(pdfType: string, familyData: any): any {
-  const profile = familyData.profile?.[0] || {}
-  switch (pdfType) {
-    case 'TM7':
-      return {
-        form_name: 'TM.7 Application for Extension of Temporary Stay',
-        fields: {
-          full_name: profile.member_name || '',
-          nationality: profile.member_nationality || '',
-          passport_no: profile.passport_number || '',
-          passport_expiry: profile.passport_expiry || '',
-          visa_type: profile.visa_type || '',
-          address_in_thailand: familyData.places?.find((p: any) => p.place_type === 'home')?.address || '',
-        },
-        download_url: 'https://www.immigration.go.th/content/tm7',
-        official_url: 'https://www.immigration.go.th',
-      }
-    case 'medical_form':
-      return {
-        form_name: '就诊信息表',
-        fields: {
-          name: profile.member_name || '',
-          blood_type: profile.blood_type || '',
-          allergies: profile.allergies || '',
-          chronic_conditions: profile.chronic_conditions || '',
-        }
-      }
-    default:
-      return {}
-  }
+async function enrichPackActions(
+  actions: any[] | undefined,
+  familyData: any,
+  childName?: string,
+) {
+  if (!actions?.length) return actions || []
+  const formTypes = actions
+    .filter((a: any) => a.type === 'download_pdf' && (a.data?.form_type || a.data?.pdf_type))
+    .map((a: any) => a.data.form_type || a.data.pdf_type)
+  const formTemplates = await fetchFormTemplates(supabase, formTypes)
+  return enrichActionsWithFormTemplates(actions, familyData, formTemplates, childName)
 }
 
 // ══ 执行动作 Make.com ══
@@ -132,7 +134,12 @@ async function executeAction(action: any, userId: string) {
         })
         return { ok: true, message: '已加入日历' }
       default:
-        return { ok: true, message: '动作已记录' }
+        console.warn('Unknown action type:', action?.type)
+        return {
+          ok: false,
+          skipped: true,
+          reason: `Unknown action type: ${action?.type ?? 'unknown'}`,
+        }
     }
   } catch (e: any) {
     return { ok: false, error: e.message }
@@ -231,8 +238,7 @@ const EXECUTION_PACK_SCHEMA = `严格只输出JSON，不加任何其他文字：
         "note": "说明",
         "item": "商品名",
         "channel": "lazada|shopee",
-        "pdf_type": "TM7|medical_form",
-        "pdf_data": {"official_url": "", "download_url": ""}
+        "form_type": "TM7|medical_form|school_form"
       }
     }
   ],
@@ -269,49 +275,47 @@ async function callClaude(prompt: string): Promise<any> {
   }
 }
 
-// ══ 补全 actions ══
-function enrichActions(actions: any[], familyData: any): any[] {
-  return (actions || []).map((action: any) => {
-    if (action.type === 'download_pdf' && action.data?.pdf_type) {
-      action.data.pdf_data = buildPDFData(action.data.pdf_type, familyData)
-    }
-    if (action.type === 'navigate' && action.data?.destination && !action.data?.url) {
-      action.data.url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(action.data.destination)}`
-    }
-    return action
-  })
-}
-
 // ══ 主处理函数 ══
 export async function POST(req: NextRequest) {
-  const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-  process.env.SUPABASE_SERVICE_ROLE_KEY || ''
-)
   try {
     const body = await req.json()
-    const { todo_id, user_id, execute_action, schedule_event, child_name } = body
+    const { todo_id, user_id: bodyUserId, execute_action, schedule_event, child_name } = body
 
-    if (!user_id) {
-      return NextResponse.json({ ok: false, error: 'Missing user_id' }, { status: 400 })
+    const { user, error: authError } = await getAuthUser(req)
+    const cronSecret = process.env.CRON_SECRET
+    const authHeader = req.headers.get('Authorization') || ''
+    let userId: string
+    if (user?.id) {
+      userId = user.id
+    } else if (cronSecret && authHeader === `Bearer ${cronSecret}`) {
+      if (!bodyUserId) {
+        return NextResponse.json({ ok: false, error: 'Missing user_id for internal call' }, { status: 400 })
+      }
+      userId = bodyUserId
+    } else {
+      return NextResponse.json({ ok: false, error: authError || 'Unauthorized' }, { status: 401 })
     }
 
     // ── 直接执行动作（Make.com）──
     if (execute_action) {
-      return NextResponse.json(await executeAction(execute_action, user_id))
+      return NextResponse.json(await executeAction(execute_action, userId))
     }
 
     // ── 孩子日程分支 ──
     if (schedule_event) {
       const dimension = EVENT_TYPE_DIMENSION[schedule_event.event_type || 'other'] || 'education'
       const needed = DIMENSION_DATA_NEEDED[dimension] || ['children', 'places']
-      const familyData = await getFamilyData(user_id, needed)
+      const familyData = await getFamilyData(userId, needed)
 
       const prompt = buildSchedulePrompt(schedule_event, child_name || '孩子', dimension, familyData)
       const executionPack = await callClaude(prompt)
 
       if (executionPack.actions) {
-        executionPack.actions = enrichActions(executionPack.actions, familyData)
+        executionPack.actions = await enrichPackActions(
+          executionPack.actions,
+          familyData,
+          child_name || undefined,
+        )
       }
 
       // 存入 child_school_calendar
@@ -331,7 +335,7 @@ export async function POST(req: NextRequest) {
     }
 
     const { data: todo, error: todoError } = await supabase
-      .from('todo_items').select('*').eq('id', todo_id).eq('user_id', user_id).single()
+      .from('todo_items').select('*').eq('id', todo_id).eq('user_id', userId).single()
     if (todoError || !todo) {
       return NextResponse.json({ ok: false, error: 'Todo not found' }, { status: 404 })
     }
@@ -349,13 +353,13 @@ export async function POST(req: NextRequest) {
     const grokResult = todo.ai_action_data?.grok_result || ''
     const needed = brainInstruction.family_data_needed ||
       DIMENSION_DATA_NEEDED[brainInstruction.dimension || 'education'] || []
-    const familyData = await getFamilyData(user_id, needed)
+    const familyData = await getFamilyData(userId, needed)
 
     const prompt = buildTodoPrompt(todo, brainInstruction, familyData, grokResult)
     const executionPack = await callClaude(prompt)
 
     if (executionPack.actions) {
-      executionPack.actions = enrichActions(executionPack.actions, familyData)
+      executionPack.actions = await enrichPackActions(executionPack.actions, familyData)
     }
 
     await supabase.from('todo_items').update({
@@ -364,7 +368,7 @@ export async function POST(req: NextRequest) {
         execution_pack: executionPack,
         prepared_at: new Date().toISOString(),
       }
-    }).eq('id', todo_id).eq('user_id', user_id)
+    }).eq('id', todo_id).eq('user_id', userId)
 
     return NextResponse.json({ ok: true, execution_pack: executionPack })
 

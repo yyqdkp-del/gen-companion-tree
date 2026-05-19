@@ -1,9 +1,9 @@
 'use client'
-import { useState, useEffect, useRef, Suspense } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useParams, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { motion, AnimatePresence } from 'framer-motion'
-import { ArrowLeft, ArrowRight, Check, Loader, Save, Camera, Plus, X } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Check, Loader, Save } from 'lucide-react'
 
 const supabase = createClient()
 
@@ -12,6 +12,7 @@ import { StepSchool }   from './steps/StepSchool'
 import { StepSchedule } from './steps/StepSchedule'
 import { StepHealth }   from './steps/StepHealth'
 import { THEME } from '@/app/_shared/_constants/theme'
+import { logOrAlertNetworkError } from '@/lib/errors/logOrAlertNetworkError'
 
 const STEPS = [
   { id: 'basic', label: '基本信息' },
@@ -20,129 +21,19 @@ const STEPS = [
   { id: 'health', label: '健康信息' },
 ]
 
-const EMOJIS = ['🌟', '🌈', '🦁', '🐼', '🦊', '🐬', '🦋', '🌸', '🍀', '🎨', '🚀', '⚽']
-
-const DAYS = [
-  { key: 'mon', label: '周一' },
-  { key: 'tue', label: '周二' },
-  { key: 'wed', label: '周三' },
-  { key: 'thu', label: '周四' },
-  { key: 'fri', label: '周五' },
-]
-
-const ACTIVITY_TYPES = [
-  { value: 'tutor', label: '补习课' },
-  { value: 'sport', label: '体育运动' },
-  { value: 'activity', label: '兴趣班' },
-  { value: 'other', label: '其他' },
-]
-
-// ── 清迈医院预设列表 ──
-const PRESET_HOSPITALS = [
-  { category: '综合国际医院', hospitals: [
-    { name: '清迈曼谷医院 (Bangkok Hospital)', phone: '052-089-888' },
-    { name: '清迈兰医院 (Ram Hospital)', phone: '053-920-300' },
-    { name: '兰纳医院 (Lanna Hospital)', phone: '052-134-777' },
-    { name: '麦考密克医院 (McCormick)', phone: '053-921-777' },
-    { name: 'Rajavej 医院', phone: '052-011-999' },
-    { name: 'Sriphat 医疗中心 (清大附属)', phone: '053-936-900' },
-  ]},
-  { category: '牙科诊所', hospitals: [
-    { name: 'Grace Dental Care', phone: '053-894-568' },
-    { name: 'CIDC 国际牙科中心', phone: '052-089-323' },
-    { name: 'GrandDent Dental', phone: '053-274-420' },
-    { name: 'Kitcha Dental', phone: '053-202-011' },
-    { name: 'Dental 4 U', phone: '086-431-3711' },
-    { name: 'Elite Smile Dental', phone: '053-288-199' },
-  ]},
-  { category: '眼科', hospitals: [
-    { name: '圣彼得眼科医院', phone: '053-225-011' },
-    { name: 'CMES 清大专家诊所', phone: '090-670-1719' },
-    { name: 'Darin Eye Center', phone: '052-005-552' },
-    { name: '兰医院眼科中心', phone: '053-920-300' },
-    { name: 'Sriphat 眼科中心', phone: '053-936-948' },
-  ]},
-]
-
-// ── 健康选项 ──
-const BLOOD_TYPES = ['不知道', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-']
-const ALLERGY_OPTIONS = ['无', '青霉素', '头孢', '阿司匹林', '花生', '海鲜', '牛奶', '鸡蛋', '尘螨', '花粉', '猫狗毛', '乳胶', '其他']
-const CONDITION_OPTIONS = ['无', '哮喘', '湿疹', '过敏性鼻炎', '糖尿病', '癫痫', '心脏病', '其他']
-const MEDICATION_OPTIONS = ['无', '哮喘喷雾', '过敏药', '退烧药备用', '维生素', '其他']
-
-function Field({ label, value, onChange, placeholder, type = 'text' }: {
-  label: string; value: string; onChange: (v: string) => void
-  placeholder?: string; type?: string
-}) {
-  return (
-    <div style={{ marginBottom: 16 }}>
-      <div style={{ fontSize: 12, color: THEME.muted, fontWeight: 700, marginBottom: 6, letterSpacing: '0.08em' }}>{label}</div>
-      <input type={type} value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder}
-        style={{ width: '100%', padding: '12px 14px', borderRadius: 12, border: '1px solid rgba(0,0,0,0.1)', background: 'rgba(255,255,255,0.65)', fontSize: 14, color: THEME.text, outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit' }} />
-    </div>
-  )
-}
-
-function SelectField({ label, value, onChange, options }: {
-  label: string; value: string; onChange: (v: string) => void
-  options: { value: string; label: string }[]
-}) {
-  return (
-    <div style={{ marginBottom: 16 }}>
-      <div style={{ fontSize: 12, color: THEME.muted, fontWeight: 700, marginBottom: 6, letterSpacing: '0.08em' }}>{label}</div>
-      <select value={value} onChange={e => onChange(e.target.value)}
-        style={{ width: '100%', padding: '12px 14px', borderRadius: 12, border: '1px solid rgba(0,0,0,0.1)', background: 'rgba(255,255,255,0.65)', fontSize: 14, color: THEME.text, outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit', appearance: 'none' }}>
-        {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-      </select>
-    </div>
-  )
-}
-
-// ── 多选标签组件 ──
-function MultiSelect({ label, options, selected, onChange }: {
-  label: string
-  options: string[]
-  selected: string[]
-  onChange: (v: string[]) => void
-}) {
-  const [customInput, setCustomInput] = useState('')
-  const showCustom = selected.includes('其他')
-
-  const toggle = (opt: string) => {
-    if (opt === '无') { onChange(['无']); return }
-    const without = selected.filter(s => s !== '无')
-    if (without.includes(opt)) {
-      const next = without.filter(s => s !== opt)
-      onChange(next.length ? next : ['无'])
-    } else {
-      onChange([...without, opt])
+function allergiesToText(val: unknown): string {
+  if (Array.isArray(val)) return val.filter(Boolean).join('、')
+  if (typeof val === 'string' && val) {
+    try {
+      const p = JSON.parse(val)
+      return Array.isArray(p) ? p.filter(Boolean).join('、') : val
+    } catch {
+      return val
     }
   }
-
-  return (
-    <div style={{ marginBottom: 16 }}>
-      <div style={{ fontSize: 12, color: THEME.muted, fontWeight: 700, marginBottom: 8, letterSpacing: '0.08em' }}>{label}</div>
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-        {options.map(opt => {
-          const isSelected = selected.includes(opt)
-          return (
-            <motion.div key={opt} whileTap={{ scale: 0.92 }} onClick={() => toggle(opt)}
-              style={{ padding: '7px 14px', borderRadius: 20, fontSize: 13, cursor: 'pointer', background: isSelected ? 'rgba(176,141,87,0.15)' : 'rgba(255,255,255,0.6)', border: isSelected ? `1.5px solid ${THEME.gold}` : '1px solid rgba(0,0,0,0.1)', color: isSelected ? THEME.gold : THEME.text, fontWeight: isSelected ? 600 : 400 }}>
-              {opt}
-            </motion.div>
-          )
-        })}
-      </div>
-      {showCustom && (
-        <input value={customInput} onChange={e => setCustomInput(e.target.value)}
-          placeholder="请描述具体情况…"
-          style={{ width: '100%', marginTop: 8, padding: '10px 14px', borderRadius: 10, border: '1px solid rgba(0,0,0,0.1)', background: 'rgba(255,255,255,0.65)', fontSize: 13, outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit' }} />
-      )}
-    </div>
-  )
+  return ''
 }
 
-// ── Step 0：基本信息 ──
 // ── 主组件 ──
 function ChildEditContent() {
   const router = useRouter()
@@ -151,7 +42,6 @@ function ChildEditContent() {
   const childId = isNew ? null : params.id as string
   const searchParams = useSearchParams()
   const isFromQuick = searchParams.get('from') === 'quick'
-  const cameraRef = useRef<HTMLInputElement>(null)
   const [step, setStep] = useState(0)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
@@ -160,6 +50,9 @@ function ChildEditContent() {
 
   const [basicData, setBasicData] = useState({
     name: '', birthdate: '', emoji: '🌟', languages: [] as string[], avatar_url: '',
+    blood_type: '不知道',
+    allergies_text: '',
+    passport_number: '', passport_expiry: '', nationality: '',
   })
   const [schoolData, setSchoolData] = useState({
     school_id: '', school: '', school_name: '', grade: '',
@@ -170,10 +63,8 @@ function ChildEditContent() {
   activities: [] as any[],
 })
   const [healthData, setHealthData] = useState({
-    blood_type: '不知道',
     usual_bedtime: '21:30',
     weekend_bedtime: '22:30',
-    allergies: ['无'] as string[],
     medical_conditions: ['无'] as string[],
     medications_current: ['无'] as string[],
     preferred_hospitals: [] as any[],
@@ -215,6 +106,11 @@ function ChildEditContent() {
       emoji: child.emoji || '🌟',
       languages: child.languages || [],
       avatar_url: child.avatar_url || '',
+      blood_type: child.blood_type || '不知道',
+      allergies_text: allergiesToText(child.allergies),
+      passport_number: child.passport_number || '',
+      passport_expiry: child.passport_expiry || '',
+      nationality: child.nationality || '',
     })
     setSchoolData({
       school_id: '',
@@ -226,10 +122,8 @@ function ChildEditContent() {
       transport_method: child.transport_method || '',
     })
     setHealthData({
-      blood_type: child.blood_type || '不知道',
       usual_bedtime: child.usual_bedtime || '21:30',
       weekend_bedtime: child.weekend_bedtime || '22:30',
-      allergies: parseArray(child.allergies),
       medical_conditions: parseArray(child.medical_conditions),
       medications_current: parseArray(child.medications_current),
       preferred_hospitals: child.preferred_hospitals || [],
@@ -261,18 +155,23 @@ function ChildEditContent() {
         emoji: basicData.emoji,
         languages: basicData.languages,
         avatar_url: basicData.avatar_url || null,
+        blood_type: basicData.blood_type,
+        allergies: basicData.allergies_text.trim()
+          ? [basicData.allergies_text.trim()]
+          : ['无'],
+        passport_number: basicData.passport_number.trim() || null,
+        passport_expiry: basicData.passport_expiry || null,
+        nationality: basicData.nationality.trim() || null,
         school: schoolData.school,
         school_name: schoolData.school_name || schoolData.school,
         grade: schoolData.grade,
         school_start_time: schoolData.school_start_time || null,
         school_end_time: schoolData.school_end_time || null,
         transport_method: schoolData.transport_method,
-        blood_type: healthData.blood_type,
         usual_bedtime: healthData.usual_bedtime,
         weekend_bedtime: healthData.weekend_bedtime,
-        allergies: healthData.allergies,
-medical_conditions: healthData.medical_conditions,
-medications_current: healthData.medications_current,
+        medical_conditions: healthData.medical_conditions,
+        medications_current: healthData.medications_current,
         preferred_hospitals: healthData.preferred_hospitals,
       }
 
@@ -308,8 +207,7 @@ medications_current: healthData.medications_current,
       setTimeout(() => router.push('/'), 1200)
 
     } catch (e) {
-      console.error('保存失败', e)
-      setSaveError('保存失败，请检查网络后重试')
+      if (!logOrAlertNetworkError(e)) setSaveError('保存失败，请检查网络后重试')
     }
     setSaving(false)
   }
@@ -364,7 +262,7 @@ medications_current: healthData.medications_current,
         </div>
 
         {saveError && (
-          <div style={{ color: '#E07B2A', fontSize: 13, textAlign: 'center', marginBottom: 12, padding: '10px 14px', borderRadius: 12, background: 'rgba(224,123,42,0.08)', border: '1px solid rgba(224,123,42,0.2)' }}>
+          <div style={{ color: '#7a5a35', fontSize: 13, textAlign: 'center', marginBottom: 12, padding: '10px 14px', borderRadius: 12, background: '#fcf7ed', border: '1px solid #f2e2cd' }}>
             ⚠️ {saveError}
           </div>
         )}

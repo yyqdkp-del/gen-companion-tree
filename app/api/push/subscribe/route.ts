@@ -1,16 +1,24 @@
 export const dynamic = 'force-dynamic'
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { getAuthUser } from '@/lib/auth/getAuthUser'
 
 export async function POST(req: NextRequest) {
+  const { user, error: authError } = await getAuthUser(req)
+  if (authError || !user) {
+    return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+  }
+
+  const userId = user.id
+
   const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || '',
   process.env.SUPABASE_SERVICE_ROLE_KEY || ''
 )
   try {
-    const { subscription, user_id } = await req.json()
+    const { subscription } = await req.json()
 
-    if (!subscription || !user_id) {
+    if (!subscription) {
       return NextResponse.json({ ok: false, error: '缺少参数' }, { status: 400 })
     }
 
@@ -18,7 +26,7 @@ export async function POST(req: NextRequest) {
     const { data: existing } = await supabase
       .from('push_subscriptions')
       .select('id')
-      .eq('user_id', user_id)
+      .eq('user_id', userId)
       .eq('subscription->>endpoint', subscription.endpoint)
       .single()
 
@@ -28,7 +36,7 @@ export async function POST(req: NextRequest) {
 
     // 存入新订阅
     await supabase.from('push_subscriptions').insert({
-      user_id,
+      user_id: userId,
       subscription,
     })
 
@@ -41,13 +49,19 @@ export async function POST(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
+  const { user, error: authError } = await getAuthUser(req)
+  if (authError || !user) {
+    return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+  }
+
+  const userId = user.id
+
   const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || '',
   process.env.SUPABASE_SERVICE_ROLE_KEY || ''
 )
   try {
-    const { user_id } = await req.json()
-    await supabase.from('push_subscriptions').delete().eq('user_id', user_id)
+    await supabase.from('push_subscriptions').delete().eq('user_id', userId)
     return NextResponse.json({ ok: true })
   } catch (e: any) {
     return NextResponse.json({ ok: false, error: e?.message }, { status: 500 })

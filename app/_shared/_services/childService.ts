@@ -1,13 +1,15 @@
 import { createClient } from '@/lib/supabase/client'
 import { calculateEnergy, getEnergyColor } from '../_engine/energy'
 import type { TimelineItem, HealthStatus, MoodStatus } from '../_types'
+import { addDaysStr, getTodayStr } from '@/lib/date/localDate'
 
 const supabase = createClient()
 
 export async function fetchChildSchedule(childId: string, today: string) {
-  const dow = new Date().getDay()
+  const dow = new Date(`${today}T12:00:00`).getDay()
   const dowKey = ['sun','mon','tue','wed','thu','fri','sat'][dow]
-  const yearEnd = new Date(new Date().getFullYear(), 11, 31).toISOString().split('T')[0]
+  const y = new Date().getFullYear()
+  const yearEnd = getTodayStr(new Date(y, 11, 31))
 
   const [profileRes, calRes, healthRes] = await Promise.all([
     supabase.from('child_profiles')
@@ -119,42 +121,50 @@ export async function enrichChildren(
           .select('*').eq('child_id', c.id)
           .eq('user_id', uid)
           .gte('date_start', today)
-          .lte('date_start', new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0])
+          .lte('date_start', addDaysStr(new Date(), 7))
           .order('date_start'),
       ])
       const log  = logRes.status === 'fulfilled' ? logRes.value.data : null
       const evts = evtRes.status === 'fulfilled' ? (evtRes.value.data || []) : []
 
-      // 推导 urgent_items
+      // 推导 urgent_items（按 title+日期去重）
       const todayEvts = evts.filter((e: any) => e.date_start === today)
       const weekEvts  = evts.filter((e: any) => e.date_start > today)
       const urgent_items: { title: string; level: 'red' | 'orange' | 'yellow' }[] = []
+      const seenUrgent = new Set<string>()
+      const addUrgent = (
+        item: { title: string; level: 'red' | 'orange' | 'yellow' },
+        dateKey?: string,
+      ) => {
+        const key = `${item.title}-${dateKey ?? ''}`
+        if (seenUrgent.has(key)) return
+        seenUrgent.add(key)
+        urgent_items.push(item)
+      }
 
       // 生病 → red
       if (log?.health_status === 'sick') {
-        urgent_items.push({ title: '生病中，注意休息', level: 'red' })
+        addUrgent({ title: '生病中，注意休息', level: 'red' }, '')
       }
 
       // 今日需要行动 → orange
       todayEvts.filter((e: any) => e.requires_action).forEach((e: any) => {
-        urgent_items.push({ title: e.title, level: 'orange' })
+        addUrgent({ title: e.title, level: 'orange' }, e.date_start)
       })
 
       // 今日需要付款 → orange
       todayEvts.filter((e: any) => e.requires_payment).forEach((e: any) => {
-        urgent_items.push({ title: `💰 ${e.title} ฿${e.requires_payment}`, level: 'orange' })
+        addUrgent({ title: `💰 ${e.title} ฿${e.requires_payment}`, level: 'orange' }, e.date_start)
       })
 
       // 今日考试或体检 → orange
       todayEvts.filter((e: any) => ['exam', 'medical'].includes(e.event_type)).forEach((e: any) => {
-        if (!urgent_items.find(u => u.title === e.title)) {
-          urgent_items.push({ title: e.title, level: 'orange' })
-        }
+        addUrgent({ title: e.title, level: 'orange' }, e.date_start)
       })
 
       // 7天内需要行动 → yellow
       weekEvts.filter((e: any) => e.requires_action || e.requires_payment).forEach((e: any) => {
-        urgent_items.push({ title: e.title, level: 'yellow' })
+        addUrgent({ title: e.title, level: 'yellow' }, e.date_start)
       })
 
       // energy 计算 — 使用精力引擎

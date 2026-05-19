@@ -1,30 +1,124 @@
 @import "tailwindcss";
 
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600&family=Noto+Serif+SC:wght@300;400;500;700&display=swap');
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --canvas-light: #fbf9f6;
+  --canvas-mist: #f4f2ed;
+  --droplet-peach: #e6a89e;
+  --droplet-peach-light: #f5d6d1;
+  --droplet-peach-dark: #7d3f37;
+  --droplet-willow: #8ca88d;
+  --droplet-willow-light: #d9e6da;
+  --droplet-willow-dark: #2f4030;
+  --droplet-slate: #6c828f;
+  --droplet-slate-light: #cddce5;
+  --droplet-slate-dark: #2b3942;
+  --treehole-deep: #0a0d14;
+  --treehole-ink: #121a29;
+  --accent-clay: #a46355;
+  --accent-jade: #5c7a5e;
+  --text-main: #1e293b;
+  --text-muted: #64748b;
+  --vh: 100dvh;
+  --keyboard-height: 0px;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+*, *::before, *::after {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Helvetica Neue', Arial, sans-serif;
+  background-color: var(--canvas-light);
+  color: var(--text-main);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
-:root {
-  --vh: 100dvh;
-  --keyboard-height: 0px;
+
+.font-serif-cn {
+  font-family: 'Noto Serif SC', 'Songti SC', 'STSong', Georgia, serif;
+}
+
+/* 宣纸纹理背景 */
+.canvas-texture {
+  background-color: var(--canvas-light);
+  background-image:
+    radial-gradient(at 100% 0%, rgba(245,214,209,0.2) 0px, transparent 60%),
+    radial-gradient(at 0% 100%, rgba(217,230,218,0.15) 0px, transparent 60%),
+    url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.015'/%3E%3C/svg%3E");
+}
+
+/* 树洞深夜背景 */
+.treehole-bg {
+  background-color: var(--treehole-deep);
+  background-image:
+    radial-gradient(at 50% -10%, rgba(245,214,209,0.05) 0px, transparent 50%),
+    linear-gradient(180deg, #0a0d14 0%, #121a29 100%);
+}
+
+/* 骨架屏shimmer */
+@keyframes shimmerWave {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.skeleton-shimmer {
+  background: linear-gradient(90deg, #fbf9f6 25%, #f0ede8 37%, #fbf9f6 63%);
+  background-size: 200% 100%;
+  animation: shimmerWave 1.4s infinite ease-in-out;
+  border-radius: 8px;
+}
+
+/* 水珠呼吸动效 */
+@keyframes breathOne {
+  0%, 100% { border-radius: 42% 58% 70% 30% / 45% 45% 55% 55%; transform: scale(1) rotate(0deg); }
+  33% { border-radius: 46% 54% 65% 35% / 48% 42% 58% 52%; transform: scale(1.025) rotate(0.8deg); }
+  66% { border-radius: 39% 61% 73% 27% / 42% 48% 52% 58%; transform: scale(0.98) rotate(-0.5deg); }
+}
+@keyframes breathTwo {
+  0%, 100% { border-radius: 70% 30% 52% 48% / 60% 40% 60% 40%; transform: scale(1) rotate(0deg); }
+  50% { border-radius: 64% 36% 58% 42% / 54% 46% 64% 36%; transform: scale(1.03) rotate(-1.2deg); }
+}
+@keyframes breathThree {
+  0%, 100% { border-radius: 48% 52% 35% 65% / 42% 68% 32% 58%; transform: scale(1) rotate(0deg); }
+  40% { border-radius: 53% 47% 41% 59% / 47% 62% 38% 52%; transform: scale(1.018) rotate(1.5deg); }
+}
+
+.animate-droplet-1 { animation: breathOne 7.8s ease-in-out infinite; }
+.animate-droplet-2 { animation: breathTwo 9.2s ease-in-out infinite; animation-delay: 1.2s; }
+.animate-droplet-3 { animation: breathThree 8.4s ease-in-out infinite; animation-delay: 2.1s; }
+
+/* 错误轻叹动效 */
+@keyframes gentleSigh {
+  0%, 100% { transform: translateY(0); }
+  33% { transform: translateY(-2px); }
+  66% { transform: translateY(1.5px); }
+}
+.animate-sigh { animation: gentleSigh 250ms ease-in-out; }
+
+/* 页面转场 */
+@keyframes pageEnter {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.page-enter {
+  animation: pageEnter 350ms cubic-bezier(0.21, 1.02, 0.43, 1.01) both;
+}
+
+/* 深夜模式切换过渡 */
+.transition-ink-wash {
+  transition: background 800ms cubic-bezier(0.16, 1, 0.3, 1),
+              backdrop-filter 800ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* reduce motion */
+@media (prefers-reduced-motion: reduce) {
+  .animate-droplet-1,
+  .animate-droplet-2,
+  .animate-droplet-3,
+  .page-enter {
+    animation: none !important;
+    transition: none !important;
+  }
 }

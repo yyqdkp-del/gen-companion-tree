@@ -1,20 +1,22 @@
 export const dynamic = 'force-dynamic'
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { getAuthUser } from '@/lib/auth/getAuthUser'
 
 export async function POST(req: NextRequest) {
   try {
-    const { content, input_type, file_url, user_id: body_user_id } = await req.json()
+    const { user, error: authError } = await getAuthUser(req)
+    if (authError || !user) {
+      return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const activeUserId = user.id
+    const { content, input_type, file_url } = await req.json()
 
     const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL || '',
       process.env.SUPABASE_SERVICE_ROLE_KEY || ''
     )
-
-    const activeUserId = body_user_id
-    if (!activeUserId) {
-      return NextResponse.json({ ok: false, error: 'Unauthorized: Missing User Context' }, { status: 401 })
-    }
 
     // 立刻存入队列，不做任何处理
     const { data: job, error } = await supabase.from('raw_inputs').insert({

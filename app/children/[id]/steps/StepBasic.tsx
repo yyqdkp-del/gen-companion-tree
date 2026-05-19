@@ -4,6 +4,7 @@ import { motion } from 'framer-motion'
 import { Loader, Camera, Check } from 'lucide-react'
 import { THEME } from '@/app/_shared/_constants/theme'
 import { createClient } from '@/lib/supabase/client'
+import { logOrAlertNetworkError } from '@/lib/errors/logOrAlertNetworkError'
 const supabase = createClient()
 
 const EMOJIS = ['🌟', '🌈', '🦁', '🐼', '🦊', '🐬', '🦋', '🌸', '🍀', '🎨', '🚀', '⚽']
@@ -84,6 +85,30 @@ function SelectField({ label, value, onChange, options }: {
   )
 }
 
+function TextAreaField({ label, value, onChange, placeholder }: {
+  label: string
+  value: string
+  onChange: (v: string) => void
+  placeholder?: string
+}) {
+  return (
+    <div style={{ marginBottom: 16 }}>
+      <div style={{ fontSize: 12, color: THEME.muted, fontWeight: 700, marginBottom: 6, letterSpacing: '0.08em' }}>{label}</div>
+      <textarea
+        rows={3}
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        placeholder={placeholder}
+        style={{
+          width: '100%', padding: '12px 14px', borderRadius: 12, border: '1px solid rgba(0,0,0,0.1)',
+          background: 'rgba(255,255,255,0.65)', fontSize: 14, color: THEME.text, outline: 'none',
+          boxSizing: 'border-box', fontFamily: 'inherit', resize: 'vertical',
+        }}
+      />
+    </div>
+  )
+}
+
 // ── 多选标签组件 ──
 function MultiSelect({ label, options, selected, onChange }: {
   label: string
@@ -149,7 +174,7 @@ function StepBasic({ data, onChange }: { data: any; onChange: (d: any) => void }
       setUploadSuccess(true)
       setTimeout(() => setUploadSuccess(false), 3000)
     } catch (e) {
-      console.error('上传失败', e)
+      logOrAlertNetworkError(e)
     }
     setUploading(false)
   }
@@ -200,6 +225,24 @@ function StepBasic({ data, onChange }: { data: any; onChange: (d: any) => void }
 
       <Field label="孩子名字" value={data.name} onChange={v => onChange({ ...data, name: v })} placeholder="小明 / William" />
       <Field label="生日" value={data.birthdate} onChange={v => onChange({ ...data, birthdate: v })} type="date" />
+
+      <SelectField
+        label="血型"
+        value={data.blood_type || '不知道'}
+        onChange={v => onChange({ ...data, blood_type: v })}
+        options={BLOOD_TYPES.map(bt => ({ value: bt, label: bt }))}
+      />
+      <TextAreaField
+        label="过敏史"
+        value={data.allergies_text || ''}
+        onChange={v => onChange({ ...data, allergies_text: v })}
+        placeholder="无过敏可留空，或写明过敏原与反应"
+      />
+
+      <div style={{ fontSize: 12, color: THEME.gold, fontWeight: 700, marginBottom: 10, marginTop: 4 }}>护照（可选，用于预填表格）</div>
+      <Field label="护照号" value={data.passport_number || ''} onChange={v => onChange({ ...data, passport_number: v })} placeholder="如有请填写" />
+      <Field label="护照到期日" value={data.passport_expiry || ''} onChange={v => onChange({ ...data, passport_expiry: v })} type="date" />
+      <Field label="国籍" value={data.nationality || ''} onChange={v => onChange({ ...data, nationality: v })} placeholder="如：中国" />
 
       <div style={{ marginBottom: 16 }}>
         <div style={{ fontSize: 12, color: THEME.muted, fontWeight: 700, marginBottom: 8, letterSpacing: '0.08em' }}>日常语言</div>

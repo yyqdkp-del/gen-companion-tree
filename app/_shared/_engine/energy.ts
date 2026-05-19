@@ -210,10 +210,10 @@ export function calculateEnergy(input: EnergyInput): EnergyResult {
 
 // ── 辅助函数（供水珠和UI使用）────────────
 export function getEnergyColor(score: number): string {
-  if (score >= 75) return '#4ADE80'
-  if (score >= 55) return '#FACC15'
-  if (score >= 35) return '#FB923C'
-  return '#FB7185'
+  if (score >= 75) return '#8ca88d'
+  if (score >= 55) return '#b88e5e'
+  if (score >= 35) return '#e6a89e'
+  return '#d58074'
 }
 
 export function getEnergyLevel(score: number): EnergyLevel {

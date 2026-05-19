@@ -26,13 +26,17 @@ export async function fetchSmartChars(
     R5: ['蕴', '醇', '澄', '廉', '谦', '逸', '渊', '翰', '璞', '骥'],
   }
   try {
-    const { data } = await supabase
-      .from('hanzi_library')
-      .select('char')
-      .eq('level_tag', level)
-      .not('char', 'in', `(${learnedChars.slice(0, 50).join(',') || 'x'})`)
-      .order('hit_count', { ascending: false })
-      .limit(10)
+    const { data } = await (() => {
+      let q = supabase
+        .from('hanzi_library')
+        .select('char')
+        .eq('level_tag', level)
+      const slice = learnedChars.slice(0, 50)
+      if (slice.length > 0) {
+        q = q.not('char', 'in', `(${slice.map(c => `"${c}"`).join(',')})`)
+      }
+      return q.order('hit_count', { ascending: false }).limit(10)
+    })()
     if (data?.length) return data.map((d: any) => d.char)
   } catch {}
   return fallbacks[level] || fallbacks.R2

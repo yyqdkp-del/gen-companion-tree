@@ -2,21 +2,39 @@ import { createClient } from '@/lib/supabase/client'
 
 const supabase = createClient()
 
-export async function fetchAppData(uid: string) {
+function applyAbortSignal<T>(builder: T, signal?: AbortSignal): T {
+  if (!signal) return builder
+  const b = builder as { abortSignal?: (s: AbortSignal) => T }
+  return typeof b.abortSignal === 'function' ? b.abortSignal(signal) : builder
+}
+
+export async function fetchAppData(uid: string, signal?: AbortSignal) {
   const [childRes, todoRes, hotspotRes] = await Promise.all([
-    supabase.from('children')
-      .select('*').eq('user_id', uid),
-    supabase.from('todo_items')
-      .select('*').eq('user_id', uid)
-      .neq('status', 'done')
-      .order('created_at', { ascending: false })
-      .limit(50),
-    supabase.from('hotspot_items')
-      .select('*').neq('status', 'dismissed')
-      .eq('user_id', uid)
-      .order('created_at', { ascending: false })
-      .limit(20),
+    applyAbortSignal(
+      supabase.from('children').select('*').eq('user_id', uid),
+      signal,
+    ),
+    applyAbortSignal(
+      supabase.from('todo_items')
+        .select('*').eq('user_id', uid)
+        .not('status', 'in', '("done","dismissed")')
+        .order('created_at', { ascending: false })
+        .limit(50),
+      signal,
+    ),
+    applyAbortSignal(
+      supabase.from('hotspot_items')
+        .select('*').neq('status', 'dismissed')
+        .eq('user_id', uid)
+        .order('created_at', { ascending: false })
+        .limit(20),
+      signal,
+    ),
   ])
+
+  if (signal?.aborted) {
+    throw new DOMException('Aborted', 'AbortError')
+  }
 
   return {
     kids:     childRes.data   || [],

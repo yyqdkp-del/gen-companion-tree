@@ -12,10 +12,11 @@ type Props = {
 
 export default function SmartQuickChars({ level, learnedChars, onSelect }: Props) {
   const [chars, setChars] = useState<string[]>([])
+  const learnedKey = learnedChars.join(',')
 
   useEffect(() => {
     fetchSmartChars(level, learnedChars).then(setChars)
-  }, [level, learnedChars.length])
+  }, [level, learnedKey])
 
   if (!chars.length) return null
 

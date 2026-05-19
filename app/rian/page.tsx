@@ -17,7 +17,9 @@ import { useUpload, UPLOAD_STATUS_TEXT } from '@/app/_shared/_hooks/useUpload'
 const TodoDetailModal = nextDynamic(() => import('./TodoDetailModal'), { ssr: false })
 export const dynamic = 'force-dynamic'
 import { useApp } from '@/app/context/AppContext'
-  
+import { logOrAlertNetworkError } from '@/lib/errors/logOrAlertNetworkError'
+import { useTodoEngine } from '@/app/_shared/_hooks/useTodoEngine'
+import type { TodoItem } from '@/app/_shared/_types'
 
 type Reminder = {
   id: string
@@ -61,28 +63,33 @@ export default function RianPage() {
   const [mounted, setMounted] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const cameraInputRef = useRef<HTMLInputElement>(null)
-  const getEnergyColor = (v: number) => v > 70 ? '#4ADE80' : v > 40 ? '#FACC15' : '#FB7185'
+const getEnergyColor = (v: number) => v > 70 ? '#8ca88d' : v > 40 ? '#b88e5e' : '#d58074'
 
 const { userId, kids: ctxKids, todos: ctxTodos, sync: ctxSync } = useApp()
 
-// ── 从 Context 筛选今日水珠 ──
-const todayStr = useMemo(() => new Date().toISOString().split('T')[0], [])
-const reminders = useMemo<Reminder[]>(() => ctxTodos
-  .filter((t: any) => t._isTemp || (t.status === 'pending' && t.due_date === todayStr))
-  .sort((a: any, b: any) => {
-    const o: Record<string, number> = { red: 0, orange: 1, yellow: 2 }
-    return (o[a.priority] ?? 2) - (o[b.priority] ?? 2)
-  })
-  .map((t: any) => ({
+const todosTyped = ctxTodos as TodoItem[]
+const { groups } = useTodoEngine(todosTyped)
+
+const mapTodoToReminder = (t: TodoItem): Reminder => ({
   id: t.id,
   title: t.title,
-  description: t.description,
+  description: (t as any).description,
   category: t.category,
   urgency_level: t.priority === 'red' ? 3 : t.priority === 'orange' ? 2 : 1,
   due_date: t.due_date,
   status: t.status,
   ai_action_data: t.ai_action_data,
-})), [ctxTodos, todayStr])
+})
+
+// ── 今日水珠：引擎 today 分组 + 临时待办（与 TodoEngine 语义一致）──
+const reminders = useMemo<Reminder[]>(() => {
+  const temps = (ctxTodos as any[])
+    .filter((t: any) => t._isTemp)
+    .map((t: any) => mapTodoToReminder(t as TodoItem))
+  const fromEngine = groups.today.map(mapTodoToReminder)
+  const priority = (t: Reminder) => (t.urgency_level === 3 ? 0 : t.urgency_level === 2 ? 1 : 2)
+  return [...temps, ...fromEngine].sort((a, b) => priority(a) - priority(b))
+}, [ctxTodos, groups.today])
  // ── 时钟 ──
   useEffect(() => {
     setMounted(true)
@@ -130,8 +137,10 @@ const reminders = useMemo<Reminder[]>(() => ctxTodos
   u.rate = 0.95
   window.speechSynthesis.speak(u)
 }
-    } catch {
-      setReminderChat(prev => [...prev, { role: 'assistant', text: '网络异常，请稍后再试' }])
+    } catch (e) {
+      if (!logOrAlertNetworkError(e)) {
+        setReminderChat(prev => [...prev, { role: 'assistant', text: '抱歉，暂时无法回复，请稍后再试' }])
+      }
     } finally {
       setReminderLoading(false)
     }
@@ -356,7 +365,7 @@ initial={false}
               </span>
               {isUrgent && (
                 <motion.div animate={{ scale: [1, 1.4, 1], opacity: [1, 0.5, 1] }} transition={{ repeat: Infinity, duration: 1.5 }}
-                  style={{ position: 'absolute', top: 8, right: 10, width: 8, height: 8, background: '#FF6B6B', borderRadius: '50%', border: '2px solid white' }} />
+                  style={{ position: 'absolute', top: 8, right: 10, width: 8, height: 8, background: '#d58074', borderRadius: '50%', border: '2px solid white' }} />
               )}
               <div style={{ position: 'absolute', top: 13, left: 18, width: 13, height: 6, background: 'rgba(255,255,255,0.45)', borderRadius: '50%', transform: 'rotate(-35deg)' }} />
             </div>

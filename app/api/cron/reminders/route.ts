@@ -4,6 +4,7 @@ export const dynamic = 'force-dynamic'
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { getTodayStr } from '@/lib/date/localDate'
 
 const familyId = 'default'
 
@@ -59,7 +60,7 @@ export async function GET(req: NextRequest) {
   console.log('三级提醒检查开始:', new Date().toISOString())
 
   try {
-    const today = new Date().toISOString().split('T')[0]
+    const today = getTodayStr()
 
     // 1. 找到今天需要触发的提醒
     const { data: dueChains, error } = await supabase

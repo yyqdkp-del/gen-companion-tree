@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { X } from 'lucide-react'
 import { THEME } from '../_constants/theme'
 import { createClient } from '@/lib/supabase/client'
+import { logOrAlertNetworkError } from '@/lib/errors/logOrAlertNetworkError'
 
 const supabase = createClient()
 
@@ -99,7 +100,7 @@ export default function HotspotPreferences({ userId, onClose, onSave }: Props) {
       onSave()
       onClose()
     } catch (e) {
-      console.error(e)
+      logOrAlertNetworkError(e)
     } finally {
       setSaving(false)
     }

@@ -3,7 +3,6 @@ import React, { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Home as HomeIcon } from 'lucide-react'
 import { useRouter, usePathname } from 'next/navigation'
-import { THEME } from '@/app/_shared/_constants/theme'
 import { useApp } from '@/app/context/AppContext'
 import SettingsButton from '@/app/components/SettingsButton'
 
@@ -12,16 +11,18 @@ const PAGE_MAP: Record<string, string> = {
   '/rian':      '日安',
   '/growth':    '根·中文',
   '/treehouse': '日栖',
+  '/school':    '学校',
 }
 
 const NAV_ITEMS = [
   { label: '基地',   path: '/' },
   { label: '日安',   path: '/rian' },
   { label: '根·中文', path: '/growth' },
+  { label: '学校',   path: '/school' },
   { label: '日栖',   path: '/treehouse' },
 ]
 
-const SHOW_PATHS = ['/', '/rian', '/growth', '/treehouse']
+const SHOW_PATHS = ['/', '/rian', '/growth', '/treehouse', '/school']
 
 type Props = {
   leftSlot?: React.ReactNode   // 左侧按钮（话筒）
@@ -62,9 +63,10 @@ export default function BottomNav({ leftSlot, rightSlot }: Props) {
                 onClick={() => { router.push(item.path); setShowMenu(false) }}
                 style={{ padding: '8px 18px', borderRadius: 14,
                   background: pathname === item.path
-                    ? 'rgba(255,255,255,0.6)' : 'rgba(255,255,255,0.3)',
-                  border: 'none', fontSize: 11, fontWeight: 700, color: THEME.text,
-                  backdropFilter: 'blur(10px)', cursor: 'pointer' }}>
+                    ? 'rgba(164, 99, 85, 0.08)' : 'rgba(251, 249, 246, 0.72)',
+                  border: '1px solid rgba(30, 41, 59, 0.06)', fontSize: 11, fontWeight: 700,
+                  color: pathname === item.path ? '#a46355' : 'rgba(30, 41, 59, 0.35)',
+                  backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)', cursor: 'pointer' }}>
                 {item.label}
               </motion.button>
             ))}
@@ -75,8 +77,11 @@ export default function BottomNav({ leftSlot, rightSlot }: Props) {
       {/* 底部胶囊 */}
       <div style={{
         width: '100%', maxWidth: 360, height: 62,
-        background: 'rgba(255,255,255,0.1)', backdropFilter: 'blur(30px)',
-        border: '1px solid rgba(255,255,255,0.2)', borderRadius: 31,
+        background: 'rgba(251, 249, 246, 0.88)',
+        backdropFilter: 'blur(24px)',
+        WebkitBackdropFilter: 'blur(24px)',
+        borderTop: '1px solid rgba(30, 41, 59, 0.06)',
+        borderRadius: 31,
         display: 'flex', alignItems: 'center',
         justifyContent: 'space-between', padding: '0 10px',
       }}>
@@ -88,9 +93,9 @@ export default function BottomNav({ leftSlot, rightSlot }: Props) {
           onClick={() => setShowMenu(!showMenu)}
           style={{ display: 'flex', alignItems: 'center', gap: 7,
             border: 'none', background: 'none', cursor: 'pointer' }}>
-          <HomeIcon size={19} color={showMenu ? THEME.gold : THEME.text} />
+          <HomeIcon size={19} color={showMenu ? '#a46355' : 'rgba(30, 41, 59, 0.35)'} />
           <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: '0.3em',
-            color: showMenu ? THEME.gold : THEME.text }}>
+            color: showMenu ? '#a46355' : 'rgba(30, 41, 59, 0.35)' }}>
             {currentPage}
           </span>
         </motion.button>

@@ -1,5 +1,5 @@
 'use client'
-import React, { useState } from 'react'
+import React, { useState, useCallback, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, ExternalLink, RefreshCw, ChevronDown, AlertTriangle, Plus } from 'lucide-react'
 import { THEME, URGENCY_CFG } from '@/app/_shared/_constants/theme'
@@ -7,12 +7,12 @@ import { FLOAT_SHEET_BOTTOM } from '@/app/_shared/_constants/layout'
 import { CAT_EMOJI } from '@/app/_shared/_constants/categories'
 import { useHotspotEngine } from '@/app/_shared/_hooks/useHotspotEngine'
 import { isConsumed } from '@/app/_shared/_engine/hotspot'
-import { useHotspotSheet } from '@/app/_shared/_hooks/useHotspotSheet'
+import { convertHotspotToTodoAndMarkRead } from '@/app/_shared/_services/todoService'
 import { useApp } from '@/app/context/AppContext'
-import { useEffect, useRef } from 'react'
 import type { HotspotItem } from '@/app/_shared/_types'
 import ActionModal from '@/app/components/ActionModal'
 import HotspotPreferences from '@/app/_shared/_components/HotspotPreferences'
+import { logOrAlertNetworkError } from '@/lib/errors/logOrAlertNetworkError'
 
 function timeAgo(dateStr: string): string {
   const diff = Math.max(0, Date.now() - new Date(dateStr).getTime())
@@ -51,8 +51,8 @@ function HotspotCard({ item, onRead, onActionModal, onConvertTodo }: {
     setConvertError(false)
     try {
       await onConvertTodo()
-    } catch {
-      setConvertError(true)
+    } catch (e) {
+      if (!logOrAlertNetworkError(e)) setConvertError(true)
     } finally {
       setConverting(false)
     }
@@ -108,7 +108,7 @@ function HotspotCard({ item, onRead, onActionModal, onConvertTodo }: {
                 {item.summary}
               </p>
               {convertError && (
-                <p style={{ fontSize: 11, color: '#CC3333', marginBottom: 8 }}>添加失败，请重试</p>
+                <p style={{ fontSize: 11, color: '#7d3f37', marginBottom: 8 }}>添加失败，请重试</p>
               )}
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                 {showActionButton && (
@@ -116,7 +116,7 @@ function HotspotCard({ item, onRead, onActionModal, onConvertTodo }: {
                     onClick={e => { e.stopPropagation(); onActionModal() }}
                     style={{ display: 'flex', alignItems: 'center', gap: 5,
                       padding: '8px 14px', borderRadius: 20, border: 'none',
-                      background: isUrgent ? '#FF6B6B' : '#FF8C00',
+                      background: isUrgent ? '#d58074' : '#b88e5e',
                       color: '#fff', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
                     ⚡ 一键处理
                   </motion.button>
@@ -179,8 +179,14 @@ export default function HotspotSheet({ hotspots, onClose, onPatrol, patrolling, 
         speak(`紧急提醒：${urgent.title}`)
       }
     }
-  }, [urgentCount])
-  const { handleConvertTodo } = useHotspotSheet(hotspots, userId, onRead, onSync)
+  }, [urgentCount, speak, stop, sorted])
+
+  const handleConvertTodo = useCallback(
+    async (item: HotspotItem) => {
+      await convertHotspotToTodoAndMarkRead(item.id, onRead, onSync)
+    },
+    [onRead, onSync],
+  )
 
   return (
     <>
@@ -202,8 +208,8 @@ export default function HotspotSheet({ hotspots, onClose, onPatrol, patrolling, 
 
           <div style={{ height: 4, flexShrink: 0,
             background: urgentCount > 0
-              ? 'linear-gradient(90deg,#FF6B6B,#FF8E53)'
-              : 'linear-gradient(90deg,#4A9EFF,#7BC4FF)' }} />
+              ? 'linear-gradient(90deg,#d58074,#e6a89e)'
+              : 'linear-gradient(90deg,#537b8e,#cddce5)' }} />
           <div style={{ width: 32, height: 4, background: 'rgba(0,0,0,0.1)',
             borderRadius: 2, margin: '10px auto 0' }} />
 
@@ -219,8 +225,8 @@ export default function HotspotSheet({ hotspots, onClose, onPatrol, patrolling, 
               </motion.div>
               {unreadCount > 0 && (
                 <span style={{ fontSize: 10, padding: '2px 7px', borderRadius: 10,
-                  background: urgentCount > 0 ? 'rgba(255,100,100,0.12)' : 'rgba(154,183,232,0.15)',
-                  color: urgentCount > 0 ? '#CC3333' : THEME.navy, fontWeight: 600 }}>
+                  background: urgentCount > 0 ? '#fff2f0' : '#f0f5f6',
+                  color: urgentCount > 0 ? '#7d3f37' : '#2b3942', fontWeight: 600 }}>
                   {unreadCount} 条未读
                 </span>
               )}
@@ -232,10 +238,10 @@ export default function HotspotSheet({ hotspots, onClose, onPatrol, patrolling, 
 
           {urgentCount > 0 && (
             <div style={{ margin: '10px 14px 0', padding: '9px 12px', borderRadius: 10,
-              background: 'rgba(255,100,100,0.09)', border: '0.5px solid rgba(255,100,100,0.25)',
+              background: '#fff2f0', border: '0.5px solid #fad6d1',
               display: 'flex', alignItems: 'center', gap: 7 }}>
-              <AlertTriangle size={14} color="#CC3333" />
-              <span style={{ fontSize: 12, color: '#CC3333', fontWeight: 500 }}>
+              <AlertTriangle size={14} color="#7d3f37" />
+              <span style={{ fontSize: 12, color: '#7d3f37', fontWeight: 500 }}>
                 有 {urgentCount} 条紧急信息需要关注
               </span>
             </div>
