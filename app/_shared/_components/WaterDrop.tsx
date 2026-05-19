@@ -40,11 +40,12 @@ type Props = {
   onClick: () => void
   size?: number
   delay?: number
+  className?: string
   index?: number
 }
 
 export default function WaterDrop({
-  state, icon, label, value, badge, pulse, onClick, size = 96, delay = 0, index = 0
+  state, icon, label, value, badge, pulse, onClick, size = 96, delay = 0, className, index = 0
 }: Props) {
   const c = COLORS[state] || COLORS.calm
   const [reducedMotion, setReducedMotion] = useState(false)
@@ -80,7 +81,7 @@ export default function WaterDrop({
               background: c.glow }} />
         )}
         <div
-          className={`${index === 0 ? 'animate-droplet-1' : index === 1 ? 'animate-droplet-2' : 'animate-droplet-3'}`}
+          className={className ?? `${index === 0 ? 'animate-droplet-1' : index === 1 ? 'animate-droplet-2' : 'animate-droplet-3'}`}
           style={{
           width: size, height: size, backdropFilter: 'blur(20px)',
           border: `1.5px solid ${c.border}`,

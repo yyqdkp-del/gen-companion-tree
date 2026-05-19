@@ -456,17 +456,20 @@ export default function BasePage() {
           <WaterDrop state={childState} icon={<Heart size={24} />} label="孩子"
             value={activeKid ? `${activeKid.energy ?? 75}%` : '—'}
             badge={childUrgent} pulse={childUrgent > 0}
-            onClick={() => openModal('child')} size={124} delay={0} index={0} />
+            onClick={() => openModal('child')} size={124} delay={0}
+            className="animate-droplet-1" />
           <div style={{ display: 'flex', gap: 'clamp(28px, 8vw, 52px)', alignItems: 'center' }}>
             <WaterDrop state={todoEngine.state} icon={<Bell size={20} />} label="待办"
               value={todoEngine.badge > 0 ? `${todoEngine.badge}条` : '静默'}
               badge={todoEngine.badge} pulse={todoEngine.badge > 0}
-              onClick={() => openModal('todo')} size={98} delay={1.8} index={1} />
+              onClick={() => openModal('todo')} size={98} delay={1.8}
+              className="animate-droplet-2" />
             <WaterDrop state={hotspotEngine.state}
               icon={patrolling ? <Loader size={20} /> : <Zap size={20} />}
               label="热点" value={hotspotEngine.badge > 0 ? `${hotspotEngine.badge}条` : '根'}
               badge={hotspotEngine.badge} pulse={hotspotEngine.badge > 0}
-              onClick={() => openModal('hotspot')} size={98} delay={3.4} index={2} />
+              onClick={() => openModal('hotspot')} size={98} delay={3.4}
+              className="animate-droplet-3" />
           </div>
         </div>
       )}
