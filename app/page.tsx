@@ -35,8 +35,17 @@ const ChildAvatar = nextDynamic(() => import('@/app/components/ChildAvatar'), { 
 type ScheduleItem = { time: string; title: string; location?: string; requires_action?: string }
 type UrgentItem = { title: string; level: 'red' | 'orange' | 'yellow' }
 type PackingAlert = { item: string; level: 1 | 2 | 3 | 'today'; days_left?: number; need_buy: boolean }
+type Greeting = { text: string; sub: string }
 
 const getEnergyColor = (v: number) => v > 70 ? '#8ca88d' : v > 40 ? '#b88e5e' : '#d58074'
+
+function getGreetingForHour(h: number): Greeting {
+  if (h < 6) return { text: '深夜了，好好休息', sub: '树洞随时为你亮着' }
+  if (h < 12) return { text: '早安', sub: '今天也是新的开始' }
+  if (h < 18) return { text: '下午好', sub: '喝杯水，歇一歇' }
+  if (h < 21) return { text: '晚上好', sub: '今天辛苦了' }
+  return { text: '夜深了', sub: '放下今天，好好睡觉' }
+}
 
 function dropState(type: string, data: any) {
   if (type === 'child') {
@@ -255,6 +264,7 @@ export default function BasePage() {
   const [patrolling, setPatrolling] = useState(false)
   const patrolTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [mounted, setMounted] = useState(false)
+  const [greeting, setGreeting] = useState<Greeting | null>(null)
   const [keyboardOpen, setKeyboardOpen] = useState(false)
 
   const { enrichedKids, refresh: refreshKids } = useChildData(userId)
@@ -272,7 +282,13 @@ export default function BasePage() {
 
   useEffect(() => {
     setMounted(true)
-    const ticker = setInterval(() => setTime(new Date()), 1000)
+    const updateClock = () => {
+      const now = new Date()
+      setTime(now)
+      setGreeting(getGreetingForHour(now.getHours()))
+    }
+    updateClock()
+    const ticker = setInterval(updateClock, 1000)
     return () => clearInterval(ticker)
   }, [])
 
@@ -348,15 +364,6 @@ export default function BasePage() {
   const unread = hotspots.filter((h: HotspotItem) => h.status === 'unread').length
   const childUrgent = (activeKid?.urgent_items || [])
     .filter((i: { level: string }) => i.level === 'red').length
-  const getGreeting = () => {
-    const h = new Date().getHours()
-    if (h < 6) return { text: '深夜了，好好休息', sub: '树洞随时为你亮着' }
-    if (h < 12) return { text: '早安', sub: '今天也是新的开始' }
-    if (h < 18) return { text: '下午好', sub: '喝杯水，歇一歇' }
-    if (h < 21) return { text: '晚上好', sub: '今天辛苦了' }
-    return { text: '夜深了', sub: '放下今天，好好睡觉' }
-  }
-  const greeting = getGreeting()
 
   return (
     <main style={{
@@ -378,34 +385,36 @@ export default function BasePage() {
         }} />
       )}
 
-      <div style={{
-        position: 'fixed',
-        top: 'max(52px, env(safe-area-inset-top, 52px))',
-        left: '6%',
-        zIndex: 10,
-      }}>
+      {mounted && greeting && (
         <div style={{
-          fontFamily: "'Noto Serif SC', serif",
-          fontWeight: 300,
-          fontSize: 'clamp(20px, 5vw, 26px)',
-          color: '#1e293b',
-          letterSpacing: '0.02em',
-          lineHeight: 1.3,
+          position: 'fixed',
+          top: 'max(52px, env(safe-area-inset-top, 52px))',
+          left: '6%',
+          zIndex: 10,
         }}>
-          {greeting.text}
+          <div style={{
+            fontFamily: "'Noto Serif SC', serif",
+            fontWeight: 300,
+            fontSize: 'clamp(20px, 5vw, 26px)',
+            color: '#1e293b',
+            letterSpacing: '0.02em',
+            lineHeight: 1.3,
+          }}>
+            {greeting.text}
+          </div>
+          <div style={{
+            fontFamily: "'Montserrat', sans-serif",
+            fontWeight: 400,
+            fontSize: 12,
+            color: '#94a3b8',
+            letterSpacing: '0.15em',
+            marginTop: 4,
+            textTransform: 'uppercase',
+          }}>
+            {greeting.sub}
+          </div>
         </div>
-        <div style={{
-          fontFamily: "'Montserrat', sans-serif",
-          fontWeight: 400,
-          fontSize: 12,
-          color: '#94a3b8',
-          letterSpacing: '0.15em',
-          marginTop: 4,
-          textTransform: 'uppercase',
-        }}>
-          {greeting.sub}
-        </div>
-      </div>
+      )}
 
       <div style={{ position: 'absolute', top: '12%', right: '-4%',
         fontSize: 'clamp(60px, 18vw, 130px)', fontWeight: 'bold',
