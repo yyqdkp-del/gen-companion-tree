@@ -340,7 +340,7 @@ export default function ChildSheet({ children, sel, onSel, onClose, onAdd, userI
         style={{ position: 'fixed', inset: 0, zIndex: 200,
           display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
           padding: '0 0 16px',
-          paddingBottom: FLOAT_SHEET_BOTTOM,
+          paddingBottom: `max(${FLOAT_SHEET_BOTTOM}, max(env(safe-area-inset-bottom), 20px))`,
           background: 'rgba(180,200,210,0.35)', backdropFilter: 'blur(6px)' }}
         onClick={onClose}>
         <motion.div initial={{ y: 100, opacity: 0 }} animate={{ y: 0, opacity: 1 }}

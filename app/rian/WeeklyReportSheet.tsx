@@ -89,7 +89,7 @@ export default function WeeklyReportSheet({ childId, childName, onClose }: Props
         display: 'flex',
         alignItems: 'flex-end',
         justifyContent: 'center',
-        paddingBottom: FLOAT_SHEET_BOTTOM,
+        paddingBottom: `max(${FLOAT_SHEET_BOTTOM}, max(env(safe-area-inset-bottom), 20px))`,
         background: 'rgba(180,200,210,0.35)',
         backdropFilter: 'blur(6px)',
       }}
@@ -164,7 +164,14 @@ export default function WeeklyReportSheet({ childId, childName, onClose }: Props
           </motion.button>
         </div>
 
-        <div style={{ overflowY: 'auto', flex: 1, padding: '14px 16px 16px' }}>
+        <div style={{
+          overflowY: 'auto', flex: 1, padding: '14px 16px 16px',
+          paddingBottom: 'max(16px, max(env(safe-area-inset-bottom), 20px))',
+          wordBreak: 'break-word',
+          overflowWrap: 'break-word',
+          whiteSpace: 'pre-wrap',
+        }}
+        >
           {loading && (
             <div style={{ textAlign: 'center', padding: '40px 0', color: THEME.muted }}>
               <Loader
@@ -230,6 +237,9 @@ export default function WeeklyReportSheet({ childId, childName, onClose }: Props
                     color: THEME.text,
                     margin: 0,
                     fontFamily: 'serif',
+                    wordBreak: 'break-word',
+                    overflowWrap: 'break-word',
+                    whiteSpace: 'pre-wrap',
                   }}
                 >
                   {content.letter || '本周过得很好，想你们了！'}
@@ -257,10 +267,11 @@ export default function WeeklyReportSheet({ childId, childName, onClose }: Props
                         marginBottom: 6,
                         display: 'flex',
                         gap: 8,
+                        minWidth: 0,
                       }}
                     >
-                      <span>✨</span>
-                      <span>{a}</span>
+                      <span style={{ flexShrink: 0 }}>✨</span>
+                      <span style={{ wordBreak: 'break-word', overflowWrap: 'break-word', minWidth: 0 }}>{a}</span>
                     </div>
                   ))}
                 </div>

@@ -85,15 +85,24 @@ const mapTodoToReminder = (t: TodoItem): Reminder => ({
   ai_action_data: t.ai_action_data,
 })
 
-// ── 今日水珠：引擎 today 分组 + 临时待办（与 TodoEngine 语义一致）──
+// ── 今日水珠：today + soon（前几条） + 临时待办 ──
 const reminders = useMemo<Reminder[]>(() => {
   const temps = (ctxTodos as any[])
     .filter((t: any) => t._isTemp)
     .map((t: any) => mapTodoToReminder(t as TodoItem))
-  const fromEngine = groups.today.map(mapTodoToReminder)
+  const todayReminders = (groups.today || []).map(mapTodoToReminder)
+  const soonReminders = (groups.soon || []).slice(0, 3).map(mapTodoToReminder)
+
   const priority = (t: Reminder) => (t.urgency_level === 3 ? 0 : t.urgency_level === 2 ? 1 : 2)
-  return [...temps, ...fromEngine].sort((a, b) => priority(a) - priority(b))
-}, [ctxTodos, groups.today])
+  const merged = [...temps, ...todayReminders, ...soonReminders].filter(Boolean) as Reminder[]
+  const seen = new Set<string>()
+  const deduped = merged.filter((r) => {
+    if (!r?.id || seen.has(r.id)) return false
+    seen.add(r.id)
+    return true
+  })
+  return deduped.sort((a, b) => priority(a) - priority(b))
+}, [ctxTodos, groups.today, groups.soon])
  // ── 时钟 ──
   useEffect(() => {
     setMounted(true)
@@ -353,10 +362,11 @@ const reminders = useMemo<Reminder[]>(() => {
               display: 'flex',
               alignItems: 'center',
               gap: 14,
+              minWidth: 0,
             }}
           >
-            <div style={{ fontSize: 36 }}>💌</div>
-            <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 36, flexShrink: 0 }}>💌</div>
+            <div style={{ flex: 1, minWidth: 0 }}>
               <div
                 style={{
                   fontSize: 15,
@@ -364,6 +374,9 @@ const reminders = useMemo<Reminder[]>(() => {
                   color: '#2d322f',
                   fontFamily: "'Noto Serif SC', serif",
                   marginBottom: 4,
+                  overflow: 'hidden',
+                  whiteSpace: 'nowrap',
+                  textOverflow: 'ellipsis',
                 }}
               >
                 给爷爷奶奶的成长周报
@@ -373,12 +386,18 @@ const reminders = useMemo<Reminder[]>(() => {
                   fontSize: 12,
                   color: 'rgba(45,50,47,0.5)',
                   fontFamily: 'sans-serif',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  display: '-webkit-box',
+                  WebkitLineClamp: 2,
+                  WebkitBoxOrient: 'vertical' as const,
+                  wordBreak: 'break-word',
                 }}
               >
                 根·生成本周成长故事，一键分享到微信
               </div>
             </div>
-            <div style={{ fontSize: 18, color: 'rgba(45,50,47,0.3)' }}>→</div>
+            <div style={{ fontSize: 18, color: 'rgba(45,50,47,0.3)', flexShrink: 0 }}>→</div>
           </div>
         )}
       </div>

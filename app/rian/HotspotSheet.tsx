@@ -101,7 +101,12 @@ function HotspotCard({ item, onRead, onActionModal, onConvertTodo }: {
                   background: `${cfg.color}18`, color: cfg.color, fontWeight: 600, flexShrink: 0 }}>
                   {cfg.label}
                 </span>
-                <span style={{ fontSize: 13, fontWeight: 500, color: THEME.text, lineHeight: 1.3 }}>
+                <span style={{ fontSize: 13, fontWeight: 500, color: THEME.text, lineHeight: 1.3,
+                  wordBreak: 'break-word',
+                  overflowWrap: 'break-word',
+                  minWidth: 0,
+                  flex: 1,
+                }}>
                   {item.title}
                 </span>
               </div>
@@ -220,7 +225,7 @@ export default function HotspotSheet({ hotspots, onClose, onPatrol, patrolling, 
         style={{ position: 'fixed', inset: 0, zIndex: 200,
           display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
           padding: '0 0 16px',
-          paddingBottom: FLOAT_SHEET_BOTTOM,
+          paddingBottom: `max(${FLOAT_SHEET_BOTTOM}, max(env(safe-area-inset-bottom), 20px))`,
           background: 'rgba(180,200,210,0.35)', backdropFilter: 'blur(6px)' }}
         onClick={onClose}>
         <motion.div initial={{ y: 100, opacity: 0 }} animate={{ y: 0, opacity: 1 }}
@@ -290,7 +295,8 @@ export default function HotspotSheet({ hotspots, onClose, onPatrol, patrolling, 
           </div>
 
           <div style={{ flexShrink: 0, borderTop: '0.5px solid rgba(0,0,0,0.06)',
-            padding: '10px 14px 14px', display: 'flex', justifyContent: 'flex-end' }}>
+            padding: '10px 14px 14px', paddingBottom: 'max(14px, max(env(safe-area-inset-bottom), 20px))',
+            display: 'flex', justifyContent: 'flex-end' }}>
             <motion.button whileTap={{ scale: 0.93 }} onClick={onPatrol}
               style={{ display: 'flex', alignItems: 'center', gap: 6,
                 padding: '8px 16px', borderRadius: 20,

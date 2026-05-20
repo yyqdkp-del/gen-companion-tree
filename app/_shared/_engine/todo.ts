@@ -23,6 +23,12 @@ export type TodoEngineResult = {
 }
 
 // ── 분그룹 분류 ────────────────────────────
+/** ISO / 其它格式统一为日历日 YYYY-MM-DD */
+function dueYmd(d?: string): string {
+  if (!d) return ''
+  return d.slice(0, 10)
+}
+
 export function groupTodos(todos: TodoItem[], now: Date = new Date()): TodoGroup {
   const today    = getTodayStr(now)
   const in3days  = addDaysStr(now, 3)
@@ -32,19 +38,19 @@ export function groupTodos(todos: TodoItem[], now: Date = new Date()): TodoGroup
   )
 
   const today_items = pending.filter(t =>
-    !t.due_date || t.due_date === today || t.priority === 'red'
+    !t.due_date || dueYmd(t.due_date) === today || t.priority === 'red'
   ).sort((a, b) => {
     const o: Record<string, number> = { red: 0, orange: 1, yellow: 2, green: 3, blue: 4, grey: 5 }
     return (o[a.priority] ?? 5) - (o[b.priority] ?? 5)
   })
 
   const soon_items = pending.filter(t =>
-    t.due_date && t.due_date > today && t.due_date <= in3days
-  ).sort((a, b) => a.due_date!.localeCompare(b.due_date!))
+    t.due_date && dueYmd(t.due_date) > today && dueYmd(t.due_date) <= in3days
+  ).sort((a, b) => dueYmd(a.due_date!).localeCompare(dueYmd(b.due_date!)))
 
   const later_items = pending.filter(t =>
-    t.due_date && t.due_date > in3days
-  ).sort((a, b) => a.due_date!.localeCompare(b.due_date!))
+    t.due_date && dueYmd(t.due_date) > in3days
+  ).sort((a, b) => dueYmd(a.due_date!).localeCompare(dueYmd(b.due_date!)))
 
   return { today: today_items, soon: soon_items, later: later_items }
 }
