@@ -81,7 +81,7 @@ export default function WaterDrop({
               background: c.glow }} />
         )}
         <div
-          className={className ?? `${index === 0 ? 'animate-droplet-1' : index === 1 ? 'animate-droplet-2' : 'animate-droplet-3'}`}
+          className={`droplet-lens ${className ?? (index === 0 ? 'animate-droplet-1' : index === 1 ? 'animate-droplet-2' : 'animate-droplet-3')}`}
           style={{
           width: size, height: size, backdropFilter: 'blur(20px)',
           border: `1.5px solid ${c.border}`,
