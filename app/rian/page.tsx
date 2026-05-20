@@ -15,6 +15,7 @@ import { useTodoActions } from '@/app/_shared/_hooks/useTodoActions'
 import { useRecorder } from '@/app/_shared/_hooks/useRecorder'
 import { useUpload, UPLOAD_STATUS_TEXT } from '@/app/_shared/_hooks/useUpload'
 const TodoDetailModal = nextDynamic(() => import('./TodoDetailModal'), { ssr: false })
+const WeeklyReportSheet = nextDynamic(() => import('./WeeklyReportSheet'), { ssr: false })
 export const dynamic = 'force-dynamic'
 import { useApp } from '@/app/context/AppContext'
 import { logOrAlertNetworkError } from '@/lib/errors/logOrAlertNetworkError'
@@ -61,6 +62,7 @@ export default function RianPage() {
   const [reminderInput, setReminderInput] = useState('')
   const [reminderLoading, setReminderLoading] = useState(false)
   const [mounted, setMounted] = useState(false)
+  const [showWeeklyReport, setShowWeeklyReport] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const cameraInputRef = useRef<HTMLInputElement>(null)
 const getEnergyColor = (v: number) => v > 70 ? '#8ca88d' : v > 40 ? '#b88e5e' : '#d58074'
@@ -319,6 +321,59 @@ const reminders = useMemo<Reminder[]>(() => {
         )}
       </AnimatePresence>
 
+      {/* 跨代成长周报卡片 */}
+      {currentChild && (
+        <div
+          role="button"
+          tabIndex={0}
+          onClick={() => setShowWeeklyReport(true)}
+          onKeyDown={e => {
+            if (e.key === 'Enter' || e.key === ' ') setShowWeeklyReport(true)
+          }}
+          style={{
+            position: 'absolute',
+            bottom: '12%',
+            left: '5%',
+            right: '5%',
+            zIndex: 18,
+            background:
+              'linear-gradient(135deg, rgba(164,99,85,0.08) 0%, rgba(92,122,94,0.06) 100%)',
+            borderRadius: 18,
+            padding: '16px 18px',
+            border: '1px solid rgba(164,99,85,0.12)',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 14,
+          }}
+        >
+          <div style={{ fontSize: 36 }}>💌</div>
+          <div style={{ flex: 1 }}>
+            <div
+              style={{
+                fontSize: 15,
+                fontWeight: 500,
+                color: '#2d322f',
+                fontFamily: "'Noto Serif SC', serif",
+                marginBottom: 4,
+              }}
+            >
+              给爷爷奶奶的成长周报
+            </div>
+            <div
+              style={{
+                fontSize: 12,
+                color: 'rgba(45,50,47,0.5)',
+                fontFamily: 'sans-serif',
+              }}
+            >
+              AI生成本周成长故事，一键分享到微信
+            </div>
+          </div>
+          <div style={{ fontSize: 18, color: 'rgba(45,50,47,0.3)' }}>→</div>
+        </div>
+      )}
+
       {/* 水珠 */}
       {!loading && !allDone && reminders.map((r, i) => {
         const pos = POSITIONS[i % POSITIONS.length]
@@ -382,6 +437,16 @@ initial={false}
   onSnooze={snooze}
   onSync={ctxSync}
 />
+
+      <AnimatePresence>
+        {showWeeklyReport && currentChild?.id && (
+          <WeeklyReportSheet
+            childId={currentChild.id}
+            childName={currentChild.name || '宝宝'}
+            onClose={() => setShowWeeklyReport(false)}
+          />
+        )}
+      </AnimatePresence>
     </main>
   )
 }
