@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import { motion, AnimatePresence } from 'framer-motion'
 import { ArrowLeft, Plus, X, Check, Loader, Camera, Pause, Play, Trash2 } from 'lucide-react'
 import { logOrAlertNetworkError } from '@/lib/errors/logOrAlertNetworkError'
+import { sanitizeFileName } from '@/lib/storage/sanitizeFileName'
 
 const supabase = createClient()
 
@@ -115,8 +116,7 @@ function ActivityForm({ form, setForm, onSave, onCancel, saving, childId }: {
     if (!file) return
     setUploadingAttachment(true)
     try {
-      const ext = file.name.split('.').pop()
-      const path = `activities/${childId}/${Date.now()}.${ext}`
+      const path = `activities/${childId}/${sanitizeFileName(file.name)}`
       const { error } = await supabase.storage.from('companion-files').upload(path, file, { upsert: true })
       if (error) throw error
       const { data: urlData } = supabase.storage.from('companion-files').getPublicUrl(path)

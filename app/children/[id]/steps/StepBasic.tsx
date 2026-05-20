@@ -5,6 +5,7 @@ import { Loader, Camera, Check } from 'lucide-react'
 import { THEME } from '@/app/_shared/_constants/theme'
 import { createClient } from '@/lib/supabase/client'
 import { logOrAlertNetworkError } from '@/lib/errors/logOrAlertNetworkError'
+import { sanitizeFileName } from '@/lib/storage/sanitizeFileName'
 const supabase = createClient()
 
 const EMOJIS = ['🌟', '🌈', '🦁', '🐼', '🦊', '🐬', '🦋', '🌸', '🍀', '🎨', '🚀', '⚽']
@@ -165,8 +166,7 @@ function StepBasic({ data, onChange }: { data: any; onChange: (d: any) => void }
     setUploading(true)
     setUploadSuccess(false)
     try {
-      const ext = file.name.split('.').pop()
-      const path = `children/${Date.now()}.${ext}`
+      const path = `children/${sanitizeFileName(file.name)}`
       const { error } = await supabase.storage.from('companion-files').upload(path, file, { upsert: true })
       if (error) throw error
       const { data: urlData } = supabase.storage.from('companion-files').getPublicUrl(path)

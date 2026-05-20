@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/client'
 import { fetchWithAuth } from '@/lib/auth/fetchWithAuth'
+import { sanitizeFileName } from '@/lib/storage/sanitizeFileName'
 
 const supabase = createClient()
 
@@ -9,7 +10,7 @@ export async function uploadAndProcess(
   filename?: string,
 ): Promise<void> {
   const name = filename || (file instanceof File ? file.name : `file_${Date.now()}`)
-  const path = `uploads/${category}/${Date.now()}_${name}`
+  const path = `uploads/${category}/${sanitizeFileName(name)}`
 
   const { error } = await supabase.storage
     .from('companion-files')

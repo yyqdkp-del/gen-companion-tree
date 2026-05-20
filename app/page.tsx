@@ -29,6 +29,7 @@ import { addChild } from '@/app/_shared/_services/childService'
 import { getJsonAuthHeaders } from '@/lib/auth/clientAuthHeaders'
 import { fetchWithAuth } from '@/lib/auth/fetchWithAuth'
 import { logOrAlertNetworkError } from '@/lib/errors/logOrAlertNetworkError'
+import { sanitizeFileName } from '@/lib/storage/sanitizeFileName'
 
 const ChildAvatar = nextDynamic(() => import('@/app/components/ChildAvatar'), { ssr: false })
 
@@ -90,7 +91,7 @@ function AddChildSheet({ onClose, onSave }: { onClose: () => void; onSave: (d: a
     if (!file) return
     setUploading(true)
     try {
-      const path = `children/${Date.now()}_${file.name}`
+      const path = `children/${sanitizeFileName(file.name)}`
       const { error } = await supabase.storage.from('companion-files').upload(path, file, { upsert: true })
       if (error) throw error
       const { data: urlData } = supabase.storage.from('companion-files').getPublicUrl(path)
