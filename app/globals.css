@@ -205,3 +205,96 @@ img {
     height: 100dvh;
   }
 }
+
+/* ===== 全站视觉温度升级 ===== */
+
+/* 1. 全局字体回退保护 */
+body, input, button, textarea, select {
+  font-family: 'Noto Serif SC', 'Songti SC', 'STSong', 'Georgia',
+    -apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif;
+}
+
+/* 2. 暖阳漫反射投影 */
+.card-warm {
+  background: rgba(255, 255, 255, 0.82);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  border-radius: 22px;
+  box-shadow:
+    0 12px 40px rgba(164, 99, 85, 0.05),
+    0 2px 6px rgba(45, 50, 47, 0.02),
+    inset 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+
+/* 3. 宣纸纹理背景 */
+.paper-bg {
+  background-color: #fbf9f6;
+  background-image:
+    radial-gradient(rgba(164,99,85,0.012) 1px, transparent 0),
+    radial-gradient(at 90% 10%, rgba(245,214,209,0.2) 0px, transparent 50%),
+    radial-gradient(at 10% 90%, rgba(217,230,218,0.15) 0px, transparent 50%);
+  background-size: 16px 16px, 100% 100%, 100% 100%;
+}
+
+/* 4. 输入框聚焦统一样式 */
+input:focus,
+textarea:focus,
+select:focus {
+  outline: none !important;
+  border-color: rgba(164, 99, 85, 0.5) !important;
+  box-shadow: 0 0 0 4px rgba(164, 99, 85, 0.1) !important;
+}
+
+/* 5. 弹性阻尼点击反馈 */
+.warm-tap {
+  transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275),
+              box-shadow 0.3s ease;
+  cursor: pointer;
+}
+.warm-tap:active {
+  transform: scale(0.96) !important;
+}
+
+/* 6. 页面路由淡入 */
+@keyframes pageEnterUp {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.page-enter-up {
+  animation: pageEnterUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* 7. 进度条暖色 */
+.progress-warm {
+  height: 6px;
+  background: #ece6dc;
+  border-radius: 6px;
+  overflow: hidden;
+}
+.progress-warm-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #d5b4ab 0%, #a46355 100%);
+  border-radius: 6px;
+  transition: width 0.4s ease;
+}
+
+/* 8. 表格行卡片化 */
+table, th, td {
+  border-color: rgba(164, 99, 85, 0.08) !important;
+}
+
+/* 9. 卡片淡入动效 */
+@keyframes cardFadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.card-enter {
+  animation: cardFadeIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* 10. 底部弹层统一圆角 */
+.bottom-sheet {
+  border-radius: 24px 24px 0 0 !important;
+  padding-bottom: max(env(safe-area-inset-bottom), 20px) !important;
+}

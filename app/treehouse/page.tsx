@@ -30,8 +30,9 @@ const TREEHOUSE_ENTRY_CARD: React.CSSProperties = {
   background: 'rgba(255,255,255,0.04)',
   backdropFilter: 'blur(10px)',
   WebkitBackdropFilter: 'blur(10px)',
-  border: '1px solid rgba(255,255,255,0.08)',
-  borderRadius: 18,
+  border: '1px solid rgba(255,255,255,0.1)',
+  borderRadius: 20,
+  padding: '20px',
 }
 
 type Message = {

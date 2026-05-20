@@ -10,7 +10,29 @@ const GLASS_CARD: React.CSSProperties = {
   WebkitBackdropFilter: 'blur(10px)',
   borderRadius: 18,
   border: '1px solid rgba(255,255,255,0.6)',
-  boxShadow: '0 4px 20px rgba(45,50,47,0.05)',
+  boxShadow: '0 4px 20px rgba(45,50,47,0.04)',
+  padding: '16px 18px',
+  marginBottom: 10,
+}
+
+const TAG_URGENT: React.CSSProperties = {
+  background: 'rgba(164,99,85,0.08)',
+  color: '#a46355',
+  border: '1px solid rgba(164,99,85,0.2)',
+  borderRadius: 8,
+  fontSize: 10,
+  fontWeight: 600,
+  padding: '3px 8px',
+}
+
+const TAG_NORMAL: React.CSSProperties = {
+  background: 'rgba(92,122,94,0.08)',
+  color: '#5c7a5e',
+  border: '1px solid rgba(92,122,94,0.2)',
+  borderRadius: 8,
+  fontSize: 10,
+  fontWeight: 600,
+  padding: '3px 8px',
 }
 
 export default function SchoolPage() {

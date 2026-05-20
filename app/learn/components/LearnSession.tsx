@@ -5,19 +5,68 @@ import { CHINESE_THEME as T } from '@/app/_shared/_constants/chineseTheme'
 import { useApp } from '@/app/context/AppContext'
 
 const GLASS_CARD: React.CSSProperties = {
-  background: 'rgba(255,255,255,0.8)',
-  backdropFilter: 'blur(10px)',
-  WebkitBackdropFilter: 'blur(10px)',
-  borderRadius: 18,
+  background: 'rgba(255,255,255,0.82)',
+  backdropFilter: 'blur(12px)',
+  WebkitBackdropFilter: 'blur(12px)',
   border: '1px solid rgba(255,255,255,0.6)',
-  boxShadow: '0 4px 20px rgba(45,50,47,0.05)',
+  borderRadius: 20,
+  boxShadow: '0 8px 32px rgba(45,50,47,0.05), inset 0 1px 0 rgba(255,255,255,0.8)',
+  padding: '20px',
+  marginBottom: 12,
 }
 
 const MOM_SCRIPT_BOX: React.CSSProperties = {
   background: 'linear-gradient(135deg, rgba(164,99,85,0.06) 0%, rgba(164,99,85,0.02) 100%)',
-  border: '1px solid rgba(164,99,85,0.12)',
+  border: '1px solid rgba(164,99,85,0.15)',
+  borderLeft: '3px solid #a46355',
   borderRadius: 14,
-  padding: '14px 16px',
+  padding: '16px 18px',
+}
+
+const CANVAS_GRID_WRAP: React.CSSProperties = {
+  background: '#faf7f0',
+  border: '3px double rgba(164,99,85,0.3)',
+  borderRadius: 16,
+  backgroundImage: `
+    linear-gradient(rgba(164,99,85,0.07) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(164,99,85,0.07) 1px, transparent 1px)
+  `,
+  backgroundSize: '50% 50%',
+  display: 'inline-block',
+  lineHeight: 0,
+}
+
+const PROGRESS_TRACK: React.CSSProperties = {
+  background: '#ece6dc',
+  borderRadius: 4,
+  height: 4,
+  overflow: 'hidden',
+}
+
+const PROGRESS_FILL: React.CSSProperties = {
+  height: '100%',
+  background: 'linear-gradient(90deg, #d5b4ab 0%, #a46355 100%)',
+  borderRadius: 4,
+  transition: 'width 0.4s ease',
+}
+
+function drawTianZiGrid(ctx: CanvasRenderingContext2D, size: number, char: string) {
+  ctx.fillStyle = '#faf7f0'
+  ctx.fillRect(0, 0, size, size)
+  ctx.strokeStyle = 'rgba(164, 99, 85, 0.15)'
+  ctx.lineWidth = 0.8
+  ctx.strokeRect(2, 2, size - 4, size - 4)
+  ctx.beginPath()
+  ctx.moveTo(size / 2, 2)
+  ctx.lineTo(size / 2, size - 2)
+  ctx.moveTo(2, size / 2)
+  ctx.lineTo(size - 2, size / 2)
+  ctx.stroke()
+  ctx.font = `${size * 0.75}px "Noto Serif SC", serif`
+  ctx.fillStyle = 'rgba(164, 99, 85, 0.08)'
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'middle'
+  ctx.fillText(char, size / 2, size / 2)
 }
 
 const PRIMARY_BTN: React.CSSProperties = {
@@ -85,17 +134,12 @@ function ProgressBar({ current }: { current: number }) {
       {STEPS.map((s, i) => (
         <div key={s.key} style={{ flex: 1, display: 'flex',
           flexDirection: 'column', alignItems: 'center', gap: 4 }}>
-            <motion.div style={{ width: '100%', height: 4, borderRadius: 4,
-            background: 'rgba(255,255,255,0.6)', overflow: 'hidden',
-            border: '1px solid rgba(164,99,85,0.08)' }}>
+            <div style={{ ...PROGRESS_TRACK, width: '100%' }}>
             <div style={{
+              ...PROGRESS_FILL,
               width: i <= current ? '100%' : '0%',
-              height: '100%',
-              background: '#a46355',
-              borderRadius: 4,
-              transition: 'width 0.3s ease',
             }} />
-          </motion.div>
+          </div>
           <span style={{ fontSize: 10,
             color: i === current ? '#a46355' : 'rgba(45,50,47,0.45)',
             fontFamily: 'sans-serif',
@@ -531,27 +575,7 @@ function StepWrite({ data, char, canvasRef, onNext }: {
     canvas.height = size
     const ctx = canvas.getContext('2d')
     if (!ctx) return
-    // 白色背景
-    ctx.fillStyle = T.paper
-    ctx.fillRect(0, 0, size, size)
-    // 田字格
-    ctx.strokeStyle = 'rgba(164,99,85,0.4)'
-    ctx.lineWidth = 1.5
-    ctx.strokeRect(2, 2, size - 4, size - 4)
-    ctx.setLineDash([4, 3])
-    ctx.strokeStyle = 'rgba(164,99,85,0.25)'
-    ctx.lineWidth = 1
-    ctx.beginPath()
-    ctx.moveTo(size / 2, 2); ctx.lineTo(size / 2, size - 2)
-    ctx.moveTo(2, size / 2); ctx.lineTo(size - 2, size / 2)
-    ctx.stroke()
-    ctx.setLineDash([])
-    // 描红底字（淡色）
-    ctx.font = `${size * 0.75}px "Noto Serif SC", serif`
-    ctx.fillStyle = 'rgba(164,99,85,0.08)'
-    ctx.textAlign = 'center'
-    ctx.textBaseline = 'middle'
-    ctx.fillText(char, size / 2, size / 2)
+    drawTianZiGrid(ctx, size, char)
   }, [char])
 
   const getPos = (e: React.TouchEvent | React.MouseEvent, canvas: HTMLCanvasElement) => {
@@ -583,7 +607,7 @@ function StepWrite({ data, char, canvasRef, onNext }: {
     if (!ctx) return
     ctx.beginPath()
     ctx.arc(pos.x, pos.y, 2, 0, Math.PI * 2)
-    ctx.fillStyle = '#1A1208'
+    ctx.fillStyle = '#2d322f'
     ctx.fill()
   }
 
@@ -598,8 +622,8 @@ function StepWrite({ data, char, canvasRef, onNext }: {
     ctx.beginPath()
     ctx.moveTo(lastPos.current.x, lastPos.current.y)
     ctx.lineTo(pos.x, pos.y)
-    ctx.strokeStyle = '#1A1208'
-    ctx.lineWidth = 3.5
+    ctx.strokeStyle = '#2d322f'
+    ctx.lineWidth = 3
     ctx.lineCap = 'round'
     ctx.lineJoin = 'round'
     ctx.stroke()
@@ -617,24 +641,7 @@ function StepWrite({ data, char, canvasRef, onNext }: {
     const ctx = canvas.getContext('2d')
     if (!ctx) return
     const size = canvas.width
-    ctx.fillStyle = T.paper
-    ctx.fillRect(0, 0, size, size)
-    ctx.strokeStyle = 'rgba(164,99,85,0.4)'
-    ctx.lineWidth = 1.5
-    ctx.strokeRect(2, 2, size - 4, size - 4)
-    ctx.setLineDash([4, 3])
-    ctx.strokeStyle = 'rgba(164,99,85,0.25)'
-    ctx.lineWidth = 1
-    ctx.beginPath()
-    ctx.moveTo(size / 2, 2); ctx.lineTo(size / 2, size - 2)
-    ctx.moveTo(2, size / 2); ctx.lineTo(size - 2, size / 2)
-    ctx.stroke()
-    ctx.setLineDash([])
-    ctx.font = `${size * 0.75}px "Noto Serif SC", serif`
-    ctx.fillStyle = 'rgba(164,99,85,0.08)'
-    ctx.textAlign = 'center'
-    ctx.textBaseline = 'middle'
-    ctx.fillText(char, size / 2, size / 2)
+    drawTianZiGrid(ctx, size, char)
     setHasDrawn(false)
     setShowGuide(true)
   }
@@ -678,11 +685,10 @@ function StepWrite({ data, char, canvasRef, onNext }: {
               </>
             )}
             {/* 进度条 */}
-            <div style={{ marginTop: 10, height: 4, borderRadius: 2,
-              background: 'rgba(164,99,85,0.1)', overflow: 'hidden' }}>
+            <div style={{ ...PROGRESS_TRACK, marginTop: 10 }}>
               <motion.div
                 animate={{ width: `${(completedStrokes.length / Math.max(strokes.length, 1)) * 100}%` }}
-                style={{ height: '100%', background: '#a46355', borderRadius: 2 }} />
+                style={PROGRESS_FILL} />
             </div>
           </motion.div>
         ) : showCelebration ? (
@@ -690,11 +696,11 @@ function StepWrite({ data, char, canvasRef, onNext }: {
             initial={{ scale: 0.8, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             style={{ padding: '16px', borderRadius: 16, textAlign: 'center',
-              background: 'rgba(45,106,79,0.08)',
-              border: '1px solid rgba(45,106,79,0.3)',
+              background: 'rgba(164,99,85,0.08)',
+              border: '1px solid rgba(164,99,85,0.2)',
               marginBottom: 12 }}>
             <div style={{ fontSize: 32, marginBottom: 6 }}>🌟</div>
-            <div style={{ fontSize: 16, fontWeight: 700, color: '#5c7a5e',
+            <div style={{ fontSize: 16, fontWeight: 700, color: '#a46355',
               fontFamily: "'Noto Serif SC', serif" }}>
               写完了！共 {strokeCount} 画
             </div>
@@ -714,15 +720,15 @@ function StepWrite({ data, char, canvasRef, onNext }: {
               onClick={() => { setActiveStroke(i); setShowCelebration(false) }}
               style={{ padding: '3px 10px', borderRadius: 20, cursor: 'pointer',
                 background: completedStrokes.includes(i)
-                  ? 'rgba(45,106,79,0.1)'
+                  ? 'rgba(164,99,85,0.12)'
                   : i === activeStroke
                     ? '#a46355' : 'rgba(164,99,85,0.08)',
                 border: `1px solid ${completedStrokes.includes(i)
-                  ? 'rgba(45,106,79,0.3)'
+                  ? 'rgba(164,99,85,0.25)'
                   : i === activeStroke ? '#a46355' : 'rgba(164,99,85,0.2)'}`,
                 fontSize: 11,
                 color: completedStrokes.includes(i)
-                  ? '#5c7a5e'
+                  ? '#a46355'
                   : i === activeStroke ? '#fff' : '#5a5a4a',
                 fontFamily: 'sans-serif', transition: 'all 0.2s',
                 fontWeight: i === activeStroke ? 700 : 400 }}>
@@ -733,18 +739,24 @@ function StepWrite({ data, char, canvasRef, onNext }: {
       )}
 
       {/* Canvas 田字格（下方，孩子低头写）*/}
-      <div ref={containerRef} style={{ display: 'flex',
+      <motion.div ref={containerRef} style={{ display: 'flex',
         justifyContent: 'center', marginBottom: 12, position: 'relative' }}>
+        <div style={CANVAS_GRID_WRAP}>
         <canvas ref={canvasRef}
-          style={{ borderRadius: 18, boxShadow: '0 8px 28px rgba(45,50,47,0.1)',
-            border: '1px solid rgba(255,255,255,0.7)',
-            touchAction: 'none', cursor: 'crosshair',
+          style={{
+            borderRadius: 14,
+            boxShadow: '0 8px 28px rgba(45,50,47,0.08)',
+            touchAction: 'none',
+            cursor: 'crosshair',
+            display: 'block',
             width: Math.min(window.innerWidth - 80, 280),
-            height: Math.min(window.innerWidth - 80, 280) }}
+            height: Math.min(window.innerWidth - 80, 280),
+          }}
           onMouseDown={startDraw} onMouseMove={draw}
           onMouseUp={endDraw} onMouseLeave={endDraw}
           onTouchStart={startDraw} onTouchMove={draw}
           onTouchEnd={endDraw} />
+        </div>
         {showGuide && (
           <motion.div animate={{ opacity: [0.5, 1, 0.5] }}
             transition={{ duration: 1.5, repeat: Infinity }}
@@ -757,7 +769,7 @@ function StepWrite({ data, char, canvasRef, onNext }: {
             手指描红
           </motion.div>
         )}
-      </div>
+      </motion.div>
 
       {/* 按钮区 */}
       <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
@@ -802,7 +814,7 @@ function StepWrite({ data, char, canvasRef, onNext }: {
 function drawCityElement(ctx: CanvasRenderingContext2D, city: string, W: number, H: number) {
   ctx.save()
   ctx.globalAlpha = 0.06
-  ctx.fillStyle = '#C8A060'
+  ctx.fillStyle = '#a46355'
   ctx.font = `${H * 0.35}px serif`
   ctx.textAlign = 'right'
   ctx.textBaseline = 'bottom'
@@ -834,17 +846,12 @@ function generateCard(
   cardCanvas.width = W; cardCanvas.height = H
   const ctx = cardCanvas.getContext('2d')!
 
-  // ── 背景：深夜墨色，像妈妈陪孩子的那一刻 ──
-  const bgGrad = ctx.createLinearGradient(0, 0, 0, H)
-  bgGrad.addColorStop(0, '#0D0A06')
-  bgGrad.addColorStop(0.4, '#1A1208')
-  bgGrad.addColorStop(1, '#241608')
-  ctx.fillStyle = bgGrad
+  // ── 背景：宣纸白 ──
+  ctx.fillStyle = '#faf7f2'
   ctx.fillRect(0, 0, W, H)
 
-  // 微光晕染
   const glow1 = ctx.createRadialGradient(W/2, 300, 0, W/2, 300, 400)
-  glow1.addColorStop(0, 'rgba(164,99,85,0.06)')
+  glow1.addColorStop(0, 'rgba(164,99,85,0.08)')
   glow1.addColorStop(1, 'transparent')
   ctx.fillStyle = glow1
   ctx.fillRect(0, 0, W, H)
@@ -853,12 +860,7 @@ function generateCard(
   drawCityElement(ctx, city || '', W, H)
 
   // ── 顶部细金线 ──
-  const lineGrad = ctx.createLinearGradient(60, 0, W - 60, 0)
-  lineGrad.addColorStop(0, 'transparent')
-  lineGrad.addColorStop(0.3, 'rgba(164,99,85,0.6)')
-  lineGrad.addColorStop(0.7, 'rgba(164,99,85,0.6)')
-  lineGrad.addColorStop(1, 'transparent')
-  ctx.strokeStyle = lineGrad
+  ctx.strokeStyle = 'rgba(164,99,85,0.3)'
   ctx.lineWidth = 0.8
   ctx.beginPath()
   ctx.moveTo(60, 70); ctx.lineTo(W - 60, 70)
@@ -866,17 +868,16 @@ function generateCard(
 
   // ── 那个字：巨大，金色，发光 ──
   // 发光效果
-  ctx.shadowColor = 'rgba(164,99,85,0.4)'
-  ctx.shadowBlur = 60
+  ctx.shadowColor = 'rgba(164,99,85,0.12)'
+  ctx.shadowBlur = 24
   ctx.font = `900 260px "Noto Serif SC", serif`
-  ctx.fillStyle = '#C8A060'
+  ctx.fillStyle = '#2d322f'
   ctx.textAlign = 'center'
   ctx.fillText(char, W / 2, 340)
   ctx.shadowBlur = 0
 
-  // 拼音（极小，低调）
   ctx.font = '300 28px sans-serif'
-  ctx.fillStyle = 'rgba(164,99,85,0.4)'
+  ctx.fillStyle = 'rgba(45,50,47,0.45)'
   ctx.fillText(pinyin, W / 2, 385)
 
   // ── 孩子手迹（如有）──
@@ -886,7 +887,7 @@ function generateCard(
     const wx = W / 2 - wSize / 2
     const wy = 420
     ctx.globalAlpha = 0.15
-    ctx.fillStyle = '#C8A060'
+    ctx.fillStyle = '#a46355'
     ctx.fillRect(wx, wy, wSize, wSize)
     ctx.globalAlpha = 0.6
     ctx.drawImage(writingCanvas, wx, wy, wSize, wSize)
@@ -900,7 +901,7 @@ function generateCard(
   const sentenceY = writingCanvas?.width ? 630 : 460
   if (sentence && sentence.trim()) {
     ctx.font = '500 42px "Noto Serif SC", serif'
-    ctx.fillStyle = 'rgba(255,255,255,0.92)'
+    ctx.fillStyle = '#2d322f'
     ctx.textAlign = 'center'
 
     // 自动换行
@@ -931,24 +932,18 @@ function generateCard(
 
     // 正文
     ctx.font = '500 42px "Noto Serif SC", serif'
-    ctx.fillStyle = 'rgba(255,255,255,0.92)'
+    ctx.fillStyle = '#2d322f'
     displayLines.forEach((line, i) => {
       ctx.fillText(line, W / 2, startY + i * lineH)
     })
   } else {
     // 没有造句时显示含义
     ctx.font = '400 36px "Noto Serif SC", serif'
-    ctx.fillStyle = 'rgba(255,255,255,0.5)'
+    ctx.fillStyle = 'rgba(45,50,47,0.5)'
     ctx.fillText(meaning, W / 2, sentenceY)
   }
 
-  // ── 底部分隔线 ──
-  const line2Grad = ctx.createLinearGradient(60, 0, W - 60, 0)
-  line2Grad.addColorStop(0, 'transparent')
-  line2Grad.addColorStop(0.3, 'rgba(164,99,85,0.3)')
-  line2Grad.addColorStop(0.7, 'rgba(164,99,85,0.3)')
-  line2Grad.addColorStop(1, 'transparent')
-  ctx.strokeStyle = line2Grad
+  ctx.strokeStyle = 'rgba(164,99,85,0.3)'
   ctx.lineWidth = 0.8
   ctx.beginPath()
   ctx.moveTo(60, H - 240); ctx.lineTo(W - 60, H - 240)
@@ -959,7 +954,7 @@ function generateCard(
   const infoLine = [childName, cityStr, childAge ? `${childAge}岁` : '']
     .filter(Boolean).join(' · ')
   ctx.font = '300 28px sans-serif'
-  ctx.fillStyle = 'rgba(164,99,85,0.6)'
+  ctx.fillStyle = '#a46355'
   ctx.textAlign = 'center'
   ctx.fillText(infoLine, W / 2, H - 195)
 
@@ -982,8 +977,7 @@ function generateCard(
   ctx.fillStyle = 'rgba(164,99,85,0.35)'
   ctx.fillText('根 · 中文', W / 2, H - 70)
 
-  // 底部细金线
-  ctx.strokeStyle = line2Grad
+  ctx.strokeStyle = 'rgba(164,99,85,0.3)'
   ctx.lineWidth = 0.8
   ctx.beginPath()
   ctx.moveTo(60, H - 50); ctx.lineTo(W - 60, H - 50)
@@ -1129,8 +1123,8 @@ function StepUse({ data, char, childName, canvasRef, onComplete }: {
         {/* AI 评价 */}
         {aiComment && (
           <div style={{ padding: '14px 16px', borderRadius: 14,
-            background: 'rgba(45,106,79,0.08)',
-            border: '1px solid rgba(45,106,79,0.2)',
+            background: 'rgba(164,99,85,0.08)',
+            border: '1px solid rgba(164,99,85,0.2)',
             fontSize: 14, color: '#5c7a5e', lineHeight: 1.8,
             fontFamily: 'sans-serif', marginBottom: 16, textAlign: 'left' }}>
             🌟 {aiComment}

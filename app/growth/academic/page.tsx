@@ -159,8 +159,14 @@ function VisionSetup({ childName, childId, onComplete }: {
       <div style={{ maxWidth: 480, margin: '0 auto', width: '100%', flex: 1, display: 'flex', flexDirection: 'column', padding: '52px 20px 32px' }}>
         <div style={{ display: 'flex', gap: 5, marginBottom: 40 }}>
           {Array.from({ length: TOTAL }).map((_, i) => (
-            <motion.div key={i} animate={{ width: i === step ? 28 : 6, background: i <= step ? T.gold : T.border }}
-              style={{ height: 4, borderRadius: 2 }} />
+            <motion.div key={i} animate={{ width: i === step ? 28 : 6 }}
+              style={{
+                height: 4,
+                borderRadius: 4,
+                background: i <= step
+                  ? 'linear-gradient(90deg, #d5b4ab, #a46355)'
+                  : '#ece6dc',
+              }} />
           ))}
         </div>
 
@@ -292,7 +298,7 @@ function TodaySection({ report, vision, childName, childId }: any) {
     <div>
       {/* 顶部状态条 */}
       <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
-        style={{ background: `linear-gradient(135deg, ${T.gold}15 0%, rgba(78,205,196,0.06) 100%)`, borderRadius: 18, padding: '16px 18px', marginBottom: 14, border: `1px solid ${T.borderGold}` }}>
+        style={{ background: `linear-gradient(135deg, rgba(164,99,85,0.08) 0%, rgba(164,99,85,0.02) 100%)`, borderRadius: 18, padding: '16px 18px', marginBottom: 14, border: `1px solid ${T.borderGold}` }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <div>
             <div style={{ fontSize: 11, color: T.goldDim, fontWeight: 700, letterSpacing: '0.1em', marginBottom: 6 }}>妈妈的愿景</div>
@@ -530,8 +536,8 @@ function RoadmapSection({ report, childId, generating, onGenerate }: any) {
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                       <span style={{ fontSize: 10, color: T.textDim }}>{node.grade_target} · {node.year_target}年</span>
-                      <div style={{ flex: 1, height: 3, borderRadius: 2, background: 'rgba(255,255,255,0.08)', overflow: 'hidden' }}>
-                        <div style={{ height: '100%', borderRadius: 2, background: completion === 100 ? T.green : color, width: `${completion}%`, transition: 'width 0.5s' }} />
+                      <div style={{ flex: 1, height: 4, borderRadius: 4, background: '#ece6dc', overflow: 'hidden' }}>
+                        <div style={{ height: '100%', borderRadius: 4, background: 'linear-gradient(90deg, #d5b4ab, #a46355)', width: `${completion}%`, transition: 'width 0.5s' }} />
                       </div>
                       <span style={{ fontSize: 10, color: completion === 100 ? T.green : color, fontFamily: "'Space Mono', monospace", flexShrink: 0 }}>{completion}%</span>
                     </div>
@@ -680,7 +686,7 @@ function SpikeSection({ report, childId, vision }: any) {
 function RecordsSection({ childId, router }: any) {
   const modules = [
     { icon: '🏆', label: '荣誉奖项', desc: '比赛 · 考级 · 竞赛 · 申请权重', color: T.gold, path: '/growth/academic/achievements' },
-    { icon: '📊', label: '学术记录', desc: '成绩轨迹 · 考试 · 语言成绩', color: T.teal, path: '/growth/academic/records' },
+    { icon: '📊', label: '学术记录', desc: '成绩轨迹 · 考试 · 语言成绩', color: '#a46355', path: '/growth/academic/records' },
     { icon: '🎯', label: '课外活动', desc: '兴趣班 · 参与年限 · Spike积累', color: '#A78BFA', path: childId ? `/children/${childId}/activities` : '/children' },
     { icon: '📝', label: '文书素材库', desc: '故事碎片 · 申请角度 · 文书准备', color: '#b88e5e', path: '/growth/academic/essays' },
   ]
