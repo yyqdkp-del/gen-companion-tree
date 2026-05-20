@@ -13,6 +13,7 @@ import { StepAddress }   from './steps/StepAddress'
 import { StepEmergency } from './steps/StepEmergency'
 import { useApp } from '@/app/context/AppContext'
 import { logOrAlertNetworkError } from '@/lib/errors/logOrAlertNetworkError'
+import { fetchWithAuth } from '@/lib/auth/fetchWithAuth'
 
 const supabase = createClient()
 
@@ -73,6 +74,18 @@ function ProfileContent() {
   const [gmailConnected, setGmailConnected] = useState(false)
   const [calendarConnected, setCalendarConnected] = useState(false)
   const [oauthBanner, setOauthBanner] = useState<{ type: 'ok' | 'err'; text: string } | null>(null)
+  const [isPro, setIsPro] = useState(false)
+
+  useEffect(() => {
+    const loadSub = async () => {
+      try {
+        const r = await fetchWithAuth('/api/stripe/status')
+        const data = await r.json().catch(() => ({}))
+        setIsPro(!!data?.is_pro)
+      } catch { /* noop */ }
+    }
+    void loadSub()
+  }, [searchParams])
 
   useEffect(() => {
     const load = async () => {
@@ -91,6 +104,7 @@ function ProfileContent() {
           phone: data.phone || '',
           email: data.email || '',
         })
+        setIsPro(!!data.is_pro)
         setPassportData({
           passport_number: data.passport_number || '',
           passport_expiry: data.passport_expiry || '',
@@ -284,6 +298,52 @@ function ProfileContent() {
       </div>
 
       <div style={{ padding: '20px 20px 0', maxWidth: 640, margin: '0 auto' }}>
+
+        {!isPro && (
+          <button
+            type="button"
+            onClick={() => router.push('/upgrade')}
+            style={{
+              width: '100%',
+              padding: '14px 20px',
+              background: 'linear-gradient(135deg, #a46355 0%, #8a5247 100%)',
+              color: '#fff',
+              border: 'none',
+              borderRadius: 16,
+              fontSize: 15,
+              fontFamily: "'Noto Serif SC', serif",
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              marginBottom: 12,
+              boxShadow: '0 4px 16px rgba(164,99,85,0.3)',
+            }}
+          >
+            <span>🌳 升级 Pro 解锁全部功能</span>
+            <span style={{ fontSize: 13, opacity: 0.9 }}>$9.99/月 →</span>
+          </button>
+        )}
+
+        {isPro && (
+          <div style={{
+            width: '100%',
+            padding: '12px 20px',
+            background: 'rgba(92,122,94,0.08)',
+            border: '1px solid rgba(92,122,94,0.2)',
+            borderRadius: 14,
+            fontSize: 14,
+            color: '#5c7a5e',
+            fontFamily: 'sans-serif',
+            marginBottom: 12,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+          }}
+          >
+            ✓ Pro 会员已激活
+          </div>
+        )}
 
         {/* 快捷入口 - 在进度条之前 */}
         <div
