@@ -2,7 +2,15 @@
   "crons": [
     {
       "path": "/api/cron/scheduler",
-      "schedule": "0 23 * * *"
+      "schedule": "28 23 * * *"
+    },
+    {
+      "path": "/api/cron/scheduler",
+      "schedule": "28 7 * * *"
+    },
+    {
+      "path": "/api/cron/scheduler",
+      "schedule": "28 13 * * *"
     }
   ],
   "functions": {

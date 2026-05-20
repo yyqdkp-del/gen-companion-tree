@@ -287,6 +287,11 @@ export async function POST(req: NextRequest) {
         const hotspots = await callClaude(grokData, geminiData, snapshot, location)
         const saved = await saveHotspots(hotspots, userId, todayYmd)
 
+        await supabase
+          .from('family_profile')
+          .update({ updated_at: new Date().toISOString() })
+          .eq('user_id', userId)
+
         console.log(`${patrolTime} 用户${userId.slice(0,8)} ${location} 写入${saved}条热点`)
         results.push({ userId: userId.slice(0,8), location, generated: hotspots.length, saved })
       } catch (e: any) {
