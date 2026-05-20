@@ -163,8 +163,17 @@ const reminders = useMemo<Reminder[]>(() => {
 
   return (
     <main style={{
-      position: 'fixed', inset: 0, width: '100vw', height: '100vh',
-      overflow: 'hidden', background: THEME.bg, fontFamily: 'sans-serif',
+      position: 'fixed',
+      inset: 0,
+      width: '100vw',
+      height: '100vh',
+      backgroundColor: '#fbf9f6',
+      backgroundImage: `
+        radial-gradient(at 90% 10%, rgba(245,214,209,0.2) 0px, transparent 50%),
+        radial-gradient(at 10% 90%, rgba(217,230,218,0.15) 0px, transparent 50%)
+      `,
+      overflow: 'hidden',
+      fontFamily: 'sans-serif',
     }}>
 
       <input ref={fileInputRef} type="file" accept="image/*,application/pdf,audio/*,.doc,.docx" style={{ display: 'none' }} onChange={handleFileChange} />

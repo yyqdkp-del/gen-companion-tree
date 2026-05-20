@@ -6,9 +6,9 @@ import { THEME } from '@/app/_shared/_constants/theme'
 function StepAddress({ data, onChange }: { data: any; onChange: (d: any) => void }) {
   return (
     <div>
-      <div style={{ fontSize: 15, fontWeight: 600, color: THEME.navy, marginBottom: 4 }}>常用地址 📍</div>
+      <div style={{ fontSize: 15, fontWeight: 600, color: '#2d322f', marginBottom: 4 }}>常用地址 📍</div>
       <div style={{ fontSize: 12, color: THEME.muted, marginBottom: 20, lineHeight: 1.6 }}>用于导航和表格填写</div>
-      <div style={{ fontSize: 12, color: THEME.gold, fontWeight: 700, marginBottom: 12 }}>住所地址</div>
+      <div style={{ fontSize: 12, color: '#8a7355', fontWeight: 700, marginBottom: 12 }}>住所地址</div>
       <SelectField
         label="居住城市"
         value={data.resident_city}
@@ -35,11 +35,11 @@ function StepAddress({ data, onChange }: { data: any; onChange: (d: any) => void
       <Field label="地址（英文）" value={data.home_address_en} onChange={v => onChange({ ...data, home_address_en: v })} placeholder="123 Nimman Rd, Chiang Mai 50200" />
       <Field label="地址（中文，可选）" value={data.home_address_zh} onChange={v => onChange({ ...data, home_address_zh: v })} placeholder="清迈市区尼曼路123号" />
       <div style={{ height: 1, background: 'rgba(0,0,0,0.07)', margin: '20px 0' }} />
-      <div style={{ fontSize: 12, color: THEME.gold, fontWeight: 700, marginBottom: 12 }}>孩子学校</div>
+      <div style={{ fontSize: 12, color: '#8a7355', fontWeight: 700, marginBottom: 12 }}>孩子学校</div>
       <Field label="学校名称" value={data.school_name} onChange={v => onChange({ ...data, school_name: v })} placeholder="Lanna International School" />
       <Field label="学校地址" value={data.school_address} onChange={v => onChange({ ...data, school_address: v })} placeholder="Chiang Mai, Thailand" />
       <div style={{ height: 1, background: 'rgba(0,0,0,0.07)', margin: '20px 0' }} />
-      <div style={{ fontSize: 12, color: THEME.gold, fontWeight: 700, marginBottom: 12 }}>常用医院（可选）</div>
+      <div style={{ fontSize: 12, color: '#8a7355', fontWeight: 700, marginBottom: 12 }}>常用医院（可选）</div>
       <Field label="常用医院" value={data.hospital_name} onChange={v => onChange({ ...data, hospital_name: v })} placeholder="清迈国际医院 / Ram Hospital" />
     </div>
   )

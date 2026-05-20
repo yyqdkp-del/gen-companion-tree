@@ -14,16 +14,24 @@ const supabase = createClient(
 
 // ── 深夜色系 ──
 const THEME = {
-  bg1: '#020617',
-  bg2: '#0A1F18',
+  bg1: '#0a0d14',
+  bg2: '#121a29',
   glow: '#1a4a3a',
-  gold: '#E8D5B8',
-  goldDim: '#8a7a6a',
-  aiText: '#A8C4B8',
-  aiBubble: 'rgba(20,50,40,0.6)',
-  userBubble: 'rgba(80,60,30,0.5)',
-  textDim: '#4a5a52',
-  star: '#6a9a8a',
+  gold: 'rgba(230,168,158,0.8)',
+  goldDim: 'rgba(230,168,158,0.35)',
+  aiText: '#e6e1d6',
+  aiBubble: 'rgba(255,255,255,0.04)',
+  userBubble: 'rgba(255,255,255,0.06)',
+  textDim: 'rgba(230,232,214,0.45)',
+  star: 'rgba(230,168,158,0.6)',
+}
+
+const TREEHOUSE_ENTRY_CARD: React.CSSProperties = {
+  background: 'rgba(255,255,255,0.04)',
+  backdropFilter: 'blur(10px)',
+  WebkitBackdropFilter: 'blur(10px)',
+  border: '1px solid rgba(255,255,255,0.08)',
+  borderRadius: 18,
 }
 
 type Message = {
@@ -310,9 +318,18 @@ export default function TreehousePage() {
   if (!unlocked) {
     return (
       <main style={{
-        position: 'fixed', inset: 0,
-        background: `linear-gradient(160deg, ${THEME.bg1} 0%, ${THEME.bg2} 100%)`,
-        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+        position: 'fixed',
+        inset: 0,
+        minHeight: '100vh',
+        backgroundColor: '#0a0d14',
+        backgroundImage: `
+          radial-gradient(at 50% 0%, rgba(245,214,209,0.06) 0px, transparent 40%),
+          linear-gradient(180deg, #0a0d14 0%, #121a29 100%)
+        `,
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
         fontFamily: "'Noto Serif SC', 'SimSun', Georgia, serif",
       }}>
 
@@ -388,11 +405,18 @@ export default function TreehousePage() {
       onMouseDown={handleLongPressStart}
       onMouseUp={handleLongPressEnd}
       style={{
-        position: 'fixed', inset: 0,
-        background: `linear-gradient(160deg, ${THEME.bg1} 0%, ${THEME.bg2} 100%)`,
+        position: 'fixed',
+        inset: 0,
+        minHeight: '100vh',
+        backgroundColor: '#0a0d14',
+        backgroundImage: `
+          radial-gradient(at 50% 0%, rgba(245,214,209,0.06) 0px, transparent 40%),
+          linear-gradient(180deg, #0a0d14 0%, #121a29 100%)
+        `,
         overflow: 'hidden',
         fontFamily: "'Noto Serif SC', 'SimSun', Georgia, serif",
-        display: 'flex', flexDirection: 'column',
+        display: 'flex',
+        flexDirection: 'column',
       }}
     >
 
@@ -448,14 +472,13 @@ export default function TreehousePage() {
         <span style={{ fontSize: '11px', color: THEME.textDim, letterSpacing: '0.35em', opacity: 0.5 }}>日栖</span>
         <motion.button whileTap={{ scale: 0.96 }} onClick={() => router.push('/treehouse/mom')}
           style={{
-            background: 'rgba(232,213,184,0.08)',
-            border: '1px solid rgba(232,213,184,0.12)',
-            borderRadius: '999px',
+            ...TREEHOUSE_ENTRY_CARD,
+            borderRadius: 999,
             color: THEME.gold,
             fontSize: '12px',
             cursor: 'pointer',
-            opacity: 0.78,
-            padding: '7px 12px',
+            opacity: 0.9,
+            padding: '7px 14px',
             letterSpacing: '0.08em',
             fontFamily: "'Noto Serif SC', serif",
           }}>

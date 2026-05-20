@@ -11,19 +11,28 @@ import {
 const supabase = createClient()
 
 const T = {
-  bg: '#0F1A14',
-  bgCard: 'rgba(255,255,255,0.04)',
-  bgCardHover: 'rgba(255,255,255,0.07)',
-  border: 'rgba(255,255,255,0.08)',
-  borderGold: 'rgba(240,192,64,0.3)',
-  gold: '#F0C040',
-  goldDim: 'rgba(240,192,64,0.6)',
-  teal: '#4ECDC4',
-  coral: '#d58074',
-  text: '#F5F0E8',
-  textDim: 'rgba(245,240,232,0.5)',
-  textFaint: 'rgba(245,240,232,0.25)',
+  bg: '#fbf9f6',
+  bgCard: 'rgba(255,255,255,0.8)',
+  bgCardHover: 'rgba(255,255,255,0.95)',
+  border: 'rgba(45,50,47,0.08)',
+  borderGold: 'rgba(164,99,85,0.25)',
+  gold: '#8a7355',
+  goldDim: 'rgba(138,115,85,0.6)',
+  teal: '#6b8f71',
+  coral: '#a46355',
+  text: '#2d322f',
+  textDim: 'rgba(45,50,47,0.45)',
+  textFaint: 'rgba(45,50,47,0.25)',
   green: '#8ca88d',
+}
+
+const GLASS_CARD: React.CSSProperties = {
+  background: 'rgba(255,255,255,0.8)',
+  backdropFilter: 'blur(10px)',
+  WebkitBackdropFilter: 'blur(10px)',
+  borderRadius: 18,
+  border: '1px solid rgba(255,255,255,0.6)',
+  boxShadow: '0 4px 20px rgba(45,50,47,0.05)',
 }
 
 const PERSON_TYPES = [
@@ -72,7 +81,7 @@ const urgencyLabel = (u: string) =>
 function Card({ children, style = {}, onClick }: any) {
   return (
     <motion.div whileTap={onClick ? { scale: 0.98 } : undefined} onClick={onClick}
-      style={{ background: T.bgCard, border: `1px solid ${T.border}`, borderRadius: 16, padding: '16px', cursor: onClick ? 'pointer' : 'default', ...style }}>
+      style={{ ...GLASS_CARD, padding: '16px', cursor: onClick ? 'pointer' : 'default', ...style }}>
       {children}
     </motion.div>
   )
@@ -490,7 +499,7 @@ function RoadmapSection({ report, childId, generating, onGenerate }: any) {
   return (
     <div>
       <div style={{ position: 'relative' }}>
-        <div style={{ position: 'absolute', left: 11, top: 24, bottom: 0, width: 1, background: `linear-gradient(to bottom, ${T.gold}50, transparent)` }} />
+        <div style={{ position: 'absolute', left: 14, top: 24, bottom: 0, width: 1, background: 'rgba(45,50,47,0.08)' }} />
 
         {roadmap.map((node: any, i: number) => {
           const completion = getNodeCompletion(node)
@@ -503,11 +512,12 @@ function RoadmapSection({ report, childId, generating, onGenerate }: any) {
               style={{ paddingLeft: 30, marginBottom: 12, position: 'relative' }}>
 
               {/* 节点圆点 */}
-              <div style={{ position: 'absolute', left: 0, top: 16, width: 22, height: 22, borderRadius: '50%', background: isCurrent ? color : T.bgCard, border: `2px solid ${isCurrent ? color : T.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                {completion === 100
-                  ? <Check size={12} color={isCurrent ? '#0F1A14' : T.textDim} />
-                  : isCurrent && <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#0F1A14' }} />}
-              </div>
+              <div style={{
+                position: 'absolute', left: 9, top: 20,
+                width: 10, height: 10, borderRadius: '50%',
+                background: '#a46355',
+                boxShadow: '0 0 0 4px rgba(164,99,85,0.15)',
+              }} />
 
               {/* 节点卡片 */}
               <Card onClick={() => setExpandedNode(isExpanded ? null : node.id)}

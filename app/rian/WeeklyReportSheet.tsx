@@ -177,7 +177,7 @@ export default function WeeklyReportSheet({ childId, childName, onClose }: Props
                   padding: '8px 16px',
                   borderRadius: 20,
                   border: 'none',
-                  background: THEME.gold,
+                  background: '#8a7355',
                   color: '#fff',
                   fontSize: 12,
                   cursor: 'pointer',

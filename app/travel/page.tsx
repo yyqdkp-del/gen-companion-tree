@@ -13,6 +13,27 @@ import { logOrAlertNetworkError } from '@/lib/errors/logOrAlertNetworkError'
 
 const supabase = createClient()
 
+const TRAVEL_PAGE_BG: CSSProperties = {
+  backgroundColor: '#fbf9f6',
+  backgroundImage: `
+    radial-gradient(at 80% 20%, rgba(228,237,228,0.3) 0px, transparent 50%),
+    radial-gradient(at 20% 80%, rgba(245,214,209,0.2) 0px, transparent 50%)
+  `,
+}
+
+const GLASS_CARD: CSSProperties = {
+  background: 'rgba(255,255,255,0.8)',
+  backdropFilter: 'blur(10px)',
+  WebkitBackdropFilter: 'blur(10px)',
+  borderRadius: 18,
+  border: '1px solid rgba(255,255,255,0.6)',
+  boxShadow: '0 4px 20px rgba(45,50,47,0.05)',
+}
+
+const INK = '#2d322f'
+const ACCENT = '#a46355'
+const GOLD = '#8a7355'
+
 const PREF_OPTIONS = [
   { id: '亲子友好', label: '亲子友好' },
   { id: '文化探索', label: '文化探索' },
@@ -195,18 +216,17 @@ export default function TravelPage() {
   )
 
   return (
-    <main style={{ minHeight: '100dvh', background: THEME.bg, paddingBottom: NAV_HEIGHT_CSS, fontFamily: "'Noto Sans SC', sans-serif" }}>
+    <main style={{ minHeight: '100dvh', ...TRAVEL_PAGE_BG, paddingBottom: NAV_HEIGHT_CSS, fontFamily: "'Noto Sans SC', sans-serif" }}>
       <header style={{
         position: 'sticky', top: 0, zIndex: 20, display: 'flex', alignItems: 'center', gap: 10,
-        padding: '14px 16px', background: 'rgba(167,215,217,0.9)', backdropFilter: 'blur(12px)',
-        borderBottom: '1px solid rgba(255,255,255,0.35)',
+        padding: '14px 16px', ...GLASS_CARD, borderRadius: 0, borderLeft: 'none', borderRight: 'none', borderTop: 'none',
       }}>
         <motion.button type="button" whileTap={{ scale: 0.92 }} onClick={() => router.back()}
-          style={{ border: 'none', background: 'none', cursor: 'pointer', color: THEME.navy }}>
+          style={{ border: 'none', background: 'none', cursor: 'pointer', color: INK }}>
           <ArrowLeft size={22} />
         </motion.button>
-        <Plane size={22} color={THEME.navy} />
-        <span style={{ fontSize: 17, fontWeight: 700, color: THEME.navy }}>旅行规划</span>
+        <Plane size={22} color={INK} />
+        <span style={{ fontSize: 17, fontWeight: 700, color: INK }}>旅行规划</span>
       </header>
 
       <div style={{ maxWidth: 640, margin: '0 auto', padding: '12px 16px 32px' }}>
@@ -219,7 +239,7 @@ export default function TravelPage() {
               onClick={() => setTab(t)}
               style={{
                 flex: 1, padding: '10px', borderRadius: 12, border: 'none', fontWeight: 600, cursor: 'pointer',
-                background: tab === t ? THEME.navy : 'rgba(255,255,255,0.5)', color: tab === t ? '#fff' : THEME.text,
+                background: tab === t ? ACCENT : 'rgba(255,255,255,0.5)', color: tab === t ? '#fff' : THEME.text,
               }}>
               {t === 'plan' ? '规划行程' : '历史行程'}
             </motion.button>
@@ -232,11 +252,8 @@ export default function TravelPage() {
               <div style={{ color: THEME.muted, textAlign: 'center', padding: 32 }}>暂无保存的行程</div>
             ) : (
               history.map((h: any) => (
-                <div key={h.id} style={{
-                  borderRadius: 14, padding: 14, background: 'rgba(255,255,255,0.65)',
-                  border: '1px solid rgba(255,255,255,0.85)', fontSize: 14,
-                }}>
-                  <div style={{ fontWeight: 700, color: THEME.navy }}>{h.destination}</div>
+                <div key={h.id} style={{ ...GLASS_CARD, padding: 14, fontSize: 14 }}>
+                  <div style={{ fontWeight: 700, color: INK }}>{h.destination}</div>
                   <div style={{ fontSize: 12, color: THEME.muted, marginTop: 4 }}>
                     {h.start_date} → {h.end_date} · {h.status}
                   </div>
@@ -294,8 +311,8 @@ export default function TravelPage() {
                     whileTap={{ scale: 0.95 }}
                     onClick={() => togglePref(p.id)}
                     style={{
-                      padding: '8px 12px', borderRadius: 20, border: prefs.includes(p.id) ? `2px solid ${THEME.gold}` : '1px solid rgba(0,0,0,0.1)',
-                      background: prefs.includes(p.id) ? 'rgba(176,141,87,0.12)' : 'rgba(255,255,255,0.6)', fontSize: 13, cursor: 'pointer',
+                      padding: '8px 12px', borderRadius: 20, border: prefs.includes(p.id) ? `2px solid ${GOLD}` : '1px solid rgba(0,0,0,0.1)',
+                      background: prefs.includes(p.id) ? 'rgba(164,99,85,0.12)' : 'rgba(255,255,255,0.6)', fontSize: 13, cursor: 'pointer',
                     }}>
                     {p.label}
                   </motion.button>
@@ -309,7 +326,7 @@ export default function TravelPage() {
               disabled={planning}
               onClick={() => void submitPlan()}
               style={{
-                width: '100%', padding: 14, borderRadius: 14, border: 'none', background: THEME.navy, color: '#fff',
+                width: '100%', padding: 14, borderRadius: 14, border: 'none', background: ACCENT, color: '#fff',
                 fontWeight: 700, fontSize: 15, cursor: planning ? 'wait' : 'pointer', marginTop: 8,
               }}>
               {planning ? 'AI 正在规划你的专属行程…' : '生成行程方案'}
@@ -323,8 +340,8 @@ export default function TravelPage() {
             )}
 
             {plan && !planning && (
-              <div style={{ marginTop: 20, borderRadius: 16, padding: 16, background: 'rgba(255,255,255,0.7)', border: '1px solid rgba(255,255,255,0.9)' }}>
-                <div style={{ fontSize: 16, fontWeight: 700, color: THEME.navy, marginBottom: 8 }}>行程概述</div>
+              <div style={{ marginTop: 20, ...GLASS_CARD, padding: 16 }}>
+                <div style={{ fontSize: 16, fontWeight: 700, color: INK, marginBottom: 8 }}>行程概述</div>
                 <p style={{ fontSize: 14, lineHeight: 1.75, color: THEME.text }}>{plan.summary}</p>
                 {plan.duration && <div style={{ fontSize: 13, color: THEME.muted, marginTop: 6 }}>{plan.duration}</div>}
                 {Array.isArray(plan.highlights) && plan.highlights.length > 0 && (
@@ -335,14 +352,14 @@ export default function TravelPage() {
 
                 {Array.isArray(plan.itinerary) && plan.itinerary.length > 0 && (
                   <>
-                    <div style={{ fontSize: 15, fontWeight: 700, color: THEME.navy, marginTop: 18 }}>每日安排</div>
+                    <div style={{ fontSize: 15, fontWeight: 700, color: INK, marginTop: 18 }}>每日安排</div>
                     {plan.itinerary.map((d: any) => (
-                      <div key={d.day} style={{ marginTop: 12, padding: 12, borderRadius: 12, background: 'rgba(0,0,0,0.03)' }}>
+                      <div key={d.day} style={{ marginTop: 12, padding: 12, ...GLASS_CARD }}>
                         <div style={{ fontWeight: 700 }}>第{d.day}天 {d.date ? `· ${d.date}` : ''} {d.title ? `· ${d.title}` : ''}</div>
                         <div style={{ fontSize: 13, marginTop: 6 }}>上午：{d.morning}</div>
                         <div style={{ fontSize: 13 }}>下午：{d.afternoon}</div>
                         <div style={{ fontSize: 13 }}>晚上：{d.evening}</div>
-                        {d.tips && <div style={{ fontSize: 12, color: THEME.gold, marginTop: 6 }}>提示：{d.tips}</div>}
+                        {d.tips && <div style={{ fontSize: 12, color: GOLD, marginTop: 6 }}>提示：{d.tips}</div>}
                       </div>
                     ))}
                   </>
@@ -350,7 +367,7 @@ export default function TravelPage() {
 
                 {plan.packing_list && (
                   <>
-                    <div style={{ fontSize: 15, fontWeight: 700, color: THEME.navy, marginTop: 18 }}>打包清单</div>
+                    <div style={{ fontSize: 15, fontWeight: 700, color: INK, marginTop: 18 }}>打包清单</div>
                     {['documents', 'clothing', 'kids', 'others'].map(key => {
                       const arr = plan.packing_list[key]
                       if (!Array.isArray(arr) || !arr.length) return null
@@ -366,7 +383,7 @@ export default function TravelPage() {
 
                 {plan.budget_breakdown && (
                   <div style={{ marginTop: 16, fontSize: 13, lineHeight: 1.7, color: THEME.text }}>
-                    <div style={{ fontWeight: 700, color: THEME.navy, marginBottom: 6 }}>预算参考</div>
+                    <div style={{ fontWeight: 700, color: INK, marginBottom: 6 }}>预算参考</div>
                     {Object.entries(plan.budget_breakdown).map(([k, v]) => (
                       <div key={k}>{k}: {String(v)}</div>
                     ))}
@@ -375,7 +392,7 @@ export default function TravelPage() {
 
                 {plan.useful_info && (
                   <div style={{ marginTop: 16, fontSize: 13, lineHeight: 1.7, color: THEME.text }}>
-                    <div style={{ fontWeight: 700, color: THEME.navy, marginBottom: 6 }}>实用信息</div>
+                    <div style={{ fontWeight: 700, color: INK, marginBottom: 6 }}>实用信息</div>
                     {Object.entries(plan.useful_info).map(([k, v]) => (
                       <div key={k} style={{ marginBottom: 6 }}><strong>{k}</strong>：{String(v)}</div>
                     ))}
@@ -383,24 +400,24 @@ export default function TravelPage() {
                 )}
 
                 {plan.kid_friendly_tips && (
-                  <div style={{ marginTop: 14, fontSize: 13, color: THEME.text, background: 'rgba(176,141,87,0.08)', padding: 12, borderRadius: 12 }}>
+                  <div style={{ marginTop: 14, fontSize: 13, color: THEME.text, background: 'rgba(164,99,85,0.08)', padding: 12, borderRadius: 12 }}>
                     <strong>亲子提示</strong>：{plan.kid_friendly_tips}
                   </div>
                 )}
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 18 }}>
                   <motion.button type="button" whileTap={{ scale: 0.98 }} onClick={addTodosFromPlan}
-                    style={{ padding: 12, borderRadius: 12, border: `1px solid ${THEME.gold}`, background: 'rgba(176,141,87,0.1)', fontWeight: 600, cursor: 'pointer' }}>
+                    style={{ padding: 12, borderRadius: 12, border: `1px solid ${GOLD}`, background: 'rgba(164,99,85,0.1)', fontWeight: 600, cursor: 'pointer' }}>
                     加入待办（签证 / 机票 / 保险）
                   </motion.button>
                   <motion.button type="button" whileTap={{ scale: 0.98 }} disabled={savingPlan} onClick={() => void savePlanToDb()}
-                    style={{ padding: 12, borderRadius: 12, border: 'none', background: THEME.navy, color: '#fff', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+                    style={{ padding: 12, borderRadius: 12, border: 'none', background: ACCENT, color: '#fff', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
                     <Bookmark size={16} /> {savingPlan ? '保存中…' : '保存行程'}
                   </motion.button>
                 </div>
 
                 <div style={{ marginTop: 24, paddingTop: 16, borderTop: '1px solid rgba(0,0,0,0.08)' }}>
-                  <div style={{ fontSize: 16, fontWeight: 700, color: THEME.navy, marginBottom: 10 }}>机票方案</div>
+                  <div style={{ fontSize: 16, fontWeight: 700, color: INK, marginBottom: 10 }}>机票方案</div>
                   <motion.button
                     type="button"
                     whileTap={{ scale: 0.98 }}
@@ -420,7 +437,7 @@ export default function TravelPage() {
                           <div style={{ fontWeight: 700, marginBottom: 6 }}>比价平台</div>
                           {flightResult.search_links.map((l: any, i: number) => (
                             <div key={i} style={{ marginBottom: 8 }}>
-                              <a href={l.url} target="_blank" rel="noreferrer" style={{ color: THEME.navy, fontWeight: 600 }}>{l.platform}</a>
+                              <a href={l.url} target="_blank" rel="noreferrer" style={{ color: INK, fontWeight: 600 }}>{l.platform}</a>
                               <div style={{ fontSize: 12, color: THEME.muted }}>{l.description}</div>
                               {l.tip && <div style={{ fontSize: 12 }}>{l.tip}</div>}
                             </div>
@@ -431,7 +448,7 @@ export default function TravelPage() {
                         <div style={{ marginBottom: 14 }}>
                           <div style={{ fontWeight: 700, marginBottom: 6 }}>航司参考</div>
                           {flightResult.airlines.map((a: any, i: number) => (
-                            <div key={i} style={{ marginBottom: 8, padding: 10, borderRadius: 10, background: 'rgba(0,0,0,0.03)' }}>
+                            <div key={i} style={{ marginBottom: 8, padding: 10, ...GLASS_CARD }}>
                               <strong>{a.name}</strong> · {a.type} · {a.duration} · {a.price_range}
                               {a.kid_friendly ? ' · 亲子友好' : ''}
                               <div style={{ fontSize: 12 }}>优：{a.pros} / 劣：{a.cons}</div>
@@ -483,6 +500,7 @@ export default function TravelPage() {
 }
 
 const inputStyle: CSSProperties = {
-  width: '100%', padding: '11px 12px', borderRadius: 10, border: '1px solid rgba(0,0,0,0.1)',
-  background: 'rgba(255,255,255,0.75)', fontSize: 14, color: THEME.text, boxSizing: 'border-box',
+  width: '100%', padding: '11px 12px', borderRadius: 12,
+  border: '1.5px solid rgba(164,99,85,0.15)',
+  background: '#f7f4ee', fontSize: 14, color: THEME.text, boxSizing: 'border-box',
 }

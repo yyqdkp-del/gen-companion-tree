@@ -6,7 +6,7 @@ import { THEME } from '@/app/_shared/_constants/theme'
 function StepMember({ data, onChange }: { data: any; onChange: (d: any) => void }) {
   return (
     <div>
-      <div style={{ fontSize: 15, fontWeight: 600, color: THEME.navy, marginBottom: 20 }}>告诉根你是谁 🌿</div>
+      <div style={{ fontSize: 15, fontWeight: 600, color: '#2d322f', marginBottom: 20 }}>告诉根你是谁 🌿</div>
       <Field label="姓名" value={data.member_name} onChange={v => onChange({ ...data, member_name: v })} placeholder="中文姓名或英文名" required />
       <SelectField
         label="国籍"

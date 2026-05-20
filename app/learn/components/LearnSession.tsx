@@ -4,6 +4,37 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { CHINESE_THEME as T } from '@/app/_shared/_constants/chineseTheme'
 import { useApp } from '@/app/context/AppContext'
 
+const GLASS_CARD: React.CSSProperties = {
+  background: 'rgba(255,255,255,0.8)',
+  backdropFilter: 'blur(10px)',
+  WebkitBackdropFilter: 'blur(10px)',
+  borderRadius: 18,
+  border: '1px solid rgba(255,255,255,0.6)',
+  boxShadow: '0 4px 20px rgba(45,50,47,0.05)',
+}
+
+const MOM_SCRIPT_BOX: React.CSSProperties = {
+  background: 'linear-gradient(135deg, rgba(164,99,85,0.06) 0%, rgba(164,99,85,0.02) 100%)',
+  border: '1px solid rgba(164,99,85,0.12)',
+  borderRadius: 14,
+  padding: '14px 16px',
+}
+
+const PRIMARY_BTN: React.CSSProperties = {
+  width: '100%',
+  padding: '16px',
+  borderRadius: 16,
+  border: 'none',
+  background: 'linear-gradient(135deg, #a46355 0%, #8a5548 100%)',
+  color: '#fff',
+  fontSize: 16,
+  fontWeight: 600,
+  cursor: 'pointer',
+  fontFamily: "'Noto Serif SC', serif",
+  letterSpacing: '0.05em',
+  boxShadow: '0 6px 20px rgba(164,99,85,0.28)',
+}
+
 type Step = 'origin' | 'structure' | 'write' | 'use'
 
 type Props = {
@@ -37,8 +68,9 @@ function VoiceControl({ text }: { text: string }) {
   return (
     <motion.button whileTap={{ scale: 0.9 }} onClick={toggle}
       style={{ width: 36, height: 36, borderRadius: '50%',
-        background: playing ? 'rgba(192,57,43,0.15)' : 'rgba(200,160,96,0.1)',
-        border: `1px solid ${playing ? '#a46355' : 'rgba(200,160,96,0.3)'}`,
+        background: playing ? 'rgba(164,99,85,0.12)' : 'rgba(255,255,255,0.7)',
+        border: `1px solid ${playing ? '#a46355' : 'rgba(164,99,85,0.2)'}`,
+        boxShadow: '0 2px 8px rgba(45,50,47,0.04)',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         cursor: 'pointer', fontSize: 16 }}>
       {playing ? '⏹' : '🔊'}
@@ -53,8 +85,9 @@ function ProgressBar({ current }: { current: number }) {
       {STEPS.map((s, i) => (
         <div key={s.key} style={{ flex: 1, display: 'flex',
           flexDirection: 'column', alignItems: 'center', gap: 4 }}>
-          <motion.div style={{ width: '100%', height: 4, borderRadius: 4,
-            background: 'rgba(45,50,47,0.06)', overflow: 'hidden' }}>
+            <motion.div style={{ width: '100%', height: 4, borderRadius: 4,
+            background: 'rgba(255,255,255,0.6)', overflow: 'hidden',
+            border: '1px solid rgba(164,99,85,0.08)' }}>
             <div style={{
               width: i <= current ? '100%' : '0%',
               height: '100%',
@@ -156,8 +189,8 @@ function StepOrigin({ data, char, onNext }: {
             <motion.button key={i} whileTap={{ scale: 0.95 }}
               onClick={() => setActiveStage(i)}
               style={{ flex: 1, padding: '8px 4px', borderRadius: 10,
-                border: `1px solid ${i === activeStage ? '#a46355' : 'rgba(200,160,96,0.2)'}`,
-                background: i === activeStage ? 'rgba(192,57,43,0.08)' : '#f7f4ee',
+                border: `1px solid ${i === activeStage ? '#a46355' : 'rgba(164,99,85,0.2)'}`,
+                background: i === activeStage ? 'rgba(164,99,85,0.08)' : '#f7f4ee',
                 cursor: 'pointer', textAlign: 'center' }}>
               <div style={{ fontSize: i === activeStage ? 26 : 20,
                 fontFamily: "'Noto Serif SC', serif",
@@ -195,10 +228,9 @@ function StepOrigin({ data, char, onNext }: {
           <motion.div key={activeStage}
             initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.2 }}
-            style={{ padding: '14px 16px', borderRadius: 12,
-              background: 'rgba(192,57,43,0.05)',
-              borderLeft: '3px solid rgba(192,57,43,0.3)',
-              fontSize: 14, color: '#2d322f', lineHeight: 1.9,
+            style={{ ...GLASS_CARD, padding: '14px 16px', borderRadius: 14,
+              borderLeft: '3px solid rgba(164,99,85,0.35)',
+              fontSize: 14, color: T.text, lineHeight: 1.9,
               fontFamily: 'sans-serif' }}>
             <strong style={{ color: '#a46355' }}>{stages[activeStage].stage}</strong>
             {' '}——{' '}{stages[activeStage].desc}
@@ -210,21 +242,14 @@ function StepOrigin({ data, char, onNext }: {
       {data.memory_trick && (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}
           transition={{ delay: 0.5 }}
-          style={{ padding: '12px 16px', borderRadius: 12,
-            background: 'rgba(200,160,96,0.08)',
-            border: '1px solid rgba(200,160,96,0.2)',
-            fontSize: 14, color: '#8a7355', fontStyle: 'italic',
-            fontFamily: 'sans-serif', marginBottom: 16 }}>
+          style={{ ...GLASS_CARD, padding: '12px 16px', marginBottom: 16,
+            fontSize: 14, color: T.gold, fontStyle: 'italic',
+            fontFamily: 'sans-serif' }}>
           🎵 {data.memory_trick}
         </motion.div>
       )}
 
-      <motion.button whileTap={{ scale: 0.96 }} onClick={onNext}
-        style={{ width: '100%', padding: '16px', borderRadius: 16,
-          border: 'none', background: '#a46355', color: '#fff',
-          fontSize: 16, fontWeight: 700, cursor: 'pointer',
-          fontFamily: "'Noto Serif SC', serif",
-          boxShadow: '0 4px 16px rgba(192,57,43,0.3)' }}>
+      <motion.button whileTap={{ scale: 0.96 }} onClick={onNext} style={PRIMARY_BTN}>
         我明白了 →
       </motion.button>
     </div>
@@ -233,7 +258,7 @@ function StepOrigin({ data, char, onNext }: {
 
 // ── 六书颜色 ──
 const LIUSHU_CFG: Record<string, { color: string; bg: string; desc: string }> = {
-  '象形': { color: '#C03A2B', bg: 'rgba(192,57,43,0.08)', desc: '照着东西的样子画出来' },
+  '象形': { color: '#a46355', bg: 'rgba(164,99,85,0.08)', desc: '照着东西的样子画出来' },
   '指事': { color: '#BA6A00', bg: 'rgba(186,106,0,0.08)', desc: '用符号指示抽象概念' },
   '会意': { color: '#5c7a5e', bg: 'rgba(45,106,79,0.08)', desc: '两个或多个部件合起来表意' },
   '形声': { color: '#1A3C5E', bg: 'rgba(26,60,94,0.08)', desc: '一部分表意，一部分表音' },
@@ -274,7 +299,7 @@ function StepStructure({ data, char, onNext }: {
 
       {/* 六书分类 */}
       {data.liushu && (() => {
-        const cfg = LIUSHU_CFG[data.liushu.type] || { color: '#8a7355', bg: 'rgba(200,160,96,0.08)', desc: '' }
+        const cfg = LIUSHU_CFG[data.liushu.type] || { color: '#8a7355', bg: 'rgba(164,99,85,0.08)', desc: '' }
         const [showMomExplain, setShowMomExplain] = React.useState(false)
         return (
           <div style={{ marginBottom: 14 }}>
@@ -355,9 +380,9 @@ function StepStructure({ data, char, onNext }: {
                 stop()
               }}
               style={{ padding: '12px 16px', borderRadius: 14,
-                background: activeIdx === i ? 'rgba(192,57,43,0.1)' : '#f7f4ee',
+                background: activeIdx === i ? 'rgba(164,99,85,0.1)' : '#f7f4ee',
                 border: `1.5px solid ${activeIdx === i
-                  ? 'rgba(192,57,43,0.4)' : 'rgba(200,160,96,0.25)'}`,
+                  ? 'rgba(164,99,85,0.4)' : 'rgba(164,99,85,0.25)'}`,
                 cursor: 'pointer', textAlign: 'center',
                 transition: 'all 0.2s', minWidth: 70 }}>
               <div style={{ fontSize: 32, fontFamily: "'Noto Serif SC', serif",
@@ -376,8 +401,8 @@ function StepStructure({ data, char, onNext }: {
             exit={{ opacity: 0, height: 0 }}
             style={{ overflow: 'hidden', marginBottom: 10 }}>
             <div style={{ padding: '12px 16px', borderRadius: 12,
-              background: 'rgba(192,57,43,0.06)',
-              borderLeft: '3px solid rgba(192,57,43,0.3)',
+              background: 'rgba(164,99,85,0.06)',
+              borderLeft: '3px solid rgba(164,99,85,0.3)',
               fontSize: 13, color: '#2d322f', lineHeight: 1.8,
               fontFamily: 'sans-serif' }}>
               <strong>{parts[activeIdx].char}</strong> ——{' '}
@@ -402,8 +427,8 @@ function StepStructure({ data, char, onNext }: {
       <motion.div whileTap={{ scale: 0.98 }}
         onClick={() => setShowMom(o => !o)}
         style={{ padding: '12px 16px', borderRadius: 14,
-          background: showMom ? 'rgba(200,160,96,0.08)' : '#f7f4ee',
-          border: `1px solid ${showMom ? 'rgba(200,160,96,0.35)' : 'rgba(200,160,96,0.2)'}`,
+          background: showMom ? 'rgba(164,99,85,0.08)' : '#f7f4ee',
+          border: `1px solid ${showMom ? 'rgba(164,99,85,0.35)' : 'rgba(164,99,85,0.2)'}`,
           cursor: 'pointer', marginBottom: 12,
           display: 'flex', justifyContent: 'space-between',
           alignItems: 'center' }}>
@@ -422,9 +447,7 @@ function StepStructure({ data, char, onNext }: {
             animate={{ opacity: 1, height: 'auto' }}
             exit={{ opacity: 0, height: 0 }}
             style={{ overflow: 'hidden', marginBottom: 12 }}>
-            <div style={{ padding: '16px', borderRadius: 14,
-              background: 'linear-gradient(135deg, rgba(200,160,96,0.1), rgba(192,57,43,0.04))',
-              border: '1px solid rgba(200,160,96,0.25)' }}>
+            <div style={MOM_SCRIPT_BOX}>
               <div style={{ fontSize: 14, color: '#2d322f', lineHeight: 2,
                 fontStyle: 'italic', fontFamily: 'sans-serif' }}>
                 「{data.mom_script}」
@@ -451,12 +474,7 @@ function StepStructure({ data, char, onNext }: {
         )}
       </AnimatePresence>
 
-      <motion.button whileTap={{ scale: 0.96 }} onClick={onNext}
-        style={{ width: '100%', padding: '16px', borderRadius: 16,
-          border: 'none', background: '#a46355', color: '#fff',
-          fontSize: 16, fontWeight: 700, cursor: 'pointer',
-          fontFamily: "'Noto Serif SC', serif",
-          boxShadow: '0 4px 16px rgba(192,57,43,0.3)' }}>
+      <motion.button whileTap={{ scale: 0.96 }} onClick={onNext} style={PRIMARY_BTN}>
         明白了 →
       </motion.button>
     </div>
@@ -514,14 +532,14 @@ function StepWrite({ data, char, canvasRef, onNext }: {
     const ctx = canvas.getContext('2d')
     if (!ctx) return
     // 白色背景
-    ctx.fillStyle = '#FDFBF7'
+    ctx.fillStyle = T.paper
     ctx.fillRect(0, 0, size, size)
     // 田字格
-    ctx.strokeStyle = 'rgba(200,160,96,0.4)'
+    ctx.strokeStyle = 'rgba(164,99,85,0.4)'
     ctx.lineWidth = 1.5
     ctx.strokeRect(2, 2, size - 4, size - 4)
     ctx.setLineDash([4, 3])
-    ctx.strokeStyle = 'rgba(200,160,96,0.25)'
+    ctx.strokeStyle = 'rgba(164,99,85,0.25)'
     ctx.lineWidth = 1
     ctx.beginPath()
     ctx.moveTo(size / 2, 2); ctx.lineTo(size / 2, size - 2)
@@ -530,7 +548,7 @@ function StepWrite({ data, char, canvasRef, onNext }: {
     ctx.setLineDash([])
     // 描红底字（淡色）
     ctx.font = `${size * 0.75}px "Noto Serif SC", serif`
-    ctx.fillStyle = 'rgba(192,57,43,0.08)'
+    ctx.fillStyle = 'rgba(164,99,85,0.08)'
     ctx.textAlign = 'center'
     ctx.textBaseline = 'middle'
     ctx.fillText(char, size / 2, size / 2)
@@ -599,13 +617,13 @@ function StepWrite({ data, char, canvasRef, onNext }: {
     const ctx = canvas.getContext('2d')
     if (!ctx) return
     const size = canvas.width
-    ctx.fillStyle = '#FDFBF7'
+    ctx.fillStyle = T.paper
     ctx.fillRect(0, 0, size, size)
-    ctx.strokeStyle = 'rgba(200,160,96,0.4)'
+    ctx.strokeStyle = 'rgba(164,99,85,0.4)'
     ctx.lineWidth = 1.5
     ctx.strokeRect(2, 2, size - 4, size - 4)
     ctx.setLineDash([4, 3])
-    ctx.strokeStyle = 'rgba(200,160,96,0.25)'
+    ctx.strokeStyle = 'rgba(164,99,85,0.25)'
     ctx.lineWidth = 1
     ctx.beginPath()
     ctx.moveTo(size / 2, 2); ctx.lineTo(size / 2, size - 2)
@@ -613,7 +631,7 @@ function StepWrite({ data, char, canvasRef, onNext }: {
     ctx.stroke()
     ctx.setLineDash([])
     ctx.font = `${size * 0.75}px "Noto Serif SC", serif`
-    ctx.fillStyle = 'rgba(192,57,43,0.08)'
+    ctx.fillStyle = 'rgba(164,99,85,0.08)'
     ctx.textAlign = 'center'
     ctx.textBaseline = 'middle'
     ctx.fillText(char, size / 2, size / 2)
@@ -632,10 +650,7 @@ function StepWrite({ data, char, canvasRef, onNext }: {
           <motion.div key={activeStroke}
             initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 10 }}
-            style={{ padding: '14px 16px', borderRadius: 16,
-              background: 'rgba(192,57,43,0.06)',
-              border: '1px solid rgba(192,57,43,0.2)',
-              marginBottom: 12 }}>
+            style={{ ...GLASS_CARD, padding: '14px 16px', marginBottom: 12 }}>
             <div style={{ display: 'flex', alignItems: 'center',
               justifyContent: 'space-between', marginBottom: 8 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -664,7 +679,7 @@ function StepWrite({ data, char, canvasRef, onNext }: {
             )}
             {/* 进度条 */}
             <div style={{ marginTop: 10, height: 4, borderRadius: 2,
-              background: 'rgba(192,57,43,0.1)', overflow: 'hidden' }}>
+              background: 'rgba(164,99,85,0.1)', overflow: 'hidden' }}>
               <motion.div
                 animate={{ width: `${(completedStrokes.length / Math.max(strokes.length, 1)) * 100}%` }}
                 style={{ height: '100%', background: '#a46355', borderRadius: 2 }} />
@@ -701,10 +716,10 @@ function StepWrite({ data, char, canvasRef, onNext }: {
                 background: completedStrokes.includes(i)
                   ? 'rgba(45,106,79,0.1)'
                   : i === activeStroke
-                    ? '#a46355' : 'rgba(200,160,96,0.08)',
+                    ? '#a46355' : 'rgba(164,99,85,0.08)',
                 border: `1px solid ${completedStrokes.includes(i)
                   ? 'rgba(45,106,79,0.3)'
-                  : i === activeStroke ? '#a46355' : 'rgba(200,160,96,0.2)'}`,
+                  : i === activeStroke ? '#a46355' : 'rgba(164,99,85,0.2)'}`,
                 fontSize: 11,
                 color: completedStrokes.includes(i)
                   ? '#5c7a5e'
@@ -721,7 +736,8 @@ function StepWrite({ data, char, canvasRef, onNext }: {
       <div ref={containerRef} style={{ display: 'flex',
         justifyContent: 'center', marginBottom: 12, position: 'relative' }}>
         <canvas ref={canvasRef}
-          style={{ borderRadius: 16, boxShadow: '0 4px 20px rgba(26,18,8,0.1)',
+          style={{ borderRadius: 18, boxShadow: '0 8px 28px rgba(45,50,47,0.1)',
+            border: '1px solid rgba(255,255,255,0.7)',
             touchAction: 'none', cursor: 'crosshair',
             width: Math.min(window.innerWidth - 80, 280),
             height: Math.min(window.innerWidth - 80, 280) }}
@@ -747,7 +763,7 @@ function StepWrite({ data, char, canvasRef, onNext }: {
       <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
         <motion.button whileTap={{ scale: 0.95 }} onClick={clearCanvas}
           style={{ flex: 1, padding: '12px', borderRadius: 12,
-            border: `1px solid rgba(200,160,96,0.3)`,
+            border: `1px solid rgba(164,99,85,0.3)`,
             background: 'transparent', fontSize: 13,
             color: '#5a5a4a', cursor: 'pointer',
             fontFamily: 'sans-serif' }}>
@@ -760,7 +776,7 @@ function StepWrite({ data, char, canvasRef, onNext }: {
               border: 'none', background: '#8a7355',
               color: '#fff', fontSize: 13, fontWeight: 700,
               cursor: 'pointer', fontFamily: 'sans-serif',
-              boxShadow: '0 3px 12px rgba(200,160,96,0.3)' }}>
+              boxShadow: '0 3px 12px rgba(164,99,85,0.3)' }}>
             这画写好了 ✓
           </motion.button>
         )}
@@ -768,12 +784,12 @@ function StepWrite({ data, char, canvasRef, onNext }: {
         <motion.button whileTap={{ scale: 0.96 }} onClick={onNext}
           style={{ flex: 2, padding: '12px', borderRadius: 12,
             border: 'none',
-            background: (hasDrawn || showCelebration) ? '#a46355' : 'rgba(192,57,43,0.3)',
+            background: (hasDrawn || showCelebration) ? '#a46355' : 'rgba(164,99,85,0.3)',
             color: '#fff', fontSize: 13, fontWeight: 700,
             cursor: (hasDrawn || showCelebration) ? 'pointer' : 'default',
             fontFamily: "'Noto Serif SC', serif",
             boxShadow: (hasDrawn || showCelebration)
-              ? '0 4px 16px rgba(192,57,43,0.3)' : 'none',
+              ? '0 4px 16px rgba(164,99,85,0.3)' : 'none',
             transition: 'all 0.3s' }}>
           {showCelebration ? '继续 →' : hasDrawn ? '写好了 →' : '跳过 →'}
         </motion.button>
@@ -828,7 +844,7 @@ function generateCard(
 
   // 微光晕染
   const glow1 = ctx.createRadialGradient(W/2, 300, 0, W/2, 300, 400)
-  glow1.addColorStop(0, 'rgba(200,160,96,0.06)')
+  glow1.addColorStop(0, 'rgba(164,99,85,0.06)')
   glow1.addColorStop(1, 'transparent')
   ctx.fillStyle = glow1
   ctx.fillRect(0, 0, W, H)
@@ -839,8 +855,8 @@ function generateCard(
   // ── 顶部细金线 ──
   const lineGrad = ctx.createLinearGradient(60, 0, W - 60, 0)
   lineGrad.addColorStop(0, 'transparent')
-  lineGrad.addColorStop(0.3, 'rgba(200,160,96,0.6)')
-  lineGrad.addColorStop(0.7, 'rgba(200,160,96,0.6)')
+  lineGrad.addColorStop(0.3, 'rgba(164,99,85,0.6)')
+  lineGrad.addColorStop(0.7, 'rgba(164,99,85,0.6)')
   lineGrad.addColorStop(1, 'transparent')
   ctx.strokeStyle = lineGrad
   ctx.lineWidth = 0.8
@@ -850,7 +866,7 @@ function generateCard(
 
   // ── 那个字：巨大，金色，发光 ──
   // 发光效果
-  ctx.shadowColor = 'rgba(200,160,96,0.4)'
+  ctx.shadowColor = 'rgba(164,99,85,0.4)'
   ctx.shadowBlur = 60
   ctx.font = `900 260px "Noto Serif SC", serif`
   ctx.fillStyle = '#C8A060'
@@ -860,7 +876,7 @@ function generateCard(
 
   // 拼音（极小，低调）
   ctx.font = '300 28px sans-serif'
-  ctx.fillStyle = 'rgba(200,160,96,0.4)'
+  ctx.fillStyle = 'rgba(164,99,85,0.4)'
   ctx.fillText(pinyin, W / 2, 385)
 
   // ── 孩子手迹（如有）──
@@ -876,7 +892,7 @@ function generateCard(
     ctx.drawImage(writingCanvas, wx, wy, wSize, wSize)
     ctx.globalAlpha = 1
     ctx.font = '300 18px sans-serif'
-    ctx.fillStyle = 'rgba(200,160,96,0.3)'
+    ctx.fillStyle = 'rgba(164,99,85,0.3)'
     ctx.fillText('手迹', W / 2, wy + wSize + 22)
   }
 
@@ -909,7 +925,7 @@ function generateCard(
 
     // 句子前的引号装饰
     ctx.font = '300 60px "Noto Serif SC", serif'
-    ctx.fillStyle = 'rgba(200,160,96,0.3)'
+    ctx.fillStyle = 'rgba(164,99,85,0.3)'
     ctx.fillText('「', 60, startY + 10)
     ctx.fillText('」', W - 60, startY + (displayLines.length - 1) * lineH + 20)
 
@@ -929,8 +945,8 @@ function generateCard(
   // ── 底部分隔线 ──
   const line2Grad = ctx.createLinearGradient(60, 0, W - 60, 0)
   line2Grad.addColorStop(0, 'transparent')
-  line2Grad.addColorStop(0.3, 'rgba(200,160,96,0.3)')
-  line2Grad.addColorStop(0.7, 'rgba(200,160,96,0.3)')
+  line2Grad.addColorStop(0.3, 'rgba(164,99,85,0.3)')
+  line2Grad.addColorStop(0.7, 'rgba(164,99,85,0.3)')
   line2Grad.addColorStop(1, 'transparent')
   ctx.strokeStyle = line2Grad
   ctx.lineWidth = 0.8
@@ -943,7 +959,7 @@ function generateCard(
   const infoLine = [childName, cityStr, childAge ? `${childAge}岁` : '']
     .filter(Boolean).join(' · ')
   ctx.font = '300 28px sans-serif'
-  ctx.fillStyle = 'rgba(200,160,96,0.6)'
+  ctx.fillStyle = 'rgba(164,99,85,0.6)'
   ctx.textAlign = 'center'
   ctx.fillText(infoLine, W / 2, H - 195)
 
@@ -951,19 +967,19 @@ function generateCard(
   const today = new Date().toLocaleDateString('zh-CN',
     { year: 'numeric', month: 'long', day: 'numeric' })
   ctx.font = '300 22px sans-serif'
-  ctx.fillStyle = 'rgba(200,160,96,0.3)'
+  ctx.fillStyle = 'rgba(164,99,85,0.3)'
   ctx.fillText(today, W / 2, H - 160)
 
   // ── 成就标签（极小，像诗的注脚）──
   const tags = ['字源溯源', '六书解构', '笔顺临摹', '情境造句']
   ctx.font = '400 18px sans-serif'
-  ctx.fillStyle = 'rgba(200,160,96,0.25)'
+  ctx.fillStyle = 'rgba(164,99,85,0.25)'
   ctx.textAlign = 'center'
   ctx.fillText(tags.map(t => `✦ ${t}`).join('  '), W / 2, H - 110)
 
   // ── 品牌落款 ──
   ctx.font = '300 22px "Noto Serif SC", serif'
-  ctx.fillStyle = 'rgba(200,160,96,0.35)'
+  ctx.fillStyle = 'rgba(164,99,85,0.35)'
   ctx.fillText('根 · 中文', W / 2, H - 70)
 
   // 底部细金线
@@ -1128,7 +1144,7 @@ function StepUse({ data, char, childName, canvasRef, onComplete }: {
               border: 'none', background: '#a46355', color: '#fff',
               fontSize: 15, fontWeight: 700, cursor: 'pointer',
               fontFamily: "'Noto Serif SC', serif",
-              boxShadow: '0 4px 16px rgba(192,57,43,0.3)',
+              boxShadow: '0 4px 16px rgba(164,99,85,0.3)',
               display: 'flex', alignItems: 'center',
               justifyContent: 'center', gap: 8 }}>
             <span>📤</span> 分享给家人
@@ -1136,7 +1152,7 @@ function StepUse({ data, char, childName, canvasRef, onComplete }: {
           <div style={{ display: 'flex', gap: 8 }}>
             <motion.button whileTap={{ scale: 0.96 }} onClick={downloadCard}
               style={{ flex: 1, padding: '12px', borderRadius: 12,
-                border: `1px solid rgba(200,160,96,0.4)`,
+                border: `1px solid rgba(164,99,85,0.4)`,
                 background: 'transparent', fontSize: 13,
                 color: '#5a5a4a', cursor: 'pointer',
                 fontFamily: 'sans-serif' }}>
@@ -1173,7 +1189,7 @@ function StepUse({ data, char, childName, canvasRef, onComplete }: {
         <div style={{ fontSize: 12, color: 'rgba(45,50,47,0.45)', lineHeight: 1.7,
           fontFamily: 'sans-serif', marginBottom: 12,
           padding: '8px 12px', borderRadius: 10,
-          background: 'rgba(200,160,96,0.06)' }}>
+          background: 'rgba(164,99,85,0.06)' }}>
           🌍 {data.scene}
         </div>
       )}
@@ -1185,8 +1201,8 @@ function StepUse({ data, char, childName, canvasRef, onComplete }: {
           placeholder={`孩子说，妈妈帮忙打\n或者按话筒让孩子直接说`}
           rows={3}
           style={{ flex: 1, padding: '14px', borderRadius: 14,
-            border: '1px solid rgba(200,160,96,0.3)',
-            background: '#f7f4ee', fontSize: 15,
+            border: '1px solid rgba(164,99,85,0.15)',
+            background: 'rgba(255,255,255,0.85)', fontSize: 15,
             color: '#2d322f', fontFamily: "'Noto Serif SC', serif",
             lineHeight: 1.7, outline: 'none', resize: 'none',
             boxSizing: 'border-box' as const,
@@ -1194,13 +1210,13 @@ function StepUse({ data, char, childName, canvasRef, onComplete }: {
         <motion.button whileTap={{ scale: 0.9 }}
           onClick={isRecording ? stopRecording : startRecording}
           animate={isRecording ? {
-            boxShadow: ['0 0 0 0 rgba(192,57,43,0.4)',
-              '0 0 0 12px rgba(192,57,43,0)',
-              '0 0 0 0 rgba(192,57,43,0)']
+            boxShadow: ['0 0 0 0 rgba(164,99,85,0.4)',
+              '0 0 0 12px rgba(164,99,85,0)',
+              '0 0 0 0 rgba(164,99,85,0)']
           } : {}}
           transition={{ repeat: Infinity, duration: 1.2 }}
           style={{ width: 56, borderRadius: 14, border: 'none',
-            background: isRecording ? '#a46355' : 'rgba(192,57,43,0.1)',
+            background: isRecording ? '#a46355' : 'rgba(164,99,85,0.1)',
             color: isRecording ? '#fff' : '#a46355',
             fontSize: 24, cursor: 'pointer',
             flexShrink: 0, alignSelf: 'stretch' }}>
@@ -1217,16 +1233,18 @@ function StepUse({ data, char, childName, canvasRef, onComplete }: {
 
       <motion.button whileTap={{ scale: 0.96 }} onClick={handleComplete}
         disabled={loading}
-        style={{ width: '100%', padding: '16px', borderRadius: 16,
-          border: 'none',
-          background: sentence.trim() ? '#5c7a5e' : '#a46355',
-          color: '#fff', fontSize: 16, fontWeight: 700,
-          cursor: loading ? 'default' : 'pointer',
-          fontFamily: "'Noto Serif SC', serif",
+        style={{
+          ...PRIMARY_BTN,
+          background: sentence.trim()
+            ? 'linear-gradient(135deg, #5c7a5e 0%, #4a6650 100%)'
+            : PRIMARY_BTN.background,
           opacity: loading ? 0.7 : 1,
-          boxShadow: `0 4px 16px ${sentence.trim()
-            ? 'rgba(45,106,79,0.3)' : 'rgba(192,57,43,0.3)'}`,
-          transition: 'background 0.3s' }}>
+          cursor: loading ? 'default' : 'pointer',
+          boxShadow: sentence.trim()
+            ? '0 6px 20px rgba(92,122,94,0.28)'
+            : PRIMARY_BTN.boxShadow,
+          transition: 'background 0.3s, box-shadow 0.3s',
+        }}>
         {loading ? '生成中...' : sentence.trim() ? '🌟 生成学习卡片' : '跳过完成'}
       </motion.button>
     </div>

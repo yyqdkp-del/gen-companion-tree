@@ -68,14 +68,14 @@ function Timeline({ items }: { items: TimelineItem[] }) {
           <div key={item.id} style={{ position: 'relative', marginBottom: i < sorted.length - 1 ? 8 : 0 }}>
             <div style={{ position: 'absolute', left: -24, top: 4, width: 10, height: 10,
               borderRadius: '50%',
-              background: isCurrent ? THEME.gold : isPast ? 'rgba(0,0,0,0.15)' : GREEN.mid,
+              background: isCurrent ? '#8a7355' : isPast ? 'rgba(0,0,0,0.15)' : GREEN.mid,
               boxShadow: isCurrent ? `0 0 0 4px rgba(176,141,87,0.2)` : 'none' }} />
             <div style={{ padding: '6px 10px', borderRadius: 9,
               background: isCurrent ? 'rgba(176,141,87,0.08)' : isPast ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.7)',
               border: `0.5px solid ${isCurrent ? 'rgba(176,141,87,0.25)' : 'rgba(0,0,0,0.05)'}`,
               opacity: isPast ? 0.55 : 1 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <span style={{ fontSize: 10, color: isCurrent ? THEME.gold : THEME.muted,
+                <span style={{ fontSize: 10, color: isCurrent ? '#8a7355' : THEME.muted,
                   fontWeight: isCurrent ? 600 : 400, minWidth: 32, flexShrink: 0 }}>
                   {item.time}
                 </span>
@@ -86,7 +86,7 @@ function Timeline({ items }: { items: TimelineItem[] }) {
                 </span>
                 {isCurrent && (
                   <span style={{ fontSize: 9, padding: '2px 6px', borderRadius: 8,
-                    background: THEME.gold, color: '#fff', fontWeight: 600, flexShrink: 0 }}>
+                    background: '#8a7355', color: '#fff', fontWeight: 600, flexShrink: 0 }}>
                     进行中
                   </span>
                 )}
@@ -269,7 +269,7 @@ function StatusEditor({ log, onSave, onClose }: {
         <motion.button whileTap={{ scale: 0.97 }}
           onClick={() => onSave(health as HealthStatus, mood as MoodStatus)}
           style={{ width: '100%', padding: '14px', borderRadius: 14, border: 'none',
-            background: THEME.navy, color: '#fff', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
+            background: '#2d322f', color: '#fff', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
           保存
         </motion.button>
       </motion.div>
@@ -374,7 +374,7 @@ export default function ChildSheet({ children, sel, onSel, onClose, onAdd, userI
                     padding: '12px 22px',
                     borderRadius: 14,
                     border: 'none',
-                    background: THEME.navy,
+                    background: '#2d322f',
                     color: '#fff',
                     fontSize: 14,
                     fontWeight: 600,
@@ -393,14 +393,14 @@ export default function ChildSheet({ children, sel, onSel, onClose, onAdd, userI
                     gap: 3, cursor: 'pointer', flexShrink: 0 }}>
                   <div style={{ width: c.id === sel?.id ? 52 : 40, height: c.id === sel?.id ? 52 : 40,
                     borderRadius: '50%', background: 'rgba(176,141,87,0.08)',
-                    border: `2px solid ${c.id === sel?.id ? THEME.gold : 'transparent'}`,
+                    border: `2px solid ${c.id === sel?.id ? '#8a7355' : 'transparent'}`,
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                     fontSize: c.id === sel?.id ? 28 : 22, transition: 'all 0.18s',
                     boxShadow: c.id === sel?.id ? '0 0 0 3px rgba(176,141,87,0.18)' : 'none' }}>
                     {c.emoji}
                   </div>
                   <span style={{ fontSize: 9, fontWeight: c.id === sel?.id ? 700 : 400,
-                    color: c.id === sel?.id ? THEME.gold : THEME.muted }}>
+                    color: c.id === sel?.id ? '#8a7355' : THEME.muted }}>
                     {c.name}
                   </span>
                 </motion.div>

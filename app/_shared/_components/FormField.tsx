@@ -1,6 +1,29 @@
 'use client'
-import React from 'react'
+import React, { useCallback } from 'react'
 import { THEME } from '../_constants/theme'
+
+const INPUT_BASE: React.CSSProperties = {
+  width: '100%',
+  padding: '11px 14px',
+  borderRadius: 12,
+  border: '1.5px solid rgba(164,99,85,0.15)',
+  background: '#f7f4ee',
+  fontSize: 14,
+  color: THEME.text,
+  outline: 'none',
+  fontFamily: 'inherit',
+  boxSizing: 'border-box',
+}
+
+function applyFocus(el: HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement) {
+  el.style.borderColor = '#a46355'
+  el.style.boxShadow = '0 0 0 3px rgba(164,99,85,0.08)'
+}
+
+function applyBlur(el: HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement) {
+  el.style.borderColor = 'rgba(164,99,85,0.15)'
+  el.style.boxShadow = 'none'
+}
 
 type FieldProps = {
   label: string
@@ -12,20 +35,23 @@ type FieldProps = {
 }
 
 export function Field({ label, value, onChange, placeholder, type = 'text', required = false }: FieldProps) {
+  const onFocus = useCallback((e: React.FocusEvent<HTMLInputElement>) => applyFocus(e.currentTarget), [])
+  const onBlur = useCallback((e: React.FocusEvent<HTMLInputElement>) => applyBlur(e.currentTarget), [])
+
   return (
     <div style={{ marginBottom: 14 }}>
-      <div style={{ fontSize: 12, color: THEME.muted, fontWeight: 700,
-        marginBottom: 6, letterSpacing: '0.08em' }}>
-        {label}{required && <span style={{ color: '#E05C45', marginLeft: 3 }}>*</span>}
+      <div style={{ fontSize: 12, color: THEME.muted, fontWeight: 700, marginBottom: 6, letterSpacing: '0.08em' }}>
+        {label}{required && <span style={{ color: '#a46355', marginLeft: 3 }}>*</span>}
       </div>
-      <input type={type} value={value}
+      <input
+        type={type}
+        value={value}
         onChange={e => onChange(e.target.value)}
+        onFocus={onFocus}
+        onBlur={onBlur}
         placeholder={placeholder}
-        style={{ width: '100%', padding: '11px 14px', borderRadius: 12,
-          border: '1px solid rgba(0,0,0,0.1)',
-          background: 'rgba(255,255,255,0.65)',
-          fontSize: 14, color: THEME.text, outline: 'none',
-          fontFamily: 'inherit', boxSizing: 'border-box' as const }} />
+        style={INPUT_BASE}
+      />
     </div>
   )
 }
@@ -38,16 +64,15 @@ type SelectFieldProps = {
 }
 
 export function SelectField({ label, value, onChange, options }: SelectFieldProps) {
+  const onFocus = useCallback((e: React.FocusEvent<HTMLSelectElement>) => applyFocus(e.currentTarget), [])
+  const onBlur = useCallback((e: React.FocusEvent<HTMLSelectElement>) => applyBlur(e.currentTarget), [])
+
   return (
     <div style={{ marginBottom: 14 }}>
-      <div style={{ fontSize: 12, color: THEME.muted, fontWeight: 700,
-        marginBottom: 6, letterSpacing: '0.08em' }}>{label}</div>
-      <select value={value} onChange={e => onChange(e.target.value)}
-        style={{ width: '100%', padding: '11px 14px', borderRadius: 12,
-          border: '1px solid rgba(0,0,0,0.1)',
-          background: 'rgba(255,255,255,0.65)',
-          fontSize: 14, color: THEME.text, outline: 'none',
-          fontFamily: 'inherit', boxSizing: 'border-box' as const }}>
+      <div style={{ fontSize: 12, color: THEME.muted, fontWeight: 700, marginBottom: 6, letterSpacing: '0.08em' }}>
+        {label}
+      </div>
+      <select value={value} onChange={e => onChange(e.target.value)} onFocus={onFocus} onBlur={onBlur} style={INPUT_BASE}>
         {options.map(o => (
           <option key={o.value} value={o.value}>{o.label}</option>
         ))}

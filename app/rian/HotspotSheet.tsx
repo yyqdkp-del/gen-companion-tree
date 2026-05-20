@@ -14,6 +14,18 @@ import ActionModal from '@/app/components/ActionModal'
 import HotspotPreferences from '@/app/_shared/_components/HotspotPreferences'
 import { logOrAlertNetworkError } from '@/lib/errors/logOrAlertNetworkError'
 
+const HOTSPOT_GLASS: React.CSSProperties = {
+  background: 'rgba(255,255,255,0.8)',
+  backdropFilter: 'blur(10px)',
+  WebkitBackdropFilter: 'blur(10px)',
+  borderRadius: 18,
+  border: '1px solid rgba(255,255,255,0.6)',
+  boxShadow: '0 4px 20px rgba(45,50,47,0.05)',
+}
+
+const RIAN_GOLD = '#8a7355'
+const RIAN_NAVY = '#2d322f'
+
 function timeAgo(dateStr: string): string {
   const diff = Math.max(0, Date.now() - new Date(dateStr).getTime())
   const mins = Math.floor(diff / 60000)
@@ -60,10 +72,14 @@ function HotspotCard({ item, onRead, onActionModal, onConvertTodo }: {
 
   return (
     <motion.div layout
-      style={{ borderRadius: 12, marginBottom: 10, overflow: 'hidden',
-        border: `0.5px solid ${cfg.border}40`,
-        background: consumed ? 'rgba(255,255,255,0.4)' : cfg.bg,
-        opacity: consumed ? 0.6 : 1, transition: 'opacity 0.3s' }}>
+      style={{
+        ...HOTSPOT_GLASS,
+        marginBottom: 10,
+        overflow: 'hidden',
+        border: consumed ? '1px solid rgba(255,255,255,0.5)' : `1px solid ${cfg.border}55`,
+        opacity: consumed ? 0.6 : 1,
+        transition: 'opacity 0.3s',
+      }}>
 
       <div onClick={handleExpand} style={{ padding: '12px 14px', cursor: 'pointer' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
@@ -80,7 +96,7 @@ function HotspotCard({ item, onRead, onActionModal, onConvertTodo }: {
                 </span>
               </div>
               {item.relevance_reason && (
-                <div style={{ fontSize: 12, color: THEME.gold, fontWeight: 500,
+                <div style={{ fontSize: 12, color: RIAN_GOLD, fontWeight: 500,
                   background: 'rgba(176,141,87,0.08)', padding: '3px 8px',
                   borderRadius: 6, display: 'inline-block', marginBottom: 4 }}>
                   和你有关：{item.relevance_reason}
@@ -125,9 +141,9 @@ function HotspotCard({ item, onRead, onActionModal, onConvertTodo }: {
                   onClick={handleConvert} disabled={converting}
                   style={{ display: 'flex', alignItems: 'center', gap: 5,
                     padding: '8px 14px', borderRadius: 20,
-                    border: `0.5px solid ${THEME.gold}`,
+                    border: `0.5px solid ${RIAN_GOLD}`,
                     background: 'rgba(176,141,87,0.08)',
-                    color: THEME.gold, fontSize: 12, fontWeight: 500,
+                    color: RIAN_GOLD, fontSize: 12, fontWeight: 500,
                     cursor: converting ? 'default' : 'pointer',
                     opacity: converting ? 0.6 : 1 }}>
                   {converting ? '添加中…' : <><Plus size={12} /> 加入待办</>}
@@ -219,7 +235,7 @@ export default function HotspotSheet({ hotspots, onClose, onPatrol, patrolling, 
               <span style={{ fontSize: 16, fontWeight: 600, color: THEME.text }}>热点</span>
               <motion.div whileTap={{ scale: 0.88 }} onClick={() => setShowPrefs(true)}
                 style={{ fontSize: 10, padding: '2px 8px', borderRadius: 8,
-                  background: 'rgba(176,141,87,0.1)', color: THEME.gold,
+                  background: 'rgba(176,141,87,0.1)', color: RIAN_GOLD,
                   cursor: 'pointer', fontWeight: 500 }}>
                 设置关注
               </motion.div>
@@ -270,10 +286,10 @@ export default function HotspotSheet({ hotspots, onClose, onPatrol, patrolling, 
                 padding: '8px 16px', borderRadius: 20,
                 border: '0.5px solid rgba(176,141,87,0.3)',
                 background: 'rgba(176,141,87,0.08)',
-                fontSize: 12, color: THEME.gold, fontWeight: 500, cursor: 'pointer' }}>
+                fontSize: 12, color: RIAN_GOLD, fontWeight: 500, cursor: 'pointer' }}>
               <motion.div animate={patrolling ? { rotate: 360 } : { rotate: 0 }}
                 transition={patrolling ? { duration: 1, repeat: Infinity, ease: 'linear' } : {}}>
-                <RefreshCw size={13} color={THEME.gold} />
+                <RefreshCw size={13} color={RIAN_GOLD} />
               </motion.div>
               {patrolling ? '刷新中…' : '刷新热点'}
             </motion.button>

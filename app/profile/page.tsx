@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect, Suspense } from 'react'
+import React, { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -15,6 +15,19 @@ import { useApp } from '@/app/context/AppContext'
 import { logOrAlertNetworkError } from '@/lib/errors/logOrAlertNetworkError'
 
 const supabase = createClient()
+
+const PROFILE_GLASS: React.CSSProperties = {
+  background: 'rgba(255,255,255,0.8)',
+  backdropFilter: 'blur(10px)',
+  WebkitBackdropFilter: 'blur(10px)',
+  borderRadius: 18,
+  border: '1px solid rgba(255,255,255,0.6)',
+  boxShadow: '0 4px 20px rgba(45,50,47,0.05)',
+}
+
+const INK = '#2d322f'
+const ACCENT = '#a46355'
+const GOLD = '#8a7355'
 
 const STEPS = [
   { id: 'member', icon: <User size={18} />, label: '本人信息' },
@@ -230,24 +243,27 @@ function ProfileContent() {
   const canProceed = step === 0 ? !!memberData.member_name.trim() : true
 
   return (
-    <main style={{ minHeight: '100dvh', background: THEME.bg, fontFamily: "'Noto Sans SC', 'PingFang SC', sans-serif", paddingBottom: NAV_HEIGHT_CSS }}>
+    <main style={{ minHeight: '100dvh', backgroundColor: '#fbf9f6', fontFamily: "'Noto Sans SC', 'PingFang SC', sans-serif", paddingBottom: NAV_HEIGHT_CSS }}>
 
       {/* 顶部 */}
       <div style={{
         position: 'sticky', top: 0, zIndex: 50,
-        background: 'rgba(167,215,217,0.85)',
-        backdropFilter: 'blur(20px)',
+        ...PROFILE_GLASS,
+        borderRadius: 0,
+        borderLeft: 'none',
+        borderRight: 'none',
+        borderTop: 'none',
         padding: '16px 20px',
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         borderBottom: '1px solid rgba(255,255,255,0.3)',
       }}>
         <motion.button whileTap={{ scale: 0.9 }}
           onClick={() => step > 0 ? setStep(step - 1) : router.back()}
-          style={{ background: 'none', border: 'none', cursor: 'pointer', color: THEME.navy }}>
+          style={{ background: 'none', border: 'none', cursor: 'pointer', color: INK }}>
           <ArrowLeft size={20} />
         </motion.button>
         {/* 标题根据模式变化 */}
-        <span style={{ fontSize: 16, fontWeight: 700, color: THEME.navy }}>
+        <span style={{ fontSize: 16, fontWeight: 700, color: INK }}>
           {isEdit ? '编辑个人资料' : '建立家庭档案'}
         </span>
         <span onClick={() => router.back()}
@@ -264,7 +280,7 @@ function ProfileContent() {
             <div key={i} onClick={() => i < step && setStep(i)}
               style={{
                 flex: 1, height: 3, borderRadius: 2,
-                background: i <= step ? THEME.gold : 'rgba(0,0,0,0.1)',
+                background: i <= step ? ACCENT : 'rgba(164,99,85,0.12)',
                 cursor: i < step ? 'pointer' : 'default',
                 transition: 'background 0.3s',
               }}
@@ -276,28 +292,21 @@ function ProfileContent() {
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 24 }}>
           <div style={{
             width: 36, height: 36, borderRadius: '50%',
-            background: 'rgba(176,141,87,0.12)',
-            border: '1.5px solid rgba(176,141,87,0.4)',
+            background: 'rgba(164,99,85,0.1)',
+            border: '1.5px solid rgba(164,99,85,0.25)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            color: THEME.gold,
+            color: ACCENT,
           }}>
             {STEPS[step].icon}
           </div>
           <div>
-            <div style={{ fontSize: 18, fontWeight: 600, color: THEME.navy }}>{STEPS[step].label}</div>
+            <div style={{ fontSize: 18, fontWeight: 600, color: INK }}>{STEPS[step].label}</div>
             <div style={{ fontSize: 11, color: THEME.muted }}>步骤 {step + 1} / {STEPS.length}</div>
           </div>
         </div>
 
         {/* 内容卡片 */}
-        <div style={{
-          background: 'rgba(255,255,255,0.6)',
-          backdropFilter: 'blur(30px)',
-          borderRadius: 24, padding: '24px 20px',
-          border: '1px solid rgba(255,255,255,0.8)',
-          boxShadow: '0 8px 32px rgba(0,0,0,0.06)',
-          marginBottom: 20,
-        }}>
+        <div style={{ ...PROFILE_GLASS, padding: '24px 20px', marginBottom: 20 }}>
           <AnimatePresence mode="wait">
             <motion.div key={step}
               initial={{ opacity: 0, x: 20 }}
@@ -330,14 +339,8 @@ function ProfileContent() {
           </div>
         )}
 
-        <div style={{
-          background: 'rgba(255,255,255,0.55)',
-          borderRadius: 20,
-          padding: '18px 16px',
-          border: '1px solid rgba(255,255,255,0.85)',
-          marginBottom: 18,
-        }}>
-          <div style={{ fontSize: 15, fontWeight: 600, color: THEME.navy, marginBottom: 6 }}>Google 服务连接</div>
+        <div style={{ ...PROFILE_GLASS, padding: '18px 16px', marginBottom: 18 }}>
+          <div style={{ fontSize: 15, fontWeight: 600, color: INK, marginBottom: 6 }}>Google 服务连接</div>
           <div style={{ fontSize: 12, color: THEME.muted, marginBottom: 14, lineHeight: 1.6 }}>
             连接后可使用 Gmail 真正代发邮件；日历授权为后续一键写日程预留。
           </div>
@@ -347,7 +350,7 @@ function ProfileContent() {
                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
                 padding: '12px 14px', borderRadius: 14, border: '1px solid rgba(0,0,0,0.08)',
                 background: gmailConnected ? 'rgba(34,197,94,0.12)' : 'rgba(255,255,255,0.75)',
-                color: THEME.navy, fontSize: 14, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit',
+                color: INK, fontSize: 14, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit',
               }}>
               <Mail size={18} color={gmailConnected ? '#16a34a' : THEME.muted} />
               {gmailConnected ? 'Gmail 已连接' : '连接 Gmail（一键发邮件）'}
@@ -357,7 +360,7 @@ function ProfileContent() {
                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
                 padding: '12px 14px', borderRadius: 14, border: '1px solid rgba(0,0,0,0.08)',
                 background: calendarConnected ? 'rgba(34,197,94,0.12)' : 'rgba(255,255,255,0.75)',
-                color: THEME.navy, fontSize: 14, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit',
+                color: INK, fontSize: 14, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit',
               }}>
               <Calendar size={18} color={calendarConnected ? '#16a34a' : THEME.muted} />
               {calendarConnected ? 'Google 日历已连接' : '连接 Google 日历（预留）'}
@@ -375,9 +378,10 @@ function ProfileContent() {
               </motion.button>
               <motion.button whileTap={{ scale: 0.97 }} onClick={handleSave} disabled={saving || saved}
                 style={{
-                  flex: 2, padding: '14px', borderRadius: 16, border: 'none',
-                  background: saved ? '#22C55E' : THEME.navy,
-                  color: '#fff', fontSize: 14, fontWeight: 600,
+                  flex: 2, padding: '14px', borderRadius: 14, border: 'none',
+                  background: saved ? '#22C55E' : ACCENT,
+                  color: '#ffffff', fontSize: 14, fontWeight: 600,
+                  boxShadow: saved ? 'none' : '0 4px 16px rgba(164,99,85,0.25)',
                   cursor: saving ? 'default' : 'pointer',
                   display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
                   transition: 'background 0.3s',
@@ -397,7 +401,8 @@ function ProfileContent() {
               <motion.button whileTap={{ scale: 0.97 }} onClick={() => canProceed && setStep(step + 1)}
                 style={{
                   flex: 2, padding: '14px', borderRadius: 16, border: 'none',
-                  background: canProceed ? THEME.navy : 'rgba(0,0,0,0.08)',
+                  background: canProceed ? ACCENT : 'rgba(0,0,0,0.08)',
+                  boxShadow: canProceed ? '0 4px 16px rgba(164,99,85,0.25)' : 'none',
                   color: canProceed ? '#fff' : THEME.muted,
                   fontSize: 14, fontWeight: 600, cursor: canProceed ? 'pointer' : 'default',
                   display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,

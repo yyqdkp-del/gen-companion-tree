@@ -45,6 +45,7 @@ export default function GrowthPage() {
       position: 'fixed', inset: 0,
       width: '100dvw', height: '100dvh',
       overflow: 'hidden',
+      backgroundColor: '#fbf9f6',
       fontFamily: "'Noto Serif SC', Georgia, serif",
     }}>
       <div style={{
@@ -70,10 +71,11 @@ export default function GrowthPage() {
           left: '50%', top: '30vh',
           transform: 'translateX(-50%)',
           zIndex: 50,
-          background: 'rgba(20,12,4,0.52)',
-          border: '1px solid rgba(240,192,64,0.45)',
-          borderRadius: 16,
-          backdropFilter: 'blur(14px)',
+          background: 'rgba(255,255,255,0.8)',
+          border: '1px solid rgba(255,255,255,0.6)',
+          borderRadius: 18,
+          backdropFilter: 'blur(10px)',
+          boxShadow: '0 4px 20px rgba(45,50,47,0.05)',
           cursor: 'pointer',
           width: 'min(280px, 75vw)',
           padding: '14px 18px',
@@ -82,25 +84,24 @@ export default function GrowthPage() {
       >
         <div style={{
           width: 44, height: 44, borderRadius: 22,
-          background: 'rgba(240,192,64,0.15)',
-          border: '1px solid rgba(240,192,64,0.35)',
+          background: 'rgba(164,99,85,0.12)',
+          border: '1px solid rgba(164,99,85,0.25)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           fontSize: 24, flexShrink: 0,
         }}>🏆</div>
         <div style={{ flex: 1, textAlign: 'left' }}>
           <div style={{
-            fontSize: 15, fontWeight: 700, color: '#FFE080',
+            fontSize: 15, fontWeight: 700, color: '#2d322f',
             letterSpacing: '0.08em',
-            textShadow: '0 0 10px rgba(255,180,0,0.7)',
             lineHeight: 1.3,
           }}>
             {activeKid ? `${activeKid.name}的学业` : '学业成长'}
           </div>
-          <div style={{ fontSize: 11, color: 'rgba(255,220,120,0.6)', marginTop: 3, letterSpacing: '0.06em' }}>
+          <div style={{ fontSize: 11, color: 'rgba(45,50,47,0.5)', marginTop: 3, letterSpacing: '0.06em' }}>
             升学规划 · 成长档案
           </div>
         </div>
-        <div style={{ fontSize: 18, color: 'rgba(255,220,120,0.5)', flexShrink: 0 }}>›</div>
+        <div style={{ fontSize: 18, color: 'rgba(45,50,47,0.35)', flexShrink: 0 }}>›</div>
       </motion.button>
 
       <motion.button
@@ -115,10 +116,11 @@ export default function GrowthPage() {
           left: '50%', top: '62vh',
           transform: 'translateX(-50%)',
           zIndex: 50,
-          background: 'rgba(20,4,4,0.52)',
-          border: '1px solid rgba(192,57,43,0.45)',
-          borderRadius: 16,
-          backdropFilter: 'blur(14px)',
+          background: 'rgba(255,255,255,0.8)',
+          border: '1px solid rgba(255,255,255,0.6)',
+          borderRadius: 18,
+          backdropFilter: 'blur(10px)',
+          boxShadow: '0 4px 20px rgba(45,50,47,0.05)',
           cursor: 'pointer',
           width: 'min(280px, 75vw)',
           padding: '14px 18px',
@@ -127,25 +129,24 @@ export default function GrowthPage() {
       >
         <div style={{
           width: 44, height: 44, borderRadius: 22,
-          background: 'rgba(192,57,43,0.15)',
-          border: '1px solid rgba(192,57,43,0.35)',
+          background: 'rgba(164,99,85,0.12)',
+          border: '1px solid rgba(164,99,85,0.25)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           fontSize: 24, flexShrink: 0,
         }}>📖</div>
         <div style={{ flex: 1, textAlign: 'left' }}>
           <div style={{
-            fontSize: 15, fontWeight: 700, color: '#FFE080',
+            fontSize: 15, fontWeight: 700, color: '#2d322f',
             letterSpacing: '0.08em',
-            textShadow: '0 0 10px rgba(255,100,80,0.7)',
             lineHeight: 1.3,
           }}>
             根·中文
           </div>
-          <div style={{ fontSize: 11, color: 'rgba(255,220,120,0.6)', marginTop: 3, letterSpacing: '0.06em' }}>
+          <div style={{ fontSize: 11, color: 'rgba(45,50,47,0.5)', marginTop: 3, letterSpacing: '0.06em' }}>
             字理解码 · 成语 · 文化句
           </div>
         </div>
-        <div style={{ fontSize: 18, color: 'rgba(255,220,120,0.5)', flexShrink: 0 }}>›</div>
+        <div style={{ fontSize: 18, color: 'rgba(45,50,47,0.35)', flexShrink: 0 }}>›</div>
       </motion.button>
 
       <FallingLeaves />

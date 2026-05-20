@@ -7,6 +7,24 @@ import ChineseAccordion from './ChineseAccordion'
 import LearnSession from './LearnSession'
 import { WordPopup, FamilyPopup, type PopupItem } from './WordPopup'
 
+const GLASS_CARD: React.CSSProperties = {
+  background: 'rgba(255,255,255,0.8)',
+  backdropFilter: 'blur(10px)',
+  WebkitBackdropFilter: 'blur(10px)',
+  borderRadius: 18,
+  border: '1px solid rgba(255,255,255,0.6)',
+  boxShadow: '0 4px 20px rgba(45,50,47,0.05)',
+  marginBottom: 10,
+  padding: '16px 18px',
+}
+
+const MOM_SCRIPT_BOX: React.CSSProperties = {
+  background: 'linear-gradient(135deg, rgba(164,99,85,0.06) 0%, rgba(164,99,85,0.02) 100%)',
+  border: '1px solid rgba(164,99,85,0.12)',
+  borderRadius: 14,
+  padding: '14px 16px',
+}
+
 type Props = {
   data: any
   char: string
@@ -81,8 +99,8 @@ function PartsDisplay({ parts, char, evolution }: {
           <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }}
             exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.2 }}
             style={{ overflow: 'hidden' }}>
-            <div style={{ background: 'rgba(192,57,43,0.05)', borderRadius: 10,
-              padding: '10px 13px', marginTop: 8, borderLeft: '3px solid rgba(192,57,43,0.3)' }}>
+            <div style={{ background: 'rgba(164,99,85,0.05)', borderRadius: 10,
+              padding: '10px 13px', marginTop: 8, borderLeft: '3px solid rgba(164,99,85,0.3)' }}>
               <div style={{ fontSize: 12, fontWeight: 700, color: T.red,
                 marginBottom: 4, fontFamily: 'sans-serif' }}>
                 {parts[openIdx].char} · {parts[openIdx].name}
@@ -97,10 +115,10 @@ function PartsDisplay({ parts, char, evolution }: {
 
       {evolution && (
         <div style={{ marginTop: 10, borderRadius: 10,
-          border: '1px solid rgba(200,160,96,0.2)', overflow: 'hidden' }}>
+          border: '1px solid rgba(164,99,85,0.2)', overflow: 'hidden' }}>
           <button onClick={() => setShowEvolution(o => !o)}
             style={{ width: '100%', padding: '10px 14px',
-              background: showEvolution ? 'rgba(200,160,96,0.06)' : 'transparent',
+              background: showEvolution ? 'rgba(164,99,85,0.06)' : 'transparent',
               border: 'none', display: 'flex', alignItems: 'center',
               justifyContent: 'space-between', cursor: 'pointer' }}>
             <span style={{ fontSize: 12, color: T.gold, fontFamily: 'sans-serif',
@@ -114,7 +132,7 @@ function PartsDisplay({ parts, char, evolution }: {
                 exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.2 }}
                 style={{ overflow: 'hidden' }}>
                 <div style={{ padding: '0 14px 12px',
-                  borderTop: '1px solid rgba(200,160,96,0.15)', background: T.white }}>
+                  borderTop: '1px solid rgba(164,99,85,0.15)', background: T.white }}>
                   <div style={{ fontSize: 12, color: T.text, lineHeight: 1.85,
                     marginTop: 10, fontFamily: 'sans-serif' }}>{evolution}</div>
                 </div>
@@ -140,7 +158,7 @@ function FamilyWords({ family, extension, chengyu, cy_story, cultural_sentence,
   return (
     <>
       <div style={{ background: T.white, borderRadius: 16, padding: '16px',
-        marginBottom: 8, border: '1px solid rgba(200,160,96,0.15)' }}>
+        marginBottom: 8, border: '1px solid rgba(164,99,85,0.15)' }}>
         <div style={{ fontSize: 10, letterSpacing: 3, color: T.red,
           marginBottom: 10, fontFamily: 'sans-serif' }}>🌳 字族 · 延伸</div>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7 }}>
@@ -157,8 +175,8 @@ function FamilyWords({ family, extension, chengyu, cy_story, cultural_sentence,
           {chengyu && (
             <button onClick={() => setPopup({ word: chengyu, type: 'chengyu', extra: { cy_story } })}
               style={{ padding: '6px 13px', borderRadius: 20,
-                background: 'rgba(200,160,96,0.1)',
-                border: '1px solid rgba(200,160,96,0.3)',
+                background: 'rgba(164,99,85,0.1)',
+                border: '1px solid rgba(164,99,85,0.3)',
                 fontSize: 14, fontFamily: "'Noto Serif SC', serif",
                 color: T.gold, cursor: 'pointer' }}>
               🌟 {chengyu}
@@ -290,7 +308,7 @@ export default function HanziResult({ data, char, onMomCopy, childLevel, childNa
             fontFamily: "'Noto Serif SC', serif" }}>{data.visual_hook}</div>
           {data.memory_trick && (
             <div style={{ marginTop: 8, padding: '8px 12px', borderRadius: 10,
-              background: 'rgba(200,160,96,0.08)', fontSize: 13,
+              background: 'rgba(164,99,85,0.08)', fontSize: 13,
               color: T.gold, fontStyle: 'italic', fontFamily: 'sans-serif' }}>
               🎵 {data.memory_trick}
             </div>
@@ -314,8 +332,7 @@ export default function HanziResult({ data, char, onMomCopy, childLevel, childNa
 
       {/* 书写引导 */}
       {data.writing_guide && (
-        <div style={{ background: T.white, borderRadius: 14, padding: '14px 16px',
-          marginBottom: 8, border: '1px solid rgba(200,160,96,0.15)' }}>
+        <div style={GLASS_CARD}>
           <div style={{ fontSize: 10, letterSpacing: 3, color: T.gold,
             marginBottom: 8, fontFamily: 'sans-serif' }}>
             ✍️ 学着写 · {data.stroke_count ? `${data.stroke_count}画` : ''}
@@ -328,8 +345,8 @@ export default function HanziResult({ data, char, onMomCopy, childLevel, childNa
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
               {data.stroke_order.map((s: string, i: number) => (
                 <span key={i} style={{ padding: '3px 10px', borderRadius: 20,
-                  background: 'rgba(200,160,96,0.08)',
-                  border: '1px solid rgba(200,160,96,0.2)',
+                  background: 'rgba(164,99,85,0.06)',
+                  border: '1px solid rgba(164,99,85,0.15)',
                   fontSize: 12, color: T.textMid, fontFamily: 'sans-serif' }}>
                   {i + 1}. {s}
                 </span>
@@ -356,9 +373,7 @@ export default function HanziResult({ data, char, onMomCopy, childLevel, childNa
       {data.mom_script && (
         <ChineseAccordion title="妈妈台词" emoji="👩" defaultOpen>
           <div style={{ paddingTop: 12 }}>
-            <div style={{ padding: '13px', borderRadius: 12,
-              background: 'linear-gradient(135deg, rgba(200,160,96,0.1), rgba(192,57,43,0.05))',
-              border: '1px solid rgba(200,160,96,0.2)', marginBottom: 10 }}>
+            <div style={{ ...MOM_SCRIPT_BOX, marginBottom: 10 }}>
               <div style={{ fontSize: 13, color: T.text, lineHeight: 1.9,
                 fontStyle: 'italic', fontFamily: 'sans-serif' }}>「{data.mom_script}」</div>
             </div>
@@ -380,7 +395,7 @@ export default function HanziResult({ data, char, onMomCopy, childLevel, childNa
                 ))}
               </>
             )}
-            <div style={{ background: 'rgba(192,57,43,0.06)', borderRadius: 10,
+            <div style={{ background: 'rgba(164,99,85,0.06)', borderRadius: 10,
               padding: '9px 12px', marginTop: 4 }}>
               <div style={{ fontSize: 11, color: T.textMid, lineHeight: 1.7,
                 fontFamily: 'sans-serif' }}>
@@ -389,15 +404,15 @@ export default function HanziResult({ data, char, onMomCopy, childLevel, childNa
             </div>
             <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
               <button onClick={onMomCopy}
-                style={{ flex: 1, padding: '9px', borderRadius: 10,
-                  border: `1px solid ${T.gold}`, background: 'transparent',
+                style={{ flex: 1, padding: '9px', borderRadius: 12,
+                  border: '1px solid rgba(164,99,85,0.25)', background: 'rgba(255,255,255,0.6)',
                   fontSize: 12, color: T.gold, fontWeight: 600,
                   cursor: 'pointer', fontFamily: 'sans-serif' }}>
                 📋 复制台词
               </button>
               <button onClick={() => speak(data.mom_script)}
-                style={{ padding: '9px 14px', borderRadius: 10,
-                  border: `1px solid ${T.gold}`, background: 'transparent',
+                style={{ padding: '9px 14px', borderRadius: 12,
+                  border: '1px solid rgba(164,99,85,0.25)', background: 'rgba(255,255,255,0.6)',
                   fontSize: 12, color: T.gold, fontWeight: 600,
                   cursor: 'pointer', fontFamily: 'sans-serif' }}>
                 🔊 朗读
@@ -413,7 +428,7 @@ export default function HanziResult({ data, char, onMomCopy, childLevel, childNa
             {data.story && <div style={{ fontSize: 13, color: T.text, lineHeight: 1.85,
               fontFamily: 'sans-serif', marginBottom: data.scene ? 10 : 0 }}>{data.story}</div>}
             {data.scene && (
-              <div style={{ background: 'rgba(200,160,96,0.08)', borderRadius: 10,
+              <div style={{ background: 'rgba(164,99,85,0.08)', borderRadius: 10,
                 padding: '10px 13px', borderLeft: '3px solid #C8A060' }}>
                 <div style={{ fontSize: 11, letterSpacing: 2, color: T.gold,
                   marginBottom: 4, fontFamily: 'sans-serif' }}>🌍 生活场景</div>
