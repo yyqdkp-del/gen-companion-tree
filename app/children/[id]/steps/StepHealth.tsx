@@ -4,7 +4,6 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { Check, X, Plus } from 'lucide-react'
 import { THEME } from '@/app/_shared/_constants/theme'
 
-// ── 清迈医院预设列表 ──
 const PRESET_HOSPITALS = [
   { category: '综合国际医院', hospitals: [
     { name: '清迈曼谷医院 (Bangkok Hospital)', phone: '052-089-888' },
@@ -31,28 +30,70 @@ const PRESET_HOSPITALS = [
   ]},
 ]
 
-// ── 健康选项 ──
 const CONDITION_OPTIONS = ['无', '哮喘', '湿疹', '过敏性鼻炎', '糖尿病', '癫痫', '心脏病', '其他']
 const MEDICATION_OPTIONS = ['无', '哮喘喷雾', '过敏药', '退烧药备用', '维生素', '其他']
 
-// ── 多选标签组件 ──
-function MultiSelect({ label, options, selected, onChange }: {
+/** 「其他」在数组中的持久化前缀；补充说明为 `其他：具体文字` */
+const OTHER_TAG = '其他'
+const OTHER_PREFIX = '其他：'
+
+function MultiSelect({
+  label,
+  options,
+  selected,
+  onChange,
+}: {
   label: string
   options: string[]
   selected: string[]
   onChange: (v: string[]) => void
 }) {
-  const [customInput, setCustomInput] = useState('')
-  const showCustom = selected.includes('其他')
+  const stripOtherVariants = (arr: string[]) =>
+    arr.filter((s) => s !== OTHER_TAG && !s.startsWith(OTHER_PREFIX))
+
+  const getOtherDetail = (): string => {
+    const row = selected.find((s) => s.startsWith(OTHER_PREFIX))
+    return row ? row.slice(OTHER_PREFIX.length) : ''
+  }
+
+  const otherDetail = getOtherDetail()
+  const showOtherInput = selected.some((s) => s === OTHER_TAG || s.startsWith(OTHER_PREFIX))
 
   const toggle = (opt: string) => {
-    if (opt === '无') { onChange(['无']); return }
-    const without = selected.filter(s => s !== '无')
+    if (opt === '无') {
+      onChange(['无'])
+      return
+    }
+    if (opt === OTHER_TAG) {
+      const withoutNone = selected.filter((s) => s !== '无')
+      const hasOther = withoutNone.some((s) => s === OTHER_TAG || s.startsWith(OTHER_PREFIX))
+      if (hasOther) {
+        const next = stripOtherVariants(withoutNone)
+        onChange(next.length ? next : ['无'])
+      } else {
+        onChange([...stripOtherVariants(withoutNone), OTHER_TAG])
+      }
+      return
+    }
+
+    const without = stripOtherVariants(selected.filter((s) => s !== '无'))
     if (without.includes(opt)) {
-      const next = without.filter(s => s !== opt)
+      const next = without.filter((s) => s !== opt)
       onChange(next.length ? next : ['无'])
     } else {
       onChange([...without, opt])
+    }
+  }
+
+  const commitOtherText = (raw: string) => {
+    const base = stripOtherVariants(selected.filter((s) => s !== '无'))
+    const t = raw.trim()
+    if (t) {
+      onChange([...base, `${OTHER_PREFIX}${t}`])
+      return
+    }
+    if (showOtherInput) {
+      onChange(base.length ? base : ['无'])
     }
   }
 
@@ -60,8 +101,11 @@ function MultiSelect({ label, options, selected, onChange }: {
     <div style={{ marginBottom: 16 }}>
       <div style={{ fontSize: 12, color: THEME.muted, fontWeight: 700, marginBottom: 8, letterSpacing: '0.08em' }}>{label}</div>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-        {options.map(opt => {
-          const isSelected = selected.includes(opt)
+        {options.map((opt) => {
+          let isSelected = selected.includes(opt)
+          if (opt === OTHER_TAG) {
+            isSelected = selected.some((s) => s === OTHER_TAG || s.startsWith(OTHER_PREFIX))
+          }
           return (
             <motion.div key={opt} whileTap={{ scale: 0.92 }} onClick={() => toggle(opt)}
               style={{ padding: '7px 14px', borderRadius: 20, fontSize: 13, cursor: 'pointer', background: isSelected ? 'rgba(164,99,85,0.15)' : 'rgba(255,255,255,0.6)', border: isSelected ? `1.5px solid ${THEME.gold}` : '1px solid rgba(0,0,0,0.1)', color: isSelected ? THEME.gold : THEME.text, fontWeight: isSelected ? 600 : 400 }}>
@@ -70,16 +114,18 @@ function MultiSelect({ label, options, selected, onChange }: {
           )
         })}
       </div>
-      {showCustom && (
-        <input value={customInput} onChange={e => setCustomInput(e.target.value)}
+      {showOtherInput && (
+        <input
+          value={otherDetail}
+          onChange={(e) => commitOtherText(e.target.value)}
           placeholder="请描述具体情况…"
-          style={{ width: '100%', marginTop: 8, padding: '10px 14px', borderRadius: 10, border: '1px solid rgba(0,0,0,0.1)', background: 'rgba(255,255,255,0.65)', fontSize: 13, outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit' }} />
+          style={{ width: '100%', marginTop: 8, padding: '10px 14px', borderRadius: 10, border: '1px solid rgba(0,0,0,0.1)', background: 'rgba(255,255,255,0.65)', fontSize: 13, outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit' }}
+        />
       )}
     </div>
   )
 }
 
-// ── Step 0：基本信息 ──
 function StepHealth({ data, onChange }: { data: any; onChange: (d: any) => void }) {
   const [showHospitalPicker, setShowHospitalPicker] = useState(false)
   const [customHospital, setCustomHospital] = useState('')
@@ -117,11 +163,9 @@ function StepHealth({ data, onChange }: { data: any; onChange: (d: any) => void 
       <MultiSelect label="慢性病 / 医疗状况" options={CONDITION_OPTIONS} selected={parseArray(data.medical_conditions)} onChange={v => onChange({ ...data, medical_conditions: v })} />
       <MultiSelect label="当前用药" options={MEDICATION_OPTIONS} selected={parseArray(data.medications_current)} onChange={v => onChange({ ...data, medications_current: v })} />
 
-      {/* 常用医院 */}
       <div style={{ marginBottom: 16 }}>
         <div style={{ fontSize: 12, color: THEME.muted, fontWeight: 700, marginBottom: 8, letterSpacing: '0.08em' }}>常用医院</div>
 
-        {/* 已选医院列表 */}
         {hospitals.map((h: any, i: number) => (
           <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderRadius: 12, background: 'rgba(164,99,85,0.08)', border: '1px solid rgba(164,99,85,0.2)', marginBottom: 8 }}>
             <div style={{ flex: 1 }}>
@@ -135,14 +179,12 @@ function StepHealth({ data, onChange }: { data: any; onChange: (d: any) => void 
           </div>
         ))}
 
-        {/* 从预设选择 */}
         <motion.button whileTap={{ scale: 0.97 }}
           onClick={() => setShowHospitalPicker(!showHospitalPicker)}
           style={{ width: '100%', padding: '10px', borderRadius: 12, border: `1.5px dashed rgba(164,99,85,0.4)`, background: 'transparent', color: THEME.gold, fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, marginBottom: 8 }}>
           <Plus size={14} /> 从清迈医院列表选择
         </motion.button>
 
-        {/* 医院选择器 */}
         <AnimatePresence>
           {showHospitalPicker && (
             <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}
@@ -175,7 +217,6 @@ function StepHealth({ data, onChange }: { data: any; onChange: (d: any) => void 
           )}
         </AnimatePresence>
 
-        {/* 手动添加 */}
         <div style={{ display: 'flex', gap: 8 }}>
           <input value={customHospital} onChange={e => setCustomHospital(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && addCustomHospital()}
@@ -188,13 +229,59 @@ function StepHealth({ data, onChange }: { data: any; onChange: (d: any) => void 
         </div>
       </div>
 
-      <div style={{ padding: '12px 14px', borderRadius: 12, background: 'rgba(154,183,232,0.12)', fontSize: 12, color: THEME.muted, lineHeight: 1.7 }}>
+      <div style={{ marginTop: 20 }}>
+        <div style={{ fontSize: 13, color: 'rgba(45,50,47,0.6)', marginBottom: 12, fontFamily: 'sans-serif' }}>
+          作息时间（用于智能提醒）
+        </div>
+        <div style={{ display: 'flex', gap: 12 }}>
+          <div style={{ flex: 1 }}>
+            <label style={{ fontSize: 12, color: 'rgba(45,50,47,0.5)', fontFamily: 'sans-serif', display: 'block', marginBottom: 6 }}>
+              平日就寝
+            </label>
+            <input
+              type="time"
+              value={data.usual_bedtime || '21:00'}
+              onChange={e => onChange({ ...data, usual_bedtime: e.target.value })}
+              style={{
+                width: '100%',
+                padding: '10px 12px',
+                background: '#f7f4ee',
+                border: '1.5px solid rgba(164,99,85,0.15)',
+                borderRadius: 12,
+                fontSize: 14,
+                color: '#2d322f',
+                boxSizing: 'border-box',
+              }}
+            />
+          </div>
+          <div style={{ flex: 1 }}>
+            <label style={{ fontSize: 12, color: 'rgba(45,50,47,0.5)', fontFamily: 'sans-serif', display: 'block', marginBottom: 6 }}>
+              周末就寝
+            </label>
+            <input
+              type="time"
+              value={data.weekend_bedtime || '22:00'}
+              onChange={e => onChange({ ...data, weekend_bedtime: e.target.value })}
+              style={{
+                width: '100%',
+                padding: '10px 12px',
+                background: '#f7f4ee',
+                border: '1.5px solid rgba(164,99,85,0.15)',
+                borderRadius: 12,
+                fontSize: 14,
+                color: '#2d322f',
+                boxSizing: 'border-box',
+              }}
+            />
+          </div>
+        </div>
+      </div>
+
+      <div style={{ padding: '12px 14px', borderRadius: 12, background: 'rgba(154,183,232,0.12)', fontSize: 12, color: THEME.muted, lineHeight: 1.7, marginTop: 16 }}>
         💡 慢性病、用药与医院用于就诊卡；血型与过敏请在「基本信息」中填写
       </div>
     </div>
   )
 }
-
-// ── 主组件 ──
 
 export { StepHealth }

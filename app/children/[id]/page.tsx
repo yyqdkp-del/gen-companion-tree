@@ -32,10 +32,10 @@ const PAGE = {
 }
 
 const STEPS = [
-  { id: 'basic', label: '基本信息' },
-  { id: 'school', label: '学校信息' },
-  { id: 'schedule', label: '课程活动' },
-  { id: 'health', label: '健康信息' },
+  { id: 'basic', title: '基本信息', desc: '名字 · 生日 · 护照' },
+  { id: 'school', title: '学校信息', desc: '学校 · 年级 · 接送' },
+  { id: 'health', title: '健康档案', desc: '过敏 · 用药 · 作息' },
+  { id: 'schedule', title: '课程活动', desc: '课表 · 兴趣班' },
 ]
 
 function allergiesToText(val: unknown): string {
@@ -254,13 +254,15 @@ function ChildEditContent() {
 
         <div style={{ display: 'flex', gap: 6, marginBottom: 20 }}>
           {STEPS.map((s, i) => (
-            <div key={i} onClick={() => i < step && setStep(i)}
+            <div key={s.id} onClick={() => i < step && setStep(i)}
               style={{ flex: 1, height: 3, borderRadius: 2, background: i <= step ? PAGE.accent : 'rgba(164,99,85,0.12)', cursor: i < step ? 'pointer' : 'default', transition: 'background 0.3s' }} />
           ))}
         </div>
 
-        <div style={{ fontSize: 17, fontWeight: 600, color: PAGE.ink, marginBottom: 2 }}>{STEPS[step].label}</div>
-        <div style={{ fontSize: 11, color: PAGE.muted, marginBottom: 16 }}>步骤 {step + 1} / {STEPS.length}</div>
+        <div style={{ fontSize: 17, fontWeight: 600, color: PAGE.ink, marginBottom: 2 }}>{STEPS[step].title}</div>
+        <div style={{ fontSize: 11, color: PAGE.muted, marginBottom: 16 }}>
+          {STEPS[step].desc} · 步骤 {step + 1} / {STEPS.length}
+        </div>
 
         {isFromQuick && step === 0 && (
           <div style={{ background: 'rgba(164,99,85,0.1)', borderRadius: 12, padding: '10px 14px', fontSize: 12, color: PAGE.accent, marginBottom: 14, textAlign: 'center' }}>
@@ -273,8 +275,8 @@ function ChildEditContent() {
             <motion.div key={step} initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} transition={{ duration: 0.25 }}>
               {step === 0 && <StepBasic data={basicData} onChange={setBasicData} />}
               {step === 1 && <StepSchool data={schoolData} onChange={setSchoolData} schools={schools} />}
-              {step === 2 && <StepSchedule data={scheduleData} onChange={setScheduleData} />}
-              {step === 3 && <StepHealth data={healthData} onChange={setHealthData} />}
+              {step === 2 && <StepHealth data={healthData} onChange={setHealthData} />}
+              {step === 3 && <StepSchedule data={scheduleData} onChange={setScheduleData} />}
             </motion.div>
           </AnimatePresence>
         </motion.div>

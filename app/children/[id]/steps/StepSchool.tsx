@@ -1,55 +1,6 @@
 'use client'
-import React, { useState } from 'react'
-import { motion } from 'framer-motion'
+import React from 'react'
 import { THEME } from '@/app/_shared/_constants/theme'
-
-const DAYS = [
-  { key: 'mon', label: '周一' },
-  { key: 'tue', label: '周二' },
-  { key: 'wed', label: '周三' },
-  { key: 'thu', label: '周四' },
-  { key: 'fri', label: '周五' },
-]
-
-const ACTIVITY_TYPES = [
-  { value: 'tutor', label: '补习课' },
-  { value: 'sport', label: '体育运动' },
-  { value: 'activity', label: '兴趣班' },
-  { value: 'other', label: '其他' },
-]
-
-// ── 清迈医院预设列表 ──
-const PRESET_HOSPITALS = [
-  { category: '综合国际医院', hospitals: [
-    { name: '清迈曼谷医院 (Bangkok Hospital)', phone: '052-089-888' },
-    { name: '清迈兰医院 (Ram Hospital)', phone: '053-920-300' },
-    { name: '兰纳医院 (Lanna Hospital)', phone: '052-134-777' },
-    { name: '麦考密克医院 (McCormick)', phone: '053-921-777' },
-    { name: 'Rajavej 医院', phone: '052-011-999' },
-    { name: 'Sriphat 医疗中心 (清大附属)', phone: '053-936-900' },
-  ]},
-  { category: '牙科诊所', hospitals: [
-    { name: 'Grace Dental Care', phone: '053-894-568' },
-    { name: 'CIDC 国际牙科中心', phone: '052-089-323' },
-    { name: 'GrandDent Dental', phone: '053-274-420' },
-    { name: 'Kitcha Dental', phone: '053-202-011' },
-    { name: 'Dental 4 U', phone: '086-431-3711' },
-    { name: 'Elite Smile Dental', phone: '053-288-199' },
-  ]},
-  { category: '眼科', hospitals: [
-    { name: '圣彼得眼科医院', phone: '053-225-011' },
-    { name: 'CMES 清大专家诊所', phone: '090-670-1719' },
-    { name: 'Darin Eye Center', phone: '052-005-552' },
-    { name: '兰医院眼科中心', phone: '053-920-300' },
-    { name: 'Sriphat 眼科中心', phone: '053-936-948' },
-  ]},
-]
-
-// ── 健康选项 ──
-const BLOOD_TYPES = ['不知道', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-']
-const ALLERGY_OPTIONS = ['无', '青霉素', '头孢', '阿司匹林', '花生', '海鲜', '牛奶', '鸡蛋', '尘螨', '花粉', '猫狗毛', '乳胶', '其他']
-const CONDITION_OPTIONS = ['无', '哮喘', '湿疹', '过敏性鼻炎', '糖尿病', '癫痫', '心脏病', '其他']
-const MEDICATION_OPTIONS = ['无', '哮喘喷雾', '过敏药', '退烧药备用', '维生素', '其他']
 
 function Field({ label, value, onChange, placeholder, type = 'text' }: {
   label: string; value: string; onChange: (v: string) => void
@@ -79,51 +30,6 @@ function SelectField({ label, value, onChange, options }: {
   )
 }
 
-// ── 多选标签组件 ──
-function MultiSelect({ label, options, selected, onChange }: {
-  label: string
-  options: string[]
-  selected: string[]
-  onChange: (v: string[]) => void
-}) {
-  const [customInput, setCustomInput] = useState('')
-  const showCustom = selected.includes('其他')
-
-  const toggle = (opt: string) => {
-    if (opt === '无') { onChange(['无']); return }
-    const without = selected.filter(s => s !== '无')
-    if (without.includes(opt)) {
-      const next = without.filter(s => s !== opt)
-      onChange(next.length ? next : ['无'])
-    } else {
-      onChange([...without, opt])
-    }
-  }
-
-  return (
-    <div style={{ marginBottom: 16 }}>
-      <div style={{ fontSize: 12, color: THEME.muted, fontWeight: 700, marginBottom: 8, letterSpacing: '0.08em' }}>{label}</div>
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-        {options.map(opt => {
-          const isSelected = selected.includes(opt)
-          return (
-            <motion.div key={opt} whileTap={{ scale: 0.92 }} onClick={() => toggle(opt)}
-              style={{ padding: '7px 14px', borderRadius: 20, fontSize: 13, cursor: 'pointer', background: isSelected ? 'rgba(164,99,85,0.15)' : 'rgba(255,255,255,0.6)', border: isSelected ? `1.5px solid ${THEME.gold}` : '1px solid rgba(0,0,0,0.1)', color: isSelected ? THEME.gold : THEME.text, fontWeight: isSelected ? 600 : 400 }}>
-              {opt}
-            </motion.div>
-          )
-        })}
-      </div>
-      {showCustom && (
-        <input value={customInput} onChange={e => setCustomInput(e.target.value)}
-          placeholder="请描述具体情况…"
-          style={{ width: '100%', marginTop: 8, padding: '10px 14px', borderRadius: 10, border: '1px solid rgba(0,0,0,0.1)', background: 'rgba(255,255,255,0.65)', fontSize: 13, outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit' }} />
-      )}
-    </div>
-  )
-}
-
-// ── Step 0：基本信息 ──
 function StepSchool({ data, onChange, schools }: { data: any; onChange: (d: any) => void; schools: any[] }) {
   return (
     <div>
@@ -179,7 +85,5 @@ function StepSchool({ data, onChange, schools }: { data: any; onChange: (d: any)
     </div>
   )
 }
-
-// ── Step 2：课程表 ──
 
 export { StepSchool }
