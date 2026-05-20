@@ -185,3 +185,23 @@ img {
   animation: breathThree 14s ease-in-out infinite !important;
   animation-delay: 2.5s !important;
 }
+
+/* 全局安全区域适配 */
+.page-container {
+  padding-bottom: calc(80px + max(env(safe-area-inset-bottom), 20px));
+}
+
+.page-container-dark {
+  padding-bottom: calc(80px + max(env(safe-area-inset-bottom), 20px));
+  background-color: #0a0d14;
+}
+
+.fixed-bottom {
+  bottom: max(env(safe-area-inset-bottom), 0px);
+}
+
+@supports (height: 100dvh) {
+  .full-height {
+    height: 100dvh;
+  }
+}

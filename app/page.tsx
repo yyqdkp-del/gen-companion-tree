@@ -383,7 +383,7 @@ export default function BasePage() {
       position: 'fixed',
       inset: 0,
       width: '100vw',
-      height: '100vh',
+      height: '100dvh',
       overflow: 'hidden',
       backgroundColor: '#fbf9f6',
       backgroundImage: `

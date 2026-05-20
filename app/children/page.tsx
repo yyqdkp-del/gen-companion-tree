@@ -1,6 +1,7 @@
 'use client'
 import React, { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import { NAV_HEIGHT_CSS, STICKY_HEADER_PADDING_TOP } from '@/app/_shared/_constants/layout'
 import { createClient } from '@/lib/supabase/client'
 import { motion } from 'framer-motion'
 import { Plus, ChevronRight, Check } from 'lucide-react'
@@ -105,10 +106,10 @@ export default function ChildrenPage() {
   }
 
   return (
-    <main style={{ minHeight: '100dvh', backgroundColor: PAGE.bg, fontFamily: "'Noto Sans SC', sans-serif" }}>
+    <main style={{ minHeight: '100dvh', backgroundColor: PAGE.bg, fontFamily: "'Noto Sans SC', sans-serif", paddingBottom: NAV_HEIGHT_CSS }}>
 
       {/* 顶部 */}
-      <motion.div style={{ position: 'sticky', top: 0, zIndex: 50, ...GLASS_CARD, borderRadius: 0, borderLeft: 'none', borderRight: 'none', borderTop: 'none', padding: '16px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+      <motion.div style={{ position: 'sticky', top: 0, zIndex: 50, ...GLASS_CARD, borderRadius: 0, borderLeft: 'none', borderRight: 'none', borderTop: 'none', padding: `${STICKY_HEADER_PADDING_TOP} 20px 16px`, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <button onClick={() => router.back()} style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', color: PAGE.ink }}>←</button>
         <span style={{ fontSize: 16, fontWeight: 700, color: PAGE.ink, fontFamily: "'Noto Serif SC', serif" }}>孩子资料</span>
         <div style={{ width: 28 }} />

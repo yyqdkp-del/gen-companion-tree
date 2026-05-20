@@ -15,6 +15,7 @@ import WritingResult from './components/WritingResult'
 import SmartQuickChars from './components/SmartQuickChars'
 import TabBar, { type TabType } from './components/TabBar'
 import { track } from '@/lib/analytics/track'
+import { SAFE_BOTTOM_INSET, STICKY_HEADER_PADDING_TOP } from '@/app/_shared/_constants/layout'
 
 const supabase = createClient()
 
@@ -204,7 +205,7 @@ export default function DecodePage() {
     radial-gradient(at 20% 90%, rgba(245,214,209,0.2) 0px, transparent 50%)
   `,
       fontFamily: "'Noto Serif SC', Georgia, serif",
-      paddingBottom: 80,
+      paddingBottom: `calc(${SAFE_BOTTOM_INSET} + 24px)`,
     }}>
 
       {/* 顶部导航 */}
@@ -213,7 +214,7 @@ export default function DecodePage() {
         backdropFilter: 'blur(20px)',
         WebkitBackdropFilter: 'blur(20px)',
         borderBottom: '1px solid rgba(45,50,47,0.06)',
-        padding: '12px 16px',
+        padding: `${STICKY_HEADER_PADDING_TOP} 16px 12px`,
         display: 'flex',
         alignItems: 'center',
         position: 'sticky',

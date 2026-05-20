@@ -806,7 +806,7 @@ function AcademicContent() {
   ]
 
   return (
-    <main style={{ minHeight: '100dvh', background: T.bg, fontFamily: "'Noto Sans SC', sans-serif", paddingBottom: 80 }}>
+    <main style={{ minHeight: '100dvh', background: T.bg, fontFamily: "'Noto Sans SC', sans-serif", paddingBottom: 'max(env(safe-area-inset-bottom), 20px)' }}>
       <div style={{ position: 'sticky', top: 0, zIndex: 50, background: 'rgba(15,26,20,0.94)', backdropFilter: 'blur(24px)', borderBottom: `1px solid ${T.border}` }}>
         <div style={{ maxWidth: 560, margin: '0 auto', padding: '14px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <motion.button whileTap={{ scale: 0.9 }} onClick={() => router.back()}

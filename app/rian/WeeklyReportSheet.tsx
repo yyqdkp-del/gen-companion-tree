@@ -107,7 +107,7 @@ export default function WeeklyReportSheet({ childId, childName, onClose }: Props
           margin: '0 10px',
           background: 'rgba(255,255,255,0.94)',
           backdropFilter: 'blur(40px)',
-          borderRadius: 22,
+          borderRadius: '24px 24px 0 0',
           overflow: 'hidden',
           maxHeight: '82vh',
           display: 'flex',

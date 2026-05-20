@@ -12,6 +12,7 @@ import { StepSchool }   from './steps/StepSchool'
 import { StepSchedule } from './steps/StepSchedule'
 import { StepHealth }   from './steps/StepHealth'
 import { logOrAlertNetworkError } from '@/lib/errors/logOrAlertNetworkError'
+import { SAFE_BOTTOM_INSET } from '@/app/_shared/_constants/layout'
 
 const GLASS_CARD: React.CSSProperties = {
   background: 'rgba(255,255,255,0.8)',
@@ -234,7 +235,7 @@ function ChildEditContent() {
   return (
     <main style={{ height: 'var(--vh, 100dvh)', overflow: 'hidden', display: 'flex', flexDirection: 'column', backgroundColor: PAGE.bg, fontFamily: "'Noto Sans SC', sans-serif" }}>
 
-      <div style={{ position: 'sticky', top: 0, zIndex: 50, ...GLASS_CARD, borderRadius: 0, borderLeft: 'none', borderRight: 'none', borderTop: 'none', padding: '14px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+      <div style={{ position: 'sticky', top: 0, zIndex: 50, ...GLASS_CARD, borderRadius: 0, borderLeft: 'none', borderRight: 'none', borderTop: 'none', padding: 'calc(14px + env(safe-area-inset-top)) 16px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <motion.button whileTap={{ scale: 0.9 }}
           onClick={() => step > 0 ? setStep(step - 1) : router.back()}
           style={{ background: 'none', border: 'none', cursor: 'pointer', color: PAGE.ink, padding: '4px' }}>
@@ -283,7 +284,7 @@ function ChildEditContent() {
           </div>
         )}
       
-        <div style={{ display: 'flex', gap: 10, paddingBottom: 40 }}>
+        <div style={{ display: 'flex', gap: 10, paddingBottom: `calc(${SAFE_BOTTOM_INSET} + 20px)` }}>
           {isLastStep ? (
             <>
               <motion.button whileTap={{ scale: 0.97 }} onClick={() => setStep(step - 1)}

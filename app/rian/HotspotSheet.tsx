@@ -229,7 +229,7 @@ export default function HotspotSheet({ hotspots, onClose, onPatrol, patrolling, 
           onClick={e => e.stopPropagation()}
           style={{ width: '100%', maxWidth: 430, margin: '0 10px',
             background: 'rgba(255,255,255,0.94)', backdropFilter: 'blur(40px)',
-            borderRadius: 22, overflow: 'hidden',
+            borderRadius: '24px 24px 0 0', overflow: 'hidden',
             maxHeight: '82vh', display: 'flex', flexDirection: 'column' }}>
 
           <div style={{ height: 4, flexShrink: 0,

@@ -2,6 +2,7 @@
 
 import { BookOpen, Camera, FileText, Sparkles } from 'lucide-react'
 import { CHINESE_THEME as T } from '@/app/_shared/_constants/chineseTheme'
+import { NAV_HEIGHT_CSS, PAGE_TOP_PADDING } from '@/app/_shared/_constants/layout'
 
 const GLASS_CARD: React.CSSProperties = {
   background: 'rgba(255,255,255,0.8)',
@@ -15,8 +16,8 @@ const GLASS_CARD: React.CSSProperties = {
 export default function SchoolPage() {
   return (
     <main style={{
-      minHeight: '100vh',
-      padding: '56px 20px 140px',
+      minHeight: '100dvh',
+      padding: `${PAGE_TOP_PADDING} 20px ${NAV_HEIGHT_CSS}`,
       backgroundColor: T.bg,
       backgroundImage: `
         radial-gradient(at 80% 10%, rgba(228,237,228,0.35) 0px, transparent 50%),

@@ -113,7 +113,7 @@ export default function GrowthPage() {
         onClick={() => router.push('/learn')}
         style={{
           position: 'absolute',
-          left: '50%', top: '62vh',
+          left: '50%', top: 'min(56vh, calc(100dvh - 180px))',
           transform: 'translateX(-50%)',
           zIndex: 50,
           background: 'rgba(255,255,255,0.8)',

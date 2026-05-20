@@ -155,6 +155,8 @@ export default function KapokTreeholePage() {
         .kapok-page {
           position: fixed;
           inset: 0;
+          height: 100dvh;
+          height: var(--vh, 100dvh);
           display: flex;
           flex-direction: column;
           overflow: hidden;
@@ -183,7 +185,7 @@ export default function KapokTreeholePage() {
           display: grid;
           grid-template-columns: 44px 1fr 44px;
           align-items: center;
-          padding: 48px 18px 18px;
+          padding: max(48px, calc(env(safe-area-inset-top) + 16px)) 18px 18px;
           border-bottom: 1px solid rgba(255, 224, 178, 0.08);
           background: linear-gradient(to bottom, rgba(10, 13, 20, 0.86), rgba(10, 13, 20, 0.18));
           backdrop-filter: blur(18px);
@@ -231,7 +233,7 @@ export default function KapokTreeholePage() {
           z-index: 1;
           flex: 1;
           overflow-y: auto;
-          padding: 22px 18px 18px;
+          padding: 22px 18px max(24px, calc(env(safe-area-inset-bottom) + 12px));
           scrollbar-width: none;
         }
 
@@ -298,7 +300,7 @@ export default function KapokTreeholePage() {
           position: relative;
           z-index: 1;
           flex-shrink: 0;
-          padding: 14px 16px 28px;
+          padding: 14px 16px max(28px, calc(env(safe-area-inset-bottom) + 16px));
           background: linear-gradient(to top, rgba(10, 13, 20, 0.96), rgba(10, 13, 20, 0));
         }
 

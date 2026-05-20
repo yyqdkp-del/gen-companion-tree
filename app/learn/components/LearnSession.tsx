@@ -1291,7 +1291,7 @@ export default function LearnSession({
         backdropFilter: 'blur(20px)',
         WebkitBackdropFilter: 'blur(20px)',
         borderBottom: '1px solid rgba(45,50,47,0.06)',
-        padding: '12px 16px',
+        padding: 'calc(12px + env(safe-area-inset-top)) 16px 12px',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',

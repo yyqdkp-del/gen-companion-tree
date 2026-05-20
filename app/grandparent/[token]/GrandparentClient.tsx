@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { SAFE_BOTTOM_INSET, PAGE_TOP_PADDING } from '@/app/_shared/_constants/layout'
 
 type ReportRow = {
   week_start: string
@@ -45,19 +46,19 @@ export default function GrandparentClient({
 
   return (
     <div style={{
-      minHeight: '100vh',
+      minHeight: '100dvh',
       background: '#fbf9f6',
       backgroundImage: `
         radial-gradient(at 80% 20%, rgba(245,214,209,0.3) 0px, transparent 50%),
         radial-gradient(at 20% 80%, rgba(217,230,218,0.2) 0px, transparent 50%)
       `,
       fontFamily: "'Noto Serif SC', serif",
-      padding: '20px 16px 40px',
+      padding: `${PAGE_TOP_PADDING} 16px calc(${SAFE_BOTTOM_INSET} + 24px)`,
       maxWidth: 480,
       margin: '0 auto',
     }}>
 
-      <div style={{ textAlign: 'center', marginBottom: 32, paddingTop: 20 }}>
+      <div style={{ textAlign: 'center', marginBottom: 32 }}>
         <div style={{ fontSize: 48, marginBottom: 12 }}>{childEmoji}</div>
         <div style={{
           fontSize: 22,

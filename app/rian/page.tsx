@@ -9,6 +9,7 @@ import {
 } from 'lucide-react'
 import nextDynamic from 'next/dynamic'
 import { THEME, URGENCY_COLOR, URGENCY_BORDER } from '@/app/_shared/_constants/theme'
+import { SAFE_AREA_TOP } from '@/app/_shared/_constants/layout'
 import { DROP_ANIM, POSITIONS } from '@/app/_shared/_constants/animations'
 import { getCategoryIcon } from '@/app/_shared/_constants/categories'
 import { useTodoActions } from '@/app/_shared/_hooks/useTodoActions'
@@ -166,7 +167,7 @@ const reminders = useMemo<Reminder[]>(() => {
       position: 'fixed',
       inset: 0,
       width: '100vw',
-      height: '100vh',
+      height: '100dvh',
       backgroundColor: '#fbf9f6',
       backgroundImage: `
         radial-gradient(at 90% 10%, rgba(245,214,209,0.2) 0px, transparent 50%),
@@ -185,7 +186,7 @@ const reminders = useMemo<Reminder[]>(() => {
       </div>
 
       {/* 左上角：孩子头像 */}
-      <div style={{ position: 'absolute', top: '5%', left: '5%', zIndex: 100 }}>
+      <div style={{ position: 'absolute', top: `calc(${SAFE_AREA_TOP} + 5%)`, left: '5%', zIndex: 100 }}>
         <motion.div
           onClick={() => setShowFamilyMenu(!showFamilyMenu)}
           animate={{ boxShadow: [`0 0 15px ${getEnergyColor(currentChild?.energy ?? 75)}40`, `0 0 35px ${getEnergyColor(currentChild?.energy ?? 75)}80`, `0 0 15px ${getEnergyColor(currentChild?.energy ?? 75)}40`] }}
@@ -226,7 +227,7 @@ const reminders = useMemo<Reminder[]>(() => {
       </AnimatePresence>
 
       {/* 右上角：时间 */}
-     <header style={{ position: 'absolute', top: '5%', right: '5%', zIndex: 50, textAlign: 'right' }}>
+     <header style={{ position: 'absolute', top: `calc(${SAFE_AREA_TOP} + 5%)`, right: '5%', zIndex: 50, textAlign: 'right' }}>
   <h1 style={{ fontSize: 'clamp(48px, 14vw, 72px)', fontWeight: 100, color: THEME.text, opacity: 0.9, lineHeight: 1, margin: 0 }}>
     {mounted ? `${time.getHours()}:${time.getMinutes() < 10 ? `0${time.getMinutes()}` : time.getMinutes()}` : '--:--'}
   </h1>
@@ -331,7 +332,7 @@ const reminders = useMemo<Reminder[]>(() => {
       </AnimatePresence>
 
       {/* 跨代成长周报卡片（文档流，位于水珠区域上方） */}
-      <div style={{ position: 'relative', zIndex: 25, margin: '28vh 5% 0' }}>
+      <div style={{ position: 'relative', zIndex: 25, margin: 'min(28vh, calc(22vh + env(safe-area-inset-top))) 5% 0' }}>
         {currentChild && (
           <div
             role="button"

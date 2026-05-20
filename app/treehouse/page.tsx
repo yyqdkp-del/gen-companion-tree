@@ -320,7 +320,7 @@ export default function TreehousePage() {
       <main style={{
         position: 'fixed',
         inset: 0,
-        minHeight: '100vh',
+        minHeight: '100dvh',
         backgroundColor: '#0a0d14',
         backgroundImage: `
           radial-gradient(at 50% 0%, rgba(245,214,209,0.06) 0px, transparent 40%),
@@ -407,7 +407,7 @@ export default function TreehousePage() {
       style={{
         position: 'fixed',
         inset: 0,
-        minHeight: '100vh',
+        minHeight: '100dvh',
         backgroundColor: '#0a0d14',
         backgroundImage: `
           radial-gradient(at 50% 0%, rgba(245,214,209,0.06) 0px, transparent 40%),

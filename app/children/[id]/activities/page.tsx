@@ -388,7 +388,7 @@ function ActivitiesContent() {
     .reduce((sum, a) => sum + (a.monthly_fee || 0), 0)
 
   return (
-    <main style={{ minHeight: '100dvh', background: THEME.bg, fontFamily: "'Noto Sans SC', sans-serif", paddingBottom: 80 }}>
+    <main style={{ minHeight: '100dvh', background: THEME.bg, fontFamily: "'Noto Sans SC', sans-serif", paddingBottom: 'max(env(safe-area-inset-bottom), 20px)' }}>
 
       {/* 顶部 */}
       <div style={{ position: 'sticky', top: 0, zIndex: 50, background: 'rgba(167,215,217,0.85)', backdropFilter: 'blur(20px)', padding: '14px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.3)' }}>

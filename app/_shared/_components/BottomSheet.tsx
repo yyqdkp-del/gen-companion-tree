@@ -29,7 +29,8 @@ export default function BottomSheet({ children, onClose, title, zIndex = 300 }: 
         style={{
           width: '100%', maxWidth: 480,
           background: 'rgba(255,255,255,0.93)', backdropFilter: 'blur(40px)',
-          borderRadius: '28px 28px 0 0', maxHeight: '88vh', overflowY: 'auto',
+          borderRadius: '24px 24px 0 0', maxHeight: '88vh', overflowY: 'auto',
+          paddingBottom: 'max(env(safe-area-inset-bottom), 0px)',
           boxShadow: '0 -10px 60px rgba(0,0,0,0.14)',
         }}
       >

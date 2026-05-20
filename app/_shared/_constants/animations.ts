@@ -8,15 +8,16 @@ export const DROP_ANIM = [
   { duration: 7.8, delay: 1.9, yRange: 11, xRange: 5, rotate: 1.8 },
 ] as const
 
+// top 上限约 55%，避免与底部导航（~110px）重叠
 export const POSITIONS = [
-  { top: '25%', left: '8%'   },
-  { top: '22%', right: '8%'  },
-  { top: '38%', left: '55%'  },
-  { top: '45%', left: '15%'  },
-  { top: '52%', right: '12%' },
-  { top: '60%', left: '40%'  },
-  { top: '65%', right: '45%' },
-  { top: '35%', left: '30%'  },
-  { top: '70%', left: '10%'  },
-  { top: '58%', right: '55%' },
+  { top: '22%', left: '8%'   },
+  { top: '20%', right: '8%'  },
+  { top: '32%', left: '55%'  },
+  { top: '38%', left: '15%'  },
+  { top: '44%', right: '12%' },
+  { top: '48%', left: '40%'  },
+  { top: '52%', right: '45%' },
+  { top: '30%', left: '30%'  },
+  { top: '55%', left: '10%'  },
+  { top: '46%', right: '55%' },
 ] as const

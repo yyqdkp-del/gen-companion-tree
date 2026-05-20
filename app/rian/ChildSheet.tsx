@@ -348,7 +348,7 @@ export default function ChildSheet({ children, sel, onSel, onClose, onAdd, userI
           onClick={e => e.stopPropagation()}
           style={{ width: '100%', maxWidth: 430, margin: '0 10px',
             background: 'rgba(255,255,255,0.95)', backdropFilter: 'blur(40px)',
-            borderRadius: 22, overflow: 'hidden',
+            borderRadius: '24px 24px 0 0', overflow: 'hidden',
             maxHeight: '88vh', display: 'flex', flexDirection: 'column' }}>
 
           <div style={{ height: 4, background: 'linear-gradient(90deg,#cddce5,#e8e4dc)', flexShrink: 0 }} />

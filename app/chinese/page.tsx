@@ -261,7 +261,7 @@ export default function ChinesePage() {
 
   // ── 问卷页 ──
   if (phase === 'quiz') return (
-    <main style={{ minHeight:'100dvh', background: THEME.bg, fontFamily:"'Noto Sans SC', sans-serif", paddingBottom:'60px' }}>
+    <main style={{ minHeight:'100dvh', background: THEME.bg, fontFamily:"'Noto Sans SC', sans-serif", paddingBottom:'max(env(safe-area-inset-bottom), 20px)' }}>
 
       <div style={{ background: THEME.navy, padding:'14px 20px', display:'flex', alignItems:'center' }}>
         <span style={{ fontFamily:"'Noto Serif SC', serif", fontSize:'18px', fontWeight:700, color:'#fff', letterSpacing:'2px' }}>根·中文</span>
@@ -388,7 +388,7 @@ export default function ChinesePage() {
   const childName = answers['q0'] || ''
 
   return (
-    <main style={{ minHeight:'100dvh', background: THEME.bg, fontFamily:"'Noto Sans SC', sans-serif", paddingBottom:'60px' }}>
+    <main style={{ minHeight:'100dvh', background: THEME.bg, fontFamily:"'Noto Sans SC', sans-serif", paddingBottom:'max(env(safe-area-inset-bottom), 20px)' }}>
       <div style={{ background: THEME.navy, padding:'14px 20px', display:'flex', alignItems:'center' }}>
         <span style={{ fontFamily:"'Noto Serif SC', serif", fontSize:'18px', fontWeight:700, color:'#fff', letterSpacing:'2px' }}>根·中文</span>
         <span style={{ fontSize:'11px', color:'rgba(255,255,255,0.55)', marginLeft:'auto' }}>专属报告</span>
