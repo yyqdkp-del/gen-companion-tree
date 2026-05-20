@@ -51,16 +51,39 @@ export function WordPopup({ word, onClose, childLevel }: {
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-      style={{ position: 'fixed', inset: 0, background: 'rgba(26,18,8,0.5)', zIndex: 300,
-        display: 'flex', alignItems: 'flex-end', justifyContent: 'center', padding: '0 0 80px' }}
+      style={{
+        position: 'fixed',
+        inset: 0,
+        background: 'rgba(45,50,47,0.4)',
+        backdropFilter: 'blur(8px)',
+        zIndex: 200,
+      }}
       onClick={onClose}>
       <motion.div initial={{ y: 60, opacity: 0 }} animate={{ y: 0, opacity: 1 }}
         exit={{ y: 60, opacity: 0 }}
         transition={{ type: 'spring', damping: 28, stiffness: 300 }}
-        style={{ background: T.white, borderRadius: 20, padding: '20px', width: '100%',
-          maxWidth: 440, margin: '0 16px', maxHeight: '70vh', overflowY: 'auto',
-          boxShadow: '0 -8px 40px rgba(26,18,8,0.12)' }}
+        style={{
+          position: 'fixed',
+          bottom: 0,
+          left: 0,
+          right: 0,
+          maxWidth: 520,
+          margin: '0 auto',
+          background: '#fbf9f6',
+          borderRadius: '24px 24px 0 0',
+          padding: '20px 20px 40px',
+          maxHeight: '75vh',
+          overflowY: 'auto',
+          boxShadow: '0 -8px 40px rgba(45,50,47,0.12)',
+        }}
         onClick={e => e.stopPropagation()}>
+        <div style={{
+          width: 36,
+          height: 4,
+          background: 'rgba(45,50,47,0.15)',
+          borderRadius: 2,
+          margin: '0 auto 20px',
+        }} />
         <div style={{ display: 'flex', justifyContent: 'space-between',
           alignItems: 'center', marginBottom: 14 }}>
           <div style={{ fontSize: 32, fontFamily: "'Noto Serif SC', serif",

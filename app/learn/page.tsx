@@ -420,7 +420,16 @@ export default function DecodePage() {
 
         {/* 错误 */}
         {error && (
-          <div style={{ background: '#FFF0EE', border: `1px solid ${THEME.red}`, borderRadius: 12, padding: '11px 14px', color: THEME.red, fontSize: 13, marginBottom: 10, fontFamily: 'sans-serif' }}>
+          <div style={{
+            background: 'rgba(164,99,85,0.06)',
+            border: '1px solid rgba(164,99,85,0.2)',
+            borderRadius: 14,
+            padding: '11px 14px',
+            color: '#a46355',
+            fontSize: 13,
+            marginBottom: 10,
+            fontFamily: 'sans-serif',
+          }}>
             ⚠️ {error}
           </div>
         )}
@@ -469,11 +478,34 @@ export default function DecodePage() {
 
               <div style={{ display: 'flex', gap: 10, marginTop: 4, marginBottom: 20 }}>
                 <motion.button whileTap={{ scale: 0.97 }} onClick={() => router.push('/')}
-                  style={{ flex: 1, padding: 13, background: THEME.red, color: '#fff', border: 'none', borderRadius: 14, fontSize: 14, fontWeight: 700, cursor: 'pointer', fontFamily: "'Noto Serif SC', serif", boxShadow: '0 4px 16px rgba(192,57,43,0.25)' }}>
+                  style={{
+                    flex: 1,
+                    padding: 14,
+                    background: '#a46355',
+                    color: '#fff',
+                    border: 'none',
+                    borderRadius: 16,
+                    fontSize: 14,
+                    fontWeight: 500,
+                    cursor: 'pointer',
+                    fontFamily: "'Noto Serif SC', serif",
+                    letterSpacing: '0.05em',
+                    boxShadow: '0 4px 16px rgba(164,99,85,0.25)',
+                  }}>
                   回到根·陪伴 →
                 </motion.button>
                 <motion.button whileTap={{ scale: 0.97 }} onClick={() => { setData(null); setInput('') }}
-                  style={{ flex: 1, padding: 13, background: 'transparent', color: THEME.textDim, border: `1px solid rgba(200,160,96,0.3)`, borderRadius: 14, fontSize: 13, cursor: 'pointer', fontFamily: 'sans-serif' }}>
+                  style={{
+                    flex: 1,
+                    padding: 14,
+                    background: 'transparent',
+                    color: 'rgba(45,50,47,0.5)',
+                    border: '1px solid rgba(45,50,47,0.1)',
+                    borderRadius: 16,
+                    fontSize: 13,
+                    cursor: 'pointer',
+                    fontFamily: 'sans-serif',
+                  }}>
                   再学一个
                 </motion.button>
               </div>

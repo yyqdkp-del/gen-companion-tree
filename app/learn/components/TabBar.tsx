@@ -1,7 +1,6 @@
 'use client'
 import React from 'react'
 import { motion } from 'framer-motion'
-import { CHINESE_THEME as T } from '@/app/_shared/_constants/chineseTheme'
 
 export type TabType = 'hanzi' | 'chengyu' | 'writing'
 
@@ -18,20 +17,48 @@ export default function TabBar({ active, onChange }: Props) {
   ]
 
   return (
-    <div style={{ display: 'flex', gap: 6, marginBottom: 14 }}>
-      {tabs.map(t => (
-        <motion.button key={t.key} whileTap={{ scale: 0.95 }}
-          onClick={() => onChange(t.key)}
-          style={{ flex: 1, padding: '10px 6px', borderRadius: 12, border: 'none',
-            background: active === t.key ? T.red : 'rgba(192,57,43,0.06)',
-            color: active === t.key ? '#fff' : T.textMid,
-            fontSize: 12, fontWeight: 700, cursor: 'pointer',
-            fontFamily: "'Noto Sans SC', sans-serif", transition: 'all 0.2s',
-            boxShadow: active === t.key ? '0 4px 12px rgba(192,57,43,0.25)' : 'none' }}>
-          <div style={{ fontSize: 18, marginBottom: 3 }}>{t.emoji}</div>
-          <div>{t.label}</div>
-        </motion.button>
-      ))}
+    <div style={{
+      display: 'flex',
+      gap: 4,
+      background: 'rgba(45,50,47,0.05)',
+      borderRadius: 24,
+      padding: '4px',
+      marginBottom: 14,
+    }}>
+      {tabs.map(t => {
+        const isActive = active === t.key
+        return (
+          <motion.button key={t.key} whileTap={{ scale: 0.95 }}
+            onClick={() => onChange(t.key)}
+            style={{
+              flex: 1,
+              ...(isActive ? {
+                background: '#a46355',
+                color: '#ffffff',
+                borderRadius: 20,
+                border: 'none',
+                fontFamily: "'Noto Serif SC', serif",
+                fontSize: 13,
+                fontWeight: 500,
+                letterSpacing: '0.05em',
+                padding: '7px 18px',
+                boxShadow: '0 4px 12px rgba(164,99,85,0.25)',
+              } : {
+                background: 'transparent',
+                color: 'rgba(45,50,47,0.5)',
+                borderRadius: 20,
+                border: 'none',
+                fontFamily: 'sans-serif',
+                fontSize: 13,
+                padding: '7px 18px',
+                cursor: 'pointer',
+              }),
+            }}>
+            <div style={{ fontSize: 18, marginBottom: 3 }}>{t.emoji}</div>
+            <div>{t.label}</div>
+          </motion.button>
+        )
+      })}
     </div>
   )
 }
