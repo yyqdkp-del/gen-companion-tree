@@ -20,7 +20,7 @@ import { useApp } from '@/app/context/AppContext'
 import TodoSheet from '@/app/rian/TodoSheet'
 import { THEME } from '@/app/_shared/_constants/theme'
 import WaterDrop from '@/app/_shared/_components/WaterDrop'
-import type { Child, TodoItem, HotspotItem } from '@/app/_shared/_types'
+import type { TodoItem, HotspotItem } from '@/app/_shared/_types'
 import { useChildData } from '@/app/_shared/_hooks/useChildData'
 import { useTodoActions } from '@/app/_shared/_hooks/useTodoActions'
 import { useTodoEngine } from '@/app/_shared/_hooks/useTodoEngine'
@@ -57,19 +57,6 @@ function dropState(type: string, data: any) {
     if (data.urgent_items?.some((i: UrgentItem) => i.level === 'red')) return 'red'
     if (data.urgent_items?.some((i: UrgentItem) => i.level === 'orange')) return 'orange'
     if (data.urgent_items?.length) return 'yellow'
-    return 'calm'
-  }
-  if (type === 'todo') {
-    if (!data?.length) return 'calm'
-    if (data.some((t: TodoItem) => t.priority === 'red')) return 'red'
-    if (data.some((t: TodoItem) => t.priority === 'orange')) return 'orange'
-    if (data.some((t: TodoItem) => t.priority === 'yellow')) return 'yellow'
-    return 'calm'
-  }
-  if (type === 'hotspot') {
-    if (!data?.length) return 'calm'
-    if (data.some((h: HotspotItem) => h.urgency === 'urgent')) return 'red'
-    if (data.some((h: HotspotItem) => h.urgency === 'important')) return 'orange'
     return 'calm'
   }
   return 'calm'
@@ -374,10 +361,54 @@ export default function BasePage() {
 
   // 孩子水珠状态来自 dropState；待办/热点状态来自 todoEngine/hotspotEngine
   const childState = dropState('child', activeKid)
-  const redCount = todos.filter((t: TodoItem) => t.priority === 'red').length
-  const unread = hotspots.filter((h: HotspotItem) => h.status === 'unread').length
-  const childUrgent = (activeKid?.urgent_items || [])
-    .filter((i: { level: string }) => i.level === 'red').length
+  const childUrgent = activeKid?.urgent_items?.filter(
+    (i: UrgentItem) => i.level === 'red' || i.level === 'orange',
+  ).length || 0
+
+  const dayMap: Record<number, string> = { 0: 'sun', 1: 'mon', 2: 'tue', 3: 'wed', 4: 'thu', 5: 'fri', 6: 'sat' }
+  const todayDow = new Date().getDay()
+  const todayKey = dayMap[todayDow]
+  const todayActivities = (activeKid as any)?.activities?.filter((a: any) => {
+    if (a.is_active === false) return false
+    if (Array.isArray(a.days) && a.days.includes(todayKey)) return true
+    if (typeof a.day_of_week === 'number' && a.day_of_week === todayDow) return true
+    if (typeof a.day === 'number' && a.day === todayDow) return true
+    return false
+  }) || []
+
+  const childValue = !activeKid ? '—'
+    : todayActivities.length > 0 ? `${todayActivities[0].name ?? todayActivities[0].title ?? '活动'}`
+      : (activeKid as any).energy != null ? `${(activeKid as any).energy}%`
+        : '—'
+
+  const childSubValue = !activeKid ? ''
+    : todayActivities.length > 0 ? `今天有${todayActivities.length}个活动`
+      : (activeKid as any).school_end_time ? `放学${(activeKid as any).school_end_time}`
+        : ''
+
+  const todayDeadline = todos.filter((t: TodoItem) => {
+    if (t.status === 'done') return false
+    if (!t.due_date) return false
+    const due = new Date(t.due_date)
+    const today = new Date()
+    return due.toDateString() === today.toDateString()
+  }).length
+
+  const todoValue = todayDeadline > 0
+    ? `${todayDeadline}件今日截止`
+    : todoEngine.badge > 0 ? `${todoEngine.badge}条` : '静默'
+
+  const HOTSPOT_URGENCY_RANK: Record<string, number> = { urgent: 0, important: 1, lifestyle: 2 }
+  const topHotspot = [...hotspots]
+    .filter((h: HotspotItem) => h.status === 'unread' || !h.status)
+    .sort((a, b) =>
+      (HOTSPOT_URGENCY_RANK[a.urgency] ?? 2) - (HOTSPOT_URGENCY_RANK[b.urgency] ?? 2),
+    )[0]
+
+  const hotspotValue = patrolling ? '巡逻中'
+    : topHotspot?.title && topHotspot.title.length > 8 ? `${topHotspot.title.slice(0, 8)}…`
+      : topHotspot?.title
+        || (hotspotEngine.badge > 0 ? `${hotspotEngine.badge}条` : '根')
 
   return (
     <main style={{
@@ -463,16 +494,27 @@ export default function BasePage() {
           gap: 'clamp(20px, 5vw, 36px)' }}>
           <div style={{ position: 'relative', display: 'inline-flex', flexDirection: 'column', alignItems: 'center' }}>
             <WaterDrop state={childState} icon={<Heart size={24} />} label="孩子"
-              value={activeKid ? `${activeKid.energy ?? 75}%` : '—'}
+              value={childValue}
               badge={childUrgent} pulse={childUrgent > 0}
               onClick={() => { void track({ event_type: 'droplet_click', meta: { type: 'child' } }); openModal('child') }} size={124} delay={0}
               className="animate-droplet-1" />
+            {childSubValue && (
+              <div style={{
+                fontSize: 10,
+                color: 'rgba(45,50,47,0.5)',
+                fontFamily: 'sans-serif',
+                textAlign: 'center',
+                marginTop: 2,
+                letterSpacing: '0.05em',
+                whiteSpace: 'nowrap',
+              }}
+              >
+                {childSubValue}
+              </div>
+            )}
             {activeKid && (activeKid.total_hanzi ?? 0) > 0 && (
               <div style={{
-                position: 'absolute',
-                bottom: -8,
-                left: '50%',
-                transform: 'translateX(-50%)',
+                marginTop: childSubValue ? 4 : 6,
                 background: '#a46355',
                 color: '#fff',
                 fontSize: 10,
@@ -488,13 +530,13 @@ export default function BasePage() {
           </div>
           <div style={{ display: 'flex', gap: 'clamp(28px, 8vw, 52px)', alignItems: 'center' }}>
             <WaterDrop state={todoEngine.state} icon={<Bell size={20} />} label="待办"
-              value={todoEngine.badge > 0 ? `${todoEngine.badge}条` : '静默'}
+              value={todoValue}
               badge={todoEngine.badge} pulse={todoEngine.badge > 0}
               onClick={() => { void track({ event_type: 'droplet_click', meta: { type: 'todo' } }); openModal('todo') }} size={98} delay={1.8}
               className="animate-droplet-2" />
             <WaterDrop state={hotspotEngine.state}
               icon={patrolling ? <Loader size={20} /> : <Zap size={20} />}
-              label="热点" value={hotspotEngine.badge > 0 ? `${hotspotEngine.badge}条` : '根'}
+              label="热点" value={hotspotValue}
               badge={hotspotEngine.badge} pulse={hotspotEngine.badge > 0}
               onClick={() => { void track({ event_type: 'droplet_click', meta: { type: 'hotspot' } }); openModal('hotspot') }} size={98} delay={3.4}
               className="animate-droplet-3" />

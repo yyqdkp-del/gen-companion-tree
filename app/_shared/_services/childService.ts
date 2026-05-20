@@ -113,7 +113,7 @@ export async function enrichChildren(
 
   const results = await Promise.allSettled(
     childData.map(async (c: any) => {
-      const [logRes, evtRes] = await Promise.allSettled([
+      const [logRes, evtRes, profRes, actsRes] = await Promise.allSettled([
         supabase.from('child_daily_log')
           .select('*').eq('child_id', c.id)
           .eq('user_id', uid).eq('date', today).maybeSingle(),
@@ -123,9 +123,36 @@ export async function enrichChildren(
           .gte('date_start', today)
           .lte('date_start', addDaysStr(new Date(), 7))
           .order('date_start'),
+        supabase.from('child_profiles')
+          .select('activities').eq('child_id', c.id).maybeSingle(),
+        supabase.from('child_activities')
+          .select('name, days, is_active').eq('child_id', c.id).eq('user_id', uid),
       ])
       const log  = logRes.status === 'fulfilled' ? logRes.value.data : null
       const evts = evtRes.status === 'fulfilled' ? (evtRes.value.data || []) : []
+
+      const profileActsRaw =
+        profRes.status === 'fulfilled' ? (profRes.value.data?.activities ?? []) : []
+      const profileActivities = Array.isArray(profileActsRaw) ? profileActsRaw : []
+
+      const normalizeActDays = (raw: unknown): string[] => {
+        if (Array.isArray(raw)) return raw.map(String).filter(Boolean)
+        if (typeof raw === 'string') {
+          try {
+            const j = JSON.parse(raw)
+            return Array.isArray(j) ? j.map(String).filter(Boolean) : []
+          } catch { return [] }
+        }
+        return []
+      }
+      const tableRows = actsRes.status === 'fulfilled' ? (actsRes.value.data || []) : []
+      const tableActivities = tableRows.map((row: any) => ({
+        name: row.name,
+        title: row.name,
+        days: normalizeActDays(row.days),
+        is_active: row.is_active !== false,
+      }))
+      const activities = [...profileActivities, ...tableActivities]
 
       // 推导 urgent_items（按 title+日期去重）
       const todayEvts = evts.filter((e: any) => e.date_start === today)
@@ -187,7 +214,10 @@ export async function enrichChildren(
         energy: energy,
         health_status: log?.health_status || 'normal',
         mood_status: log?.mood_status || 'calm',
-        school_name: c.school_name, grade: c.grade,
+        school_name: c.school_name,
+        grade: c.grade,
+        school_end_time: c.school_end_time ?? null,
+        activities,
         urgent_items,
         today_schedule: todayEvts.map((e: any) => ({
           time: '', title: e.title,

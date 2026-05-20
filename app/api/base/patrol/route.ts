@@ -26,6 +26,50 @@ async function getFamilySnapshot(userId: string) {
   return { children, places, interests, habits }
 }
 
+async function fetchFamilyContextForHotspots(userId: string, locationCityFallback: string) {
+  const { data: profile } = await supabase
+    .from('family_profile')
+    .select('visa_type, member_nationality, resident_city, resident_city_custom')
+    .eq('user_id', userId)
+    .maybeSingle()
+
+  const { data: kids } = await supabase
+    .from('children')
+    .select('name, grade, school_name, languages, passport_expiry, nationality')
+    .eq('user_id', userId)
+    .limit(3)
+
+  const residentDisplay =
+    profile?.resident_city === 'other' && profile?.resident_city_custom?.trim()
+      ? profile.resident_city_custom.trim()
+      : (profile?.resident_city || locationCityFallback)
+
+  const firstLangs = kids?.[0]?.languages as unknown
+  const langLine = Array.isArray(firstLangs) && firstLangs.length
+    ? firstLangs.join('、')
+    : '中文/英文'
+
+  const kidsLine =
+    kids?.length
+      ? kids
+        .map((k: any) => `${k.name}(${k.grade || ''}，就读${k.school_name || '国际学校'})`)
+        .join('、')
+      : '有孩子'
+
+  const passportLine = kids?.some(k => k.passport_expiry)
+    ? `\n- 护照到期提醒：${kids!.filter(k => k.passport_expiry).map(k => `${k.name}护照${k.passport_expiry}`).join('、')}`
+    : ''
+
+  return `
+家庭背景：
+- 居住城市：${residentDisplay}
+- 签证类型：${profile?.visa_type || '未知'}
+- 家长国籍：${profile?.member_nationality || '华人'}
+- 孩子：${kidsLine}
+- 孩子语言：${langLine}${passportLine}
+`.trim()
+}
+
 // ── Grok 实时快数据 ──
 async function callGrok(snapshot: any, location: string, patrolPrompt?: string): Promise<string> {
   const child = snapshot.children?.[0]
@@ -110,7 +154,13 @@ async function callGemini(snapshot: any, location: string, officialSites: string
 }
 
 // ── Claude 整合润色 ──
-async function callClaude(grokData: string, geminiData: string, snapshot: any, location: string): Promise<any[]> {
+async function callClaude(
+  grokData: string,
+  geminiData: string,
+  snapshot: any,
+  location: string,
+  familyContext: string,
+): Promise<any[]> {
   const children = snapshot.children?.map((c: any) => `${c.name}(${c.school_name})`).join('、') || '孩子'
 
   try {
@@ -138,6 +188,8 @@ ${geminiData || '（无数据）'}
 - 地区：${location}
 - 孩子：${children}
 - 关注兴趣：${snapshot.interests?.map((i: any) => i.topic).slice(0, 5).join('、') || '无'}
+
+${familyContext}
 
 要求：
 1. 合并两份数据，去除重复内容
@@ -250,12 +302,13 @@ async function runPatrolForUsers(userIds: string[], patrolTime: string) {
       await archiveOldHotspots(userId)
       const snapshot = await getFamilySnapshot(userId)
 
-      const [grokData, geminiData] = await Promise.all([
+      const [grokData, geminiData, familyContext] = await Promise.all([
         callGrok(snapshot, location, patrolPrompt),
         callGemini(snapshot, location, userLocation.local_config.official_sites),
+        fetchFamilyContextForHotspots(userId, userLocation.city),
       ])
 
-      const hotspots = await callClaude(grokData, geminiData, snapshot, location)
+      const hotspots = await callClaude(grokData, geminiData, snapshot, location, familyContext)
       const saved = await saveHotspots(hotspots, userId, todayYmd)
       if (!saved.ok) {
         console.error('hotspots not saved for user:', userId)
