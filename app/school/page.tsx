@@ -1,8 +1,10 @@
 'use client'
 
-import { BookOpen, Camera, FileText, Sparkles } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { BookOpen, Camera, ChevronDown, FileText, Sparkles } from 'lucide-react'
 import { CHINESE_THEME as T } from '@/app/_shared/_constants/chineseTheme'
 import { NAV_HEIGHT_CSS, PAGE_TOP_PADDING } from '@/app/_shared/_constants/layout'
+import { fetchWithAuth } from '@/lib/auth/fetchWithAuth'
 
 const GLASS_CARD: React.CSSProperties = {
   background: 'rgba(255,255,255,0.8)',
@@ -15,27 +17,34 @@ const GLASS_CARD: React.CSSProperties = {
   marginBottom: 10,
 }
 
-const TAG_URGENT: React.CSSProperties = {
-  background: 'rgba(164,99,85,0.08)',
-  color: '#a46355',
-  border: '1px solid rgba(164,99,85,0.2)',
-  borderRadius: 8,
-  fontSize: 10,
-  fontWeight: 600,
-  padding: '3px 8px',
+type SchoolHistoryRecord = {
+  id: string
+  subject: string | null
+  processed_at: string | null
+  todos_created: number | null
+  events_created?: number | null
+  email_type: string | null
+  source?: string | null
+  from_email?: string | null
 }
 
-const TAG_NORMAL: React.CSSProperties = {
-  background: 'rgba(92,122,94,0.08)',
-  color: '#5c7a5e',
-  border: '1px solid rgba(92,122,94,0.2)',
-  borderRadius: 8,
-  fontSize: 10,
-  fontWeight: 600,
-  padding: '3px 8px',
+const SOURCE_LABELS: Record<string, string> = {
+  school_upload: '拍照 / 上传',
+  make: '邮件同步',
+  mcp_scan: '邮箱扫描',
 }
 
 export default function SchoolPage() {
+  const [history, setHistory] = useState<SchoolHistoryRecord[]>([])
+  const [expandedId, setExpandedId] = useState<string | null>(null)
+
+  useEffect(() => {
+    fetchWithAuth('/api/school/history')
+      .then((r) => r.json())
+      .then((data) => setHistory(data.records || []))
+      .catch(() => {})
+  }, [])
+
   return (
     <main style={{
       minHeight: '100dvh',
@@ -128,6 +137,111 @@ export default function SchoolPage() {
             </div>
           ))}
         </div>
+
+        {history.length > 0 && (
+          <div style={{ marginTop: 24 }}>
+            <div style={{
+              fontSize: 10,
+              letterSpacing: 3,
+              color: '#a46355',
+              marginBottom: 12,
+              fontFamily: 'sans-serif',
+              textTransform: 'uppercase',
+            }}>
+              📋 解析历史
+            </div>
+            {history.map((record) => {
+              const expanded = expandedId === record.id
+              const todos = record.todos_created ?? 0
+              const events = record.events_created ?? 0
+              return (
+                <div
+                  key={record.id}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => setExpandedId(expanded ? null : record.id)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault()
+                      setExpandedId(expanded ? null : record.id)
+                    }
+                  }}
+                  style={{
+                    background: 'rgba(255,255,255,0.8)',
+                    backdropFilter: 'blur(10px)',
+                    borderRadius: 14,
+                    padding: '14px 16px',
+                    marginBottom: 10,
+                    border: '1px solid rgba(255,255,255,0.6)',
+                    boxShadow: '0 4px 16px rgba(45,50,47,0.04)',
+                    cursor: 'pointer',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{
+                        fontSize: 14,
+                        fontWeight: 500,
+                        color: '#2d322f',
+                        fontFamily: "'Noto Serif SC', serif",
+                        marginBottom: 4,
+                      }}>
+                        {record.subject || '学校通知'}
+                      </div>
+                      <div style={{
+                        display: 'flex',
+                        flexWrap: 'wrap',
+                        gap: 12,
+                        fontSize: 12,
+                        color: 'rgba(45,50,47,0.5)',
+                        fontFamily: 'sans-serif',
+                      }}>
+                        <span>
+                          {record.processed_at
+                            ? new Date(record.processed_at).toLocaleDateString('zh-CN')
+                            : '—'}
+                        </span>
+                        {todos > 0 && <span>生成了 {todos} 个待办</span>}
+                        {events > 0 && <span>写入 {events} 个校历</span>}
+                      </div>
+                    </div>
+                    <ChevronDown
+                      size={18}
+                      style={{
+                        color: 'rgba(45,50,47,0.35)',
+                        flexShrink: 0,
+                        transform: expanded ? 'rotate(180deg)' : 'rotate(0deg)',
+                        transition: 'transform 0.2s ease',
+                      }}
+                    />
+                  </div>
+                  {expanded && (
+                    <div style={{
+                      marginTop: 12,
+                      paddingTop: 12,
+                      borderTop: '1px solid rgba(164,99,85,0.1)',
+                      fontSize: 13,
+                      lineHeight: 1.75,
+                      color: 'rgba(45,50,47,0.65)',
+                    }}>
+                      {record.from_email && (
+                        <p style={{ margin: '0 0 6px' }}>来源：{record.from_email}</p>
+                      )}
+                      <p style={{ margin: '0 0 6px' }}>
+                        渠道：{SOURCE_LABELS[record.source || ''] || record.source || '未知'}
+                      </p>
+                      <p style={{ margin: 0 }}>
+                        {record.processed_at
+                          ? `处理时间：${new Date(record.processed_at).toLocaleString('zh-CN')}`
+                          : null}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        )}
       </section>
     </main>
   )
