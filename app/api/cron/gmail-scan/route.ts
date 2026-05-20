@@ -16,6 +16,7 @@ const SCHOOL_FILTERS = [
   '学校', '幼儿园', '家长', '通知', '课表', '成绩',
   '缴费', '活动', '假期', '运动会', '家长会',
   'lanna', 'prem', 'maerim', 'chiang mai',
+  'ClassDojo', 'dojo', 'class story', 'portfolio', 'behavior report',
 ]
 
 async function fetchRecentEmails(): Promise<any[]> {

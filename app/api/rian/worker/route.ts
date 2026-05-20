@@ -603,7 +603,7 @@ function isSchoolParsing(inputType: string, processedContent: string, toolUses: 
 
   const text = `${processedContent || ''} ${toolUses.map((tool: any) => `${tool.name} ${tool.input?.title || ''} ${tool.input?.description || ''}`).join(' ')}`.toLowerCase()
   return toolUses.some((tool: any) => tool.name === 'add_schedule') ||
-    ['school', 'academy', '校', '学校', '家长会', 'field trip', 'exam', 'term', 'class'].some((keyword) => text.includes(keyword))
+    ['school', 'academy', '校', '学校', '家长会', 'field trip', 'exam', 'term', 'class', 'classdojo', 'dojo', 'class story', 'portfolio'].some((keyword) => text.includes(keyword))
 }
 
 function buildSchoolParsingSummary(toolUses: any[]) {

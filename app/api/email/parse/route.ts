@@ -35,6 +35,14 @@ ${email.body}
 - other（其他）
 - spam（垃圾邮件，不处理）
 
+### ClassDojo / 家校平台
+如果邮件来自 ClassDojo，识别：
+- 老师发送的故事/作品（class story）
+- 行为报告（behavior points）
+- 老师留言（teacher message）
+- 作业提醒
+并提取为待办或校历事件
+
 ### 第二步：提取所有有价值的信息
 对于每个事件，必须主动推断 requires_items（不要留空）：
 - 体育课/运动会 → 运动鞋、水壶、运动服
