@@ -132,7 +132,7 @@ export default function AuthPage() {
       >
         {/* ── Logo ── */}
         <div style={{ textAlign: 'center', marginBottom: 32 }}>
-          <div style={{ fontSize: 13, letterSpacing: 6, color: '#B08D57', marginBottom: 6, fontFamily: 'Noto Serif SC, serif' }}>
+          <div style={{ fontSize: 13, letterSpacing: 6, color: '#8a7355', marginBottom: 6, fontFamily: "'Noto Serif SC', serif" }}>
             根·陪伴
           </div>
           <div style={{ fontSize: 22, fontWeight: 700, color: '#2d322f', fontFamily: 'Noto Serif SC, serif' }}>
