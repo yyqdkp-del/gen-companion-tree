@@ -555,7 +555,7 @@ export default function BasePage() {
                 setProcessStatus(null)
               }
             }}
-            style={{ position: 'fixed', bottom: 90, left: 16, right: 16, zIndex: 500,
+            style={{ position: 'fixed', bottom: 'calc(90px + env(safe-area-inset-bottom, 0px))', left: 16, right: 16, zIndex: 500,
               background: processStatus.status === 'done' ? 'rgba(29,158,117,0.95)'
                 : processStatus.status === 'failed' ? 'rgba(220,38,38,0.95)'
                 : 'rgba(45,63,74,0.95)',

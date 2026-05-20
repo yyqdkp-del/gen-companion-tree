@@ -27,7 +27,7 @@ export default function CardsPage() {
   return (
     <main
       style={{
-        minHeight: '100vh',
+        minHeight: '100dvh',
         backgroundColor: '#fbf9f6',
         paddingBottom: 'calc(80px + max(env(safe-area-inset-bottom), 20px))',
       }}

@@ -248,7 +248,7 @@ export default function KapokTreeholePage() {
 
         .back-button {
           width: 38px;
-          height: 38px;
+          min-height: 38px;
           border: 1px solid rgba(255, 224, 178, 0.16);
           border-radius: 999px;
           color: #f8d6a0;

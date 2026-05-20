@@ -16,7 +16,21 @@ export async function POST(req: NextRequest) {
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
-  const { child_id } = await req.json()
+  const { child_id: childId } = await req.json()
+  if (!childId) {
+    return NextResponse.json({ error: 'bad request' }, { status: 400 })
+  }
+
+  const { data: child, error: childErr } = await supabase
+    .from('children')
+    .select('*')
+    .eq('id', childId)
+    .eq('user_id', userId)
+    .single()
+
+  if (childErr || !child) {
+    return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  }
 
   let today: string
   let dow: number
@@ -30,11 +44,10 @@ export async function POST(req: NextRequest) {
   }
   const hour = new Date().getHours()
 
-  const [{ data: child }, { data: logs }, { data: profile }, { data: events }] = await Promise.all([
-    supabase.from('children').select('*').eq('id', child_id).single(),
-    supabase.from('child_daily_log').select('*').eq('child_id', child_id).order('date', { ascending: false }).limit(7),
-    supabase.from('child_profiles').select('class_schedule').eq('child_id', child_id).maybeSingle(),
-    supabase.from('child_school_calendar').select('*').eq('child_id', child_id).eq('date_start', today),
+  const [{ data: logs }, { data: profile }, { data: events }] = await Promise.all([
+    supabase.from('child_daily_log').select('*').eq('child_id', childId).order('date', { ascending: false }).limit(7),
+    supabase.from('child_profiles').select('class_schedule').eq('child_id', childId).maybeSingle(),
+    supabase.from('child_school_calendar').select('*').eq('child_id', childId).eq('date_start', today),
   ])
   const dowKey = ['sun','mon','tue','wed','thu','fri','sat'][dow]
   const sched = profile?.class_schedule?.[dowKey] || []
@@ -70,7 +83,7 @@ export async function POST(req: NextRequest) {
   try {
     const text = data.content?.[0]?.text || '{}'
     const result = JSON.parse(text)
-    await supabase.from('children').update({ energy: result.energy }).eq('id', child_id)
+    await supabase.from('children').update({ energy: result.energy }).eq('id', childId).eq('user_id', userId)
     return NextResponse.json({ ok: true, energy: result.energy, reason: result.reason })
   } catch {
     return NextResponse.json({ ok: false, energy: 75 })

@@ -6,6 +6,7 @@ import { motion } from 'framer-motion'
 import { ArrowLeft, Plane, Loader, MapPin, Calendar as CalIcon, Bookmark } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { fetchWithAuth } from '@/lib/auth/fetchWithAuth'
+import { toast } from '@/app/components/Toast'
 import { THEME } from '@/app/_shared/_constants/theme'
 import { NAV_HEIGHT_CSS } from '@/app/_shared/_constants/layout'
 import { useApp } from '@/app/context/AppContext'
@@ -117,7 +118,7 @@ export default function TravelPage() {
 
   const submitPlan = async () => {
     if (!destination.trim() || !startDate || !endDate) {
-      alert('请填写目的地与起止日期')
+      toast('请填写目的地与起止日期', 'info')
       return
     }
     setPlanning(true)
@@ -139,20 +140,20 @@ export default function TravelPage() {
       })
       const json = await res.json().catch(() => ({}))
       if (!res.ok || !json.ok) {
-        alert(json.error || '规划失败')
+        toast(json.error || '规划失败', 'error')
         return
       }
       setPlan(json.plan)
     } catch (e) {
       logOrAlertNetworkError(e)
-      alert('网络错误')
+      toast('网络错误', 'error')
     }
     setPlanning(false)
   }
 
   const fetchFlights = async () => {
     if (!departure.trim() || !destination.trim() || !startDate) {
-      alert('请先填写出发地、目的地与出发日期')
+      toast('请先填写出发地、目的地与出发日期', 'info')
       return
     }
     setFlightLoading(true)
@@ -170,7 +171,7 @@ export default function TravelPage() {
       })
       const json = await res.json().catch(() => ({}))
       if (!res.ok || !json.ok) {
-        alert(json.error || '机票分析失败')
+        toast(json.error || '机票分析失败', 'error')
         return
       }
       setFlightResult(json)
@@ -205,11 +206,11 @@ export default function TravelPage() {
         updated_at: new Date().toISOString(),
       })
       if (error) throw error
-      alert('已保存到历史行程')
+      toast('已保存到历史行程', 'success')
       void loadHistory()
     } catch (e) {
       logOrAlertNetworkError(e)
-      alert('保存失败')
+      toast('保存失败', 'error')
     }
     setSavingPlan(false)
   }

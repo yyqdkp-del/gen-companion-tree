@@ -10,13 +10,14 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const { user_id, title, body, url, urgent, tag, actions } = await req.json()
+    const { title, body: notifyBody, url, urgent, tag, actions } = await req.json()
 
-    if (!user_id || !title || !body) {
+    if (!title || !notifyBody) {
       return NextResponse.json({ ok: false, error: '缺少参数' }, { status: 400 })
     }
 
-    const sent = await sendPushToUser(user_id, { title, body, url, urgent, tag, actions })
+    const targetUserId = user.id
+    const sent = await sendPushToUser(targetUserId, { title, body: notifyBody, url, urgent, tag, actions })
 
     return NextResponse.json({ ok: true, sent })
 

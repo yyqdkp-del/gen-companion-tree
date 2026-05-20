@@ -1,15 +1,22 @@
 export const dynamic = 'force-dynamic'
 import { NextRequest, NextResponse } from 'next/server'
 import { getUserLocation, updateUserLocationByGPS } from '@/lib/geofence'
+import { getAuthUser } from '@/lib/auth/getAuthUser'
 
 export async function POST(req: NextRequest) {
+  const { user, error } = await getAuthUser(req)
+  if (error || !user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+  const userId = user.id
+
   let body: any = {}
   try {
     body = await req.json()
   } catch {
     body = {}
   }
-  const { userId, lat, lng } = body
+  const { lat, lng } = body
 
   try {
     let location

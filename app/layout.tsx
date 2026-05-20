@@ -3,6 +3,7 @@ import './globals.css'
 import { AppProvider } from './context/AppContext'
 import ClientComponents from '@/app/components/ClientComponents'
 import PostHogInit from '@/app/components/PostHogInit'
+import Toast from '@/app/components/Toast'
 
 export const metadata: Metadata = {
   title: '根 · Companion',
@@ -19,7 +20,7 @@ export const viewport: Viewport = {
   themeColor: '#1D9E75',
   width: 'device-width',
   initialScale: 1,
-  maximumScale: 1,
+  maximumScale: 5,
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -42,6 +43,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           {children}
           <PostHogInit />
           <ClientComponents />
+          <Toast />
         </AppProvider>
         <RegisterSW />
       </body>

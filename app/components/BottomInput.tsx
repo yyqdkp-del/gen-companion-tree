@@ -12,6 +12,7 @@ import { fetchWithAuth } from '@/lib/auth/fetchWithAuth'
 import { createClient } from '@/lib/supabase/client'
 import { subscribePushIfPermitted } from '@/lib/push/subscribePushClient'
 import { logOrAlertNetworkError } from '@/lib/errors/logOrAlertNetworkError'
+import { toast } from '@/app/components/Toast'
 import BottomNav from './BottomNav'
 
 const SHOW_PATHS = ['/', '/rian', '/growth', '/treehouse', '/travel', '/vehicles', '/school']
@@ -59,7 +60,7 @@ export default function BottomInput() {
     try {
       const headers = await getJsonAuthHeaders()
       if (!headers.Authorization) {
-        window.alert('登录已过期，请重新登录')
+        toast('登录已过期，请重新登录', 'info')
         window.location.href = '/auth'
         removeTempTodo(tempId)
         return
@@ -92,7 +93,7 @@ export default function BottomInput() {
         }
       } else {
         removeTempTodo(tempId)
-        alert('发送失败，请重试')
+        toast('发送失败，请重试', 'error')
       }
     } catch (e) {
       logOrAlertNetworkError(e)
@@ -151,7 +152,7 @@ export default function BottomInput() {
       {/* 展开的输入面板 */}
       <div style={{
         position: 'fixed',
-        bottom: 'calc(max(env(safe-area-inset-bottom), 36px) + 78px)',
+        bottom: 'calc(max(env(safe-area-inset-bottom), 36px) + 78px + var(--keyboard-height, 0px))',
         left: 0, right: 0, zIndex: 109,
         display: 'flex', justifyContent: 'center', padding: '0 16px',
         pointerEvents: inputMode === 'none' ? 'none' : 'auto',

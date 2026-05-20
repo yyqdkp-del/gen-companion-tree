@@ -443,6 +443,11 @@ async function parseEmailWithClaude(email: EmailInput, familyContext: string): P
 // ══════════════════════════════════════════════════════════════
 export async function POST(req: NextRequest) {
   try {
+    const secret = req.headers.get('x-parse-secret') || req.headers.get('x-cron-secret')
+    if (!secret || secret !== process.env.CRON_SECRET) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     const body = await req.json()
 
     const supabase = createClient(

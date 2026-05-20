@@ -98,10 +98,27 @@ export default function DecodePage() {
   }, [loadSessions])
 
   useEffect(() => {
-    const uid = localStorage.getItem('anon_id') || crypto.randomUUID()
-    localStorage.setItem('anon_id', uid)
-    fetch('/api/geofence', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId: uid }) })
-      .then(r => r.json()).then(loc => { if (!loc.error) { setUserLocation(loc); setLocationScene(loc.city ? `${loc.city}华人陪读家庭` : '海外华人家庭') } }).catch(logOrAlertNetworkError)
+    void (async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        if (!session?.user?.id) {
+          setLocationScene('海外华人家庭')
+          return
+        }
+        const res = await fetchWithAuth('/api/geofence', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({}),
+        })
+        const loc = await res.json().catch(() => ({}))
+        if (loc && !loc.error) {
+          setUserLocation(loc)
+          setLocationScene(loc.city ? `${loc.city}华人陪读家庭` : '海外华人家庭')
+        }
+      } catch (e) {
+        logOrAlertNetworkError(e)
+      }
+    })()
   }, [])
 
   const handleTabChange = (t: TabType) => {

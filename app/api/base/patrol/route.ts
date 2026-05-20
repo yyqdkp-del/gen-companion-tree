@@ -11,11 +11,6 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY || ''
 )
 
-async function getDefaultUserId(): Promise<string | null> {
-  const { data } = await supabase.auth.admin.listUsers({ perPage: 1 })
-  return data?.users?.[0]?.id || null
-}
-
 async function getFamilySnapshot(userId: string) {
   const [
     { data: children },
@@ -335,9 +330,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: e?.message }, { status: 500 })
   }
 }
-export async function GET() {
-  const userId = await getDefaultUserId()
-  if (!userId) return NextResponse.json({ error: 'no user' }, { status: 400 })
+export async function GET(req: NextRequest) {
+  const { user, error } = await getAuthUser(req)
+  if (error || !user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+  const userId = user.id
 
   const userLocation = await getUserLocation(userId)
   const today = getTodayStrInTimeZone(userLocation.timezone)

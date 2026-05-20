@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { getJsonAuthHeaders } from '@/lib/auth/clientAuthHeaders'
 import { fetchWithAuth } from '@/lib/auth/fetchWithAuth'
 import { logOrAlertNetworkError } from '@/lib/errors/logOrAlertNetworkError'
+import { toast } from '@/app/components/Toast'
 import { useApp } from '@/app/context/AppContext'
 import {
   X, CheckCircle2, Navigation, Phone, Mail, Calendar,
@@ -479,7 +480,7 @@ async function executeAction(
       return { message: '已打开' }
     case 'pay':
       if (data.url) window.open(data.url, '_blank')
-      else alert(data.note || data.channel || '请按提示方式缴费')
+      else toast(data.note || data.channel || '请按提示方式缴费', 'info')
       return { message: '已查看缴费方式' }
     case 'buy': {
       const ch = data.channel === 'shopee'
@@ -674,7 +675,7 @@ export default function ActionModal({
       const headers = await getJsonAuthHeaders()
       if (!headers.Authorization) {
         if (!cancelled) {
-          window.alert('登录已过期，请重新登录')
+          toast('登录已过期，请重新登录', 'info')
           window.location.href = '/auth'
           setLoading(false)
         }
@@ -716,7 +717,7 @@ export default function ActionModal({
       })
       if (!res.ok) throw new Error('save failed')
     } catch (e) {
-      if (!logOrAlertNetworkError(e)) alert('保存失败，请重试')
+      if (!logOrAlertNetworkError(e)) toast('保存失败，请重试', 'error')
     } finally {
       setSaving(false)
     }
