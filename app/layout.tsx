@@ -1,9 +1,8 @@
 import type { Metadata, Viewport } from 'next'
-import { Suspense } from 'react'
 import './globals.css'
 import { AppProvider } from './context/AppContext'
 import ClientComponents from '@/app/components/ClientComponents'
-import PostHogProvider from '@/app/components/PostHogProvider'
+import PostHogInit from '@/app/components/PostHogInit'
 
 export const metadata: Metadata = {
   title: '根 · Companion',
@@ -40,11 +39,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body>
         <AppProvider>
-          <Suspense fallback={null}>
-            <PostHogProvider>
-              {children}
-            </PostHogProvider>
-          </Suspense>
+          {children}
+          <PostHogInit />
           <ClientComponents />
         </AppProvider>
         <RegisterSW />

@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/client'
-import { capturePostHog, identifyPostHog } from '@/lib/analytics/posthog'
+import { phCapture } from './posthog'
 
 interface TrackEvent {
   event_type: string
@@ -9,46 +9,36 @@ interface TrackEvent {
 
 export async function track(event: TrackEvent) {
   if (typeof window === 'undefined') return
-
-  const page = event.page || window.location.pathname
-  let sessionId = sessionStorage.getItem('app_session_id')
-  if (!sessionId) {
-    sessionId = crypto.randomUUID()
-    sessionStorage.setItem('app_session_id', sessionId)
-  }
-
-  const enrichedMeta = {
-    ...event.meta,
-    page,
-    session_id: sessionId,
-    is_pwa: window.matchMedia('(display-mode: standalone)').matches,
-    is_wechat: /MicroMessenger/i.test(navigator.userAgent),
-    ts: Date.now(),
-  }
-
   try {
     const supabase = createClient()
     const { data: { session } } = await supabase.auth.getSession()
 
-    if (session?.user?.id) {
-      identifyPostHog(session.user.id, { email: session.user.email })
+    let sessionId = sessionStorage.getItem('app_session_id')
+    if (!sessionId) {
+      sessionId = crypto.randomUUID()
+      sessionStorage.setItem('app_session_id', sessionId)
     }
-
-    capturePostHog(event.event_type, {
-      ...enrichedMeta,
-      user_id: session?.user?.id || null,
-    })
 
     await supabase.from('analytics_events').insert({
       event_type: event.event_type,
-      page,
+      page: event.page || window.location.pathname,
       user_id: session?.user?.id || null,
       session_id: sessionId,
-      meta: enrichedMeta,
+      meta: {
+        ...event.meta,
+        is_pwa: window.matchMedia('(display-mode: standalone)').matches,
+        is_wechat: /MicroMessenger/i.test(navigator.userAgent),
+        ts: Date.now(),
+      },
+    })
+
+    // 同时上报 PostHog
+    phCapture(event.event_type, {
+      page: event.page || (typeof window !== 'undefined' ? window.location.pathname : ''),
+      ...event.meta,
     })
   } catch (e) {
     console.warn('track failed:', e)
-    capturePostHog(event.event_type, enrichedMeta)
   }
 }
 

@@ -9,6 +9,7 @@ import type { Session } from '@supabase/supabase-js'
 import { subscribePushIfPermitted } from '@/lib/push/subscribePushClient'
 import { signOutWithPushCleanup } from '@/lib/auth/signOutClient'
 import { logOrAlertNetworkError } from '@/lib/errors/logOrAlertNetworkError'
+import { phIdentify } from '@/lib/analytics/posthog'
 
 async function subscribePush(session: Session) {
   await subscribePushIfPermitted(session)
@@ -134,6 +135,7 @@ const setActiveKid = useCallback((kid: any) => {
       setKids(kids)
       setTodos(todos)
       setHotspots(hotspots)
+      phIdentify(uid, { has_children: kids.length > 0 })
     } catch (e: unknown) {
       if (controller.signal.aborted) return
       const name = e instanceof Error ? e.name : ''
