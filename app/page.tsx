@@ -269,7 +269,7 @@ const HOME_TOUR: TourStep[] = [
 ]
 
 export default function BasePage() {
-  const { userId, kids, todos, hotspots, loading, sync: ctxSync,
+  const { userId, kids, todos, hotspots, loading, sessionReady, sync: ctxSync,
     processStatus, setProcessStatus, activeKid, setActiveKid,
     modalOpen, setModalOpen, showOnboarding, setShowOnboarding } = useApp()
   const [time, setTime] = useState(new Date())
@@ -437,6 +437,35 @@ export default function BasePage() {
       : topHotspot?.title
         || (hotspotEngine.badge > 0 ? `${hotspotEngine.badge}条` : '根')
 
+  if (loading || !sessionReady) {
+    return (
+      <main style={{
+        position: 'fixed', inset: 0,
+        backgroundColor: '#fbf9f6',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 20,
+      }}>
+        <div style={{ display: 'flex', gap: 20, alignItems: 'center' }}>
+          <div style={{ width: 90, height: 90, borderRadius: '60% 40% 60% 40%', background: 'rgba(164,99,85,0.08)', animation: 'pulse 1.5s ease infinite' }} />
+          <div style={{ width: 120, height: 120, borderRadius: '50% 60% 40% 50%', background: 'rgba(164,99,85,0.1)', animation: 'pulse 1.5s ease infinite 0.2s' }} />
+          <div style={{ width: 90, height: 90, borderRadius: '40% 60% 50% 40%', background: 'rgba(164,99,85,0.08)', animation: 'pulse 1.5s ease infinite 0.4s' }} />
+        </div>
+        <div style={{ fontSize: 13, color: 'rgba(45,50,47,0.4)', fontFamily: 'sans-serif', letterSpacing: '0.2em' }}>
+          根·启动中
+        </div>
+        <style>{`
+          @keyframes pulse {
+            0%, 100% { opacity: 0.5; transform: scale(0.98); }
+            50% { opacity: 1; transform: scale(1.02); }
+          }
+        `}</style>
+      </main>
+    )
+  }
+
   return (
     <main style={{
       position: 'fixed',
@@ -506,16 +535,7 @@ export default function BasePage() {
         </p>
       </header>
 
-      {loading ? (
-        <div style={{ position: 'absolute', inset: 0,
-          display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <motion.div animate={{ opacity: [0.3, 1, 0.3] }} transition={{ duration: 1.5, repeat: Infinity }}
-            style={{ fontSize: 13, color: THEME.text, opacity: 0.4, letterSpacing: '0.2em' }}>
-            根·启动中…
-          </motion.div>
-        </div>
-      ) : (
-        <div style={{ position: 'absolute', top: '50%', left: '50%',
+      <div style={{ position: 'absolute', top: '50%', left: '50%',
           transform: 'translate(-50%, -50%)',
           display: 'flex', flexDirection: 'column', alignItems: 'center',
           gap: 'clamp(20px, 5vw, 36px)' }}>
@@ -569,7 +589,6 @@ export default function BasePage() {
               className="animate-droplet-3" />
           </div>
         </div>
-      )}
 
       <AnimatePresence>
         {modal === 'child' && (

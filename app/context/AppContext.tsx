@@ -169,7 +169,7 @@ const setActiveKid = useCallback((kid: any) => {
         if (session?.user?.id) {
           setUserIdSafe(session.user.id)
           sync(session.user.id)
-          await subscribePush(session)
+          void subscribePush(session)
           return
         }
         if ('caches' in window) {
@@ -186,7 +186,7 @@ const setActiveKid = useCallback((kid: any) => {
                 if (s?.user?.id) {
                   setUserIdSafe(s.user.id)
                   sync(s.user.id)
-                  await subscribePush(s)
+                  void subscribePush(s)
                   return
                 }
               }
@@ -197,7 +197,7 @@ const setActiveKid = useCallback((kid: any) => {
         if (refreshData.session?.user?.id) {
           setUserIdSafe(refreshData.session.user.id)
           sync(refreshData.session.user.id)
-          await subscribePush(refreshData.session)
+          void subscribePush(refreshData.session)
           return
         }
         setTimeout(() => { if (!userIdRef.current) router.push('/auth') }, 3000)

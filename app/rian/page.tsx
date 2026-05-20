@@ -130,7 +130,6 @@ const reminders = useMemo<Reminder[]>(() => {
   }, [])
 
   const children = ctxKids
-  const allDone = reminders.length === 0
   const loading = false
   const currentChild = children[childIndex]
   
@@ -273,93 +272,6 @@ const reminders = useMemo<Reminder[]>(() => {
         </div>
       )}
 
-      {/* 空状态：今日清零 */}
-      <AnimatePresence>
-        {!loading && allDone && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 1.2 }}
-            style={{
-              position: 'fixed', inset: 0, zIndex: 15,
-              backgroundColor: '#080c10',
-              display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-              overflow: 'hidden', fontFamily: '"Source Han Serif SC", "Songti SC", serif',
-            }}
-          >
-            {/* 流动琥珀光影 */}
-            <div style={{ position: 'relative', height: 300, width: 300, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-              <motion.div
-                animate={{
-                  borderRadius: ['40% 60% 70% 30% / 40% 50% 60% 50%', '60% 40% 30% 70% / 50% 60% 40% 50%', '40% 60% 70% 30% / 40% 50% 60% 50%'],
-                  scale: [1, 1.15, 1], rotate: [0, 90, 0], opacity: [0.3, 0.6, 0.3],
-                }}
-                transition={{ duration: 12, repeat: Infinity, ease: 'easeInOut' }}
-                style={{
-                  width: 180, height: 180,
-                  background: 'radial-gradient(circle, rgba(255,190,100,0.4) 0%, transparent 70%)',
-                  filter: 'blur(40px)',
-                }}
-              />
-              <motion.div
-                animate={{ opacity: [0.2, 0.5, 0.2] }}
-                transition={{ duration: 4, repeat: Infinity }}
-                style={{
-                  position: 'absolute', width: 4, height: 4,
-                  backgroundColor: '#fff', borderRadius: '50%',
-                  boxShadow: '0 0 20px 5px rgba(255,255,255,0.4)',
-                }}
-              />
-            </div>
-
-            {/* 文字 */}
-            <div style={{ textAlign: 'center', zIndex: 10, marginTop: -40 }}>
-              <motion.div
-                initial={{ opacity: 0, filter: 'blur(15px)', y: 10 }}
-                animate={{ opacity: 1, filter: 'blur(0px)', y: 0 }}
-                transition={{ duration: 3, ease: 'easeOut' }}
-              >
-                <p style={{ fontSize: 26, fontWeight: 300, color: '#fff', letterSpacing: '0.6em', margin: 0 }}>
-                  今日清零
-                </p>
-              </motion.div>
-              <motion.div
-                initial={{ width: 0, opacity: 0 }}
-                animate={{ width: 40, opacity: 0.2 }}
-                transition={{ delay: 2, duration: 2 }}
-                style={{ height: 1, background: '#fff', margin: '30px auto' }}
-              />
-              <motion.div
-                initial={{ opacity: 0, filter: 'blur(10px)' }}
-                animate={{ opacity: 0.5, filter: 'blur(0px)' }}
-                transition={{ delay: 3.5, duration: 3 }}
-                style={{ fontSize: 15, color: '#fff', lineHeight: 2.8, letterSpacing: '0.3em' }}
-              >
-                <p style={{ margin: 0 }}>去听风 &nbsp; 去看云</p>
-                <p style={{ margin: 0 }}>去爱你自己 🫂</p>
-              </motion.div>
-            </div>
-
-            {/* 流星背景 */}
-            <div style={{ position: 'absolute', width: '100%', height: '100%', pointerEvents: 'none' }}>
-              {[1, 2, 3].map(i => (
-                <motion.div
-                  key={i}
-                  initial={{ x: '-10%', y: `${20 * i}%`, opacity: 0 }}
-                  animate={{ x: '110%', opacity: [0, 0.2, 0] }}
-                  transition={{ duration: 15, repeat: Infinity, delay: i * 5, ease: 'linear' }}
-                  style={{
-                    position: 'absolute', width: 100, height: 1,
-                    background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent)',
-                  }}
-                />
-              ))}
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
       {/* 跨代成长周报卡片（文档流，位于水珠区域上方） */}
       <div style={{ position: 'relative', zIndex: 25, margin: 'min(28vh, calc(22vh + env(safe-area-inset-top))) 5% 0' }}>
         {currentChild && (
@@ -422,7 +334,7 @@ const reminders = useMemo<Reminder[]>(() => {
       </div>
 
       {/* 水珠 */}
-      {!loading && !allDone && reminders.map((r, i) => {
+      {!loading && reminders.map((r, i) => {
         const pos = POSITIONS[i % POSITIONS.length]
         const anim = DROP_ANIM[i % DROP_ANIM.length]
         const icon = getCategoryIcon(r.category || 'default')

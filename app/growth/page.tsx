@@ -1,5 +1,5 @@
 'use client'
-import React from 'react'
+import React, { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
 import { useApp } from '@/app/context/AppContext'
@@ -36,9 +36,21 @@ function FallingLeaves() {
   )
 }
 
+function gradientForHour(hour: number): string {
+  if (hour >= 6 && hour < 12) return 'linear-gradient(135deg, #faf0e6 0%, #f0e0d0 100%)'
+  if (hour >= 12 && hour < 18) return 'linear-gradient(135deg, #e8f4e8 0%, #d8e8d8 100%)'
+  if (hour >= 18 && hour < 22) return 'linear-gradient(135deg, #f0e8f4 0%, #e0d8e8 100%)'
+  return 'linear-gradient(135deg, #2d322f 0%, #1a1f1c 100%)'
+}
+
 export default function GrowthPage() {
   const router = useRouter()
   const { activeKid } = useApp()
+  const [bgGradient, setBgGradient] = useState('')
+
+  useEffect(() => {
+    setBgGradient(gradientForHour(new Date().getHours()))
+  }, [])
 
   return (
     <main style={{
@@ -50,12 +62,9 @@ export default function GrowthPage() {
     }}>
       <div style={{
         position: 'absolute', inset: 0,
-        backgroundImage: "url('/forest-bg.webp')",
-        backgroundSize: 'cover',
-        backgroundPosition: 'center top',
-        backgroundRepeat: 'no-repeat',
+        background: bgGradient || gradientForHour(new Date().getHours()),
+        willChange: 'auto',
       }} />
-      <div style={{ position: 'absolute', inset: 0, background: 'rgba(20,40,10,0.08)' }} />
 
       <ChildAvatar />
 

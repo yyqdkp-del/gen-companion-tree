@@ -13,24 +13,26 @@ const supabase = createClient(
 )
 
 // ── 深夜色系 ──
+const TREEHOUSE_BG = 'linear-gradient(135deg, #1a2535 0%, #243040 50%, #1a2535 100%)'
+
 const THEME = {
-  bg1: '#0a0d14',
-  bg2: '#121a29',
+  bg1: '#1a2535',
+  bg2: '#243040',
   glow: '#1a4a3a',
   gold: 'rgba(230,168,158,0.8)',
   goldDim: 'rgba(230,168,158,0.35)',
-  aiText: '#e6e1d6',
-  aiBubble: 'rgba(255,255,255,0.04)',
-  userBubble: 'rgba(255,255,255,0.06)',
+  aiText: '#f0ebe4',
+  aiBubble: 'rgba(255,255,255,0.07)',
+  userBubble: 'rgba(255,255,255,0.07)',
   textDim: 'rgba(230,232,214,0.45)',
   star: 'rgba(230,168,158,0.6)',
 }
 
 const TREEHOUSE_ENTRY_CARD: React.CSSProperties = {
-  background: 'rgba(255,255,255,0.04)',
+  background: 'rgba(255,255,255,0.07)',
   backdropFilter: 'blur(10px)',
   WebkitBackdropFilter: 'blur(10px)',
-  border: '1px solid rgba(255,255,255,0.1)',
+  border: '1px solid rgba(255,255,255,0.12)',
   borderRadius: 20,
   padding: '20px',
 }
@@ -322,11 +324,7 @@ export default function TreehousePage() {
         position: 'fixed',
         inset: 0,
         minHeight: '100dvh',
-        backgroundColor: '#0a0d14',
-        backgroundImage: `
-          radial-gradient(at 50% 0%, rgba(245,214,209,0.06) 0px, transparent 40%),
-          linear-gradient(180deg, #0a0d14 0%, #121a29 100%)
-        `,
+        background: TREEHOUSE_BG,
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
@@ -409,11 +407,7 @@ export default function TreehousePage() {
         position: 'fixed',
         inset: 0,
         minHeight: '100dvh',
-        backgroundColor: '#0a0d14',
-        backgroundImage: `
-          radial-gradient(at 50% 0%, rgba(245,214,209,0.06) 0px, transparent 40%),
-          linear-gradient(180deg, #0a0d14 0%, #121a29 100%)
-        `,
+        background: TREEHOUSE_BG,
         overflow: 'hidden',
         fontFamily: "'Noto Serif SC', 'SimSun', Georgia, serif",
         display: 'flex',
@@ -615,7 +609,7 @@ export default function TreehousePage() {
           )}
         </AnimatePresence>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', background: 'rgba(255,255,255,0.04)', borderRadius: '28px', padding: '12px 16px', border: `1px solid ${inputFocused ? 'rgba(232,213,184,0.15)' : 'rgba(255,255,255,0.06)'}`, transition: 'border-color 0.4s' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', background: 'rgba(255,255,255,0.07)', borderRadius: '28px', padding: '12px 16px', border: `1px solid ${inputFocused ? 'rgba(232,213,184,0.15)' : 'rgba(255,255,255,0.12)'}`, transition: 'border-color 0.4s' }}>
           <input
             ref={inputRef}
             value={inputText}
