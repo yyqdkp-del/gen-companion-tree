@@ -136,54 +136,67 @@ img {
   transform: scale(0.94);
 }
 
-/* 呼吸动效升级为更慢更舒缓 */
 @keyframes breathOne {
-  0%, 100% {
-    border-radius: 42% 58% 70% 30% / 45% 45% 55% 55%;
-    transform: scale(1) rotate(0deg) translateY(0px);
+  0% {
+    transform: translate3d(0, -5px, 0) scale(1) rotate(0deg);
+    animation-timing-function: cubic-bezier(0.25, 1, 0.5, 1);
   }
-  33% {
-    border-radius: 46% 54% 65% 35% / 48% 42% 58% 52%;
-    transform: scale(1.025) rotate(0.8deg) translateY(-6px);
+  42% {
+    transform: translate3d(0, 4px, 0) scale(1.04) rotate(2deg);
+    animation-timing-function: cubic-bezier(0.445, 0.05, 0.55, 0.95);
   }
-  66% {
-    border-radius: 39% 61% 73% 27% / 42% 48% 52% 58%;
-    transform: scale(0.98) rotate(-0.5deg) translateY(3px);
+  100% {
+    transform: translate3d(0, -5px, 0) scale(0.98) rotate(-1.5deg);
   }
 }
 
 @keyframes breathTwo {
-  0%, 100% {
-    border-radius: 70% 30% 52% 48% / 60% 40% 60% 40%;
-    transform: scale(1) rotate(0deg) translateY(0px);
+  0% {
+    transform: translate3d(0, -4px, 0) scale(1) rotate(0deg);
+    animation-timing-function: cubic-bezier(0.25, 1, 0.5, 1);
   }
-  50% {
-    border-radius: 64% 36% 58% 42% / 54% 46% 64% 36%;
-    transform: scale(1.03) rotate(-1.2deg) translateY(-8px);
+  45% {
+    transform: translate3d(0, 5px, 0) scale(1.05) rotate(-2.5deg);
+    animation-timing-function: cubic-bezier(0.445, 0.05, 0.55, 0.95);
+  }
+  100% {
+    transform: translate3d(0, -4px, 0) scale(0.97) rotate(1deg);
   }
 }
 
 @keyframes breathThree {
-  0%, 100% {
-    border-radius: 48% 52% 35% 65% / 42% 68% 32% 58%;
-    transform: scale(1) rotate(0deg) translateY(0px);
+  0% {
+    transform: translate3d(0, -6px, 0) scale(1) rotate(0deg);
+    animation-timing-function: cubic-bezier(0.25, 1, 0.5, 1);
   }
-  40% {
-    border-radius: 53% 47% 41% 59% / 47% 62% 38% 52%;
-    transform: scale(1.018) rotate(1.5deg) translateY(5px);
+  38% {
+    transform: translate3d(0, 3px, 0) scale(1.03) rotate(1.5deg);
+    animation-timing-function: cubic-bezier(0.445, 0.05, 0.55, 0.95);
+  }
+  100% {
+    transform: translate3d(0, -6px, 0) scale(0.99) rotate(-2deg);
   }
 }
 
 .animate-droplet-1 {
-  animation: breathOne 10s ease-in-out infinite !important;
+  animation: breathOne 11s infinite alternate !important;
+  will-change: transform;
+  transform-style: preserve-3d;
+  contain: paint;
 }
 .animate-droplet-2 {
-  animation: breathTwo 12s ease-in-out infinite !important;
+  animation: breathTwo 13s infinite alternate !important;
   animation-delay: 1.5s !important;
+  will-change: transform;
+  transform-style: preserve-3d;
+  contain: paint;
 }
 .animate-droplet-3 {
-  animation: breathThree 14s ease-in-out infinite !important;
-  animation-delay: 2.5s !important;
+  animation: breathThree 14.5s infinite alternate !important;
+  animation-delay: 2.8s !important;
+  will-change: transform;
+  transform-style: preserve-3d;
+  contain: paint;
 }
 
 /* 全局安全区域适配 */
@@ -297,4 +310,22 @@ table, th, td {
 .bottom-sheet {
   border-radius: 24px 24px 0 0 !important;
   padding-bottom: max(env(safe-area-inset-bottom), 20px) !important;
+}
+
+/* 毛玻璃不支持时的降级 */
+@supports not (backdrop-filter: blur(14px)) {
+  .droplet-lens {
+    background: rgba(255, 255, 255, 0.85) !important;
+    border: 1.2px solid rgba(255, 255, 255, 0.35) !important;
+  }
+}
+
+/* 减弱动画模式 */
+@media (prefers-reduced-motion: reduce) {
+  .animate-droplet-1,
+  .animate-droplet-2,
+  .animate-droplet-3 {
+    animation: none !important;
+    transform: none !important;
+  }
 }

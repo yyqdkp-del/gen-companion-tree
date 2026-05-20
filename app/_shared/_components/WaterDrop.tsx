@@ -80,17 +80,41 @@ export default function WaterDrop({
               borderRadius: '66% 34% 71% 29% / 37% 53% 47% 63%',
               background: c.glow }} />
         )}
-        <div
+        <motion.div
           className={`droplet-lens ${className ?? (index === 0 ? 'animate-droplet-1' : index === 1 ? 'animate-droplet-2' : 'animate-droplet-3')}`}
           style={{
-          width: size, height: size, backdropFilter: 'blur(20px)',
-          border: `1.5px solid ${c.border}`,
-          borderRadius: '66% 34% 71% 29% / 37% 53% 47% 63%',
-          position: 'relative', display: 'flex', flexDirection: 'column',
-          alignItems: 'center', justifyContent: 'center',
-          background: c.fill,
-          boxShadow: `inset 5px 5px 10px rgba(255,255,255,0.35), 8px 14px 28px rgba(0,0,0,0.08)`,
-        }}>
+            width: size,
+            height: size,
+            backdropFilter: 'blur(14px) saturate(112%)',
+            WebkitBackdropFilter: 'blur(14px) saturate(112%)',
+            border: '1.2px solid rgba(255, 255, 255, 0.45)',
+            borderRadius: '66% 34% 71% 29% / 37% 53% 47% 63%',
+            position: 'relative',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: c.fill,
+            boxShadow: `
+    inset 0 4px 12px rgba(255, 255, 255, 0.7),
+    inset 0 -4px 12px ${c.glow},
+    0 15px 35px -10px ${c.glow},
+    0 4px 12px rgba(0,0,0,0.03)
+  `,
+            transform: 'translate3d(0, 0, 0)',
+            WebkitTransform: 'translate3d(0, 0, 0)',
+            WebkitBackfaceVisibility: 'hidden',
+            backfaceVisibility: 'hidden',
+          }}>
+          {/* 高光层 */}
+          <div style={{
+            position: 'absolute',
+            inset: 1,
+            borderRadius: 'inherit',
+            background: 'linear-gradient(135deg, rgba(255,255,255,0.5) 0%, rgba(255,255,255,0) 65%)',
+            pointerEvents: 'none',
+            opacity: 0.8,
+          }} />
           <div style={{ color: c.text, opacity: 0.75, marginBottom: 3 }}>{icon}</div>
           {value && (
             <span style={{ fontSize: size > 100 ? 14 : 12, fontWeight: 600, color: c.text }}>
@@ -109,9 +133,7 @@ export default function WaterDrop({
                 background: state === 'red' ? '#d58074' : state === 'orange' ? '#e6a89e' : '#8ca88d',
                 border: '2px solid white' }} />
           )}
-          <div style={{ position: 'absolute', top: 13, left: 18, width: 15, height: 7,
-            background: 'rgba(255,255,255,0.5)', borderRadius: '50%', transform: 'rotate(-35deg)' }} />
-        </div>
+        </motion.div>
       </motion.div>
       <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.2em',
         color: THEME.text, opacity: 0.55 }}>
