@@ -57,8 +57,6 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  console.log('三级提醒检查开始:', new Date().toISOString())
-
   try {
     const today = getTodayStr()
 
@@ -78,11 +76,8 @@ export async function GET(req: NextRequest) {
 
     if (error) throw error
     if (!dueChains?.length) {
-      console.log('今天没有需要触发的提醒')
       return NextResponse.json({ ok: true, triggered: 0 })
     }
-
-    console.log(`找到${dueChains.length}条待触发提醒`)
 
     let triggered = 0
 
@@ -134,11 +129,9 @@ export async function GET(req: NextRequest) {
         await supabase.from('todo_items')
           .update({ priority: chain.trigger_days_before <= 1 ? 'red' : 'orange' })
           .eq('id', todo.id)
-        console.log(`待办优先级升级：${todo.title}`)
       }
 
       triggered++
-      console.log(`提醒触发：${todo.title}（第${chain.level}级）`)
     }
 
     return NextResponse.json({

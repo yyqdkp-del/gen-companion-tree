@@ -437,8 +437,6 @@ ${JSON.stringify(nodesWithCompletion, null, 2)}
   target_path: finalReport.target_path,
   grade: finalReport.grade,
 })
-    } else {
-      console.log('pathway report saved', { childId, uid, nodes: nodesWithCompletion.length })
     }
 
   } catch (e: any) {

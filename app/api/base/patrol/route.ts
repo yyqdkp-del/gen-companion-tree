@@ -287,7 +287,7 @@ async function archiveOldHotspots(userId: string) {
 }
 
 // ── POST：立即 202，后台跑巡逻（waitUntil 保证 Vercel 上任务继续执行）──
-async function runPatrolForUsers(userIds: string[], patrolTime: string) {
+async function runPatrolForUsers(userIds: string[], _patrolTime: string) {
   const results: Array<Record<string, unknown>> = []
 
   for (const userId of userIds) {
@@ -296,8 +296,6 @@ async function runPatrolForUsers(userIds: string[], patrolTime: string) {
       const todayYmd = getTodayStrInTimeZone(userLocation.timezone)
       const location = `${userLocation.city} ${userLocation.country}`
       const patrolPrompt = userLocation.local_config.patrol_prompt
-
-      console.log(`用户${userId.slice(0, 8)} 位置: ${location}`)
 
       await archiveOldHotspots(userId)
       const snapshot = await getFamilySnapshot(userId)
@@ -319,7 +317,6 @@ async function runPatrolForUsers(userIds: string[], patrolTime: string) {
         .update({ updated_at: new Date().toISOString() })
         .eq('user_id', userId)
 
-      console.log(`${patrolTime} 用户${userId.slice(0, 8)} ${location} 写入${saved.count}条热点`)
       results.push({
         userId: userId.slice(0, 8),
         location,
@@ -331,8 +328,6 @@ async function runPatrolForUsers(userIds: string[], patrolTime: string) {
       results.push({ userId: userId.slice(0, 8), error: e?.message })
     }
   }
-
-  console.log(`${patrolTime} 巡逻批次完成`, { users: userIds.length, results })
 }
 
 export async function POST(req: NextRequest) {
@@ -340,7 +335,6 @@ export async function POST(req: NextRequest) {
     const body = await req.json().catch(() => ({}))
     const hour = new Date().getHours()
     const patrolTime = hour < 10 ? '早安巡逻' : hour < 14 ? '午间巡逻' : hour < 18 ? '放学巡逻' : '晚间巡逻'
-    console.log(`根开始${patrolTime}:`, new Date().toISOString())
 
     const { user, error: authError } = await getAuthUser(req)
     const cronSecret = process.env.CRON_SECRET

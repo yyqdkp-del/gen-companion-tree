@@ -80,18 +80,14 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  console.log('Gmail扫描开始:', new Date().toISOString())
-
   try {
     const allEmails = await fetchRecentEmails()
-    console.log('读取邮件:', allEmails.length)
 
     if (!allEmails.length) {
       return NextResponse.json({ ok: true, message: '无新邮件', scanned: 0 })
     }
 
     const relevant = filterRelevantEmails(allEmails)
-    console.log('相关邮件:', relevant.length)
 
     if (!relevant.length) {
       return NextResponse.json({ ok: true, message: '无相关邮件', scanned: allEmails.length })

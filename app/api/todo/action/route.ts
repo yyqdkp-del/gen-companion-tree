@@ -152,8 +152,6 @@ export async function POST(req: NextRequest) {
     const action = actionType || todo.ai_action_type
     const actionData = todo.ai_action_data || {}
 
-    console.log(`根执行一键办理：${todo.title}，类型：${action}`)
-
     let result = ''
     let success = false
     let message = ''

@@ -28,7 +28,6 @@ async function trigger(path: string, method: 'GET' | 'POST' = 'GET', body?: any)
       headers,
       body: body ? JSON.stringify(body) : undefined,
     })
-    console.log(`${path} → ${res.status}`)
     return res.status
   } catch (e: any) {
     console.error(`${path} 触发失败:`, e?.message)
@@ -80,8 +79,6 @@ export async function GET(req: NextRequest) {
     await trigger('/api/cron/prepare-actions')
     tasks.push('prepare_actions')
   }
-
-  console.log(`Scheduler ${now.toISOString()} 执行: ${tasks.join(', ')}`)
 
   return NextResponse.json({
     ok: true,

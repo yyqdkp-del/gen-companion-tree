@@ -544,7 +544,7 @@ export default function DecodePage() {
         <AnimatePresence>
           {data && !loading && (
             <>
-              {activeTab === 'hanzi' && <HanziResult data={data} char={input} onMomCopy={handleMomCopy} childLevel={childInfo.level} childName={activeKid?.name || childInfo.name} onSentenceSaved={(s) => console.log('sentence saved:', s)} />}
+              {activeTab === 'hanzi' && <HanziResult data={data} char={input} onMomCopy={handleMomCopy} childLevel={childInfo.level} childName={activeKid?.name || childInfo.name} />}
               {activeTab === 'chengyu' && <ChengYuResult data={data} onMomCopy={handleMomCopy} />}
               {activeTab === 'writing' && <WritingResult data={data} onMomCopy={handleMomCopy} />}
 

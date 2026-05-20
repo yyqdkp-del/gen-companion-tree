@@ -225,6 +225,14 @@ export default function ChinesePage() {
       })
 
       const data = await res.json()
+
+      if (res.status === 429 || data._rate_limited) {
+        const msg = typeof data.error === 'string' ? data.error : '今日免费次数已用完，请登录后继续'
+        window.alert(msg)
+        setPhase('quiz')
+        return
+      }
+
       const reportData: Report = data.level ? data : FALLBACK_REPORT
 
       // 存档（不含敏感信息落地）

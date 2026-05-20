@@ -738,7 +738,6 @@ ${grokInfo || '暂无'}
       return
     }
     const toolUses = data.content?.filter((c: any) => c.type === 'tool_use') || []
-    console.log(`Job ${jobId}: Claude调用了 ${toolUses.length} 个工具: ${toolUses.map((t: any) => t.name).join(', ')}`)
 
     // 执行所有工具
     const todoIds: string[] = []
@@ -759,8 +758,6 @@ ${grokInfo || '暂无'}
       completed_at: new Date().toISOString(),
       extracted_events: toolUses.map((t: any) => ({ tool: t.name, input: t.input })),
     }).eq('id', jobId)
-
-    console.log(`Job ${jobId} 完成，生成 ${todoIds.length} 个待办`)
 
   } catch (e: any) {
     console.error(`Job ${jobId} 失败:`, e?.message)
@@ -793,8 +790,6 @@ export async function GET(req: NextRequest) {
     if (!jobs?.length) {
       return NextResponse.json({ ok: true, processed: 0, message: '队列为空' })
     }
-
-    console.log(`Worker 开始处理 ${jobs.length} 个 jobs`)
 
     // 逐个处理（避免并发超时）
     for (const job of jobs) {

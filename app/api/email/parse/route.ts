@@ -497,7 +497,6 @@ export async function POST(req: NextRequest) {
         if (email.message_id) {
           const already = await isAlreadyProcessed(supabase, email.message_id)
           if (already) {
-            console.log('邮件已处理，跳过:', email.subject)
             results.push({ skipped: true, subject: email.subject })
             continue
           }
@@ -517,15 +516,12 @@ export async function POST(req: NextRequest) {
         ) && !looksImportant
 
         if (isSpam) {
-          console.log('疑似垃圾邮件，跳过:', email.subject)
           results.push({ spam: true, subject: email.subject })
           continue
         }
 
         // Claude解析
-        console.log('解析邮件:', email.subject)
         const parsed = await parseEmailWithClaude(email, familyContext)
-        console.log('解析结果类型:', parsed.email_type, '置信度:', parsed.confidence)
 
         if (parsed.email_type === 'spam' || parsed.confidence < 0.3) {
           results.push({ spam: true, subject: email.subject })

@@ -1,5 +1,37 @@
 export const dynamic = 'force-dynamic'
 import { NextRequest, NextResponse } from 'next/server'
+import { getAuthUser } from '@/lib/auth/getAuthUser'
+
+const ANON_IP_DAILY_LIMIT = 3
+type AssessIpBucket = { day: string; count: number }
+const anonymousAssessIp = new Map<string, AssessIpBucket>()
+
+function utcDay(): string {
+  return new Date().toISOString().slice(0, 10)
+}
+
+function getClientIp(req: NextRequest): string {
+  const xf = req.headers.get('x-forwarded-for')
+  if (xf) return xf.split(',')[0]?.trim() || 'unknown'
+  return req.headers.get('x-real-ip') || 'unknown'
+}
+
+/** 匿名：每 IP（UTC 日）限制次数；已通过 JWT 则不限 */
+function consumeAnonymousAssessSlot(ip: string): boolean {
+  const day = utcDay()
+  if (anonymousAssessIp.size > 5000) {
+    for (const [k, v] of anonymousAssessIp)
+      if (v.day !== day) anonymousAssessIp.delete(k)
+  }
+  let b = anonymousAssessIp.get(ip)
+  if (!b || b.day !== day) {
+    b = { day, count: 0 }
+    anonymousAssessIp.set(ip, b)
+  }
+  if (b.count >= ANON_IP_DAILY_LIMIT) return false
+  b.count += 1
+  return true
+}
 
 const FALLBACK_DATA = {
   level: 'R3',
@@ -55,6 +87,23 @@ function inferLevel(answers: Record<string, string>): string {
 }
 
 export async function POST(req: NextRequest) {
+  const authHeader = req.headers.get('Authorization') ?? req.headers.get('authorization')
+  const bearer = authHeader?.replace(/^Bearer\s+/i, '')?.trim()
+  let authenticated = false
+  if (bearer) {
+    const { user, error } = await getAuthUser(req)
+    authenticated = !!(user && !error)
+  }
+  if (!authenticated) {
+    const ip = getClientIp(req)
+    if (!consumeAnonymousAssessSlot(ip)) {
+      return NextResponse.json(
+        { error: '今日免费次数已用完，请登录后继续', _rate_limited: true },
+        { status: 429 },
+      )
+    }
+  }
+
   // 输入校验
   let answers: Record<string, string>
   let geofence: { city?: string; country?: string } | null = null

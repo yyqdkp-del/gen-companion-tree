@@ -46,8 +46,6 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ ok: true, processed: 0, message: '全部已预处理' })
     }
 
-    console.log(`[prepare-actions] 发现 ${needProcess.length} 条未预处理 todo`)
-
     // 并发限制：每次最多处理 5 条（避免超时）
     const batch = needProcess.slice(0, 5)
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || ''
@@ -71,8 +69,6 @@ export async function GET(req: NextRequest) {
 
     const succeeded = results.filter(r => r.status === 'fulfilled').length
     const failed = results.filter(r => r.status === 'rejected').length
-
-    console.log(`[prepare-actions] 完成: ${succeeded} 成功, ${failed} 失败`)
 
     return NextResponse.json({
       ok: true,
