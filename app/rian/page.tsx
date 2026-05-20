@@ -374,7 +374,7 @@ const reminders = useMemo<Reminder[]>(() => {
                   fontFamily: 'sans-serif',
                 }}
               >
-                AI生成本周成长故事，一键分享到微信
+                根·生成本周成长故事，一键分享到微信
               </div>
             </div>
             <div style={{ fontSize: 18, color: 'rgba(45,50,47,0.3)' }}>→</div>

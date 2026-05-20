@@ -71,7 +71,7 @@ function TodoRow({ todo, onAction, onDone }: {
               background: 'rgba(255,255,255,0.55)',
               border: '1px solid rgba(0,0,0,0.06)',
               fontSize: 11, color: THEME.muted, fontStyle: 'italic' }}>
-              AI草稿：{todo.ai_draft.substring(0, 50)}…
+              根·草稿：{todo.ai_draft.substring(0, 50)}…
             </div>
           )}
         </div>

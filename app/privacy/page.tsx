@@ -26,10 +26,10 @@ const sections = [
 我们不会将您的个人信息出售给任何第三方。`,
   },
   {
-    title: 'AI 与数据处理',
-    content: `根·陪伴使用 Claude（Anthropic）、Grok（xAI）等 AI 服务处理您的输入。您的数据会被发送至这些服务进行分析，但不会被用于训练这些模型（除非您在注册时明确同意 AI 训练用途）。
+    title: '根与数据处理',
+    content: `根·陪伴使用 Claude（Anthropic）、Grok（xAI）等智能服务处理您的输入。您的数据会被发送至这些服务进行分析，但不会被用于训练这些模型（除非您在注册时明确同意模型训练用途）。
 
-所有 AI 处理结果仅对您可见。`,
+所有根的处理结果仅对您可见。`,
   },
   {
     title: '数据存储与安全',
@@ -39,13 +39,13 @@ const sections = [
   },
   {
     title: '您的权利',
-    content: `您随时可以：查看和导出您的所有数据、修改或删除任何记录、撤回对 AI 训练的授权、注销账号并永久删除所有数据。
+    content: `您随时可以：查看和导出您的所有数据、修改或删除任何记录、撤回对模型训练的授权、注销账号并永久删除所有数据。
 
 如需行使上述权利，请通过应用内联系我们。`,
   },
   {
     title: '第三方服务',
-    content: `我们使用以下第三方服务：Supabase（数据存储）、Anthropic Claude（AI 分析）、xAI Grok（实时搜索）、Google（登录与日历）、LINE（登录）、Vercel（服务托管）。
+    content: `我们使用以下第三方服务：Supabase（数据存储）、Anthropic Claude（智能分析）、xAI Grok（实时搜索）、Google（登录与日历）、LINE（登录）、Vercel（服务托管）。
 
 每项服务均有其独立的隐私政策。`,
   },

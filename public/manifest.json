@@ -1,7 +1,7 @@
 {
   "name": "Gen Companion Tree",
   "short_name": "Companion",
-  "description": "Your AI companion tree application",
+  "description": "根·陪伴 — 海外华人家庭的智能生活管家",
   "start_url": "/",
   "display": "standalone",
   "orientation": "portrait",

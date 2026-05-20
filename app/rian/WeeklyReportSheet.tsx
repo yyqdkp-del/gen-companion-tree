@@ -174,7 +174,7 @@ export default function WeeklyReportSheet({ childId, childName, onClose }: Props
                   margin: '0 auto 12px',
                 }}
               />
-              <div style={{ fontSize: 13 }}>AI 正在写本周成长故事…</div>
+              <div style={{ fontSize: 13 }}>根正在写本周成长故事…</div>
             </div>
           )}
 

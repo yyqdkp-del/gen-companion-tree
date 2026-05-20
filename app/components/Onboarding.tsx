@@ -146,7 +146,7 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
               lineHeight: 1.7,
               marginBottom: 40,
             }}>
-              专为海外华人家庭打造的 AI 助手<br />
+              专为海外华人家庭打造的根<br />
               帮你管理家庭事务，陪伴孩子成长
             </p>
             <button
@@ -168,7 +168,7 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
               color: 'var(--color-text-secondary, rgba(0,0,0,0.55))',
               marginBottom: 32,
             }}>
-              添加孩子档案，让 AI 更了解你的家庭
+              添加孩子档案，让根更了解你的家庭
             </p>
 
             <div style={{ marginBottom: 20 }}>
@@ -252,7 +252,7 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
               color: 'var(--color-text-secondary, rgba(0,0,0,0.55))',
               marginBottom: 24,
             }}>
-              说出一件事，AI 会帮你整理成待办
+              说出一件事，根来帮你整理成待办
             </p>
 
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 16 }}>
@@ -315,13 +315,13 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
           <div style={{ textAlign: 'center', paddingTop: 20 }}>
             <div style={{ fontSize: 48, marginBottom: 24 }}>✨</div>
             <h2 style={{ fontSize: 22, fontWeight: 500, marginBottom: 32 }}>
-              你的专属 AI 助手已就绪
+              你的专属根已就绪
             </h2>
 
             {[
               { icon: '🌸', title: '木棉树洞', desc: '深夜有人陪，说说心里话' },
               { icon: '📚', title: '汉字解码', desc: '让中文学习变得有趣' },
-              { icon: '⚡', title: '一键办事', desc: '繁琐的事务交给 AI' },
+              { icon: '⚡', title: '一键办事', desc: '繁琐的事务交给根' },
               { icon: '🏫', title: '学校通知', desc: '自动解析英文邮件' },
             ].map(card => (
               <div

@@ -246,7 +246,7 @@ export default function AuthPage() {
                   style={styles.checkbox}
                 />
                 <span style={{ fontSize: 13, color: '#6B8BAA', lineHeight: 1.6 }}>
-                  同意将使用数据用于改进AI（可选，帮助根更懂你）
+                  同意将使用数据用于改进根（可选，帮助根更懂你）
                 </span>
               </label>
             </motion.div>

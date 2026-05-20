@@ -329,7 +329,7 @@ export default function TravelPage() {
                 width: '100%', padding: 14, borderRadius: 14, border: 'none', background: ACCENT, color: '#fff',
                 fontWeight: 700, fontSize: 15, cursor: planning ? 'wait' : 'pointer', marginTop: 8,
               }}>
-              {planning ? 'AI 正在规划你的专属行程…' : '生成行程方案'}
+              {planning ? '根正在规划你的专属行程…' : '生成行程方案'}
             </motion.button>
 
             {planning && (

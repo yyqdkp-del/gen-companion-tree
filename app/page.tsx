@@ -403,8 +403,12 @@ export default function BasePage() {
         <div style={{
           position: 'fixed',
           top: 'max(52px, env(safe-area-inset-top, 52px))',
-          left: '6%',
+          right: '22%',
+          left: 'auto',
           zIndex: 10,
+          textAlign: 'right',
+          maxWidth: 'min(38vw, 200px)',
+          pointerEvents: 'none',
         }}>
           <div style={{
             fontFamily: "'Noto Serif SC', serif",
