@@ -9,14 +9,11 @@
     "lint": "eslint"
   },
   "dependencies": {
-    "@ai-sdk/anthropic": "^3.0.71",
-    "@ai-sdk/react": "^3.0.170",
     "@anthropic-ai/sdk": "^0.97.0",
     "@supabase/ssr": "^0.10.2",
     "@supabase/supabase-js": "^2.103.3",
     "@types/bcryptjs": "^2.4.6",
     "@vercel/functions": "^3.4.5",
-    "ai": "^6.0.168",
     "bcryptjs": "^3.0.3",
     "framer-motion": "^12.38.0",
     "lucide-react": "^1.8.0",
@@ -25,8 +22,7 @@
     "posthog-js": "^1.374.2",
     "react": "19.2.4",
     "react-dom": "19.2.4",
-    "web-push": "^3.6.7",
-    "zod": "3.25.76"
+    "web-push": "^3.6.7"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

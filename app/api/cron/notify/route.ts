@@ -1,5 +1,5 @@
 export const dynamic = 'force-dynamic'
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { sendPushToUser } from '@/lib/push'
 import { getUserLocation, isMorningReportTime, isEveningReportTime } from '@/lib/geofence'
@@ -299,7 +299,17 @@ async function sendDepartureReminders(userId: string, timeZone: string) {
 // 在文件顶部加：
 // import { getUserLocation, isMorningReportTime, isEveningReportTime } from '@/lib/geofence'
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const authHeader = req.headers.get('authorization')
+  const bearer = authHeader?.startsWith('Bearer ') ? authHeader.slice('Bearer '.length).trim() : ''
+  const secret =
+    req.headers.get('x-cron-secret') ||
+    req.nextUrl.searchParams.get('secret') ||
+    bearer
+  if (!process.env.CRON_SECRET || secret !== process.env.CRON_SECRET) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
   try {
     const users = await getAllSubscribedUsers()
 

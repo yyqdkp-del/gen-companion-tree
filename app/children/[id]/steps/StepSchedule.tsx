@@ -3,6 +3,7 @@ import React, { useState, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Loader, Check, X, Plus, Camera } from 'lucide-react'
 import { THEME } from '@/app/_shared/_constants/theme'
+import { fetchWithAuth } from '@/lib/auth/fetchWithAuth'
 
 const DAYS = [
   { key: 'mon', label: '周一' },
@@ -163,7 +164,7 @@ function StepSchedule({ data, onChange }: { data: any; onChange: (d: any) => voi
         setParsing(false)
         return
       }
-      const resp = await fetch('/api/children/parse-schedule', {
+      const resp = await fetchWithAuth('/api/children/parse-schedule', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ image: base64, mediaType: 'image/jpeg' }),

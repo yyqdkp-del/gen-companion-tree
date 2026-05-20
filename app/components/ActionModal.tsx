@@ -418,7 +418,6 @@ async function executeAction(
           const pdfRes = await fetchWithAuth('/api/todo/generate-pdf', {
             method: 'POST',
             body: JSON.stringify({
-              user_id: userId,
               ...(ctx?.sourceType === 'todo' && ctx?.sourceId ? { todo_id: ctx.sourceId } : {}),
               form_type: data.form_type,
               prefilled_fields: data.prefilled_fields ?? {},

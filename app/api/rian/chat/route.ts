@@ -1,6 +1,7 @@
 export const dynamic = 'force-dynamic'
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { getAuthUser } from '@/lib/auth/getAuthUser'
 
 const MAKE_WEBHOOK_URL = process.env.NEXT_PUBLIC_MAKE_WEBHOOK_URL || ''
 
@@ -241,7 +242,13 @@ async function executeAction(question: string, context: string): Promise<string 
 
 export async function POST(req: NextRequest) {
   try {
-    const { question, context, history, event_data, user_id } = await req.json()
+    const { user, error } = await getAuthUser(req)
+    if (error || !user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+    const userId = user.id
+
+    const { question, context, history, event_data } = await req.json()
 
     const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL || '',
@@ -254,12 +261,12 @@ export async function POST(req: NextRequest) {
     // 如果有事件数据传入，自动触发Make.com
     if (event_data?.length > 0) {
       const docType = detectDocumentType(context)
-      await updateFamilyProfile(supabase, docType, event_data, user_id || null)
+      await updateFamilyProfile(supabase, docType, event_data, userId)
       triggerMake(event_data, 'chat') // 非阻塞
     }
 
     const messages = [
-      ...history.map((m: any) => ({ role: m.role as 'user' | 'assistant', content: m.text })),
+      ...(Array.isArray(history) ? history : []).map((m: any) => ({ role: m.role as 'user' | 'assistant', content: m.text })),
       { role: 'user', content: question }
     ]
 

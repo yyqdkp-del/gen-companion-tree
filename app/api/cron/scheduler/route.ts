@@ -1,13 +1,27 @@
 export const dynamic = 'force-dynamic'
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
+
+function assertCronSecret(req: NextRequest): NextResponse | null {
+  const authHeader = req.headers.get('authorization')
+  const bearer = authHeader?.startsWith('Bearer ') ? authHeader.slice('Bearer '.length).trim() : ''
+  const secret =
+    req.headers.get('x-cron-secret') ||
+    req.nextUrl.searchParams.get('secret') ||
+    bearer
+  if (!process.env.CRON_SECRET || secret !== process.env.CRON_SECRET) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+  return null
+}
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://gen-companion-tree.vercel.app'
 
 async function trigger(path: string, method: 'GET' | 'POST' = 'GET', body?: any) {
   try {
     const headers: Record<string, string> = { 'Content-Type': 'application/json' }
-    if (method === 'POST' && path === '/api/base/patrol' && process.env.CRON_SECRET) {
+    if (process.env.CRON_SECRET) {
       headers.Authorization = `Bearer ${process.env.CRON_SECRET}`
+      headers['x-cron-secret'] = process.env.CRON_SECRET
     }
     const res = await fetch(`${APP_URL}${path}`, {
       method,
@@ -22,7 +36,10 @@ async function trigger(path: string, method: 'GET' | 'POST' = 'GET', body?: any)
   }
 }
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const cronDenied = assertCronSecret(req)
+  if (cronDenied) return cronDenied
+
   const now = new Date()
   const utcHour = now.getUTCHours()
   const utcMin = now.getUTCMinutes()

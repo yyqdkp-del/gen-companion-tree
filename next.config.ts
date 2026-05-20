@@ -7,6 +7,6 @@ const nextConfig: NextConfig = {
     ignoreDuringBuilds: true,
   },
   productionBrowserSourceMaps: false,
-  serverExternalPackages: ['@supabase/supabase-js', 'ai', '@ai-sdk/anthropic'],
+  serverExternalPackages: ['@supabase/supabase-js'],
 };
 export default nextConfig;

@@ -1,5 +1,5 @@
 export const dynamic = 'force-dynamic'
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { getUserLocation } from '@/lib/geofence'
 import { getTodayStr, getTodayStrInTimeZone } from '@/lib/date/localDate'
@@ -775,7 +775,11 @@ ${grokInfo || '暂无'}
 }
 
 // ══ Worker 主入口 ══
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const secret = req.headers.get('x-cron-secret')
+  if (!process.env.CRON_SECRET || secret !== process.env.CRON_SECRET) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
   try {
     // 取待处理的 jobs（queued 状态，每次最多处理3个）
     const { data: jobs } = await supabase

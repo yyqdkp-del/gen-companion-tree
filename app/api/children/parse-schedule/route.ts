@@ -1,7 +1,13 @@
 export const dynamic = 'force-dynamic'
 import { NextRequest, NextResponse } from 'next/server'
+import { getAuthUser } from '@/lib/auth/getAuthUser'
 
 export async function POST(req: NextRequest) {
+  const { user, error } = await getAuthUser(req)
+  if (error || !user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
   const { image } = await req.json()
   if (!image) return NextResponse.json({ error: '没有图片' }, { status: 400 })
 

@@ -14,7 +14,7 @@ export async function POST(req: NextRequest) {
     req.headers.get('authorization')?.replace('Bearer ', '') || ''
   )
 
-  await supabase.from('assessments').insert({
+  const { error } = await supabase.from('assessments').insert({
     user_id:        user?.id || null,
     child_name:     body.child_name,
     child_age:      body.child_age,
@@ -25,6 +25,11 @@ export async function POST(req: NextRequest) {
     source:         'chinese_assessment',   // 改：原为 'chinese'，更具体便于后台分析
     geofence_id:    body.geofence_id || null, // 新增：记录城市围栏 ID 便于按地区统计
   })
+
+  if (error) {
+    console.error('save-assessment failed:', error)
+    return NextResponse.json({ error: '保存失败' }, { status: 500 })
+  }
 
   return NextResponse.json({ ok: true })
 }

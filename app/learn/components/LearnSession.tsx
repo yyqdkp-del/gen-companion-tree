@@ -3,6 +3,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { CHINESE_THEME as T } from '@/app/_shared/_constants/chineseTheme'
 import { useApp } from '@/app/context/AppContext'
+import { fetchWithAuth } from '@/lib/auth/fetchWithAuth'
 
 const GLASS_CARD: React.CSSProperties = {
   background: 'rgba(255,255,255,0.82)',
@@ -1042,7 +1043,7 @@ function StepUse({ data, char, childName, canvasRef, onComplete }: {
     setLoading(true)
     try {
       // AI 评价 - 走后端
-      const res = await fetch('/api/rian/chat', {
+      const res = await fetchWithAuth('/api/rian/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

@@ -20,6 +20,7 @@ const WeeklyReportSheet = nextDynamic(() => import('./WeeklyReportSheet'), { ssr
 export const dynamic = 'force-dynamic'
 import { useApp } from '@/app/context/AppContext'
 import { logOrAlertNetworkError } from '@/lib/errors/logOrAlertNetworkError'
+import { fetchWithAuth } from '@/lib/auth/fetchWithAuth'
 import { useTodoEngine } from '@/app/_shared/_hooks/useTodoEngine'
 import type { TodoItem } from '@/app/_shared/_types'
 
@@ -122,7 +123,7 @@ const reminders = useMemo<Reminder[]>(() => {
     setReminderInput('')
     setReminderLoading(true)
     try {
-      const res = await fetch('/api/rian/chat', {
+      const res = await fetchWithAuth('/api/rian/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

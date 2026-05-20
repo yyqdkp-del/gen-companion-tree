@@ -1,6 +1,7 @@
 export const dynamic = 'force-dynamic'
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { getAuthUser } from '@/lib/auth/getAuthUser'
 import { PDFDocument, rgb, StandardFonts } from 'pdf-lib'
 
 function formatDate(dateStr: string | null): { day: string; month: string; year: string } {
@@ -189,22 +190,24 @@ async function generateTM7PDF(profile: any, address: string, visaType: string): 
 }
 
 export async function POST(req: NextRequest) {
+  const { user, error } = await getAuthUser(req)
+  if (error || !user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+  const userId = user.id
+
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL || '',
     process.env.SUPABASE_SERVICE_ROLE_KEY || ''
   )
     try {
-          const { user_id, todo_id, form_type = 'tm7' } = await req.json()
-
-      if (!user_id) {
-              return NextResponse.json({ ok: false, error: 'Missing user_id' }, { status: 400 })
-      }
+          const { todo_id, form_type = 'tm7' } = await req.json()
 
       const [{ data: profiles }, { data: places }, todoResult] = await Promise.all([
-              supabase.from('family_profile').select('*').eq('user_id', user_id),
-              supabase.from('family_places').select('*').eq('user_id', user_id),
+              supabase.from('family_profile').select('*').eq('user_id', userId),
+              supabase.from('family_places').select('*').eq('user_id', userId),
               todo_id
-                ? supabase.from('todo_items').select('*').eq('id', todo_id).eq('user_id', user_id).single()
+                ? supabase.from('todo_items').select('*').eq('id', todo_id).eq('user_id', userId).single()
                 : Promise.resolve({ data: null }),
             ])
 
@@ -250,7 +253,7 @@ export async function POST(req: NextRequest) {
             pdf_form_type: form_type,
             pdf_generated_at: new Date().toISOString(),
           }
-        }).eq('id', todo_id).eq('user_id', user_id)
+        }).eq('id', todo_id).eq('user_id', userId)
       }
 
       return NextResponse.json({
