@@ -16,6 +16,7 @@ import SmartQuickChars from './components/SmartQuickChars'
 import TabBar, { type TabType } from './components/TabBar'
 import { track } from '@/lib/analytics/track'
 import { SAFE_BOTTOM_INSET, STICKY_HEADER_PADDING_TOP } from '@/app/_shared/_constants/layout'
+import TourGuide, { type TourStep } from '@/app/components/TourGuide'
 
 const supabase = createClient()
 
@@ -32,6 +33,24 @@ type LearnedItem = { char?: string; chengyu?: string; type: TabType; mastery: nu
 
 // ══ 字族 + 延伸词汇 ══
 type PopupItem = { word: string; type: 'word' | 'chengyu' | 'cultural'; extra?: any }
+
+const LEARN_TOUR: TourStep[] = [
+  {
+    id: 'input',
+    title: '输入任意汉字',
+    desc: '输入一个汉字、成语或文化句，根会帮你拆解字源、笔画、妈妈台词，让孩子爱上中文。',
+    emoji: '📚',
+    position: 'top',
+    targetHint: '在上方输入框输入「家」试试',
+  },
+  {
+    id: 'learn',
+    title: '5分钟学一个字',
+    desc: '解码后点击「和孩子一起学」，走完字源→部件→描红→造句四个步骤，生成分享卡片给爷奶。',
+    emoji: '🎯',
+    position: 'center',
+  },
+]
 
 // ══ 主页面 ══
 export default function DecodePage() {
@@ -602,6 +621,8 @@ export default function DecodePage() {
         input, textarea { font-family: 'Noto Sans SC', sans-serif; }
         button:active { opacity: 0.85; }
       `}</style>
+
+      <TourGuide tourId="learn" steps={LEARN_TOUR} />
     </main>
   )
 }

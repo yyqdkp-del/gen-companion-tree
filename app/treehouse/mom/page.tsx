@@ -4,6 +4,7 @@ import { FormEvent, useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { fetchWithAuth } from '@/lib/auth/fetchWithAuth'
 import { track } from '@/lib/analytics/track'
+import TourGuide, { type TourStep } from '@/app/components/TourGuide'
 
 type Message = {
   id: string
@@ -14,6 +15,23 @@ type Message = {
 const WELCOME_MESSAGE = `嗨，我是木棉。今晚，这里只有你和我。
 不管你想说什么，哪怕是说不出口的话，
 我都在，我都接着。`
+
+const TREEHOLE_TOUR: TourStep[] = [
+  {
+    id: 'kapok',
+    title: '木棉，你的深夜陪伴',
+    desc: '不评判，不说教，只是陪着你。说说今天的心情，或者深夜的焦虑，木棉都在。',
+    emoji: '🌸',
+    position: 'center',
+  },
+  {
+    id: 'memory',
+    title: '木棉会记住你',
+    desc: '每次对话结束后，木棉会记住重要的事。下次回来，她还记得你说过的话。',
+    emoji: '💭',
+    position: 'bottom',
+  },
+]
 
 function TreeIcon() {
   return (
@@ -431,6 +449,8 @@ export default function KapokTreeholePage() {
           }
         }
       `}</style>
+
+      <TourGuide tourId="treehole" steps={TREEHOLE_TOUR} />
     </main>
   )
 }

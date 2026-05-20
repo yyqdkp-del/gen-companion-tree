@@ -31,6 +31,7 @@ import { getJsonAuthHeaders } from '@/lib/auth/clientAuthHeaders'
 import { fetchWithAuth } from '@/lib/auth/fetchWithAuth'
 import { logOrAlertNetworkError } from '@/lib/errors/logOrAlertNetworkError'
 import { toast } from '@/app/components/Toast'
+import TourGuide, { type TourStep } from '@/app/components/TourGuide'
 import { sanitizeFileName } from '@/lib/storage/sanitizeFileName'
 
 const ChildAvatar = nextDynamic(() => import('@/app/components/ChildAvatar'), { ssr: false })
@@ -240,6 +241,32 @@ function InputSheet({ onClose, userId, onProcessing }: {
     </motion.div>
   )
 }
+
+const HOME_TOUR: TourStep[] = [
+  {
+    id: 'water',
+    title: '三颗水珠，你的家庭全貌',
+    desc: '左边是孩子状态，中间是今日待办，右边是本地热点。点击水珠展开详情。',
+    emoji: '💧',
+    position: 'bottom',
+    targetHint: '试试点击中间那颗水珠',
+  },
+  {
+    id: 'hotspot',
+    title: '根在帮你巡逻',
+    desc: '每天三次，AI自动扫描本地天气、学校通知、签证政策，只推送对你重要的信息。',
+    emoji: '⚡',
+    position: 'center',
+  },
+  {
+    id: 'nav',
+    title: '底部导航',
+    desc: '🏠首页 · 📚学字 · 📅日安 · 🌳树屋 · 👤档案，每个功能都为海外华人家庭设计。',
+    emoji: '🧭',
+    position: 'bottom',
+    targetHint: '底部导航栏',
+  },
+]
 
 export default function BasePage() {
   const { userId, kids, todos, hotspots, loading, sync: ctxSync,
@@ -634,6 +661,8 @@ export default function BasePage() {
       }} />
 
       {!keyboardOpen && <InstallPWA />}
+
+      <TourGuide tourId="home" steps={HOME_TOUR} />
     </main>
   )
 }

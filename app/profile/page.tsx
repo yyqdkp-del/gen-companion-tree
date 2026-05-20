@@ -14,6 +14,7 @@ import { StepEmergency } from './steps/StepEmergency'
 import { useApp } from '@/app/context/AppContext'
 import { logOrAlertNetworkError } from '@/lib/errors/logOrAlertNetworkError'
 import { fetchWithAuth } from '@/lib/auth/fetchWithAuth'
+import TourGuide, { type TourStep } from '@/app/components/TourGuide'
 
 const supabase = createClient()
 
@@ -35,6 +36,24 @@ const STEPS = [
   { id: 'passport', icon: <FileText size={18} />, label: '护照签证' },
   { id: 'address', icon: <MapPin size={18} />, label: '常用地址' },
   { id: 'emergency', icon: <Shield size={18} />, label: '紧急联系' },
+]
+
+const PROFILE_TOUR: TourStep[] = [
+  {
+    id: 'profile',
+    title: '填得越详细，根越懂你',
+    desc: '孩子的学校、签证类型、居住城市，这些信息让AI热点和提醒更精准。',
+    emoji: '📋',
+    position: 'top',
+    targetHint: '从基本信息开始填',
+  },
+  {
+    id: 'cards',
+    title: '证件与医疗卡随身带',
+    desc: '护照到期、签证类型、孩子血型过敏，点击「证件与医疗卡」生成可打印的就诊卡。',
+    emoji: '🗂️',
+    position: 'center',
+  },
 ]
 
 function ProfileContent() {
@@ -551,6 +570,8 @@ function ProfileContent() {
         </div>
 
       </div>
+
+      <TourGuide tourId="profile" steps={PROFILE_TOUR} />
     </main>
   )
 }

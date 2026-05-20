@@ -23,6 +23,7 @@ import { logOrAlertNetworkError } from '@/lib/errors/logOrAlertNetworkError'
 import { fetchWithAuth } from '@/lib/auth/fetchWithAuth'
 import { useTodoEngine } from '@/app/_shared/_hooks/useTodoEngine'
 import type { TodoItem } from '@/app/_shared/_types'
+import TourGuide, { type TourStep } from '@/app/components/TourGuide'
 
 type Reminder = {
   id: string
@@ -49,6 +50,24 @@ type Child = {
   progress: number
   avatar_url?: string
 }
+
+const RIAN_TOUR: TourStep[] = [
+  {
+    id: 'todo',
+    title: '说出来，根来整理',
+    desc: '点击底部相机或麦克风，说一件事、拍一张通知，AI自动变成待办和日历。',
+    emoji: '✨',
+    position: 'bottom',
+    targetHint: '试试底部右侧相机按钮',
+  },
+  {
+    id: 'report',
+    title: '每周成长周报',
+    desc: '点击「给爷爷奶奶的成长周报」，AI生成本周故事，一键发微信给国内家人。',
+    emoji: '💌',
+    position: 'center',
+  },
+]
 
 export default function RianPage() {
   const router = useRouter()
@@ -475,6 +494,8 @@ initial={false}
           />
         )}
       </AnimatePresence>
+
+      <TourGuide tourId="rian" steps={RIAN_TOUR} />
     </main>
   )
 }
