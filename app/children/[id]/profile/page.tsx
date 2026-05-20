@@ -3,8 +3,9 @@
 import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { fetchWithAuth } from '@/lib/auth/fetchWithAuth'
-import { motion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 import { logOrAlertNetworkError } from '@/lib/errors/logOrAlertNetworkError'
+import AddMomentSheet from './AddMomentSheet'
 
 type TabKey = 'overview' | 'hanzi' | 'moments' | 'achievements'
 
@@ -25,6 +26,17 @@ export default function ChildProfilePage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [activeTab, setActiveTab] = useState<TabKey>('overview')
+  const [showAddMoment, setShowAddMoment] = useState(false)
+
+  const reloadProfile = () => {
+    fetchWithAuth(`/api/children/${childId}/profile`)
+      .then(async (r) => {
+        const json = await r.json()
+        if (!r.ok) throw new Error(json.error || '加载失败')
+        setData(json)
+      })
+      .catch((e) => logOrAlertNetworkError(e))
+  }
 
   useEffect(() => {
     if (!childId) return
@@ -332,6 +344,65 @@ export default function ChildProfilePage() {
 
         {activeTab === 'hanzi' && (
           <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
+            <div style={{
+              ...GLASS,
+              borderRadius: 18,
+              padding: '20px',
+              marginBottom: 14,
+            }}>
+              <div style={{ marginBottom: 16 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                  <span style={{ fontSize: 13, color: '#2d322f', fontFamily: "'Noto Serif SC', serif" }}>
+                    已学 {data?.hanzi_count ?? 0} 字
+                  </span>
+                  <span style={{ fontSize: 12, color: 'rgba(45,50,47,0.5)', fontFamily: 'sans-serif' }}>
+                    目标 100 字
+                  </span>
+                </div>
+                <div style={{ background: '#ece6dc', borderRadius: 6, height: 8 }}>
+                  <div style={{
+                    width: `${Math.min(((data?.hanzi_count ?? 0) / 100) * 100, 100)}%`,
+                    background: 'linear-gradient(90deg, #d5b4ab, #a46355)',
+                    height: '100%',
+                    borderRadius: 6,
+                    transition: 'width 0.6s ease',
+                  }} />
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: 8 }}>
+                {[1, 10, 50, 100].map((milestone) => (
+                  <div
+                    key={milestone}
+                    style={{
+                      flex: 1,
+                      textAlign: 'center',
+                      padding: '8px 4px',
+                      borderRadius: 10,
+                      background: (data?.hanzi_count ?? 0) >= milestone
+                        ? 'rgba(164,99,85,0.1)'
+                        : 'rgba(45,50,47,0.04)',
+                      border: (data?.hanzi_count ?? 0) >= milestone
+                        ? '1px solid rgba(164,99,85,0.2)'
+                        : '1px solid transparent',
+                    }}
+                  >
+                    <div style={{ fontSize: 16, marginBottom: 2 }}>
+                      {milestone === 1 ? '🌱' : milestone === 10 ? '📖' : milestone === 50 ? '🏮' : '🐉'}
+                    </div>
+                    <div style={{
+                      fontSize: 11,
+                      color: (data?.hanzi_count ?? 0) >= milestone ? '#a46355' : 'rgba(45,50,47,0.3)',
+                      fontFamily: 'sans-serif',
+                    }}
+                    >
+                      {milestone}字
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
             <div style={{ ...GLASS, borderRadius: 18, padding: '20px' }}>
               <div style={{
                 fontSize: 10,
@@ -340,8 +411,9 @@ export default function ChildProfilePage() {
                 marginBottom: 16,
                 fontFamily: 'sans-serif',
                 textTransform: 'uppercase',
-              }}>
-                共学了 {data?.hanzi_count || 0} 个汉字
+              }}
+              >
+                学过的字
               </div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
                 {data?.hanzi_list?.map((char: string, i: number) => (
@@ -367,40 +439,61 @@ export default function ChildProfilePage() {
                     {char}
                   </button>
                 ))}
-              </div>
-              {(!data?.hanzi_list || data.hanzi_list.length === 0) && (
-                <div style={{
-                  textAlign: 'center',
-                  padding: '32px 0',
-                  color: 'rgba(45,50,47,0.4)',
-                  fontSize: 14,
-                  fontFamily: 'sans-serif',
-                }}>
-                  还没有学习记录
-                  <br />
-                  <button
-                    type="button"
-                    onClick={() => router.push('/learn')}
-                    style={{
-                      marginTop: 12,
-                      background: 'none',
-                      border: 'none',
-                      color: '#a46355',
-                      fontSize: 12,
-                      cursor: 'pointer',
-                      fontFamily: "'Noto Serif SC', serif",
-                    }}
+                {(!data?.hanzi_list || data.hanzi_list.length === 0) && (
+                  <div style={{
+                    width: '100%',
+                    textAlign: 'center',
+                    padding: '32px 0',
+                    color: 'rgba(45,50,47,0.4)',
+                    fontSize: 14,
+                    fontFamily: 'sans-serif',
+                  }}
                   >
-                    去汉字解码器学第一个字 →
-                  </button>
-                </div>
-              )}
+                    还没有学习记录
+                    <br />
+                    <button
+                      type="button"
+                      onClick={() => router.push('/learn')}
+                      style={{
+                        marginTop: 8,
+                        background: 'none',
+                        border: 'none',
+                        fontSize: 12,
+                        color: '#a46355',
+                        cursor: 'pointer',
+                        fontFamily: "'Noto Serif SC', serif",
+                      }}
+                    >
+                      去汉字解码器学第一个字 →
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
           </motion.div>
         )}
 
         {activeTab === 'moments' && (
           <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
+            <button
+              type="button"
+              onClick={() => setShowAddMoment(true)}
+              style={{
+                width: '100%',
+                padding: '14px',
+                background: '#a46355',
+                color: '#fff',
+                border: 'none',
+                borderRadius: 14,
+                fontSize: 14,
+                fontFamily: "'Noto Serif SC', serif",
+                cursor: 'pointer',
+                marginBottom: 14,
+              }}
+            >
+              📸 记录新时刻
+            </button>
+
             {(!data?.moments || data.moments.length === 0) && (
               <div style={{
                 ...GLASS,
@@ -474,6 +567,19 @@ export default function ChildProfilePage() {
             ))}
           </motion.div>
         )}
+
+        <AnimatePresence>
+          {showAddMoment && (
+            <AddMomentSheet
+              childId={childId}
+              onClose={() => setShowAddMoment(false)}
+              onSaved={() => {
+                setShowAddMoment(false)
+                reloadProfile()
+              }}
+            />
+          )}
+        </AnimatePresence>
 
         {activeTab === 'achievements' && (
           <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>

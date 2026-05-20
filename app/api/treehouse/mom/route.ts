@@ -137,11 +137,31 @@ export async function POST(req: NextRequest) {
     })
   }
 
+  const serviceSupabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+  )
+
+  const { data: memoriesRows, error: memoriesErr } = await serviceSupabase
+    .from('mom_memories')
+    .select('content, type')
+    .eq('user_id', user.id)
+    .order('created_at', { ascending: false })
+    .limit(10)
+
+  if (memoriesErr) {
+    console.warn('[treehouse/mom] mom_memories skipped:', memoriesErr.message)
+  }
+
+  const memoryContext = memoriesRows?.length
+    ? `\n\n【关于这位妈妈，我记得的事情】\n${memoriesRows.map((m) => `- ${m.content}`).join('\n')}`
+    : ''
   const hour = new Date().getHours()
   const isLateNight = hour >= 22 || hour <= 5
-  const systemPrompt = isLateNight
-    ? KAPOK_SYSTEM_PROMPT + '\n\n【现在是深夜，用户可能更脆弱，语气要更温柔更有包裹感】'
-    : KAPOK_SYSTEM_PROMPT
+  const systemPrompt =
+    (isLateNight
+      ? KAPOK_SYSTEM_PROMPT + '\n\n【现在是深夜，用户可能更脆弱，语气要更温柔更有包裹感】'
+      : KAPOK_SYSTEM_PROMPT) + memoryContext
 
   const stream = anthropic.messages.stream({
     model: 'claude-sonnet-4-20250514',

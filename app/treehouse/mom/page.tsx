@@ -1,6 +1,6 @@
 'use client'
 
-import { FormEvent, useEffect, useRef, useState } from 'react'
+import { FormEvent, useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { fetchWithAuth } from '@/lib/auth/fetchWithAuth'
 import { track } from '@/lib/analytics/track'
@@ -38,10 +38,65 @@ export default function KapokTreeholePage() {
   const [input, setInput] = useState('')
   const [isThinking, setIsThinking] = useState(false)
   const bottomRef = useRef<HTMLDivElement>(null)
+  const messagesRef = useRef<Message[]>([])
+  /** 最近一次提交的对话签名，避免静置与离开页面重复写入 */
+  const lastMemorySigRef = useRef('')
+  const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => {
+    messagesRef.current = messages
+  }, [messages])
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, isThinking])
+
+  const postMemorySlice = useCallback(async () => {
+    const filtered = messagesRef.current.filter((m) => m.id !== 'welcome')
+    const slice = filtered.slice(-10).map(({ role, content }) => ({ role, content }))
+    if (slice.length <= 2) return
+    const sig = slice.map((m) => `${m.role}:${m.content}`).join('\u001f')
+    if (sig === lastMemorySigRef.current) return
+
+    await fetchWithAuth('/api/treehouse/memory', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ messages: slice }),
+    }).catch(() => {})
+
+    lastMemorySigRef.current = sig
+  }, [])
+
+  useEffect(() => {
+    if (idleTimerRef.current) clearTimeout(idleTimerRef.current)
+
+    const filtered = messages.filter((m) => m.id !== 'welcome')
+    if (filtered.length <= 2) return
+
+    idleTimerRef.current = setTimeout(() => {
+      void postMemorySlice()
+    }, 2 * 60 * 1000)
+
+    return () => {
+      if (idleTimerRef.current) clearTimeout(idleTimerRef.current)
+      idleTimerRef.current = null
+    }
+  }, [messages, postMemorySlice])
+
+  useEffect(() => {
+    const flush = () => {
+      void postMemorySlice()
+    }
+    window.addEventListener('pagehide', flush)
+    const vis = () => {
+      if (document.visibilityState === 'hidden') flush()
+    }
+    document.addEventListener('visibilitychange', vis)
+    return () => {
+      window.removeEventListener('pagehide', flush)
+      document.removeEventListener('visibilitychange', vis)
+    }
+  }, [postMemorySlice])
 
   async function sendMessage(event?: FormEvent<HTMLFormElement>) {
     event?.preventDefault()

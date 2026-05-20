@@ -4,6 +4,20 @@ import { sanitizeFileName } from '@/lib/storage/sanitizeFileName'
 
 const supabase = createClient()
 
+/** 仅上传并得到公开 URL（不触发 Rian 异步处理）；用于时刻照片等场景 */
+export async function uploadFile(file: Blob | File, category: string): Promise<string> {
+  const name = file instanceof File ? file.name : `file_${Date.now()}`
+  const path = `uploads/${category}/${sanitizeFileName(name)}`
+
+  const { error } = await supabase.storage
+    .from('companion-files')
+    .upload(path, file, { upsert: true })
+  if (error) throw error
+
+  const { data: urlData } = supabase.storage.from('companion-files').getPublicUrl(path)
+  return urlData.publicUrl
+}
+
 export async function uploadAndProcess(
   file: Blob | File,
   category: string,

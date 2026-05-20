@@ -460,11 +460,31 @@ export default function BasePage() {
           transform: 'translate(-50%, -50%)',
           display: 'flex', flexDirection: 'column', alignItems: 'center',
           gap: 'clamp(20px, 5vw, 36px)' }}>
-          <WaterDrop state={childState} icon={<Heart size={24} />} label="孩子"
-            value={activeKid ? `${activeKid.energy ?? 75}%` : '—'}
-            badge={childUrgent} pulse={childUrgent > 0}
-            onClick={() => { void track({ event_type: 'droplet_click', meta: { type: 'child' } }); openModal('child') }} size={124} delay={0}
-            className="animate-droplet-1" />
+          <div style={{ position: 'relative', display: 'inline-flex', flexDirection: 'column', alignItems: 'center' }}>
+            <WaterDrop state={childState} icon={<Heart size={24} />} label="孩子"
+              value={activeKid ? `${activeKid.energy ?? 75}%` : '—'}
+              badge={childUrgent} pulse={childUrgent > 0}
+              onClick={() => { void track({ event_type: 'droplet_click', meta: { type: 'child' } }); openModal('child') }} size={124} delay={0}
+              className="animate-droplet-1" />
+            {activeKid && (activeKid.total_hanzi ?? 0) > 0 && (
+              <div style={{
+                position: 'absolute',
+                bottom: -8,
+                left: '50%',
+                transform: 'translateX(-50%)',
+                background: '#a46355',
+                color: '#fff',
+                fontSize: 10,
+                padding: '2px 8px',
+                borderRadius: 10,
+                fontFamily: 'sans-serif',
+                whiteSpace: 'nowrap',
+              }}
+              >
+                识{activeKid.total_hanzi}字
+              </div>
+            )}
+          </div>
           <div style={{ display: 'flex', gap: 'clamp(28px, 8vw, 52px)', alignItems: 'center' }}>
             <WaterDrop state={todoEngine.state} icon={<Bell size={20} />} label="待办"
               value={todoEngine.badge > 0 ? `${todoEngine.badge}条` : '静默'}
