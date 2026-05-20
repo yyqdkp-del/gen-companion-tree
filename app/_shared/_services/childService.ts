@@ -5,9 +5,13 @@ import { addDaysStr, getTodayStr } from '@/lib/date/localDate'
 
 const supabase = createClient()
 
+const DOW_KEY_BY_NUM: Record<number, string> = {
+  0: 'sun', 1: 'mon', 2: 'tue', 3: 'wed', 4: 'thu', 5: 'fri', 6: 'sat',
+}
+
 export async function fetchChildSchedule(childId: string, today: string) {
   const dow = new Date(`${today}T12:00:00`).getDay()
-  const dowKey = ['sun','mon','tue','wed','thu','fri','sat'][dow]
+  const dowKey = DOW_KEY_BY_NUM[dow]
   const y = new Date().getFullYear()
   const yearEnd = getTodayStr(new Date(y, 11, 31))
 
@@ -59,7 +63,12 @@ export async function fetchChildSchedule(childId: string, today: string) {
 
   if (Array.isArray(activities)) {
     activities.forEach((a: any, i: number) => {
-      if (a.day_of_week === dow || a.day === dow) {
+      const dayList = Array.isArray(a.days) ? a.days.map(String) : []
+      if (
+        a.day_of_week === dow ||
+        a.day === dow ||
+        dayList.includes(dowKey)
+      ) {
         items.push({
           id: `act_${i}`, time: a.time || a.start_time || '15:00',
           end_time: a.end_time, title: a.name || a.title,
@@ -124,16 +133,22 @@ export async function enrichChildren(
           .lte('date_start', addDaysStr(new Date(), 7))
           .order('date_start'),
         supabase.from('child_profiles')
-          .select('activities').eq('child_id', c.id).maybeSingle(),
+          .select('activities, class_schedule').eq('child_id', c.id).maybeSingle(),
         supabase.from('child_activities')
           .select('name, days, is_active').eq('child_id', c.id).eq('user_id', uid),
       ])
       const log  = logRes.status === 'fulfilled' ? logRes.value.data : null
       const evts = evtRes.status === 'fulfilled' ? (evtRes.value.data || []) : []
 
-      const profileActsRaw =
-        profRes.status === 'fulfilled' ? (profRes.value.data?.activities ?? []) : []
+      const profile =
+        profRes.status === 'fulfilled' ? profRes.value.data : null
+      const profileActsRaw = profile?.activities ?? []
       const profileActivities = Array.isArray(profileActsRaw) ? profileActsRaw : []
+      const classSchedule = (profile?.class_schedule as Record<string, unknown>) || {}
+      const todayDow = new Date(`${today}T12:00:00`).getDay()
+      const todayKey = DOW_KEY_BY_NUM[todayDow]
+      const todayClassesRaw = classSchedule[todayKey]
+      const today_classes = Array.isArray(todayClassesRaw) ? todayClassesRaw : []
 
       const normalizeActDays = (raw: unknown): string[] => {
         if (Array.isArray(raw)) return raw.map(String).filter(Boolean)
@@ -218,6 +233,8 @@ export async function enrichChildren(
         grade: c.grade,
         school_end_time: c.school_end_time ?? null,
         activities,
+        class_schedule: classSchedule,
+        today_classes,
         urgent_items,
         today_schedule: todayEvts.map((e: any) => ({
           time: '', title: e.title,

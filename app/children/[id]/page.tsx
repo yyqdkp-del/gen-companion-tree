@@ -222,7 +222,7 @@ function ChildEditContent() {
       }
 
       setSaved(true)
-      setTimeout(() => router.push('/'), 1200)
+      setTimeout(() => router.push('/?refresh=1'), 1200)
 
     } catch (e) {
       if (!logOrAlertNetworkError(e)) setSaveError('保存失败，请检查网络后重试')

@@ -33,6 +33,7 @@ import { logOrAlertNetworkError } from '@/lib/errors/logOrAlertNetworkError'
 import { toast } from '@/app/components/Toast'
 import TourGuide, { type TourStep } from '@/app/components/TourGuide'
 import { sanitizeFileName } from '@/lib/storage/sanitizeFileName'
+import { useSearchParams, useRouter } from 'next/navigation'
 
 const ChildAvatar = nextDynamic(() => import('@/app/components/ChildAvatar'), { ssr: false })
 
@@ -269,6 +270,8 @@ const HOME_TOUR: TourStep[] = [
 ]
 
 export default function BasePage() {
+  const searchParams = useSearchParams()
+  const router = useRouter()
   const { userId, kids, todos, hotspots, loading, sessionReady, sync: ctxSync,
     processStatus, setProcessStatus, activeKid, setActiveKid,
     modalOpen, setModalOpen, showOnboarding, setShowOnboarding } = useApp()
@@ -296,6 +299,12 @@ export default function BasePage() {
       setActiveKid(current)
     }
   }, [enrichedKids, setActiveKid])
+
+  useEffect(() => {
+    if (!searchParams.get('refresh')) return
+    void refreshKids()
+    router.replace('/', { scroll: false })
+  }, [searchParams, refreshKids, router])
 
   useEffect(() => {
     setMounted(true)
@@ -403,15 +412,25 @@ export default function BasePage() {
     return false
   }) || []
 
+  const todayClasses = (activeKid as any)?.today_classes || []
+
   const childValue = !activeKid ? '—'
-    : todayActivities.length > 0 ? `${todayActivities[0].name ?? todayActivities[0].title ?? '活动'}`
-      : (activeKid as any).energy != null ? `${(activeKid as any).energy}%`
-        : '—'
+    : todayActivities.length > 0
+      ? `${todayActivities[0].name ?? todayActivities[0].title ?? '活动'}`
+      : todayClasses.length > 0
+        ? `${typeof todayClasses[0] === 'object' ? (todayClasses[0].subject || '上课中') : todayClasses[0]}`
+        : (activeKid as any).energy != null
+          ? `${(activeKid as any).energy}%`
+          : '—'
 
   const childSubValue = !activeKid ? ''
-    : todayActivities.length > 0 ? `今天有${todayActivities.length}个活动`
-      : (activeKid as any).school_end_time ? `放学${(activeKid as any).school_end_time}`
-        : ''
+    : todayActivities.length > 0
+      ? `今天有${todayActivities.length}个活动`
+      : todayClasses.length > 0
+        ? `今天${todayClasses.length}节课`
+        : (activeKid as any).school_end_time
+          ? `放学${(activeKid as any).school_end_time}`
+          : ''
 
   const todayDeadline = todos.filter((t: TodoItem) => {
     if (t.status === 'done') return false
