@@ -8,6 +8,27 @@ import { getAuthUser } from '@/lib/auth/getAuthUser'
 
 const anthropic = new Anthropic()
 
+const CRISIS_KEYWORDS = [
+  '自杀', '不想活', '去死', '结束生命', '活不下去',
+  '跳楼', '割腕', '吃药死', '不想活了', '死了算了',
+  '轻生', '了结', '消失算了', '不存在了',
+]
+
+const CRISIS_RESPONSE = `听到你说的这些话，我非常担心你。
+
+你现在的感受很重要，我想确认你是安全的。
+
+如果你现在有伤害自己的想法，请立刻联系：
+🆘 国际危机热线：988（美国）
+🆘 加拿大危机热线：1-833-456-4566
+🆘 中文心理援助：400-161-9995
+
+我在这里陪着你，但我也希望你能得到专业的帮助。你愿意告诉我你现在在哪里吗？`
+
+function detectCrisis(text: string): boolean {
+  return CRISIS_KEYWORDS.some((kw) => text.includes(kw))
+}
+
 const KAPOK_SYSTEM_PROMPT = `你是木棉（Kapok），一个专门陪伴海外华人妈妈的 AI 树洞伴侣。
 
 【你的核心使命】
@@ -101,6 +122,21 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Missing messages' }, { status: 400 })
   }
 
+  const latestUserMessage = [...messages].reverse().find((message) => message.role === 'user')
+  const userMessage = latestUserMessage?.content ?? ''
+
+  if (detectCrisis(userMessage)) {
+    const sessionId = getSessionId(user.id)
+    await saveConversation(user.id, sessionId, [
+      ...(latestUserMessage ? [latestUserMessage] : []),
+      { role: 'assistant', content: CRISIS_RESPONSE },
+    ])
+    return NextResponse.json({
+      message: CRISIS_RESPONSE,
+      is_crisis: true,
+    })
+  }
+
   const hour = new Date().getHours()
   const isLateNight = hour >= 22 || hour <= 5
   const systemPrompt = isLateNight
@@ -119,7 +155,6 @@ export async function POST(req: NextRequest) {
   const text = textBlock?.type === 'text' ? textBlock.text : ''
 
   const sessionId = getSessionId(user.id)
-  const latestUserMessage = [...messages].reverse().find((message) => message.role === 'user')
   await saveConversation(user.id, sessionId, [
     ...(latestUserMessage ? [latestUserMessage] : []),
     { role: 'assistant', content: text },
