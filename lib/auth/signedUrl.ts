@@ -9,6 +9,11 @@ export function signUserId(userId: string): string {
   return `${payload}:${sig}`
 }
 
+/** 与 signUserId 相同，供卡片 token 等 API 显式命名调用 */
+export function createSignedUserId(userId: string): string {
+  return signUserId(userId)
+}
+
 export function verifySignedUserId(token: string): string | null {
   try {
     const parts = token.split(':')

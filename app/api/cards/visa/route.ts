@@ -193,12 +193,24 @@ export async function GET(req: NextRequest) {
   }
 
   const [profileRes, placesRes, locationRes] = await Promise.all([
-    supabase.from('family_profile').select('*').eq('user_id', userId).single(),
-    supabase.from('family_places').select('*').eq('user_id', userId).eq('is_primary', true).single(),
+    supabase.from('family_profile').select('*').eq('user_id', userId).maybeSingle(),
+    supabase.from('family_places').select('*').eq('user_id', userId).eq('is_primary', true).maybeSingle(),
     getUserLocation(userId),
   ])
 
-  const p = profileRes.data || {}
+  const p = profileRes.data
+  if (!p) {
+    return new NextResponse(
+      `<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>请先完善档案</title></head>
+<body style="font-family:'PingFang SC','Noto Sans SC',sans-serif;background:#f5f9fc;padding:24px;max-width:520px;margin:0 auto;line-height:1.7;color:#2c3e50">
+<h1 style="font-size:18px;margin-bottom:12px">需要先填写家庭档案</h1>
+<p style="margin:0 0 16px;color:#6b8baa">系统中还没有您的家庭档案。请在 App「个人资料 / 档案」里完成填写后，再回到签证卡片。</p>
+<p style="margin:0;font-size:13px;color:#8a7355">此链接已加密且短期有效。</p>
+</body></html>`,
+      { headers: { 'Content-Type': 'text/html; charset=utf-8' } },
+    )
+  }
+
   const place = placesRes.data || {}
   const location = locationRes
 

@@ -339,6 +339,34 @@ function ProfileContent() {
           </div>
         )}
 
+        <motion.button
+          type="button"
+          whileTap={{ scale: 0.98 }}
+          onClick={() => router.push('/profile/cards')}
+          style={{
+            width: '100%',
+            padding: '16px',
+            background: 'rgba(255,255,255,0.82)',
+            backdropFilter: 'blur(12px)',
+            border: '1px solid rgba(255,255,255,0.6)',
+            borderRadius: 18,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 14,
+            cursor: 'pointer',
+            marginBottom: 12,
+          }}
+        >
+          <span style={{ fontSize: 32 }}>🗂️</span>
+          <div style={{ textAlign: 'left' }}>
+            <div style={{ fontSize: 15, fontWeight: 500, color: INK, fontFamily: "'Noto Serif SC', serif" }}>证件与医疗卡片</div>
+            <div style={{ fontSize: 12, color: 'rgba(45,50,47,0.5)', fontFamily: 'sans-serif', marginTop: 2 }}>
+              签证提醒 · 就诊信息 · 紧急医疗卡
+            </div>
+          </div>
+          <div style={{ marginLeft: 'auto', color: 'rgba(45,50,47,0.3)', fontSize: 18 }}>→</div>
+        </motion.button>
+
         <div style={{ ...PROFILE_GLASS, padding: '18px 16px', marginBottom: 18 }}>
           <div style={{ fontSize: 15, fontWeight: 600, color: INK, marginBottom: 6 }}>Google 服务连接</div>
           <div style={{ fontSize: 12, color: THEME.muted, marginBottom: 14, lineHeight: 1.6 }}>

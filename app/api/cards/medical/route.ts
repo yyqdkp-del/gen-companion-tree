@@ -135,6 +135,21 @@ function formatDate(dateStr: string): string {
   } catch { return dateStr }
 }
 
+/** 对齐 children 表的 medical_conditions（JSONB/数组）与可能存在的 chronic_conditions */
+function formatChildMedicalHistory(child: Record<string, unknown> | null): string {
+  if (!child) return ''
+  const toText = (v: unknown): string => {
+    if (v == null || v === '') return ''
+    if (typeof v === 'string') return v.trim()
+    if (Array.isArray(v)) return v.map(x => String(x)).filter(Boolean).join('、')
+    return ''
+  }
+  const mc = toText(child.medical_conditions)
+  const cc = toText(child.chronic_conditions)
+  if (mc && cc) return `${mc}；${cc}`
+  return mc || cc || ''
+}
+
 export async function GET(req: NextRequest) {
   const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || '',
@@ -151,7 +166,7 @@ export async function GET(req: NextRequest) {
   // getUserLocation 与 Supabase 分开：避免 Promise.all 推断为 Postgrest 与 UserLocation 的联合类型
   const locationPromise = getUserLocation(userId)
   const queries = [
-    supabase.from('family_profile').select('*').eq('user_id', userId).single(),
+    supabase.from('family_profile').select('*').eq('user_id', userId).maybeSingle(),
     supabase.from('children').select('*').eq('user_id', userId),
   ]
   if (childId) {
@@ -163,7 +178,19 @@ export async function GET(req: NextRequest) {
 
   const results = await Promise.all(queries)
   const location = await locationPromise
-  const profile = results[0].data || {}
+  const profileRow = results[0].data
+  if (!profileRow) {
+    return new NextResponse(
+      `<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/><title>请先完善档案</title></head>
+<body style="font-family:'PingFang SC','Noto Sans SC',sans-serif;background:#f5f9fc;padding:24px;max-width:520px;margin:0 auto;line-height:1.7;color:#2c3e50">
+<h1 style="font-size:18px;margin-bottom:12px">需要先填写家庭档案</h1>
+<p style="margin:0 0 16px;color:#6b8baa">请先完成本人与紧急联系等信息，再在「证件与医疗卡片」里打开就诊卡。</p>
+</body></html>`,
+      { headers: { 'Content-Type': 'text/html; charset=utf-8' } },
+    )
+  }
+
+  const profile = profileRow
   const children = results[1].data || []
   const healthRecords = childId ? (results[2]?.data || []) : []
   const dailyLog = childId ? (results[3]?.data?.[0] || null) : null
@@ -177,7 +204,7 @@ export async function GET(req: NextRequest) {
   const name = isChild ? targetChild.name : profile.member_name || '—'
   const bloodType = isChild ? (targetChild.blood_type || profile.blood_type || '') : (profile.blood_type || '')
   const allergies = isChild ? (targetChild.allergies || profile.allergies || '') : (profile.allergies || '')
-  const chronic = isChild ? (targetChild.chronic_conditions || '') : (profile.chronic_conditions || '')
+  const chronic = isChild ? (formatChildMedicalHistory(targetChild as Record<string, unknown>) || '无') : (profile.chronic_conditions || '')
   const emergencyName = profile.emergency_name || '—'
   const emergencyPhone = profile.emergency_phone || '—'
   const emergencyRelation = profile.emergency_relation || '家属'

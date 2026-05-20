@@ -11,6 +11,10 @@
     {
       "path": "/api/cron/scheduler",
       "schedule": "28 13 * * *"
+    },
+    {
+      "path": "/api/cron/visa-reminder",
+      "schedule": "0 8 * * *"
     }
   ],
   "functions": {
@@ -36,6 +40,9 @@
       "maxDuration": 60
     },
     "app/api/cron/notify/route.ts": {
+      "maxDuration": 60
+    },
+    "app/api/cron/visa-reminder/route.ts": {
       "maxDuration": 60
     },
     "app/api/push/send/route.ts": {

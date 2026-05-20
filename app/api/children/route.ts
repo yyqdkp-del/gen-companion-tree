@@ -4,6 +4,31 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { getAuthUser } from '@/lib/auth/getAuthUser'
 
+export async function GET(_req: NextRequest) {
+  const { user, error: authError } = await getAuthUser(_req)
+  if (authError || !user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+    process.env.SUPABASE_SERVICE_ROLE_KEY || '',
+  )
+
+  const { data, error } = await supabase
+    .from('children')
+    .select('id, name, emoji, nationality, passport_expiry, blood_type')
+    .eq('user_id', user.id)
+    .order('created_at', { ascending: true })
+
+  if (error) {
+    console.error('[api/children] select failed:', error.message)
+    return NextResponse.json({ error: error.message }, { status: 500 })
+  }
+
+  return NextResponse.json({ children: data ?? [] })
+}
+
 export async function POST(req: NextRequest) {
   const { user, error: authError } = await getAuthUser(req)
   if (authError || !user) {
