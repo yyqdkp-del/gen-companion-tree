@@ -1,7 +1,7 @@
 {
-  "name": "Gen Companion Tree",
-  "short_name": "Companion",
-  "description": "根·陪伴 — 海外华人家庭的智能生活管家",
+  "name": "根陪伴",
+  "short_name": "根",
+  "description": "海外华人家庭的智能生活管家",
   "start_url": "/",
   "display": "standalone",
   "orientation": "portrait",
