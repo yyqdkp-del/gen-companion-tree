@@ -158,6 +158,11 @@ function StepSchedule({ data, onChange }: { data: any; onChange: (d: any) => voi
         img.onerror = rej
         img.src = url
       })
+      if (!base64 || base64.length < 100) {
+        alert('图片读取失败，请重试')
+        setParsing(false)
+        return
+      }
       const resp = await fetch('/api/children/parse-schedule', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

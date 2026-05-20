@@ -119,7 +119,7 @@ function ChildEditContent() {
 
     setBasicData({
       name: child.name || '',
-      birthdate: child.birthdate || '',
+      birthdate: child.birthdate || (child as { birth_date?: string | null }).birth_date || '',
       emoji: child.emoji || '🌟',
       languages: child.languages || [],
       avatar_url: child.avatar_url || '',
@@ -146,7 +146,7 @@ function ChildEditContent() {
       preferred_hospitals: child.preferred_hospitals || [],
     })
 
-    const { data: profile } = await supabase.from('child_profiles').select('*').eq('child_id', childId).single()
+    const { data: profile } = await supabase.from('child_profiles').select('*').eq('child_id', childId).maybeSingle()
     if (profile) {
       setScheduleData({
         class_schedule: profile.class_schedule || {},
@@ -169,6 +169,7 @@ function ChildEditContent() {
         user_id: uid,
         name: basicData.name,
         birthdate: basicData.birthdate || null,
+        birth_date: basicData.birthdate || null,
         emoji: basicData.emoji,
         languages: basicData.languages,
         avatar_url: basicData.avatar_url || null,
