@@ -35,6 +35,17 @@ export async function POST(req: NextRequest) {
 
     console.log(`已收到输入，job_id: ${job.id}, type: ${input_type}`)
 
+    // 写入 raw_inputs 成功后，立即触发 worker（不等结果，避免仅依赖 cron）
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL
+    if (appUrl) {
+      fetch(`${appUrl}/api/rian/worker`, {
+        method: 'GET',
+        headers: {
+          'x-cron-secret': process.env.CRON_SECRET || '',
+        },
+      }).catch(() => {})
+    }
+
     // 立刻返回，不等待处理
     return NextResponse.json({
       ok: true,

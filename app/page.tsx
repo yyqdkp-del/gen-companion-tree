@@ -355,7 +355,7 @@ export default function BasePage() {
       const res = await fetchWithAuth('/api/base/patrol', {
         method: 'POST',
         body: JSON.stringify({}),
-        signal: AbortSignal.timeout(15_000),
+        signal: AbortSignal.timeout(30_000),
       })
       if (!res.ok) throw new Error('巡逻失败')
     } catch (e) {

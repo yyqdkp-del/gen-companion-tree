@@ -1,6 +1,7 @@
 export const dynamic = 'force-dynamic'
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { waitUntil } from '@vercel/functions'
 import { getUserLocation } from '@/lib/geofence'
 import { getAuthUser } from '@/lib/auth/getAuthUser'
 import { getTodayStrInTimeZone } from '@/lib/date/localDate'
@@ -179,8 +180,12 @@ ${geminiData || '（无数据）'}
 }
 
 // ── 保存热点（按天去重）──
-async function saveHotspots(items: any[], userId: string, todayYmd: string): Promise<number> {
-  if (!items.length) return 0
+async function saveHotspots(
+  items: any[],
+  userId: string,
+  todayYmd: string,
+): Promise<{ ok: boolean; count: number }> {
+  if (!items.length) return { ok: true, count: 0 }
 
   // 今天已有的 category
   const { data: existing } = await supabase
@@ -197,7 +202,7 @@ async function saveHotspots(items: any[], userId: string, todayYmd: string): Pro
     item.urgency === 'urgent' || !existingCategories.has(item.category)
   )
 
-  if (!toInsert.length) return 0
+  if (!toInsert.length) return { ok: true, count: 0 }
 
   const { error } = await supabase.from('hotspot_items').insert(
     toInsert.map(item => ({
@@ -215,8 +220,11 @@ async function saveHotspots(items: any[], userId: string, todayYmd: string): Pro
     }))
   )
 
-  if (error) console.error('热点写入失败:', error)
-  return toInsert.length
+  if (error) {
+    console.error('saveHotspots failed:', error)
+    return { ok: false, count: 0 }
+  }
+  return { ok: true, count: toInsert.length }
 }
 
 // ── 归档：仅处理已过期且带 expires_at 的热点（与客户端按 expires_at 过滤一致）──
@@ -231,9 +239,53 @@ async function archiveOldHotspots(userId: string) {
     .neq('status', 'dismissed')
 }
 
-// 替换 patrol/route.ts 里的 POST 函数
-// 在文件顶部加这行 import：
-// import { getUserLocation } from '@/lib/geofence'
+// ── POST：立即 202，后台跑巡逻（waitUntil 保证 Vercel 上任务继续执行）──
+async function runPatrolForUsers(userIds: string[], patrolTime: string) {
+  const results: Array<Record<string, unknown>> = []
+
+  for (const userId of userIds) {
+    try {
+      const userLocation = await getUserLocation(userId)
+      const todayYmd = getTodayStrInTimeZone(userLocation.timezone)
+      const location = `${userLocation.city} ${userLocation.country}`
+      const patrolPrompt = userLocation.local_config.patrol_prompt
+
+      console.log(`用户${userId.slice(0, 8)} 位置: ${location}`)
+
+      await archiveOldHotspots(userId)
+      const snapshot = await getFamilySnapshot(userId)
+
+      const [grokData, geminiData] = await Promise.all([
+        callGrok(snapshot, location, patrolPrompt),
+        callGemini(snapshot, location, userLocation.local_config.official_sites),
+      ])
+
+      const hotspots = await callClaude(grokData, geminiData, snapshot, location)
+      const saved = await saveHotspots(hotspots, userId, todayYmd)
+      if (!saved.ok) {
+        console.error('hotspots not saved for user:', userId)
+      }
+
+      await supabase
+        .from('family_profile')
+        .update({ updated_at: new Date().toISOString() })
+        .eq('user_id', userId)
+
+      console.log(`${patrolTime} 用户${userId.slice(0, 8)} ${location} 写入${saved.count}条热点`)
+      results.push({
+        userId: userId.slice(0, 8),
+        location,
+        generated: hotspots.length,
+        saved: saved.count,
+      })
+    } catch (e: any) {
+      console.error(`用户${userId.slice(0, 8)}巡逻失败:`, e?.message)
+      results.push({ userId: userId.slice(0, 8), error: e?.message })
+    }
+  }
+
+  console.log(`${patrolTime} 巡逻批次完成`, { users: userIds.length, results })
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -263,50 +315,21 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: false, error: 'no users found' }, { status: 400 })
     }
 
-    const results = []
+    waitUntil(
+      runPatrolForUsers(userIds, patrolTime).catch((err: unknown) => {
+        console.error('巡逻批次未捕获错误:', err)
+      }),
+    )
 
-    for (const userId of userIds) {
-      try {
-        // 获取用户位置（地理围栏）
-        const userLocation = await getUserLocation(userId)
-        const todayYmd = getTodayStrInTimeZone(userLocation.timezone)
-        const location = `${userLocation.city} ${userLocation.country}`
-        const patrolPrompt = userLocation.local_config.patrol_prompt
-
-        console.log(`用户${userId.slice(0,8)} 位置: ${location}`)
-
-        await archiveOldHotspots(userId)
-        const snapshot = await getFamilySnapshot(userId)
-
-        // 用地理围栏的本地配置调用 AI
-        const [grokData, geminiData] = await Promise.all([
-          callGrok(snapshot, location, patrolPrompt),
-          callGemini(snapshot, location, userLocation.local_config.official_sites),
-        ])
-
-        const hotspots = await callClaude(grokData, geminiData, snapshot, location)
-        const saved = await saveHotspots(hotspots, userId, todayYmd)
-
-        await supabase
-          .from('family_profile')
-          .update({ updated_at: new Date().toISOString() })
-          .eq('user_id', userId)
-
-        console.log(`${patrolTime} 用户${userId.slice(0,8)} ${location} 写入${saved}条热点`)
-        results.push({ userId: userId.slice(0,8), location, generated: hotspots.length, saved })
-      } catch (e: any) {
-        console.error(`用户${userId.slice(0,8)}巡逻失败:`, e?.message)
-        results.push({ userId: userId.slice(0,8), error: e?.message })
-      }
-    }
-
-    return NextResponse.json({
-      ok: true,
-      patrol_time: patrolTime,
-      users: userIds.length,
-      results,
-    })
-
+    return NextResponse.json(
+      {
+        ok: true,
+        message: '巡逻中',
+        patrol_time: patrolTime,
+        users: userIds.length,
+      },
+      { status: 202 },
+    )
   } catch (e: any) {
     console.error('巡逻错误:', e?.message)
     return NextResponse.json({ ok: false, error: e?.message }, { status: 500 })
