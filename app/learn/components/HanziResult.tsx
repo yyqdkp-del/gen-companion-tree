@@ -22,15 +22,21 @@ function PartsDisplay({ parts, char, evolution }: {
   if (!parts?.length) return null
 
   return (
-    <div style={{ background: T.white, borderRadius: 16, padding: '18px 16px',
-      marginBottom: 8, border: '1px solid rgba(200,160,96,0.15)' }}>
+    <div style={{
+      background: 'rgba(255,255,255,0.8)',
+      borderRadius: 18,
+      padding: '18px 16px',
+      marginBottom: 10,
+      border: '1px solid rgba(255,255,255,0.6)',
+      boxShadow: '0 4px 20px rgba(45,50,47,0.05)',
+    }}>
       <div style={{ display: 'flex', alignItems: 'stretch', gap: 10,
         marginBottom: evolution ? 12 : 0 }}>
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
           {parts.slice(0, Math.ceil(parts.length / 2)).map((p: any, i: number) => (
             <button key={i} onClick={() => setOpenIdx(openIdx === i ? null : i)}
-              style={{ background: openIdx === i ? 'rgba(192,57,43,0.08)' : T.paper,
-                border: `1.5px solid ${openIdx === i ? 'rgba(192,57,43,0.3)' : 'rgba(200,160,96,0.2)'}`,
+              style={{ background: openIdx === i ? 'rgba(164,99,85,0.08)' : '#f7f4ee',
+                border: `1.5px solid ${openIdx === i ? 'rgba(164,99,85,0.3)' : 'rgba(164,99,85,0.1)'}`,
                 borderRadius: 10, padding: '8px 10px', cursor: 'pointer',
                 textAlign: 'center', transition: 'all 0.2s' }}>
               <div style={{ fontSize: 26, fontFamily: "'Noto Serif SC', serif",
@@ -42,17 +48,22 @@ function PartsDisplay({ parts, char, evolution }: {
         </div>
         <div style={{ display: 'flex', alignItems: 'center',
           justifyContent: 'center', flexShrink: 0 }}>
-          <div style={{ fontSize: 72, fontFamily: "'Noto Serif SC', serif",
-            color: T.text, lineHeight: 1,
-            textShadow: '0 4px 20px rgba(26,18,8,0.1)' }}>{char}</div>
+          <div style={{
+            fontSize: 80,
+            fontFamily: "'Noto Serif SC', serif",
+            color: '#2d322f',
+            lineHeight: 1,
+            textShadow: '0 4px 20px rgba(45,50,47,0.12)',
+            letterSpacing: '-0.02em',
+          }}>{char}</div>
         </div>
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
           {parts.slice(Math.ceil(parts.length / 2)).map((p: any, i: number) => {
             const idx = i + Math.ceil(parts.length / 2)
             return (
               <button key={idx} onClick={() => setOpenIdx(openIdx === idx ? null : idx)}
-                style={{ background: openIdx === idx ? 'rgba(192,57,43,0.08)' : T.paper,
-                  border: `1.5px solid ${openIdx === idx ? 'rgba(192,57,43,0.3)' : 'rgba(200,160,96,0.2)'}`,
+                style={{ background: openIdx === idx ? 'rgba(164,99,85,0.08)' : '#f7f4ee',
+                  border: `1.5px solid ${openIdx === idx ? 'rgba(164,99,85,0.3)' : 'rgba(164,99,85,0.1)'}`,
                   borderRadius: 10, padding: '8px 10px', cursor: 'pointer',
                   textAlign: 'center', transition: 'all 0.2s' }}>
                 <div style={{ fontSize: 26, fontFamily: "'Noto Serif SC', serif",
@@ -193,21 +204,52 @@ export default function HanziResult({ data, char, onMomCopy, childLevel, childNa
 
       {/* 开始学习按钮 */}
       <motion.button whileTap={{ scale: 0.97 }} onClick={() => setLearning(true)}
-        style={{ width: '100%', padding: '16px', borderRadius: 16, border: 'none',
-          background: T.red, color: '#fff', fontSize: 16, fontWeight: 700,
-          cursor: 'pointer', fontFamily: "'Noto Serif SC', serif",
-          boxShadow: '0 4px 16px rgba(192,57,43,0.25)', marginBottom: 12,
-          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+        style={{
+          width: '100%',
+          padding: '15px',
+          borderRadius: 18,
+          border: 'none',
+          background: 'linear-gradient(135deg, #a46355 0%, #8a5548 100%)',
+          color: '#fff',
+          fontSize: 15,
+          fontWeight: 500,
+          cursor: 'pointer',
+          fontFamily: "'Noto Serif SC', serif",
+          letterSpacing: '0.05em',
+          boxShadow: '0 6px 20px rgba(164,99,85,0.3)',
+          marginBottom: 12,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 8,
+        }}>
         <span style={{ fontSize: 20 }}>🌟</span>
         和孩子一起学「{char}」· 5分钟
       </motion.button>
 
-      <div style={{ background: T.white, borderRadius: 16, padding: '14px 16px',
-        marginBottom: 8, border: '1px solid rgba(200,160,96,0.15)',
-        display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-        <span style={{ padding: '4px 14px', borderRadius: 20, fontSize: 14,
-          background: T.paper, border: '1px solid rgba(200,160,96,0.3)',
-          color: T.textMid, fontFamily: 'sans-serif' }}>{data.pinyin}</span>
+      <div style={{
+        background: 'rgba(255,255,255,0.8)',
+        backdropFilter: 'blur(10px)',
+        borderRadius: 18,
+        padding: '16px 18px',
+        marginBottom: 10,
+        border: '1px solid rgba(255,255,255,0.6)',
+        boxShadow: '0 4px 20px rgba(45,50,47,0.05)',
+        display: 'flex',
+        alignItems: 'center',
+        gap: 10,
+        flexWrap: 'wrap',
+      }}>
+        <span style={{
+          padding: '5px 16px',
+          borderRadius: 20,
+          fontSize: 15,
+          background: '#f7f4ee',
+          border: '1px solid rgba(164,99,85,0.15)',
+          color: '#5a5a4a',
+          fontFamily: 'sans-serif',
+          letterSpacing: '0.05em',
+        }}>{data.pinyin}</span>
         <span style={{ padding: '4px 12px', borderRadius: 20, fontSize: 12,
           background: lvCfg.bg, border: `1px solid ${lvCfg.color}44`,
           color: lvCfg.color, fontFamily: 'sans-serif' }}>{lv} · {lvCfg.label}</span>
@@ -221,15 +263,27 @@ export default function HanziResult({ data, char, onMomCopy, childLevel, childNa
         <button onClick={() => speak(`${data.pinyin}，${data.meaning}`)}
           style={{ background: 'none', border: 'none', cursor: 'pointer',
             fontSize: 14, opacity: 0.5, padding: '2px' }} title="朗读">🔊</button>
-        <div style={{ width: '100%', fontSize: 16, fontWeight: 700, color: T.text,
-          fontFamily: "'Noto Serif SC', serif", marginTop: 4 }}>{data.meaning}</div>
+        <div style={{
+          width: '100%',
+          fontSize: 17,
+          fontWeight: 500,
+          color: '#2d322f',
+          fontFamily: "'Noto Serif SC', serif",
+          marginTop: 6,
+          lineHeight: 1.6,
+          letterSpacing: '0.03em',
+        }}>{data.meaning}</div>
       </div>
 
       {/* 视觉钩子 */}
       {data.visual_hook && (
-        <div style={{ background: 'rgba(192,57,43,0.04)', borderRadius: 14,
-          padding: '14px 16px', marginBottom: 8,
-          border: '1px solid rgba(192,57,43,0.12)' }}>
+        <div style={{
+          background: 'rgba(164,99,85,0.04)',
+          borderRadius: 16,
+          padding: '16px 18px',
+          marginBottom: 10,
+          border: '1px solid rgba(164,99,85,0.1)',
+        }}>
           <div style={{ fontSize: 10, letterSpacing: 3, color: T.red,
             marginBottom: 6, fontFamily: 'sans-serif' }}>👁 看见这个字</div>
           <div style={{ fontSize: 14, color: T.text, lineHeight: 1.8,

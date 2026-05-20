@@ -4,18 +4,18 @@
 // ─────────────────────────────────────────
 
 export const CHINESE_THEME = {
-  bg:       '#F5F0E8',
-  white:    '#FFFFFF',
-  red:      '#E05C45',
-  gold:     '#C8A060',
-  text:     '#1A1208',
-  textMid:  '#4A3728',
-  textDim:  '#7A5C48',
-  paper:    '#FDFBF7',
-  green:    '#2D6A4F',
-  blue:     '#1A3C5E',
-  navy:     '#1A3C5E',
-  orange:   '#E8892A',
+  bg:       '#fbf9f6',
+  white:    '#ffffff',
+  paper:    '#f7f4ee',
+  text:     '#2d322f',
+  textMid:  '#5a5a4a',
+  textDim:  'rgba(45,50,47,0.45)',
+  red:      '#a46355',
+  gold:     '#8a7355',
+  green:    '#5c7a5e',
+  blue:     '#4a6b7a',
+  navy:     '#2d3f4a',
+  orange:   '#b07050',
 } as const
 
 export const CHINESE_LEVELS: Record<string, { color: string; bg: string; label: string }> = {

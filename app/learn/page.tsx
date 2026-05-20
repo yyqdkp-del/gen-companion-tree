@@ -186,14 +186,48 @@ export default function DecodePage() {
   const writingCount = learnedItems.filter(i => i.type === 'writing').length
 
     return (
-    <main style={{ minHeight: '100dvh', background: THEME.bg, fontFamily: "'Noto Serif SC', Georgia, serif", paddingBottom: 80, backgroundImage: 'radial-gradient(circle at 15% 15%, rgba(200,160,96,0.1) 0%, transparent 55%), radial-gradient(circle at 85% 85%, rgba(192,57,43,0.07) 0%, transparent 55%)' }}>
+    <main style={{
+      minHeight: '100dvh',
+      backgroundColor: '#fbf9f6',
+      backgroundImage: `
+    radial-gradient(at 80% 10%, rgba(228,237,228,0.3) 0px, transparent 50%),
+    radial-gradient(at 20% 90%, rgba(245,214,209,0.2) 0px, transparent 50%)
+  `,
+      fontFamily: "'Noto Serif SC', Georgia, serif",
+      paddingBottom: 80,
+    }}>
 
       {/* 顶部导航 */}
-      <div style={{ background: THEME.white, borderBottom: '1px solid rgba(200,160,96,0.2)', padding: '12px 16px', display: 'flex', alignItems: 'center', position: 'sticky', top: 0, zIndex: 50, boxShadow: '0 2px 12px rgba(26,18,8,0.05)' }}>
+      <div style={{
+        background: 'rgba(251,249,246,0.92)',
+        backdropFilter: 'blur(20px)',
+        WebkitBackdropFilter: 'blur(20px)',
+        borderBottom: '1px solid rgba(45,50,47,0.06)',
+        padding: '12px 16px',
+        display: 'flex',
+        alignItems: 'center',
+        position: 'sticky',
+        top: 0,
+        zIndex: 50,
+        boxShadow: '0 2px 20px rgba(45,50,47,0.04)',
+      }}>
         <button onClick={() => router.back()} style={{ background: 'none', border: 'none', color: THEME.textDim, fontSize: 13, cursor: 'pointer', marginRight: 10, fontFamily: 'sans-serif', padding: '4px 8px' }}>←</button>
         <div style={{ flex: 1 }}>
-          <div style={{ fontSize: 9, letterSpacing: 4, color: THEME.red, textTransform: 'uppercase', marginBottom: 1, fontFamily: 'sans-serif' }}>根·中文</div>
-          <div style={{ fontSize: 15, fontWeight: 700, color: THEME.text }}>字理解码器</div>
+          <div style={{
+            fontSize: 9,
+            letterSpacing: 4,
+            color: '#a46355',
+            textTransform: 'uppercase',
+            marginBottom: 2,
+            fontFamily: "'Montserrat', sans-serif",
+          }}>根·中文</div>
+          <div style={{
+            fontSize: 16,
+            fontWeight: 500,
+            color: '#2d322f',
+            fontFamily: "'Noto Serif SC', serif",
+            letterSpacing: '0.05em',
+          }}>字理解码器</div>
         </div>
         {childInfo.name && (
           <div style={{ padding: '3px 10px', borderRadius: 20, background: 'rgba(200,160,96,0.1)', border: '1px solid rgba(200,160,96,0.25)', fontSize: 11, color: THEME.textMid, fontFamily: 'sans-serif', marginRight: 8 }}>
@@ -240,7 +274,16 @@ export default function DecodePage() {
         <TabBar active={activeTab} onChange={handleTabChange} />
 
         {/* 输入区 */}
-        <div style={{ background: THEME.white, borderRadius: 18, padding: '16px', boxShadow: '0 4px 20px rgba(26,18,8,0.07)', border: '1px solid rgba(200,160,96,0.18)', marginBottom: 12 }}>
+        <div style={{
+          background: 'rgba(255,255,255,0.8)',
+          backdropFilter: 'blur(10px)',
+          WebkitBackdropFilter: 'blur(10px)',
+          borderRadius: 20,
+          padding: '18px',
+          boxShadow: '0 4px 24px rgba(45,50,47,0.06), 0 1px 4px rgba(45,50,47,0.04)',
+          border: '1px solid rgba(255,255,255,0.6)',
+          marginBottom: 12,
+        }}>
 
           {/* 汉字输入 */}
           {activeTab === 'hanzi' && (
@@ -257,7 +300,21 @@ export default function DecodePage() {
                     onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); const c = [...input].find(c => /\p{Script=Han}/u.test(c)) || input.trim(); if (c) { setInput(c); generate(c) } } }}
                     maxLength={1}
                     placeholder="字"
-                    style={{ width: 72, height: 72, textAlign: 'center', fontSize: 48, border: '2px solid rgba(200,160,96,0.3)', borderRadius: 14, fontFamily: "'Noto Serif SC', serif", color: THEME.text, background: THEME.paper, outline: 'none', caretColor: THEME.gold, cursor: 'text' }}
+                    style={{
+                      width: 80,
+                      height: 80,
+                      textAlign: 'center',
+                      fontSize: 52,
+                      border: '1.5px solid rgba(164,99,85,0.2)',
+                      borderRadius: 18,
+                      fontFamily: "'Noto Serif SC', serif",
+                      color: '#2d322f',
+                      background: '#f7f4ee',
+                      outline: 'none',
+                      caretColor: '#a46355',
+                      cursor: 'text',
+                      boxShadow: 'inset 0 2px 8px rgba(45,50,47,0.04)',
+                    }}
                   />
                 </div>
                 <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -268,7 +325,23 @@ export default function DecodePage() {
                   <motion.button whileTap={{ scale: 0.96 }}
                     onClick={() => { const c = [...input].find(c => /\p{Script=Han}/u.test(c)) || input.trim(); if (c) { setInput(c); generate(c) } }}
                     disabled={loading || !input.trim()}
-                    style={{ padding: '10px 16px', background: loading || !input.trim() ? '#C5B5A5' : THEME.red, color: '#fff', border: 'none', borderRadius: 10, fontSize: 14, fontFamily: "'Noto Serif SC', serif", cursor: loading || !input.trim() ? 'not-allowed' : 'pointer', letterSpacing: 1, boxShadow: !loading && input.trim() ? '0 3px 12px rgba(192,57,43,0.3)' : 'none' }}>
+                    style={{
+                      padding: '11px 18px',
+                      background: loading || !input.trim()
+                        ? 'rgba(45,50,47,0.08)'
+                        : '#a46355',
+                      color: loading || !input.trim() ? 'rgba(45,50,47,0.35)' : '#fff',
+                      border: 'none',
+                      borderRadius: 14,
+                      fontSize: 14,
+                      fontFamily: "'Noto Serif SC', serif",
+                      cursor: loading || !input.trim() ? 'not-allowed' : 'pointer',
+                      letterSpacing: '0.05em',
+                      boxShadow: !loading && input.trim()
+                        ? '0 4px 16px rgba(164,99,85,0.25)'
+                        : 'none',
+                      transition: 'all 0.2s ease',
+                    }}>
                     {loading ? '解析中…' : '🧩 拆解'}
                   </motion.button>
                 </div>
@@ -294,7 +367,17 @@ export default function DecodePage() {
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                 {QUICK_CHENGYU.map((s, i) => (
                   <motion.button key={i} whileTap={{ scale: 0.93 }} onClick={() => { setData(null); generate(s) }}
-                    style={{ padding: '5px 11px', borderRadius: 20, background: 'rgba(200,160,96,0.08)', border: '1px solid rgba(200,160,96,0.25)', fontSize: 12, color: THEME.textMid, cursor: 'pointer', fontFamily: 'sans-serif' }}>
+                    style={{
+                      padding: '6px 14px',
+                      borderRadius: 20,
+                      background: 'rgba(164,99,85,0.06)',
+                      border: '1px solid rgba(164,99,85,0.15)',
+                      fontSize: 12,
+                      color: '#a46355',
+                      cursor: 'pointer',
+                      fontFamily: 'sans-serif',
+                      transition: 'all 0.15s ease',
+                    }}>
                     {s}
                   </motion.button>
                 ))}
@@ -317,7 +400,16 @@ export default function DecodePage() {
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                 {QUICK_WRITING.map((s, i) => (
                   <motion.button key={i} whileTap={{ scale: 0.93 }} onClick={() => { setData(null); generate(s) }}
-                    style={{ padding: '5px 11px', borderRadius: 20, background: 'rgba(45,106,79,0.06)', border: '1px solid rgba(45,106,79,0.2)', fontSize: 12, color: THEME.green, cursor: 'pointer', fontFamily: 'sans-serif' }}>
+                    style={{
+                      padding: '6px 14px',
+                      borderRadius: 20,
+                      background: 'rgba(92,122,94,0.06)',
+                      border: '1px solid rgba(92,122,94,0.15)',
+                      fontSize: 12,
+                      color: '#5c7a5e',
+                      cursor: 'pointer',
+                      fontFamily: 'sans-serif',
+                    }}>
                     {s}
                   </motion.button>
                 ))}
@@ -335,12 +427,20 @@ export default function DecodePage() {
 
         {/* 加载动画 */}
         {loading && (
-          <div style={{ background: THEME.white, borderRadius: 18, padding: '32px 20px', textAlign: 'center', boxShadow: '0 4px 20px rgba(26,18,8,0.07)', marginBottom: 12 }}>
+          <div style={{
+            background: 'rgba(255,255,255,0.8)',
+            backdropFilter: 'blur(10px)',
+            borderRadius: 20,
+            padding: '36px 20px',
+            textAlign: 'center',
+            boxShadow: '0 4px 24px rgba(45,50,47,0.06)',
+            marginBottom: 12,
+          }}>
             <div style={{ display: 'flex', justifyContent: 'center', gap: 7, marginBottom: 14 }}>
               {[0, 1, 2].map(i => (
                 <motion.div key={i} animate={{ opacity: [0.3, 1, 0.3], scale: [0.8, 1.2, 0.8] }}
                   transition={{ duration: 1.2, repeat: Infinity, delay: i * 0.2 }}
-                  style={{ width: 9, height: 9, borderRadius: '50%', background: THEME.gold }} />
+                  style={{ width: 9, height: 9, borderRadius: '50%', background: '#a46355' }} />
               ))}
             </div>
             <motion.div key={loadMsg} initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }}
@@ -384,7 +484,13 @@ export default function DecodePage() {
         {/* 空状态 */}
         {!data && !loading && !error && (
           <div style={{ textAlign: 'center', padding: '32px 16px', color: THEME.textDim }}>
-            <div style={{ fontSize: 64, fontFamily: "'Noto Serif SC', serif", color: 'rgba(192,57,43,0.08)', lineHeight: 1, marginBottom: 14 }}>
+            <div style={{
+              fontSize: 72,
+              fontFamily: "'Noto Serif SC', serif",
+              color: 'rgba(164,99,85,0.1)',
+              lineHeight: 1,
+              marginBottom: 16,
+            }}>
               {activeTab === 'hanzi' ? '字' : activeTab === 'chengyu' ? '成' : '文'}
             </div>
             <div style={{ fontSize: 13, lineHeight: 1.9, fontFamily: 'sans-serif' }}>
