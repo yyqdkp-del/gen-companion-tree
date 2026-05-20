@@ -76,7 +76,7 @@ export default function ChengYuResult({ data, onMomCopy }: Props) {
                 <div style={{ fontSize: 10, color: 'rgba(45,50,47,0.45)', marginBottom: 4,
                   fontFamily: 'sans-serif' }}>English</div>
                 <div style={{ fontSize: 12, color: '#2d3f4a', fontStyle: 'italic',
-                  fontFamily: 'sans-serif' }}>"{data.english_idiom}"</div>
+                  fontFamily: 'sans-serif' }}>「{data.english_idiom}」</div>
               </div>
               <div style={{ fontSize: 16, color: '#8a7355' }}>⟷</div>
               <div style={{ flex: 1, padding: '10px 12px', borderRadius: 10,

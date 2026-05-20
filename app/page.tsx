@@ -574,7 +574,7 @@ export default function BasePage() {
       <AnimatePresence>
         {modal === 'child' && (
           <ChildSheet key="child"
-            children={enrichedKids.length ? enrichedKids : kids}
+            childList={enrichedKids.length ? enrichedKids : kids}
             sel={activeKid}
             onSel={(c: any) => setActiveKid(c)}
             onClose={() => closeModal()}

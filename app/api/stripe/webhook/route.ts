@@ -1,19 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { stripe } from '@/lib/stripe/client'
-import { createClient } from '@supabase/supabase-js'
+import { getStripe } from '@/lib/stripe/client'
+import { getServiceSupabase } from '@/lib/supabase/service'
 import type Stripe from 'stripe'
 
 export const runtime = 'nodejs'
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
-)
-
 async function resolveSubscriptionUserId(subscription: Stripe.Subscription): Promise<string | null> {
   const meta = subscription.metadata?.user_id
   if (meta) return meta
-  const { data } = await supabase
+  const { data } = await getServiceSupabase()
     .from('subscriptions')
     .select('user_id')
     .eq('stripe_subscription_id', subscription.id)
@@ -34,12 +29,14 @@ export async function POST(req: NextRequest) {
 
   let event: Stripe.Event
   try {
-    event = stripe.webhooks.constructEvent(body, sig, webhookSecret)
+    event = getStripe().webhooks.constructEvent(body, sig, webhookSecret)
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e)
     console.error('[stripe/webhook] signature error:', msg)
     return NextResponse.json({ error: 'Invalid signature' }, { status: 400 })
   }
+
+  const supabase = getServiceSupabase()
 
   try {
     switch (event.type) {

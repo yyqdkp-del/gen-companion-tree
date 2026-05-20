@@ -328,7 +328,7 @@ function TodaySection({ report, vision, childName, childId }: any) {
         <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }}
           style={{ background: T.bgCard, borderRadius: 14, padding: '14px 16px', marginBottom: 14, border: `1px solid ${T.border}`, borderLeft: `3px solid ${T.teal}` }}>
           <div style={{ fontSize: 10, color: T.teal, fontWeight: 700, letterSpacing: '0.1em', marginBottom: 6 }}>根的判断</div>
-          <div style={{ fontSize: 13, color: T.text, lineHeight: 1.8, fontStyle: 'italic' }}>"{report.key_insight}"</div>
+          <div style={{ fontSize: 13, color: T.text, lineHeight: 1.8, fontStyle: 'italic' }}>「{report.key_insight}」</div>
         </motion.div>
       )}
 
@@ -386,7 +386,7 @@ function TodaySection({ report, vision, childName, childId }: any) {
           style={{ marginBottom: 14 }}>
           <div style={{ fontSize: 11, color: T.textDim, fontWeight: 700, letterSpacing: '0.1em', marginBottom: 8 }}>📖 申请故事主线</div>
           <Card style={{ borderLeft: `3px solid ${T.gold}` }}>
-            <div style={{ fontSize: 13, color: T.text, lineHeight: 1.9, fontStyle: 'italic' }}>"{report.narrative}"</div>
+            <div style={{ fontSize: 13, color: T.text, lineHeight: 1.9, fontStyle: 'italic' }}>「{report.narrative}」</div>
           </Card>
         </motion.div>
       )}

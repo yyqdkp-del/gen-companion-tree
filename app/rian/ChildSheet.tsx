@@ -278,12 +278,12 @@ function StatusEditor({ log, onSave, onClose }: {
 }
 
 type Props = {
-  children: Child[]; sel: Child | null; onSel: (c: Child) => void
+  childList: Child[]; sel: Child | null; onSel: (c: Child) => void
   onClose: () => void; onAdd: () => void; userId: string
   todos?: any[]; onOneTap?: (todo: any) => void
 }
 
-export default function ChildSheet({ children, sel, onSel, onClose, onAdd, userId }: Props) {
+export default function ChildSheet({ childList, sel, onSel, onClose, onAdd, userId }: Props) {
   const today    = getTodayKey()
   const tomorrow = getTomorrow()
   const in7days  = getIn7Days()
@@ -364,7 +364,7 @@ export default function ChildSheet({ children, sel, onSel, onClose, onAdd, userI
 
           <div style={{ overflowY: 'auto', flex: 1, padding: '8px 12px 20px',
             WebkitOverflowScrolling: 'touch' as any }}>
-            {children.length === 0 ? (
+            {childList.length === 0 ? (
               <div style={{ textAlign: 'center', padding: '36px 16px 28px' }}>
                 <div style={{ fontSize: 14, color: THEME.muted, marginBottom: 16, lineHeight: 1.6 }}>
                   暂无孩子档案，添加后即可查看日程与状态
@@ -387,7 +387,7 @@ export default function ChildSheet({ children, sel, onSel, onClose, onAdd, userI
             <>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12,
               overflowX: 'auto', paddingBottom: 4, scrollbarWidth: 'none' }}>
-              {children.map(c => (
+              {childList.map(c => (
                 <motion.div key={c.id} whileTap={{ scale: 0.88 }} onClick={() => handleSel(c)}
                   style={{ display: 'flex', flexDirection: 'column', alignItems: 'center',
                     gap: 3, cursor: 'pointer', flexShrink: 0 }}>

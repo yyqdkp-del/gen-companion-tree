@@ -1,10 +1,18 @@
 import Stripe from 'stripe'
 
 /** 服务端专用；勿在 `'use client'` 组件中 import 本文件。 */
-/** 与本包 `stripe` 依赖捆绑的 Stripe API 版本一致（见 `node_modules/stripe/cjs/apiVersion.js`）。 */
-export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY ?? '', {
-  apiVersion: '2026-04-22.dahlia',
-  typescript: true,
-})
+let _stripe: Stripe | null = null
+
+export function getStripe(): Stripe {
+  if (!_stripe) {
+    const key = process.env.STRIPE_SECRET_KEY
+    if (!key) throw new Error('STRIPE_SECRET_KEY is not configured')
+    _stripe = new Stripe(key, {
+      apiVersion: '2026-04-22.dahlia',
+      typescript: true,
+    })
+  }
+  return _stripe
+}
 
 export { PLANS } from './plans'

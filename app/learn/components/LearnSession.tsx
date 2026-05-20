@@ -319,6 +319,7 @@ function StepStructure({ data, char, onNext }: {
   const { stop } = useApp()
   const [activeIdx, setActiveIdx] = useState<number | null>(null)
   const [showMom, setShowMom] = useState(false)
+  const [showMomExplain, setShowMomExplain] = useState(false)
   const parts = data.parts || []
 
   const voiceText = data.mom_script
@@ -346,7 +347,6 @@ function StepStructure({ data, char, onNext }: {
       {/* 六书分类 */}
       {data.liushu && (() => {
         const cfg = LIUSHU_CFG[data.liushu.type] || { color: '#8a7355', bg: 'rgba(164,99,85,0.08)', desc: '' }
-        const [showMomExplain, setShowMomExplain] = React.useState(false)
         return (
           <div style={{ marginBottom: 14 }}>
             {/* 类型标签 */}

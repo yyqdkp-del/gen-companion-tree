@@ -1,16 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthUser } from '@/lib/auth/getAuthUser'
-import { createClient } from '@supabase/supabase-js'
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
-)
+import { getServiceSupabase } from '@/lib/supabase/service'
 
 export async function GET(req: NextRequest) {
   const { user, error } = await getAuthUser(req)
   if (error || !user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
+  const supabase = getServiceSupabase()
   const [{ data }, { data: profile }] = await Promise.all([
     supabase.from('subscriptions').select('*').eq('user_id', user.id).maybeSingle(),
     supabase.from('family_profile').select('is_pro').eq('user_id', user.id).maybeSingle(),

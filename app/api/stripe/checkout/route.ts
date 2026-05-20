@@ -1,13 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthUser } from '@/lib/auth/getAuthUser'
-import { stripe } from '@/lib/stripe/client'
-
-import { createClient } from '@supabase/supabase-js'
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
-)
+import { getStripe } from '@/lib/stripe/client'
+import { getServiceSupabase } from '@/lib/supabase/service'
 
 export async function POST(req: NextRequest) {
   const { user, error } = await getAuthUser(req)
@@ -36,6 +30,7 @@ export async function POST(req: NextRequest) {
 
   const baseUrl = (process.env.NEXT_PUBLIC_APP_URL || req.nextUrl.origin).replace(/\/$/, '')
 
+  const supabase = getServiceSupabase()
   const { data: sub } = await supabase
     .from('subscriptions')
     .select('stripe_customer_id')
@@ -45,7 +40,7 @@ export async function POST(req: NextRequest) {
   let customerId = sub?.stripe_customer_id
 
   if (!customerId) {
-    const customer = await stripe.customers.create({
+    const customer = await getStripe().customers.create({
       email: user.email ?? undefined,
       metadata: { user_id: user.id },
     })
@@ -64,7 +59,7 @@ export async function POST(req: NextRequest) {
     if (upsertErr) console.error('[stripe/checkout] subscriptions upsert:', upsertErr)
   }
 
-  const session = await stripe.checkout.sessions.create({
+  const session = await getStripe().checkout.sessions.create({
     customer: customerId,
     payment_method_types: ['card'],
     line_items: [{ price: priceId, quantity: 1 }],
