@@ -22,8 +22,8 @@ export default function Accordion({ title, count, children, defaultOpen = false,
           display: 'flex', alignItems: 'center', gap: 8,
           padding: '10px 12px', cursor: 'pointer',
           borderRadius: open ? '12px 12px 0 0' : 12,
-          background: open ? 'rgba(176,141,87,0.06)' : 'rgba(0,0,0,0.02)',
-          border: `0.5px solid ${open ? 'rgba(176,141,87,0.2)' : 'rgba(0,0,0,0.06)'}`,
+          background: open ? 'rgba(164,99,85,0.06)' : 'rgba(0,0,0,0.02)',
+          border: `0.5px solid ${open ? 'rgba(164,99,85,0.2)' : 'rgba(0,0,0,0.06)'}`,
           transition: 'all 0.18s',
         }}>
         <span style={{ fontSize: 12, fontWeight: 600, color: open ? THEME.gold : THEME.text, flex: 1 }}>
@@ -50,7 +50,7 @@ export default function Accordion({ title, count, children, defaultOpen = false,
             exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.2 }}
             style={{
               overflow: 'hidden', background: 'rgba(255,255,255,0.8)',
-              border: '0.5px solid rgba(176,141,87,0.15)',
+              border: '0.5px solid rgba(164,99,85,0.15)',
               borderTop: 'none', borderRadius: '0 0 12px 12px',
             }}>
             <div style={{ padding: '10px 12px' }}>{children}</div>

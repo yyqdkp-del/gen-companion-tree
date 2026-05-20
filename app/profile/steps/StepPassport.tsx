@@ -8,7 +8,7 @@ function StepPassport({ data, onChange }: { data: any; onChange: (d: any) => voi
     <div>
       <div style={{ fontSize: 15, fontWeight: 600, color: '#2d322f', marginBottom: 4 }}>证件信息 📋</div>
       <div style={{ fontSize: 12, color: THEME.muted, marginBottom: 20, lineHeight: 1.6 }}>仅用于预填表格，不会对外共享</div>
-      <div style={{ padding: '12px 14px', borderRadius: 12, background: 'rgba(176,141,87,0.08)', borderLeft: '3px solid rgba(176,141,87,0.4)', marginBottom: 20, fontSize: 12, color: THEME.text, lineHeight: 1.7 }}>
+      <div style={{ padding: '12px 14px', borderRadius: 12, background: 'rgba(164,99,85,0.08)', borderLeft: '3px solid rgba(164,99,85,0.4)', marginBottom: 20, fontSize: 12, color: THEME.text, lineHeight: 1.7 }}>
         🔐 证件信息存储于加密数据库
       </div>
       <div style={{ fontSize: 12, color: '#8a7355', fontWeight: 700, marginBottom: 12 }}>护照</div>

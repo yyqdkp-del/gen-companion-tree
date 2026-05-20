@@ -4,10 +4,11 @@ import { motion } from 'framer-motion'
 import { ArrowLeft } from 'lucide-react'
 
 const THEME = {
-  bg: 'linear-gradient(180deg, #A7D7D9 0%, #D9A7B4 100%)',
+  bg: '#fbf9f6',
   text: '#2C3E50',
-  gold: '#B08D57',
-  navy: '#2d3f4a',
+  gold: '#8a7355',
+  accent: '#a46355',
+  navy: '#2d322f',
   muted: '#6B8BAA',
 }
 
@@ -159,7 +160,7 @@ export default function TermsPage() {
           style={{
             width: '100%', marginTop: 24, padding: '14px',
             borderRadius: 16, border: 'none',
-            background: THEME.navy, color: '#fff',
+            background: THEME.accent, color: '#fff',
             fontSize: 14, fontWeight: 600, cursor: 'pointer',
           }}
         >

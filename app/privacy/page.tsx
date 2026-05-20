@@ -4,10 +4,11 @@ import { motion } from 'framer-motion'
 import { ArrowLeft } from 'lucide-react'
 
 const THEME = {
-  bg: 'linear-gradient(180deg, #A7D7D9 0%, #D9A7B4 100%)',
+  bg: '#fbf9f6',
   text: '#2C3E50',
-  gold: '#B08D57',
-  navy: '#2d3f4a',
+  gold: '#8a7355',
+  accent: '#a46355',
+  navy: '#2d322f',
   muted: '#6B8BAA',
 }
 
@@ -143,7 +144,7 @@ export default function PrivacyPage() {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.6 }}
-          style={{ marginTop: 24, textAlign: 'center', padding: '20px', borderRadius: 20, background: 'rgba(176,141,87,0.08)', border: '1px solid rgba(176,141,87,0.2)' }}
+          style={{ marginTop: 24, textAlign: 'center', padding: '20px', borderRadius: 20, background: 'rgba(164,99,85,0.08)', border: '1px solid rgba(164,99,85,0.2)' }}
         >
           <div style={{ fontSize: 13, color: THEME.gold, fontWeight: 700, marginBottom: 6 }}>有疑问？联系我们</div>
           <div style={{ fontSize: 12, color: THEME.muted, lineHeight: 1.8 }}>
@@ -159,7 +160,7 @@ export default function PrivacyPage() {
           style={{
             width: '100%', marginTop: 24, padding: '14px',
             borderRadius: 16, border: 'none',
-            background: THEME.navy, color: '#fff',
+            background: THEME.accent, color: '#fff',
             fontSize: 14, fontWeight: 600, cursor: 'pointer',
           }}
         >

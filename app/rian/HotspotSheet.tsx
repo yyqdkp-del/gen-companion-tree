@@ -97,7 +97,7 @@ function HotspotCard({ item, onRead, onActionModal, onConvertTodo }: {
               </div>
               {item.relevance_reason && (
                 <div style={{ fontSize: 12, color: RIAN_GOLD, fontWeight: 500,
-                  background: 'rgba(176,141,87,0.08)', padding: '3px 8px',
+                  background: 'rgba(164,99,85,0.08)', padding: '3px 8px',
                   borderRadius: 6, display: 'inline-block', marginBottom: 4 }}>
                   和你有关：{item.relevance_reason}
                 </div>
@@ -142,7 +142,7 @@ function HotspotCard({ item, onRead, onActionModal, onConvertTodo }: {
                   style={{ display: 'flex', alignItems: 'center', gap: 5,
                     padding: '8px 14px', borderRadius: 20,
                     border: `0.5px solid ${RIAN_GOLD}`,
-                    background: 'rgba(176,141,87,0.08)',
+                    background: 'rgba(164,99,85,0.08)',
                     color: RIAN_GOLD, fontSize: 12, fontWeight: 500,
                     cursor: converting ? 'default' : 'pointer',
                     opacity: converting ? 0.6 : 1 }}>
@@ -235,7 +235,7 @@ export default function HotspotSheet({ hotspots, onClose, onPatrol, patrolling, 
               <span style={{ fontSize: 16, fontWeight: 600, color: THEME.text }}>热点</span>
               <motion.div whileTap={{ scale: 0.88 }} onClick={() => setShowPrefs(true)}
                 style={{ fontSize: 10, padding: '2px 8px', borderRadius: 8,
-                  background: 'rgba(176,141,87,0.1)', color: RIAN_GOLD,
+                  background: 'rgba(164,99,85,0.1)', color: RIAN_GOLD,
                   cursor: 'pointer', fontWeight: 500 }}>
                 设置关注
               </motion.div>
@@ -284,8 +284,8 @@ export default function HotspotSheet({ hotspots, onClose, onPatrol, patrolling, 
             <motion.button whileTap={{ scale: 0.93 }} onClick={onPatrol}
               style={{ display: 'flex', alignItems: 'center', gap: 6,
                 padding: '8px 16px', borderRadius: 20,
-                border: '0.5px solid rgba(176,141,87,0.3)',
-                background: 'rgba(176,141,87,0.08)',
+                border: '0.5px solid rgba(164,99,85,0.3)',
+                background: 'rgba(164,99,85,0.08)',
                 fontSize: 12, color: RIAN_GOLD, fontWeight: 500, cursor: 'pointer' }}>
               <motion.div animate={patrolling ? { rotate: 360 } : { rotate: 0 }}
                 transition={patrolling ? { duration: 1, repeat: Infinity, ease: 'linear' } : {}}>

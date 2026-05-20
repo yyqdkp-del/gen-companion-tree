@@ -227,7 +227,7 @@ export async function GET(req: NextRequest) {
   .header-sub { font-size: 13px; opacity: 0.7; }
   .location-badge { display: inline-block; background: rgba(255,255,255,0.2); border-radius: 20px; padding: 4px 12px; font-size: 11px; margin-top: 8px; }
   .card { background: white; border-radius: 14px; padding: 20px; margin-bottom: 16px; box-shadow: 0 2px 12px rgba(0,0,0,0.06); }
-  .card-title { font-size: 14px; font-weight: 700; color: #B08D57; margin-bottom: 14px; }
+  .card-title { font-size: 14px; font-weight: 700; color: #8a7355; margin-bottom: 14px; }
   .info-row { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 0.5px solid #f0f0f0; }
   .info-row:last-child { border-bottom: none; }
   .info-label { font-size: 12px; color: #6B8BAA; }

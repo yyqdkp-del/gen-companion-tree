@@ -64,7 +64,7 @@ function MultiSelect({ label, options, selected, onChange }: {
           const isSelected = selected.includes(opt)
           return (
             <motion.div key={opt} whileTap={{ scale: 0.92 }} onClick={() => toggle(opt)}
-              style={{ padding: '7px 14px', borderRadius: 20, fontSize: 13, cursor: 'pointer', background: isSelected ? 'rgba(176,141,87,0.15)' : 'rgba(255,255,255,0.6)', border: isSelected ? `1.5px solid ${THEME.gold}` : '1px solid rgba(0,0,0,0.1)', color: isSelected ? THEME.gold : THEME.text, fontWeight: isSelected ? 600 : 400 }}>
+              style={{ padding: '7px 14px', borderRadius: 20, fontSize: 13, cursor: 'pointer', background: isSelected ? 'rgba(164,99,85,0.15)' : 'rgba(255,255,255,0.6)', border: isSelected ? `1.5px solid ${THEME.gold}` : '1px solid rgba(0,0,0,0.1)', color: isSelected ? THEME.gold : THEME.text, fontWeight: isSelected ? 600 : 400 }}>
               {opt}
             </motion.div>
           )
@@ -123,7 +123,7 @@ function StepHealth({ data, onChange }: { data: any; onChange: (d: any) => void 
 
         {/* 已选医院列表 */}
         {hospitals.map((h: any, i: number) => (
-          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderRadius: 12, background: 'rgba(176,141,87,0.08)', border: '1px solid rgba(176,141,87,0.2)', marginBottom: 8 }}>
+          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderRadius: 12, background: 'rgba(164,99,85,0.08)', border: '1px solid rgba(164,99,85,0.2)', marginBottom: 8 }}>
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: 13, fontWeight: 600, color: THEME.text }}>{h.name}</div>
               {h.phone && <div style={{ fontSize: 11, color: THEME.muted, marginTop: 2 }}>📞 {h.phone}</div>}
@@ -138,7 +138,7 @@ function StepHealth({ data, onChange }: { data: any; onChange: (d: any) => void 
         {/* 从预设选择 */}
         <motion.button whileTap={{ scale: 0.97 }}
           onClick={() => setShowHospitalPicker(!showHospitalPicker)}
-          style={{ width: '100%', padding: '10px', borderRadius: 12, border: `1.5px dashed rgba(176,141,87,0.4)`, background: 'transparent', color: THEME.gold, fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, marginBottom: 8 }}>
+          style={{ width: '100%', padding: '10px', borderRadius: 12, border: `1.5px dashed rgba(164,99,85,0.4)`, background: 'transparent', color: THEME.gold, fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, marginBottom: 8 }}>
           <Plus size={14} /> 从清迈医院列表选择
         </motion.button>
 

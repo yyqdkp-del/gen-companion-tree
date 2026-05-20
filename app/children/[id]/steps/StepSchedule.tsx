@@ -109,7 +109,7 @@ function MultiSelect({ label, options, selected, onChange }: {
           const isSelected = selected.includes(opt)
           return (
             <motion.div key={opt} whileTap={{ scale: 0.92 }} onClick={() => toggle(opt)}
-              style={{ padding: '7px 14px', borderRadius: 20, fontSize: 13, cursor: 'pointer', background: isSelected ? 'rgba(176,141,87,0.15)' : 'rgba(255,255,255,0.6)', border: isSelected ? `1.5px solid ${THEME.gold}` : '1px solid rgba(0,0,0,0.1)', color: isSelected ? THEME.gold : THEME.text, fontWeight: isSelected ? 600 : 400 }}>
+              style={{ padding: '7px 14px', borderRadius: 20, fontSize: 13, cursor: 'pointer', background: isSelected ? 'rgba(164,99,85,0.15)' : 'rgba(255,255,255,0.6)', border: isSelected ? `1.5px solid ${THEME.gold}` : '1px solid rgba(0,0,0,0.1)', color: isSelected ? THEME.gold : THEME.text, fontWeight: isSelected ? 600 : 400 }}>
               {opt}
             </motion.div>
           )
@@ -208,13 +208,13 @@ function StepSchedule({ data, onChange }: { data: any; onChange: (d: any) => voi
       <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
         <motion.button whileTap={{ scale: 0.97 }} onClick={() => cameraRef.current?.click()}
           disabled={parsing}
-          style={{ flex: 1, padding: '12px', borderRadius: 12, border: `1.5px dashed ${parseSuccess ? '#16a34a' : THEME.gold}`, background: parseSuccess ? 'rgba(34,197,94,0.08)' : 'rgba(176,141,87,0.06)', color: parseSuccess ? '#16a34a' : THEME.gold, fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+          style={{ flex: 1, padding: '12px', borderRadius: 12, border: `1.5px dashed ${parseSuccess ? '#16a34a' : THEME.gold}`, background: parseSuccess ? 'rgba(34,197,94,0.08)' : 'rgba(164,99,85,0.06)', color: parseSuccess ? '#16a34a' : THEME.gold, fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
           {parsing ? <Loader size={16} /> : parseSuccess ? <Check size={16} /> : <Camera size={16} />}
           {parsing ? '识别中…' : parseSuccess ? '识别成功 ✓' : '拍照识别'}
         </motion.button>
         <motion.button whileTap={{ scale: 0.97 }} onClick={() => fileRef.current?.click()}
           disabled={parsing}
-          style={{ flex: 1, padding: '12px', borderRadius: 12, border: `1.5px dashed ${THEME.gold}`, background: 'rgba(176,141,87,0.06)', color: THEME.gold, fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+          style={{ flex: 1, padding: '12px', borderRadius: 12, border: `1.5px dashed ${THEME.gold}`, background: 'rgba(164,99,85,0.06)', color: THEME.gold, fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
           <Plus size={16} />
           从相册上传
         </motion.button>
@@ -239,7 +239,7 @@ function StepSchedule({ data, onChange }: { data: any; onChange: (d: any) => voi
             <motion.div key={d.key} whileTap={{ scale: 0.98 }}
               onClick={() => openEdit(d.key)}
               style={{ display: 'flex', alignItems: 'center', padding: '12px 14px', borderRadius: 12, background: 'rgba(255,255,255,0.65)', border: '1px solid rgba(0,0,0,0.08)', cursor: 'pointer' }}>
-              <div style={{ width: 36, height: 36, borderRadius: 10, background: count > 0 ? 'rgba(176,141,87,0.12)' : 'rgba(0,0,0,0.04)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginRight: 12 }}>
+              <div style={{ width: 36, height: 36, borderRadius: 10, background: count > 0 ? 'rgba(164,99,85,0.12)' : 'rgba(0,0,0,0.04)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginRight: 12 }}>
                 <span style={{ fontSize: 12, fontWeight: 700, color: count > 0 ? THEME.gold : THEME.muted }}>{d.label}</span>
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>

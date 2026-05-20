@@ -116,8 +116,8 @@ export default function HotspotPreferences({ userId, onClose, onSave }: Props) {
         style={{
           display: 'flex', alignItems: 'center', gap: 6,
           padding: '8px 12px', borderRadius: 20,
-          background: on ? 'rgba(176,141,87,0.12)' : 'rgba(0,0,0,0.03)',
-          border: `1px solid ${on ? 'rgba(176,141,87,0.4)' : 'rgba(0,0,0,0.08)'}`,
+          background: on ? 'rgba(164,99,85,0.12)' : 'rgba(0,0,0,0.03)',
+          border: `1px solid ${on ? 'rgba(164,99,85,0.4)' : 'rgba(0,0,0,0.08)'}`,
           cursor: locked ? 'default' : 'pointer',
           opacity: locked ? 0.7 : 1,
           transition: 'all 0.15s',

@@ -10,8 +10,8 @@ import { sanitizeFileName } from '@/lib/storage/sanitizeFileName'
 const supabase = createClient()
 
 const THEME = {
-  bg: 'linear-gradient(180deg, #A7D7D9 0%, #D9A7B4 100%)',
-  text: '#2C3E50', gold: '#B08D57', navy: '#2d3f4a', muted: '#6B8BAA',
+  bg: '#fbf9f6',
+  text: '#2C3E50', gold: '#8a7355', navy: '#2d3f4a', muted: '#6B8BAA',
 }
 
 const CATEGORIES = [
@@ -19,7 +19,7 @@ const CATEGORIES = [
   { value: 'art', label: '艺术美育', emoji: '🎨', color: '#7C3AED' },
   { value: 'academic', label: '学科补习', emoji: '📚', color: '#2d3f4a' },
   { value: 'tech', label: '科技探索', emoji: '🤖', color: '#0891B2' },
-  { value: 'other', label: '其他', emoji: '🌟', color: '#B08D57' },
+  { value: 'other', label: '其他', emoji: '🌟', color: '#8a7355' },
 ]
 
 const PRESET_ACTIVITIES: Record<string, { name: string; location?: string }[]> = {
@@ -168,7 +168,7 @@ function ActivityForm({ form, setForm, onSave, onCancel, saving, childId }: {
             style={{ flex: 1, padding: '11px 14px', borderRadius: 12, border: '1px solid rgba(0,0,0,0.1)', background: 'rgba(255,255,255,0.65)', fontSize: 13, outline: 'none', fontFamily: 'inherit' }} />
           {presets.length > 0 && (
             <motion.button whileTap={{ scale: 0.95 }} onClick={() => setShowPreset(!showPreset)}
-              style={{ padding: '11px 14px', borderRadius: 12, border: `1px solid ${THEME.gold}`, background: 'rgba(176,141,87,0.06)', color: THEME.gold, fontSize: 12, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+              style={{ padding: '11px 14px', borderRadius: 12, border: `1px solid ${THEME.gold}`, background: 'rgba(164,99,85,0.06)', color: THEME.gold, fontSize: 12, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}>
               从列表选
             </motion.button>
           )}
@@ -243,7 +243,7 @@ function ActivityForm({ form, setForm, onSave, onCancel, saving, childId }: {
         <input ref={fileRef} type="file" accept="image/*,application/pdf" onChange={handleAttachment} style={{ display: 'none' }} />
         <motion.button whileTap={{ scale: 0.96 }} onClick={() => fileRef.current?.click()}
           disabled={uploadingAttachment}
-          style={{ width: '100%', padding: '11px', borderRadius: 12, border: `1.5px dashed ${attachmentUrl ? '#16a34a' : 'rgba(176,141,87,0.4)'}`, background: attachmentUrl ? 'rgba(34,197,94,0.06)' : 'transparent', color: attachmentUrl ? '#16a34a' : THEME.gold, fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+          style={{ width: '100%', padding: '11px', borderRadius: 12, border: `1.5px dashed ${attachmentUrl ? '#16a34a' : 'rgba(164,99,85,0.4)'}`, background: attachmentUrl ? 'rgba(34,197,94,0.06)' : 'transparent', color: attachmentUrl ? '#16a34a' : THEME.gold, fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
           {uploadingAttachment ? <Loader size={14} /> : attachmentUrl ? <Check size={14} /> : <Camera size={14} />}
           {uploadingAttachment ? '上传中…' : attachmentUrl ? '已上传 ✓' : '拍照或上传通知单'}
         </motion.button>
@@ -409,7 +409,7 @@ function ActivitiesContent() {
 
         {/* 月费汇总 */}
         {totalMonthly > 0 && (
-          <div style={{ background: 'rgba(255,255,255,0.6)', borderRadius: 16, padding: '14px 16px', marginBottom: 16, border: '1px solid rgba(176,141,87,0.2)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ background: 'rgba(255,255,255,0.6)', borderRadius: 16, padding: '14px 16px', marginBottom: 16, border: '1px solid rgba(164,99,85,0.2)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div style={{ fontSize: 13, color: THEME.muted }}>本月课外活动总费用</div>
             <div style={{ fontSize: 18, fontWeight: 700, color: THEME.gold }}>฿{totalMonthly.toLocaleString()}</div>
           </div>
@@ -453,7 +453,7 @@ function ActivitiesContent() {
                               </span>
                             )}
                             {activity.monthly_fee && (
-                              <span style={{ fontSize: 10, padding: '2px 7px', borderRadius: 8, background: 'rgba(176,141,87,0.1)', color: THEME.gold, fontWeight: 600 }}>
+                              <span style={{ fontSize: 10, padding: '2px 7px', borderRadius: 8, background: 'rgba(164,99,85,0.1)', color: THEME.gold, fontWeight: 600 }}>
                                 ฿{activity.monthly_fee.toLocaleString()}/月
                               </span>
                             )}
@@ -464,7 +464,7 @@ function ActivitiesContent() {
                         </div>
                         <div style={{ display: 'flex', gap: 6, flexShrink: 0, marginLeft: 8 }}>
                           <motion.button whileTap={{ scale: 0.85 }} onClick={() => toggleActive(activity.id, activity.is_active)}
-                            style={{ width: 28, height: 28, borderRadius: '50%', border: 'none', background: activity.is_active ? 'rgba(176,141,87,0.1)' : 'rgba(29,158,117,0.1)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            style={{ width: 28, height: 28, borderRadius: '50%', border: 'none', background: activity.is_active ? 'rgba(164,99,85,0.1)' : 'rgba(29,158,117,0.1)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                             {activity.is_active ? <Pause size={12} color={THEME.gold} /> : <Play size={12} color="#1D9E75" />}
                           </motion.button>
                           <motion.button whileTap={{ scale: 0.85 }} onClick={() => openEdit(activity)}

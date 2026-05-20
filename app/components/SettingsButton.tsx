@@ -55,8 +55,8 @@ export default function SettingsButton() {
                 <motion.div whileTap={{ scale: 0.98 }} onClick={toggleSpeech}
                   style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                     padding: '10px 12px', borderRadius: 12, cursor: 'pointer',
-                    background: speechEnabled ? 'rgba(176,141,87,0.08)' : 'rgba(0,0,0,0.03)',
-                    border: `1px solid ${speechEnabled ? 'rgba(176,141,87,0.2)' : 'rgba(0,0,0,0.06)'}` }}>
+                    background: speechEnabled ? 'rgba(164,99,85,0.08)' : 'rgba(0,0,0,0.03)',
+                    border: `1px solid ${speechEnabled ? 'rgba(164,99,85,0.2)' : 'rgba(0,0,0,0.06)'}` }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                     {speechEnabled
                       ? <Volume2 size={16} color={THEME.gold} />

@@ -204,7 +204,7 @@ export async function GET(req: NextRequest) {
   .location-badge { display: inline-block; background: rgba(255,255,255,0.15); border-radius: 20px; padding: 3px 10px; font-size: 11px; margin-top: 8px; margin-left: 8px; }
   .section { padding: 16px 20px; border-bottom: 0.5px solid #f0f0f0; }
   .section:last-child { border-bottom: none; }
-  .section-title { font-size: 10px; font-weight: 700; color: #B08D57; letter-spacing: 0.15em; text-transform: uppercase; margin-bottom: 10px; }
+  .section-title { font-size: 10px; font-weight: 700; color: #8a7355; letter-spacing: 0.15em; text-transform: uppercase; margin-bottom: 10px; }
   .alert-box { background: #FEF2F2; border: 1.5px solid #FCA5A5; border-radius: 10px; padding: 12px 14px; margin-bottom: 10px; }
   .alert-title { font-size: 11px; font-weight: 700; color: #DC2626; margin-bottom: 4px; }
   .alert-content { font-size: 13px; color: #2C3E50; line-height: 1.5; }
@@ -228,7 +228,7 @@ export async function GET(req: NextRequest) {
   .history-item:last-child { border-bottom: none; }
   .history-date { font-size: 10px; color: #6B8BAA; margin-bottom: 2px; }
   .history-desc { font-size: 12px; color: #2C3E50; }
-  .history-hospital { font-size: 11px; color: #B08D57; }
+  .history-hospital { font-size: 11px; color: #8a7355; }
   .complaint-box { border-radius: 8px; padding: 12px; font-size: 12px; line-height: 1.8; margin-bottom: 8px; }
   .print-btn { display: block; width: 100%; padding: 14px; background: #DC2626; color: white; border: none; border-radius: 12px; font-size: 14px; font-weight: 600; cursor: pointer; text-align: center; margin-bottom: 16px; }
   .footer { text-align: center; font-size: 11px; color: #6B8BAA; padding: 12px 0; line-height: 1.7; }

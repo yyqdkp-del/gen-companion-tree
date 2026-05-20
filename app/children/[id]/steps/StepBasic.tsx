@@ -139,7 +139,7 @@ function MultiSelect({ label, options, selected, onChange }: {
           const isSelected = selected.includes(opt)
           return (
             <motion.div key={opt} whileTap={{ scale: 0.92 }} onClick={() => toggle(opt)}
-              style={{ padding: '7px 14px', borderRadius: 20, fontSize: 13, cursor: 'pointer', background: isSelected ? 'rgba(176,141,87,0.15)' : 'rgba(255,255,255,0.6)', border: isSelected ? `1.5px solid ${THEME.gold}` : '1px solid rgba(0,0,0,0.1)', color: isSelected ? THEME.gold : THEME.text, fontWeight: isSelected ? 600 : 400 }}>
+              style={{ padding: '7px 14px', borderRadius: 20, fontSize: 13, cursor: 'pointer', background: isSelected ? 'rgba(164,99,85,0.15)' : 'rgba(255,255,255,0.6)', border: isSelected ? `1.5px solid ${THEME.gold}` : '1px solid rgba(0,0,0,0.1)', color: isSelected ? THEME.gold : THEME.text, fontWeight: isSelected ? 600 : 400 }}>
               {opt}
             </motion.div>
           )
@@ -186,7 +186,7 @@ function StepBasic({ data, onChange }: { data: any; onChange: (d: any) => void }
       <div style={{ marginBottom: 20 }}>
         <div style={{ fontSize: 12, color: THEME.muted, fontWeight: 700, marginBottom: 10, letterSpacing: '0.08em' }}>头像</div>
         <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14, marginBottom: 12 }}>
-          <div style={{ width: 72, height: 72, borderRadius: 20, overflow: 'hidden', border: '2px solid rgba(176,141,87,0.3)', flexShrink: 0, background: 'rgba(255,255,255,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 36 }}>
+          <div style={{ width: 72, height: 72, borderRadius: 20, overflow: 'hidden', border: '2px solid rgba(164,99,85,0.3)', flexShrink: 0, background: 'rgba(255,255,255,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 36 }}>
             {data.avatar_url
               ? <img src={data.avatar_url} alt="头像" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
               : data.emoji || '🌟'
@@ -196,7 +196,7 @@ function StepBasic({ data, onChange }: { data: any; onChange: (d: any) => void }
             <input ref={photoRef} type="file" accept="image/*" onChange={handlePhotoUpload} style={{ display: 'none' }} />
             <motion.button whileTap={{ scale: 0.96 }} onClick={() => photoRef.current?.click()}
               disabled={uploading}
-              style={{ width: '100%', padding: '10px 14px', borderRadius: 12, border: `1.5px dashed rgba(176,141,87,0.4)`, background: uploadSuccess ? 'rgba(34,197,94,0.08)' : 'rgba(176,141,87,0.06)', color: uploadSuccess ? '#16a34a' : THEME.gold, fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, marginBottom: 8 }}>
+              style={{ width: '100%', padding: '10px 14px', borderRadius: 12, border: `1.5px dashed rgba(164,99,85,0.4)`, background: uploadSuccess ? 'rgba(34,197,94,0.08)' : 'rgba(164,99,85,0.06)', color: uploadSuccess ? '#16a34a' : THEME.gold, fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, marginBottom: 8 }}>
               {uploading ? <Loader size={14} /> : uploadSuccess ? <Check size={14} /> : <Camera size={14} />}
               {uploading ? '上传中…' : uploadSuccess ? '上传成功 ✓' : data.avatar_url ? '更换照片' : '上传照片'}
             </motion.button>
@@ -215,7 +215,7 @@ function StepBasic({ data, onChange }: { data: any; onChange: (d: any) => void }
             {EMOJIS.map((e: string) => (
               <motion.div key={e} whileTap={{ scale: 0.85 }}
                 onClick={() => onChange({ ...data, emoji: e })}
-                style={{ width: 42, height: 42, borderRadius: 12, background: data.emoji === e ? 'rgba(176,141,87,0.2)' : 'rgba(255,255,255,0.5)', border: data.emoji === e ? `2px solid ${THEME.gold}` : '1px solid rgba(0,0,0,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, cursor: 'pointer' }}>
+                style={{ width: 42, height: 42, borderRadius: 12, background: data.emoji === e ? 'rgba(164,99,85,0.2)' : 'rgba(255,255,255,0.5)', border: data.emoji === e ? `2px solid ${THEME.gold}` : '1px solid rgba(0,0,0,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, cursor: 'pointer' }}>
                 {e}
               </motion.div>
             ))}
@@ -255,7 +255,7 @@ function StepBasic({ data, onChange }: { data: any; onChange: (d: any) => void }
                   const langs = data.languages || []
                   onChange({ ...data, languages: selected ? langs.filter((l: string) => l !== lang) : [...langs, lang] })
                 }}
-                style={{ padding: '7px 14px', borderRadius: 20, fontSize: 13, cursor: 'pointer', background: selected ? 'rgba(176,141,87,0.15)' : 'rgba(255,255,255,0.5)', border: selected ? `1.5px solid ${THEME.gold}` : '1px solid rgba(0,0,0,0.1)', color: selected ? THEME.gold : THEME.text, fontWeight: selected ? 600 : 400 }}>
+                style={{ padding: '7px 14px', borderRadius: 20, fontSize: 13, cursor: 'pointer', background: selected ? 'rgba(164,99,85,0.15)' : 'rgba(255,255,255,0.5)', border: selected ? `1.5px solid ${THEME.gold}` : '1px solid rgba(0,0,0,0.1)', color: selected ? THEME.gold : THEME.text, fontWeight: selected ? 600 : 400 }}>
                 {lang}
               </motion.div>
             )

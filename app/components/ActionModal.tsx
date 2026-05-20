@@ -12,7 +12,7 @@ import {
   Volume2, ChevronDown, Zap,
 } from 'lucide-react'
 
-const THEME = { text: '#2C3E50', gold: '#B08D57', muted: '#6B8BAA', navy: '#2d3f4a' }
+const THEME = { text: '#2C3E50', gold: '#8a7355', muted: '#6B8BAA', navy: '#2d3f4a' }
 const G = { bg: '#E1F5EE', border: '#9FE1CB', mid: '#5DCAA5', deep: '#1D9E75', dark: '#0F6E56', darkest: '#085041' }
 
 // ── 类型 ──

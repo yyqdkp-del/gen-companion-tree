@@ -55,7 +55,7 @@ function PWABridgeInner() {
     <div style={{
       minHeight: '100dvh', display: 'flex', alignItems: 'center',
       justifyContent: 'center',
-      background: 'linear-gradient(180deg, #A7D7D9 0%, #D9A7B4 100%)'
+      background: '#fbf9f6'
     }}>
       <p style={{ color: '#2C3E50', fontSize: 14, opacity: 0.6, letterSpacing: '0.2em' }}>
         登录中…
@@ -70,7 +70,7 @@ export default function PWABridge() {
       <div style={{
         minHeight: '100dvh', display: 'flex', alignItems: 'center',
         justifyContent: 'center',
-        background: 'linear-gradient(180deg, #A7D7D9 0%, #D9A7B4 100%)'
+        background: '#fbf9f6'
       }}>
         <p style={{ color: '#2C3E50', fontSize: 14, opacity: 0.6, letterSpacing: '0.2em' }}>
           登录中…

@@ -1,7 +1,7 @@
 export const THEME = {
-  bg:    'linear-gradient(180deg, #A7D7D9 0%, #D9A7B4 100%)',
+  bg:    '#fbf9f6',
   text:  '#2C3E50',
-  gold:  '#B08D57',
+  gold:  '#8a7355',
   navy:  '#2d3f4a',
   muted: '#6B8BAA',
 } as const

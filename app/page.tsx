@@ -124,8 +124,8 @@ function AddChildSheet({ onClose, onSave }: { onClose: () => void; onSave: (d: a
             <div style={{ position: 'relative' }}>
               <div onClick={() => photoInputRef.current?.click()}
                 style={{ width: 72, height: 72, borderRadius: '50%',
-                  background: avatarUrl ? 'transparent' : 'rgba(176,141,87,0.08)',
-                  border: '2px dashed rgba(176,141,87,0.4)',
+                  background: avatarUrl ? 'transparent' : 'rgba(164,99,85,0.08)',
+                  border: '2px dashed rgba(164,99,85,0.4)',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   cursor: 'pointer', overflow: 'hidden', flexShrink: 0 }}>
                 {avatarUrl ? <img src={avatarUrl} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
@@ -146,8 +146,8 @@ function AddChildSheet({ onClose, onSave }: { onClose: () => void; onSave: (d: a
                     onClick={() => { setEmoji(e); setAvatarUrl(null) }}
                     style={{ width: 36, height: 36, borderRadius: '50%', fontSize: 20,
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      background: emoji === e && !avatarUrl ? 'rgba(176,141,87,0.14)' : 'rgba(0,0,0,0.04)',
-                      border: emoji === e && !avatarUrl ? '2px solid rgba(176,141,87,0.5)' : '2px solid transparent',
+                      background: emoji === e && !avatarUrl ? 'rgba(164,99,85,0.14)' : 'rgba(0,0,0,0.04)',
+                      border: emoji === e && !avatarUrl ? '2px solid rgba(164,99,85,0.5)' : '2px solid transparent',
                       cursor: 'pointer' }}>
                     {e}
                   </motion.div>

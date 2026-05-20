@@ -58,7 +58,7 @@ function Timeline({ items }: { items: TimelineItem[] }) {
   return (
     <div style={{ position: 'relative', paddingLeft: 30 }}>
       <div style={{ position: 'absolute', left: 8, top: 6, bottom: 6,
-        width: 2, background: 'linear-gradient(180deg,#A7D7D9,#D9A7B4)', borderRadius: 1 }} />
+        width: 2, background: 'linear-gradient(180deg,#cddce5,#e8e4dc)', borderRadius: 1 }} />
       {sorted.map((item, i) => {
         const [h, m] = item.time.split(':').map(Number)
         const itemMin = h * 60 + (m || 0)
@@ -69,10 +69,10 @@ function Timeline({ items }: { items: TimelineItem[] }) {
             <div style={{ position: 'absolute', left: -24, top: 4, width: 10, height: 10,
               borderRadius: '50%',
               background: isCurrent ? '#8a7355' : isPast ? 'rgba(0,0,0,0.15)' : GREEN.mid,
-              boxShadow: isCurrent ? `0 0 0 4px rgba(176,141,87,0.2)` : 'none' }} />
+              boxShadow: isCurrent ? `0 0 0 4px rgba(164,99,85,0.2)` : 'none' }} />
             <div style={{ padding: '6px 10px', borderRadius: 9,
-              background: isCurrent ? 'rgba(176,141,87,0.08)' : isPast ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.7)',
-              border: `0.5px solid ${isCurrent ? 'rgba(176,141,87,0.25)' : 'rgba(0,0,0,0.05)'}`,
+              background: isCurrent ? 'rgba(164,99,85,0.08)' : isPast ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.7)',
+              border: `0.5px solid ${isCurrent ? 'rgba(164,99,85,0.25)' : 'rgba(0,0,0,0.05)'}`,
               opacity: isPast ? 0.55 : 1 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                 <span style={{ fontSize: 10, color: isCurrent ? '#8a7355' : THEME.muted,
@@ -351,7 +351,7 @@ export default function ChildSheet({ children, sel, onSel, onClose, onAdd, userI
             borderRadius: 22, overflow: 'hidden',
             maxHeight: '88vh', display: 'flex', flexDirection: 'column' }}>
 
-          <div style={{ height: 4, background: 'linear-gradient(90deg,#A7D7D9,#D9A7B4)', flexShrink: 0 }} />
+          <div style={{ height: 4, background: 'linear-gradient(90deg,#cddce5,#e8e4dc)', flexShrink: 0 }} />
           <div style={{ width: 32, height: 4, background: 'rgba(0,0,0,0.1)', borderRadius: 2, margin: '10px auto 0' }} />
 
           <div style={{ padding: '8px 14px 0', flexShrink: 0,
@@ -392,11 +392,11 @@ export default function ChildSheet({ children, sel, onSel, onClose, onAdd, userI
                   style={{ display: 'flex', flexDirection: 'column', alignItems: 'center',
                     gap: 3, cursor: 'pointer', flexShrink: 0 }}>
                   <div style={{ width: c.id === sel?.id ? 52 : 40, height: c.id === sel?.id ? 52 : 40,
-                    borderRadius: '50%', background: 'rgba(176,141,87,0.08)',
+                    borderRadius: '50%', background: 'rgba(164,99,85,0.08)',
                     border: `2px solid ${c.id === sel?.id ? '#8a7355' : 'transparent'}`,
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                     fontSize: c.id === sel?.id ? 28 : 22, transition: 'all 0.18s',
-                    boxShadow: c.id === sel?.id ? '0 0 0 3px rgba(176,141,87,0.18)' : 'none' }}>
+                    boxShadow: c.id === sel?.id ? '0 0 0 3px rgba(164,99,85,0.18)' : 'none' }}>
                     {c.emoji}
                   </div>
                   <span style={{ fontSize: 9, fontWeight: c.id === sel?.id ? 700 : 400,

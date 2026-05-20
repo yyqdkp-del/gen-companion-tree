@@ -102,8 +102,8 @@ export default function TodoGroupCard({ today, soon, later, advice, onAction, on
       {advice && (
         <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6,
           padding: '8px 12px', borderRadius: 10, marginBottom: 12,
-          background: 'rgba(176,141,87,0.07)',
-          border: '0.5px solid rgba(176,141,87,0.2)' }}>
+          background: 'rgba(164,99,85,0.07)',
+          border: '0.5px solid rgba(164,99,85,0.2)' }}>
           <div style={{ flex: 1, fontSize: 12, color: THEME.gold,
             fontWeight: 500, lineHeight: 1.5 }}>
             {advice}
