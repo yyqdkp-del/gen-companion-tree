@@ -525,7 +525,7 @@ async function executeTool(
           message: input.message || input.title,
           status: 'pending',
         }),
-      ).catch(() => {})
+      ).catch((e) => console.warn('silent catch:', e))
       return null
     }
 

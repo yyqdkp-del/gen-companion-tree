@@ -43,7 +43,7 @@ export async function POST(req: NextRequest) {
         headers: {
           'x-cron-secret': process.env.CRON_SECRET || '',
         },
-      }).catch(() => {})
+      }).catch((e) => console.warn('silent catch:', e))
     }
 
     // 立刻返回，不等待处理

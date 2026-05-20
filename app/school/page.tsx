@@ -42,7 +42,7 @@ export default function SchoolPage() {
     fetchWithAuth('/api/school/history')
       .then((r) => r.json())
       .then((data) => setHistory(data.records || []))
-      .catch(() => {})
+      .catch((e) => console.warn('silent catch:', e))
   }, [])
 
   return (

@@ -121,6 +121,15 @@ export default function DecodePage() {
     })()
   }, [])
 
+  useEffect(() => {
+    return () => {
+      if (loadMsgRef.current) {
+        clearInterval(loadMsgRef.current)
+        loadMsgRef.current = null
+      }
+    }
+  }, [])
+
   const handleTabChange = (t: TabType) => {
     decodeAbortRef.current?.abort()
     setActiveTab(t); setData(null); setError(''); setInput('')
