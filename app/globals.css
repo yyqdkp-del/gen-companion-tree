@@ -70,25 +70,6 @@ body {
   border-radius: 8px;
 }
 
-/* 水珠呼吸动效 */
-@keyframes breathOne {
-  0%, 100% { border-radius: 42% 58% 70% 30% / 45% 45% 55% 55%; transform: scale(1) rotate(0deg); }
-  33% { border-radius: 46% 54% 65% 35% / 48% 42% 58% 52%; transform: scale(1.025) rotate(0.8deg); }
-  66% { border-radius: 39% 61% 73% 27% / 42% 48% 52% 58%; transform: scale(0.98) rotate(-0.5deg); }
-}
-@keyframes breathTwo {
-  0%, 100% { border-radius: 70% 30% 52% 48% / 60% 40% 60% 40%; transform: scale(1) rotate(0deg); }
-  50% { border-radius: 64% 36% 58% 42% / 54% 46% 64% 36%; transform: scale(1.03) rotate(-1.2deg); }
-}
-@keyframes breathThree {
-  0%, 100% { border-radius: 48% 52% 35% 65% / 42% 68% 32% 58%; transform: scale(1) rotate(0deg); }
-  40% { border-radius: 53% 47% 41% 59% / 47% 62% 38% 52%; transform: scale(1.018) rotate(1.5deg); }
-}
-
-.animate-droplet-1 { animation: breathOne 7.8s ease-in-out infinite; }
-.animate-droplet-2 { animation: breathTwo 9.2s ease-in-out infinite; animation-delay: 1.2s; }
-.animate-droplet-3 { animation: breathThree 8.4s ease-in-out infinite; animation-delay: 2.1s; }
-
 /* 错误轻叹动效 */
 @keyframes gentleSigh {
   0%, 100% { transform: translateY(0); }
@@ -121,4 +102,86 @@ body {
     animation: none !important;
     transition: none !important;
   }
+}
+
+/* 全局输入框聚焦样式 */
+input:focus,
+textarea:focus,
+select:focus {
+  outline: none !important;
+  border-color: #a46355 !important;
+  box-shadow: 0 0 0 3px rgba(164, 99, 85, 0.08) !important;
+}
+
+/* 全局图片圆角 */
+img {
+  border-radius: 16px;
+}
+
+/* 全局卡片阴影 */
+.card-soft {
+  box-shadow: 0 8px 32px rgba(45, 50, 47, 0.04), 0 2px 8px rgba(45, 50, 47, 0.02);
+}
+
+/* 水珠透镜类 */
+.droplet-lens {
+  backdrop-filter: blur(14px) saturate(115%);
+  -webkit-backdrop-filter: blur(14px) saturate(115%);
+  border: 1.5px solid rgba(255, 255, 255, 0.45);
+  transition: transform 1.5s cubic-bezier(0.25, 1, 0.5, 1);
+  will-change: transform, border-radius;
+}
+
+.droplet-lens:active {
+  transform: scale(0.94);
+}
+
+/* 呼吸动效升级为更慢更舒缓 */
+@keyframes breathOne {
+  0%, 100% {
+    border-radius: 42% 58% 70% 30% / 45% 45% 55% 55%;
+    transform: scale(1) rotate(0deg) translateY(0px);
+  }
+  33% {
+    border-radius: 46% 54% 65% 35% / 48% 42% 58% 52%;
+    transform: scale(1.025) rotate(0.8deg) translateY(-6px);
+  }
+  66% {
+    border-radius: 39% 61% 73% 27% / 42% 48% 52% 58%;
+    transform: scale(0.98) rotate(-0.5deg) translateY(3px);
+  }
+}
+
+@keyframes breathTwo {
+  0%, 100% {
+    border-radius: 70% 30% 52% 48% / 60% 40% 60% 40%;
+    transform: scale(1) rotate(0deg) translateY(0px);
+  }
+  50% {
+    border-radius: 64% 36% 58% 42% / 54% 46% 64% 36%;
+    transform: scale(1.03) rotate(-1.2deg) translateY(-8px);
+  }
+}
+
+@keyframes breathThree {
+  0%, 100% {
+    border-radius: 48% 52% 35% 65% / 42% 68% 32% 58%;
+    transform: scale(1) rotate(0deg) translateY(0px);
+  }
+  40% {
+    border-radius: 53% 47% 41% 59% / 47% 62% 38% 52%;
+    transform: scale(1.018) rotate(1.5deg) translateY(5px);
+  }
+}
+
+.animate-droplet-1 {
+  animation: breathOne 10s ease-in-out infinite !important;
+}
+.animate-droplet-2 {
+  animation: breathTwo 12s ease-in-out infinite !important;
+  animation-delay: 1.5s !important;
+}
+.animate-droplet-3 {
+  animation: breathThree 14s ease-in-out infinite !important;
+  animation-delay: 2.5s !important;
 }

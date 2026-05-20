@@ -155,7 +155,7 @@ export default function KapokTreeholePage() {
           color: #fff7e8;
           background-color: #0a0d14;
           background-image:
-            radial-gradient(at 50% -5%, rgba(245,214,209,0.06) 0px, transparent 45%),
+            radial-gradient(at 50% -5%, rgba(245,214,209,0.07) 0px, transparent 45%),
             linear-gradient(180deg, #0a0d14 0%, #121a29 100%);
           font-family: "Noto Serif SC", "Songti SC", Georgia, serif;
         }
@@ -179,7 +179,7 @@ export default function KapokTreeholePage() {
           align-items: center;
           padding: 48px 18px 18px;
           border-bottom: 1px solid rgba(255, 224, 178, 0.08);
-          background: linear-gradient(to bottom, rgba(11, 7, 16, 0.86), rgba(11, 7, 16, 0.18));
+          background: linear-gradient(to bottom, rgba(10, 13, 20, 0.86), rgba(10, 13, 20, 0.18));
           backdrop-filter: blur(18px);
         }
 
@@ -293,7 +293,7 @@ export default function KapokTreeholePage() {
           z-index: 1;
           flex-shrink: 0;
           padding: 14px 16px 28px;
-          background: linear-gradient(to top, rgba(11, 7, 16, 0.96), rgba(11, 7, 16, 0));
+          background: linear-gradient(to top, rgba(10, 13, 20, 0.96), rgba(10, 13, 20, 0));
         }
 
         .input-box {
