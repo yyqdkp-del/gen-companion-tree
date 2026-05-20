@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { fetchWithAuth } from '@/lib/auth/fetchWithAuth'
+import { track } from '@/lib/analytics/track'
 
 type Message = {
   id: string
@@ -78,6 +79,11 @@ export default function KapokTreeholePage() {
         ...prev,
         { id: crypto.randomUUID(), role: 'assistant', content: reply },
       ])
+      void track({
+        event_type: 'treehole_message_sent',
+        page: '/treehouse/mom',
+        meta: { message_count: nextMessages.length },
+      })
     } catch (error) {
       console.error('[treehouse/mom] send failed:', error)
       setMessages((prev) => [

@@ -14,6 +14,7 @@ import ChengYuResult from './components/ChengYuResult'
 import WritingResult from './components/WritingResult'
 import SmartQuickChars from './components/SmartQuickChars'
 import TabBar, { type TabType } from './components/TabBar'
+import { track } from '@/lib/analytics/track'
 
 const supabase = createClient()
 
@@ -154,6 +155,15 @@ export default function DecodePage() {
       }
       if (json.error) throw new Error(json.error)
       setData(json)
+      void track({
+        event_type: 'hanzi_decoded',
+        page: '/learn',
+        meta: {
+          mode: activeTab,
+          char: activeTab === 'hanzi' ? query : undefined,
+          level: childInfo.level,
+        },
+      })
 
       let uid = userId
       if (!uid) {

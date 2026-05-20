@@ -13,6 +13,7 @@ import type { HotspotItem } from '@/app/_shared/_types'
 import ActionModal from '@/app/components/ActionModal'
 import HotspotPreferences from '@/app/_shared/_components/HotspotPreferences'
 import { logOrAlertNetworkError } from '@/lib/errors/logOrAlertNetworkError'
+import { track } from '@/lib/analytics/track'
 
 const HOTSPOT_GLASS: React.CSSProperties = {
   background: 'rgba(255,255,255,0.8)',
@@ -53,6 +54,15 @@ function HotspotCard({ item, onRead, onActionModal, onConvertTodo }: {
 
   const handleExpand = (e: React.MouseEvent) => {
     e.stopPropagation()
+    void track({
+      event_type: 'hotspot_clicked',
+      page: '/rian',
+      meta: {
+        hotspot_id: item.id,
+        category: item.category,
+        urgency: item.urgency,
+      },
+    })
     setExpanded(p => !p)
     if (!consumed) onRead()
   }

@@ -7,6 +7,7 @@ import { THEME } from '@/app/_shared/_constants/theme'
 import { FLOAT_SHEET_BOTTOM } from '@/app/_shared/_constants/layout'
 import { fetchWithAuth } from '@/lib/auth/fetchWithAuth'
 import { logOrAlertNetworkError } from '@/lib/errors/logOrAlertNetworkError'
+import { track } from '@/lib/analytics/track'
 
 type ReportContent = {
   letter?: string
@@ -44,6 +45,11 @@ export default function WeeklyReportSheet({ childId, childName, onClose }: Props
       }
       setContent(data.content || null)
       setShareUrl(data.share_url || '')
+      void track({
+        event_type: 'weekly_report_generated',
+        page: '/rian',
+        meta: { child_id: childId },
+      })
     } catch (e) {
       if (!logOrAlertNetworkError(e)) setError('网络异常，请稍后再试')
     } finally {
@@ -60,6 +66,11 @@ export default function WeeklyReportSheet({ childId, childName, onClose }: Props
     try {
       await navigator.clipboard.writeText(shareUrl)
       setCopied(true)
+      void track({
+        event_type: 'weekly_report_shared',
+        page: '/rian',
+        meta: { child_id: childId },
+      })
       setTimeout(() => setCopied(false), 2000)
     } catch {
       setError('无法复制链接，请手动长按复制')

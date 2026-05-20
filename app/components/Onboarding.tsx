@@ -4,6 +4,7 @@ import { useState } from 'react'
 import type { CSSProperties } from 'react'
 import { useApp } from '@/app/context/AppContext'
 import { fetchWithAuth } from '@/lib/auth/fetchWithAuth'
+import { track } from '@/lib/analytics/track'
 
 interface OnboardingProps {
   onComplete: () => void
@@ -62,8 +63,29 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
     }
   }
 
+  async function trackStep(currentStep: number) {
+    await track({
+      event_type: 'onboarding_step',
+      page: '/',
+      meta: { step: currentStep },
+    })
+  }
+
+  async function goToStep(nextStep: number) {
+    await trackStep(step)
+    setStep(nextStep)
+  }
+
   async function handleComplete() {
     localStorage.setItem('onboarding_completed', 'true')
+    await track({
+      event_type: 'onboarding_completed',
+      page: '/',
+      meta: {
+        has_child: !!childName,
+        has_todo: !!firstTodo,
+      },
+    })
     onComplete()
   }
 
@@ -128,7 +150,7 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
               帮你管理家庭事务，陪伴孩子成长
             </p>
             <button
-              onClick={() => setStep(2)}
+              onClick={() => void goToStep(2)}
               style={primaryButtonStyle}
             >
               开始设置（约1分钟）
@@ -201,7 +223,7 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
             <button
               onClick={async () => {
                 if (childName) await handleAddChild()
-                setStep(3)
+                await goToStep(3)
               }}
               disabled={loading || !childName}
               style={{
@@ -214,7 +236,7 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
               {loading ? '添加中...' : '下一步'}
             </button>
 
-            <button onClick={() => setStep(3)} style={skipButtonStyle}>
+            <button onClick={() => void goToStep(3)} style={skipButtonStyle}>
               跳过
             </button>
           </div>
@@ -270,7 +292,7 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
             <button
               onClick={async () => {
                 if (firstTodo) await handleAddTodo()
-                setStep(4)
+                await goToStep(4)
               }}
               disabled={loading}
               style={{
@@ -283,7 +305,7 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
               {loading ? '添加中...' : '添加待办'}
             </button>
 
-            <button onClick={() => setStep(4)} style={skipButtonStyle}>
+            <button onClick={() => void goToStep(4)} style={skipButtonStyle}>
               跳过
             </button>
           </div>
@@ -325,7 +347,7 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
               </div>
             ))}
 
-            <button onClick={() => setStep(5)} style={{ ...primaryButtonStyle, marginTop: 20 }}>
+            <button onClick={() => void goToStep(5)} style={{ ...primaryButtonStyle, marginTop: 20 }}>
               太好了！
             </button>
           </div>

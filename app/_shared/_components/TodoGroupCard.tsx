@@ -6,6 +6,7 @@ import Accordion from './Accordion'
 import { THEME, PRIORITY_CFG } from '../_constants/theme'
 import type { TodoItem } from '../_types'
 import { useApp } from '@/app/context/AppContext'
+import { track } from '@/lib/analytics/track'
 
 const REPEAT_LABEL: Record<string, string> = {
   daily: '每天',
@@ -81,7 +82,17 @@ function TodoRow({ todo, onAction, onDone }: {
               fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}>
             一键办
           </motion.button>
-          <motion.button whileTap={{ scale: 0.92 }} onClick={() => onDone(todo.id)}
+          <motion.button whileTap={{ scale: 0.92 }} onClick={() => {
+            void track({
+              event_type: 'todo_completed',
+              page: window.location.pathname,
+              meta: {
+                priority: todo.priority,
+                source: todo.category,
+              },
+            })
+            onDone(todo.id)
+          }}
             style={{ padding: '6px 12px', borderRadius: 9,
               border: `0.5px solid ${c.border}`,
               background: 'transparent', color: c.text,
