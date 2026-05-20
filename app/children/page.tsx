@@ -165,6 +165,24 @@ export default function ChildrenPage() {
                         </div>
                       )}
                       <button
+                        type="button"
+                        onClick={e => { e.stopPropagation(); router.push(`/children/${child.id}/profile`) }}
+                        style={{
+                          padding: '8px 16px',
+                          background: 'rgba(164,99,85,0.08)',
+                          border: '1px solid rgba(164,99,85,0.15)',
+                          borderRadius: 12,
+                          fontSize: 13,
+                          color: '#a46355',
+                          cursor: 'pointer',
+                          fontFamily: "'Noto Serif SC', serif",
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        📖 成长档案
+                      </button>
+                      <button
+                        type="button"
                         onClick={e => { e.stopPropagation(); router.push(`/children/${child.id}`) }}
                         style={{ background: 'none', border: 'none', cursor: 'pointer', color: PAGE.muted, display: 'flex', alignItems: 'center', gap: 2, fontSize: 12 }}>
                         编辑 <ChevronRight size={14} />
