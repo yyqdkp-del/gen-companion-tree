@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { motion } from 'framer-motion'
@@ -7,9 +7,21 @@ import { Plus, ChevronRight, Check } from 'lucide-react'
 
 const supabase = createClient()
 
-const THEME = {
-  bg: 'linear-gradient(180deg, #A7D7D9 0%, #D9A7B4 100%)',
-  text: '#2C3E50', gold: '#B08D57', navy: '#1A3C5E', muted: '#6B8BAA',
+const GLASS_CARD: React.CSSProperties = {
+  background: 'rgba(255,255,255,0.8)',
+  backdropFilter: 'blur(10px)',
+  WebkitBackdropFilter: 'blur(10px)',
+  borderRadius: 18,
+  border: '1px solid rgba(255,255,255,0.6)',
+  boxShadow: '0 4px 20px rgba(45,50,47,0.05)',
+}
+
+const PAGE = {
+  bg: '#fbf9f6',
+  ink: '#2d322f',
+  accent: '#a46355',
+  gold: '#8a7355',
+  muted: 'rgba(45,50,47,0.45)',
 }
 
 const LEVEL_COLORS: Record<string, { color: string; bg: string }> = {
@@ -93,28 +105,28 @@ export default function ChildrenPage() {
   }
 
   return (
-    <main style={{ minHeight: '100dvh', background: THEME.bg, fontFamily: "'Noto Sans SC', sans-serif" }}>
+    <main style={{ minHeight: '100dvh', backgroundColor: PAGE.bg, fontFamily: "'Noto Sans SC', sans-serif" }}>
 
       {/* 顶部 */}
-      <div style={{ position: 'sticky', top: 0, zIndex: 50, background: 'rgba(167,215,217,0.85)', backdropFilter: 'blur(20px)', padding: '16px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.3)' }}>
-        <button onClick={() => router.back()} style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', color: THEME.navy }}>←</button>
-        <span style={{ fontSize: 16, fontWeight: 700, color: THEME.navy }}>孩子资料</span>
+      <motion.div style={{ position: 'sticky', top: 0, zIndex: 50, ...GLASS_CARD, borderRadius: 0, borderLeft: 'none', borderRight: 'none', borderTop: 'none', padding: '16px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <button onClick={() => router.back()} style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', color: PAGE.ink }}>←</button>
+        <span style={{ fontSize: 16, fontWeight: 700, color: PAGE.ink, fontFamily: "'Noto Serif SC', serif" }}>孩子资料</span>
         <div style={{ width: 28 }} />
-      </div>
+      </motion.div>
 
       <div style={{ maxWidth: 640, margin: '0 auto', padding: '20px 16px' }}>
 
         {loading ? (
-          <div style={{ textAlign: 'center', padding: '60px 0', color: THEME.muted, fontSize: 14 }}>加载中…</div>
+          <div style={{ textAlign: 'center', padding: '60px 0', color: PAGE.muted, fontSize: 14 }}>加载中…</div>
         ) : children.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '60px 20px' }}>
             <div style={{ fontSize: 64, marginBottom: 16 }}>🌱</div>
-            <div style={{ fontSize: 16, fontWeight: 600, color: THEME.navy, marginBottom: 8 }}>还没有孩子资料</div>
-            <div style={{ fontSize: 13, color: THEME.muted, marginBottom: 24 }}>添加孩子后，解码器和测评会自动带入信息</div>
+            <div style={{ fontSize: 16, fontWeight: 600, color: PAGE.ink, marginBottom: 8 }}>还没有孩子资料</div>
+            <div style={{ fontSize: 13, color: PAGE.muted, marginBottom: 24 }}>添加孩子后，解码器和测评会自动带入信息</div>
           </div>
         ) : (
           <>
-            <div style={{ fontSize: 12, color: THEME.muted, marginBottom: 12, letterSpacing: '0.05em' }}>
+            <div style={{ fontSize: 12, color: PAGE.muted, marginBottom: 12, letterSpacing: '0.05em' }}>
               点击孩子卡片切换当前使用的孩子
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 16 }}>
@@ -124,36 +136,36 @@ export default function ChildrenPage() {
 
                 return (
                   <motion.div key={child.id} whileTap={{ scale: 0.98 }}
-                    style={{ background: 'rgba(255,255,255,0.7)', backdropFilter: 'blur(20px)', borderRadius: 20, padding: '16px 18px', border: isActive ? `2px solid ${THEME.gold}` : '1px solid rgba(255,255,255,0.8)', boxShadow: isActive ? '0 4px 20px rgba(176,141,87,0.2)' : '0 4px 16px rgba(0,0,0,0.06)', display: 'flex', alignItems: 'center', gap: 14, cursor: 'pointer' }}
+                    style={{ ...GLASS_CARD, padding: '16px 18px', border: isActive ? `2px solid ${PAGE.accent}` : '1px solid rgba(255,255,255,0.6)', boxShadow: isActive ? '0 4px 20px rgba(164,99,85,0.15)' : '0 4px 20px rgba(45,50,47,0.05)', display: 'flex', alignItems: 'center', gap: 14, cursor: 'pointer' }}
                     onClick={() => selectChild(child)}
                   >
                     {/* Emoji 头像 */}
-                    <div style={{ width: 52, height: 52, borderRadius: 16, background: isActive ? 'rgba(176,141,87,0.15)' : 'rgba(0,0,0,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 28, flexShrink: 0 }}>
+                    <div style={{ width: 52, height: 52, borderRadius: 16, background: isActive ? 'rgba(164,99,85,0.12)' : 'rgba(0,0,0,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 28, flexShrink: 0 }}>
                       {child.emoji || '🌟'}
                     </div>
 
                     {/* 信息 */}
                     <div style={{ flex: 1 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                        <span style={{ fontSize: 16, fontWeight: 700, color: THEME.navy }}>{child.name}</span>
-                        {child.grade && <span style={{ fontSize: 11, color: THEME.muted, background: 'rgba(0,0,0,0.05)', padding: '2px 8px', borderRadius: 8 }}>{child.grade}</span>}
+                        <span style={{ fontSize: 16, fontWeight: 700, color: PAGE.ink }}>{child.name}</span>
+                        {child.grade && <span style={{ fontSize: 11, color: PAGE.muted, background: 'rgba(0,0,0,0.05)', padding: '2px 8px', borderRadius: 8 }}>{child.grade}</span>}
                         {lvCfg && child.chinese_level && (
                           <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 8, background: lvCfg.bg, color: lvCfg.color, fontWeight: 600 }}>{child.chinese_level}</span>
                         )}
                       </div>
-                      <div style={{ fontSize: 12, color: THEME.muted }}>{child.school || '未填写学校'}</div>
+                      <div style={{ fontSize: 12, color: PAGE.muted }}>{child.school || '未填写学校'}</div>
                     </div>
 
                     {/* 右侧 */}
                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8, flexShrink: 0 }}>
                       {isActive && (
-                        <div style={{ width: 22, height: 22, borderRadius: '50%', background: THEME.gold, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <div style={{ width: 22, height: 22, borderRadius: '50%', background: PAGE.accent, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                           <Check size={12} color="#fff" />
                         </div>
                       )}
                       <button
                         onClick={e => { e.stopPropagation(); router.push(`/children/${child.id}`) }}
-                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: THEME.muted, display: 'flex', alignItems: 'center', gap: 2, fontSize: 12 }}>
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: PAGE.muted, display: 'flex', alignItems: 'center', gap: 2, fontSize: 12 }}>
                         编辑 <ChevronRight size={14} />
                       </button>
                     </div>
@@ -167,7 +179,7 @@ export default function ChildrenPage() {
         {/* 添加孩子 */}
         <motion.button whileTap={{ scale: 0.97 }}
           onClick={() => router.push('/children/new')}
-          style={{ width: '100%', padding: '16px', borderRadius: 20, border: '2px dashed rgba(176,141,87,0.4)', background: 'rgba(255,255,255,0.4)', color: THEME.gold, fontSize: 14, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+          style={{ width: '100%', padding: '16px', borderRadius: 18, border: '2px dashed rgba(164,99,85,0.35)', background: 'rgba(255,255,255,0.5)', color: PAGE.accent, fontSize: 14, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
           <Plus size={18} /> 添加孩子
         </motion.button>
 

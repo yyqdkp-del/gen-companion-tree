@@ -33,7 +33,7 @@ export default function AuthCallbackBridgePage() {
   return (
     <main style={{
       minHeight: '100dvh', display: 'flex', alignItems: 'center', justifyContent: 'center',
-      background: '#EEF5FB', fontFamily: 'system-ui, sans-serif', color: '#1A3C5E',
+      background: '#EEF5FB', fontFamily: 'system-ui, sans-serif', color: '#2d3f4a',
     }}>
       <p style={{ fontSize: 15 }}>{msg}</p>
     </main>

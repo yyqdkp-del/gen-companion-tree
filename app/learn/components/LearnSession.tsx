@@ -261,7 +261,7 @@ const LIUSHU_CFG: Record<string, { color: string; bg: string; desc: string }> = 
   '象形': { color: '#a46355', bg: 'rgba(164,99,85,0.08)', desc: '照着东西的样子画出来' },
   '指事': { color: '#BA6A00', bg: 'rgba(186,106,0,0.08)', desc: '用符号指示抽象概念' },
   '会意': { color: '#5c7a5e', bg: 'rgba(45,106,79,0.08)', desc: '两个或多个部件合起来表意' },
-  '形声': { color: '#1A3C5E', bg: 'rgba(26,60,94,0.08)', desc: '一部分表意，一部分表音' },
+  '形声': { color: '#2d3f4a', bg: 'rgba(45,63,74,0.08)', desc: '一部分表意，一部分表音' },
   '转注': { color: '#7A5C48', bg: 'rgba(122,92,72,0.08)', desc: '意义相通的字互相解释' },
   '假借': { color: '#5C6E00', bg: 'rgba(92,110,0,0.08)', desc: '借用同音字表达新意思' },
 }
@@ -331,8 +331,8 @@ function StepStructure({ data, char, onNext }: {
             <motion.div whileTap={{ scale: 0.98 }}
               onClick={() => setShowMomExplain((o: boolean) => !o)}
               style={{ padding: '10px 14px', borderRadius: 12,
-                background: showMomExplain ? 'rgba(26,60,94,0.06)' : 'transparent',
-                border: '1px solid rgba(26,60,94,0.15)',
+                background: showMomExplain ? 'rgba(45,63,74,0.06)' : 'transparent',
+                border: '1px solid rgba(45,63,74,0.15)',
                 cursor: 'pointer', marginBottom: 6,
                 display: 'flex', justifyContent: 'space-between',
                 alignItems: 'center' }}>
@@ -353,8 +353,8 @@ function StepStructure({ data, char, onNext }: {
                   exit={{ opacity: 0, height: 0 }}
                   style={{ overflow: 'hidden', marginBottom: 8 }}>
                   <div style={{ padding: '14px', borderRadius: 12,
-                    background: 'rgba(26,60,94,0.05)',
-                    borderLeft: '3px solid rgba(26,60,94,0.3)',
+                    background: 'rgba(45,63,74,0.05)',
+                    borderLeft: '3px solid rgba(45,63,74,0.3)',
                     fontSize: 13, color: T.navy, lineHeight: 1.9,
                     fontFamily: 'sans-serif' }}>
                     {data.liushu.mom_explain}
@@ -415,8 +415,8 @@ function StepStructure({ data, char, onNext }: {
       {/* 英文联结 */}
       {data.english_link && (
         <div style={{ padding: '10px 14px', borderRadius: 12,
-          background: 'rgba(26,60,94,0.05)',
-          border: '1px solid rgba(26,60,94,0.1)',
+          background: 'rgba(45,63,74,0.05)',
+          border: '1px solid rgba(45,63,74,0.1)',
           fontSize: 12, color: T.navy, lineHeight: 1.7,
           fontFamily: 'sans-serif', marginBottom: 12 }}>
           🔗 {data.english_link}

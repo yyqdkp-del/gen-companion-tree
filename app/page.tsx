@@ -533,7 +533,7 @@ export default function BasePage() {
             style={{ position: 'fixed', bottom: 90, left: 16, right: 16, zIndex: 500,
               background: processStatus.status === 'done' ? 'rgba(29,158,117,0.95)'
                 : processStatus.status === 'failed' ? 'rgba(220,38,38,0.95)'
-                : 'rgba(26,60,94,0.95)',
+                : 'rgba(45,63,74,0.95)',
               backdropFilter: 'blur(20px)', padding: '14px 20px', borderRadius: 16,
               display: 'flex', alignItems: 'center', gap: 10,
               boxShadow: '0 4px 20px rgba(0,0,0,0.15)',

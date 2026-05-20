@@ -2,7 +2,7 @@ export const THEME = {
   bg:    'linear-gradient(180deg, #A7D7D9 0%, #D9A7B4 100%)',
   text:  '#2C3E50',
   gold:  '#B08D57',
-  navy:  '#1A3C5E',
+  navy:  '#2d3f4a',
   muted: '#6B8BAA',
 } as const
 

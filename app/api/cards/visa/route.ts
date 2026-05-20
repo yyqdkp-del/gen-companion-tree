@@ -222,7 +222,7 @@ export async function GET(req: NextRequest) {
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body { font-family: 'PingFang SC', 'Noto Sans SC', sans-serif; background: #F5F9FC; color: #2C3E50; padding: 20px; max-width: 680px; margin: 0 auto; }
-  .header { background: linear-gradient(135deg, #1A3C5E, #2C5F8A); color: white; padding: 24px; border-radius: 16px; margin-bottom: 20px; }
+  .header { background: linear-gradient(135deg, #2d3f4a, #2C5F8A); color: white; padding: 24px; border-radius: 16px; margin-bottom: 20px; }
   .header-title { font-size: 20px; font-weight: 700; margin-bottom: 4px; }
   .header-sub { font-size: 13px; opacity: 0.7; }
   .location-badge { display: inline-block; background: rgba(255,255,255,0.2); border-radius: 20px; padding: 4px 12px; font-size: 11px; margin-top: 8px; }
@@ -242,12 +242,12 @@ export async function GET(req: NextRequest) {
   .field-row:last-child { border-bottom: none; }
   .field-local { font-size: 11px; color: #7a5a35; }
   .field-en { font-size: 11px; color: #6B8BAA; }
-  .field-value { font-size: 12px; font-weight: 600; color: #1A3C5E; background: #F5F9FC; padding: 4px 8px; border-radius: 6px; }
+  .field-value { font-size: 12px; font-weight: 600; color: #2d3f4a; background: #F5F9FC; padding: 4px 8px; border-radius: 6px; }
   .warning { background: #FEF3C7; border: 1px solid #F59E0B; border-radius: 10px; padding: 12px 14px; margin-bottom: 16px; font-size: 12px; color: #92400E; line-height: 1.6; }
   .tip { background: #E1F5EE; border-radius: 10px; padding: 12px 14px; font-size: 12px; color: #0F6E56; line-height: 1.9; margin-bottom: 16px; }
   .carry-item { padding: 5px 0; font-size: 12px; color: #2C3E50; border-bottom: 0.5px solid #f5f5f5; }
   .carry-item:last-child { border-bottom: none; }
-  .print-btn { display: block; width: 100%; padding: 14px; background: #1A3C5E; color: white; border: none; border-radius: 12px; font-size: 14px; font-weight: 600; cursor: pointer; text-align: center; margin-bottom: 20px; }
+  .print-btn { display: block; width: 100%; padding: 14px; background: #2d3f4a; color: white; border: none; border-radius: 12px; font-size: 14px; font-weight: 600; cursor: pointer; text-align: center; margin-bottom: 20px; }
   .footer { text-align: center; font-size: 11px; color: #6B8BAA; padding: 12px 0; }
   @media print { .print-btn { display: none; } body { background: white; } }
 </style>

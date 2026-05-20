@@ -7,7 +7,7 @@ const THEME = {
   bg: 'linear-gradient(180deg, #A7D7D9 0%, #D9A7B4 100%)',
   text: '#2C3E50',
   gold: '#B08D57',
-  navy: '#1A3C5E',
+  navy: '#2d3f4a',
   muted: '#6B8BAA',
 }
 
@@ -143,7 +143,7 @@ export default function TermsPage() {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.6 }}
-          style={{ marginTop: 24, textAlign: 'center', padding: '20px', borderRadius: 20, background: 'rgba(26,60,94,0.06)', border: '1px solid rgba(26,60,94,0.1)' }}
+          style={{ marginTop: 24, textAlign: 'center', padding: '20px', borderRadius: 20, background: 'rgba(45,63,74,0.06)', border: '1px solid rgba(45,63,74,0.1)' }}
         >
           <div style={{ fontSize: 13, color: THEME.navy, fontWeight: 700, marginBottom: 6 }}>感谢您选择根·陪伴</div>
           <div style={{ fontSize: 12, color: THEME.muted, lineHeight: 1.8 }}>

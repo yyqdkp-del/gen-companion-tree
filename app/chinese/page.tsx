@@ -7,11 +7,11 @@ import { getUserLocation, updateUserLocationByGPS } from '@/lib/geofence'
 import type { UserLocation } from '@/lib/geofence/types'
 
 const THEME = {
-  navy:   '#1A3C5E',
+  navy:   '#2d3f4a',
   orange: '#E8892A',
   bg:     '#F5F9FC',
   white:  '#FFFFFF',
-  text:   '#1A2B3C',
+  text:   '#2d3f4a',
   muted:  '#6B8BAA',
   border: '#D0DFF0',
   forest: '#3A7A2A',
@@ -295,7 +295,7 @@ export default function ChinesePage() {
           <motion.div key={current}
             initial={{ opacity:0, x:30 }} animate={{ opacity:1, x:0 }} exit={{ opacity:0, x:-30 }}
             transition={{ duration:0.3 }}
-            style={{ background: THEME.white, borderRadius:'16px', padding:'24px 20px', boxShadow:'0 4px 24px rgba(26,60,94,0.10)', marginBottom:'16px' }}
+            style={{ background: THEME.white, borderRadius:'16px', padding:'24px 20px', boxShadow:'0 4px 24px rgba(45,63,74,0.10)', marginBottom:'16px' }}
           >
             <div style={{ fontSize:'11px', color: THEME.orange, fontWeight:500, marginBottom:'8px', letterSpacing:'1px' }}>{q.label}</div>
             <div style={{ fontFamily:"'Noto Serif SC', serif", fontSize:'18px', fontWeight:700, color: THEME.navy, lineHeight:1.6, marginBottom:'20px' }}>{q.text}</div>
@@ -308,7 +308,7 @@ export default function ChinesePage() {
                     style={{
                       padding:'13px 15px', borderRadius:'10px', cursor:'pointer',
                       border: `1.5px solid ${currentAnswer === opt ? THEME.navy : THEME.border}`,
-                      background: currentAnswer === opt ? 'rgba(26,60,94,0.06)' : THEME.white,
+                      background: currentAnswer === opt ? 'rgba(45,63,74,0.06)' : THEME.white,
                       display:'flex', alignItems:'center', gap:'12px',
                       fontSize:'14px', color: THEME.text, transition:'all 0.2s',
                     }}
@@ -358,7 +358,7 @@ export default function ChinesePage() {
   // ── 加载页 ──
   if (phase === 'loading') return (
     <main style={{ minHeight:'100dvh', background: THEME.bg, display:'flex', alignItems:'center', justifyContent:'center', fontFamily:"'Noto Sans SC', sans-serif" }}>
-      <div style={{ maxWidth:'400px', width:'100%', margin:'0 16px', background: THEME.white, borderRadius:'16px', padding:'40px 28px', boxShadow:'0 4px 24px rgba(26,60,94,0.10)', textAlign:'center' }}>
+      <div style={{ maxWidth:'400px', width:'100%', margin:'0 16px', background: THEME.white, borderRadius:'16px', padding:'40px 28px', boxShadow:'0 4px 24px rgba(45,63,74,0.10)', textAlign:'center' }}>
         <motion.div animate={{ rotate: 360 }} transition={{ duration:1, repeat:Infinity, ease:'linear' }}
           style={{ width:'48px', height:'48px', border:`4px solid ${THEME.border}`, borderTopColor: THEME.navy, borderRadius:'50%', margin:'0 auto 20px' }} />
         <div style={{ fontFamily:"'Noto Serif SC', serif", fontSize:'20px', fontWeight:700, color: THEME.navy, marginBottom:'6px' }}>
@@ -396,7 +396,7 @@ export default function ChinesePage() {
 
       <div style={{ maxWidth:'560px', margin:'0 auto', padding:'24px 16px' }}>
         <motion.div initial={{ opacity:0, y:20 }} animate={{ opacity:1, y:0 }}
-          style={{ background: THEME.white, borderRadius:'16px', padding:'28px 22px', boxShadow:'0 4px 24px rgba(26,60,94,0.10)', marginBottom:'14px' }}>
+          style={{ background: THEME.white, borderRadius:'16px', padding:'28px 22px', boxShadow:'0 4px 24px rgba(45,63,74,0.10)', marginBottom:'14px' }}>
 
           {/* Fallback 提示 banner */}
           {r._is_fallback && (
@@ -452,7 +452,7 @@ export default function ChinesePage() {
           ))}
 
           {/* 本地金句 */}
-          <div style={{ background:'rgba(26,60,94,0.06)', borderLeft:`3px solid ${THEME.navy}`, padding:'13px 15px', borderRadius:'0 10px 10px 0', fontSize:'13px', fontStyle:'italic', color: THEME.navy, lineHeight:1.7, marginBottom:'12px' }}>
+          <div style={{ background:'rgba(45,63,74,0.06)', borderLeft:`3px solid ${THEME.navy}`, padding:'13px 15px', borderRadius:'0 10px 10px 0', fontSize:'13px', fontStyle:'italic', color: THEME.navy, lineHeight:1.7, marginBottom:'12px' }}>
             🌿 {r.local_line}
           </div>
 

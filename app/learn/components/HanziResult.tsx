@@ -186,8 +186,8 @@ function FamilyWords({ family, extension, chengyu, cy_story, cultural_sentence,
             <button onClick={() => setPopup({ word: '文化句', type: 'cultural',
               extra: { cultural_sentence, cultural_author, cultural_meaning, overseas_connection } })}
               style={{ padding: '6px 13px', borderRadius: 20,
-                background: 'rgba(26,60,94,0.07)',
-                border: '1px solid rgba(26,60,94,0.2)',
+                background: 'rgba(45,63,74,0.07)',
+                border: '1px solid rgba(45,63,74,0.2)',
                 fontSize: 12, fontFamily: 'sans-serif', color: T.navy, cursor: 'pointer' }}>
               📜 文化句
             </button>
@@ -363,7 +363,7 @@ export default function HanziResult({ data, char, onMomCopy, childLevel, childNa
               lineHeight: 1.85, fontStyle: 'italic', fontFamily: 'sans-serif' }}>{data.english_link}</div>}
             {data.phonics_bridge && (
               <div style={{ marginTop: 8, padding: '8px 12px', borderRadius: 10,
-                background: 'rgba(26,60,94,0.05)', fontSize: 12, color: T.textMid,
+                background: 'rgba(45,63,74,0.05)', fontSize: 12, color: T.textMid,
                 lineHeight: 1.7, fontFamily: 'sans-serif' }}>💡 {data.phonics_bridge}</div>
             )}
           </div>

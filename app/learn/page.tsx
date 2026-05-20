@@ -230,7 +230,7 @@ export default function DecodePage() {
           }}>字理解码器</div>
         </div>
         {childInfo.name && (
-          <div style={{ padding: '3px 10px', borderRadius: 20, background: 'rgba(200,160,96,0.1)', border: '1px solid rgba(200,160,96,0.25)', fontSize: 11, color: THEME.textMid, fontFamily: 'sans-serif', marginRight: 8 }}>
+          <div style={{ padding: '3px 10px', borderRadius: 20, background: 'rgba(138,115,85,0.1)', border: '1px solid rgba(138,115,85,0.25)', fontSize: 11, color: THEME.textMid, fontFamily: 'sans-serif', marginRight: 8 }}>
             {childInfo.name} · {childInfo.level}
           </div>
         )}
@@ -384,9 +384,9 @@ export default function DecodePage() {
                 onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); generate() } }}
                 placeholder="孩子说了什么？英文中文都行&#10;如：very many people / 一下子就做完了"
                 rows={3}
-                style={{ width: '100%', background: THEME.paper, border: '2px solid rgba(200,160,96,0.25)', borderRadius: 12, padding: '11px 13px', fontSize: 14, color: THEME.text, outline: 'none', resize: 'none', fontFamily: 'sans-serif', lineHeight: 1.7, marginBottom: 10, boxSizing: 'border-box' }} />
+                style={{ width: '100%', background: '#f7f4ee', border: '1.5px solid rgba(164,99,85,0.15)', borderRadius: 12, padding: '11px 13px', fontSize: 14, color: THEME.text, outline: 'none', resize: 'none', fontFamily: 'sans-serif', lineHeight: 1.7, marginBottom: 10, boxSizing: 'border-box' }} />
               <motion.button whileTap={{ scale: 0.96 }} onClick={() => generate()} disabled={loading || !input.trim()}
-                style={{ width: '100%', padding: '12px', background: !input.trim() ? '#C5B5A5' : THEME.red, color: '#fff', border: 'none', borderRadius: 12, fontSize: 14, fontFamily: "'Noto Serif SC', serif", cursor: !input.trim() ? 'not-allowed' : 'pointer', marginBottom: 10 }}>
+                style={{ width: '100%', padding: '12px', background: !input.trim() ? 'rgba(45,50,47,0.15)' : THEME.red, color: '#fff', border: 'none', borderRadius: 14, fontSize: 14, fontFamily: "'Noto Serif SC', serif", cursor: !input.trim() ? 'not-allowed' : 'pointer', marginBottom: 10 }}>
                 {loading ? '生成中…' : '🌟 生成成语脚本'}
               </motion.button>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
@@ -417,9 +417,9 @@ export default function DecodePage() {
                 onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); generate() } }}
                 placeholder="孩子今天经历了什么？让他说，你来打&#10;如：今天去夜市，人超多，我吃了芒果糯米饭"
                 rows={3}
-                style={{ width: '100%', background: THEME.paper, border: '2px solid rgba(200,160,96,0.25)', borderRadius: 12, padding: '11px 13px', fontSize: 14, color: THEME.text, outline: 'none', resize: 'none', fontFamily: 'sans-serif', lineHeight: 1.7, marginBottom: 10, boxSizing: 'border-box' }} />
+                style={{ width: '100%', background: '#f7f4ee', border: '1.5px solid rgba(164,99,85,0.15)', borderRadius: 12, padding: '11px 13px', fontSize: 14, color: THEME.text, outline: 'none', resize: 'none', fontFamily: 'sans-serif', lineHeight: 1.7, marginBottom: 10, boxSizing: 'border-box' }} />
               <motion.button whileTap={{ scale: 0.96 }} onClick={() => generate()} disabled={loading || !input.trim()}
-                style={{ width: '100%', padding: '12px', background: !input.trim() ? '#C5B5A5' : '#2D6A4F', color: '#fff', border: 'none', borderRadius: 12, fontSize: 14, fontFamily: "'Noto Serif SC', serif", cursor: !input.trim() ? 'not-allowed' : 'pointer', marginBottom: 10 }}>
+                style={{ width: '100%', padding: '12px', background: !input.trim() ? 'rgba(45,50,47,0.15)' : '#2D6A4F', color: '#fff', border: 'none', borderRadius: 14, fontSize: 14, fontFamily: "'Noto Serif SC', serif", cursor: !input.trim() ? 'not-allowed' : 'pointer', marginBottom: 10 }}>
                 {loading ? '升华中…' : '📜 生成文化句'}
               </motion.button>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>

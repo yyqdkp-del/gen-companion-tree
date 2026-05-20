@@ -332,7 +332,7 @@ export default function KapokTreeholePage() {
           border-radius: 999px;
           padding: 10px 16px;
           color: #2b170d;
-          background: #f8d6a0;
+          background: rgba(230,168,158,0.85);
           font-size: 14px;
           cursor: pointer;
           transition: opacity 0.2s, transform 0.2s;

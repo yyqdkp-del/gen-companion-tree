@@ -103,11 +103,11 @@ export function WordPopup({ word, onClose, childLevel }: {
               marginBottom: 10 }}>{data.story}</div>}
             {data.scene && <div style={{ fontSize: 12, color: '#5a5a4a', lineHeight: 1.75,
               fontStyle: 'italic', padding: '9px 12px', borderRadius: 10,
-              background: 'rgba(200,160,96,0.07)', marginBottom: 10 }}>{data.scene}</div>}
+              background: 'rgba(138,115,85,0.07)', marginBottom: 10 }}>{data.scene}</div>}
             {data.mom_script && (
               <div style={{ padding: '12px', borderRadius: 12,
-                background: 'rgba(200,160,96,0.08)',
-                border: '1px solid rgba(200,160,96,0.2)',
+                background: 'rgba(138,115,85,0.08)',
+                border: '1px solid rgba(138,115,85,0.2)',
                 fontSize: 13, color: '#2d322f', lineHeight: 1.8, fontStyle: 'italic' }}>
                 👩 {data.mom_script}
               </div>
@@ -228,7 +228,7 @@ export function FamilyPopup({ item, onClose, childLevel }: {
             {item.extra?.cy_story && <div style={{ fontSize: 14, color: '#5a5a4a',
               lineHeight: 1.85, marginBottom: 12 }}>{item.extra.cy_story}</div>}
             <div style={{ padding: '10px 13px', borderRadius: 10,
-              background: 'rgba(200,160,96,0.07)', fontSize: 12, color: '#5a5a4a', lineHeight: 1.7 }}>
+              background: 'rgba(138,115,85,0.07)', fontSize: 12, color: '#5a5a4a', lineHeight: 1.7 }}>
               💡 试着今天跟孩子用一次这个成语
             </div>
           </div>
@@ -241,11 +241,11 @@ export function FamilyPopup({ item, onClose, childLevel }: {
             {item.extra.cultural_author && <div style={{ fontSize: 12, color: 'rgba(45,50,47,0.45)',
               marginBottom: 10 }}>—— {item.extra.cultural_author}</div>}
             {item.extra.cultural_meaning && <div style={{ fontSize: 13, color: '#5a5a4a',
-              lineHeight: 1.75, marginBottom: 10, borderTop: '1px dashed rgba(200,160,96,0.3)',
+              lineHeight: 1.75, marginBottom: 10, borderTop: '1px dashed rgba(138,115,85,0.3)',
               paddingTop: 10 }}>{item.extra.cultural_meaning}</div>}
             {item.extra.overseas_connection && (
               <div style={{ padding: '9px 12px', borderRadius: 10,
-                background: 'rgba(26,60,94,0.05)', fontSize: 12, color: '#2d3f4a', lineHeight: 1.75 }}>
+                background: 'rgba(45,63,74,0.05)', fontSize: 12, color: '#2d3f4a', lineHeight: 1.75 }}>
                 🌍 {item.extra.overseas_connection}
               </div>
             )}

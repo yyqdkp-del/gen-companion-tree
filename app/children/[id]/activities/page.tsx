@@ -11,13 +11,13 @@ const supabase = createClient()
 
 const THEME = {
   bg: 'linear-gradient(180deg, #A7D7D9 0%, #D9A7B4 100%)',
-  text: '#2C3E50', gold: '#B08D57', navy: '#1A3C5E', muted: '#6B8BAA',
+  text: '#2C3E50', gold: '#B08D57', navy: '#2d3f4a', muted: '#6B8BAA',
 }
 
 const CATEGORIES = [
   { value: 'sport', label: '体育竞技', emoji: '⚽', color: '#2D6A4F' },
   { value: 'art', label: '艺术美育', emoji: '🎨', color: '#7C3AED' },
-  { value: 'academic', label: '学科补习', emoji: '📚', color: '#1A3C5E' },
+  { value: 'academic', label: '学科补习', emoji: '📚', color: '#2d3f4a' },
   { value: 'tech', label: '科技探索', emoji: '🤖', color: '#0891B2' },
   { value: 'other', label: '其他', emoji: '🌟', color: '#B08D57' },
 ]
@@ -468,7 +468,7 @@ function ActivitiesContent() {
                             {activity.is_active ? <Pause size={12} color={THEME.gold} /> : <Play size={12} color="#1D9E75" />}
                           </motion.button>
                           <motion.button whileTap={{ scale: 0.85 }} onClick={() => openEdit(activity)}
-                            style={{ width: 28, height: 28, borderRadius: '50%', border: 'none', background: 'rgba(26,60,94,0.08)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, color: THEME.navy }}>
+                            style={{ width: 28, height: 28, borderRadius: '50%', border: 'none', background: 'rgba(45,63,74,0.08)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, color: THEME.navy }}>
                             ✏️
                           </motion.button>
                           <motion.button whileTap={{ scale: 0.85 }} onClick={() => setDeleteConfirm(activity.id)}

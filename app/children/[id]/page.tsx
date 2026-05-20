@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect, Suspense } from 'react'
+import React, { useState, useEffect, Suspense } from 'react'
 import { useRouter, useParams, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -11,8 +11,24 @@ import { StepBasic }    from './steps/StepBasic'
 import { StepSchool }   from './steps/StepSchool'
 import { StepSchedule } from './steps/StepSchedule'
 import { StepHealth }   from './steps/StepHealth'
-import { THEME } from '@/app/_shared/_constants/theme'
 import { logOrAlertNetworkError } from '@/lib/errors/logOrAlertNetworkError'
+
+const GLASS_CARD: React.CSSProperties = {
+  background: 'rgba(255,255,255,0.8)',
+  backdropFilter: 'blur(10px)',
+  WebkitBackdropFilter: 'blur(10px)',
+  borderRadius: 18,
+  border: '1px solid rgba(255,255,255,0.6)',
+  boxShadow: '0 4px 20px rgba(45,50,47,0.05)',
+}
+
+const PAGE = {
+  bg: '#fbf9f6',
+  ink: '#2d322f',
+  accent: '#a46355',
+  gold: '#8a7355',
+  muted: 'rgba(45,50,47,0.45)',
+}
 
 const STEPS = [
   { id: 'basic', label: '基本信息' },
@@ -216,18 +232,18 @@ function ChildEditContent() {
   const canProceed = step === 0 ? !!basicData.name.trim() : true
 
   return (
-    <main style={{ height: 'var(--vh, 100dvh)', overflow: 'hidden', display: 'flex', flexDirection: 'column', background: THEME.bg, fontFamily: "'Noto Sans SC', sans-serif" }}>
+    <main style={{ height: 'var(--vh, 100dvh)', overflow: 'hidden', display: 'flex', flexDirection: 'column', backgroundColor: PAGE.bg, fontFamily: "'Noto Sans SC', sans-serif" }}>
 
-      <div style={{ position: 'sticky', top: 0, zIndex: 50, background: 'rgba(167,215,217,0.85)', backdropFilter: 'blur(20px)', padding: '14px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.3)' }}>
+      <div style={{ position: 'sticky', top: 0, zIndex: 50, ...GLASS_CARD, borderRadius: 0, borderLeft: 'none', borderRight: 'none', borderTop: 'none', padding: '14px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <motion.button whileTap={{ scale: 0.9 }}
           onClick={() => step > 0 ? setStep(step - 1) : router.back()}
-          style={{ background: 'none', border: 'none', cursor: 'pointer', color: THEME.navy, padding: '4px' }}>
+          style={{ background: 'none', border: 'none', cursor: 'pointer', color: PAGE.ink, padding: '4px' }}>
           <ArrowLeft size={20} />
         </motion.button>
-        <span style={{ fontSize: 15, fontWeight: 700, color: THEME.navy }}>
+        <span style={{ fontSize: 15, fontWeight: 700, color: PAGE.ink, fontFamily: "'Noto Serif SC', serif" }}>
           {isNew ? '添加孩子' : '编辑孩子资料'}
         </span>
-        <span onClick={() => router.back()} style={{ fontSize: 13, color: THEME.muted, cursor: 'pointer' }}>
+        <span onClick={() => router.back()} style={{ fontSize: 13, color: PAGE.muted, cursor: 'pointer' }}>
           取消
         </span>
       </div>
@@ -237,20 +253,20 @@ function ChildEditContent() {
         <div style={{ display: 'flex', gap: 6, marginBottom: 20 }}>
           {STEPS.map((s, i) => (
             <div key={i} onClick={() => i < step && setStep(i)}
-              style={{ flex: 1, height: 3, borderRadius: 2, background: i <= step ? THEME.gold : 'rgba(0,0,0,0.1)', cursor: i < step ? 'pointer' : 'default', transition: 'background 0.3s' }} />
+              style={{ flex: 1, height: 3, borderRadius: 2, background: i <= step ? PAGE.accent : 'rgba(164,99,85,0.12)', cursor: i < step ? 'pointer' : 'default', transition: 'background 0.3s' }} />
           ))}
         </div>
 
-        <div style={{ fontSize: 17, fontWeight: 600, color: THEME.navy, marginBottom: 2 }}>{STEPS[step].label}</div>
-        <div style={{ fontSize: 11, color: THEME.muted, marginBottom: 16 }}>步骤 {step + 1} / {STEPS.length}</div>
+        <div style={{ fontSize: 17, fontWeight: 600, color: PAGE.ink, marginBottom: 2 }}>{STEPS[step].label}</div>
+        <div style={{ fontSize: 11, color: PAGE.muted, marginBottom: 16 }}>步骤 {step + 1} / {STEPS.length}</div>
 
         {isFromQuick && step === 0 && (
-          <div style={{ background: 'rgba(176,141,87,0.1)', borderRadius: 12, padding: '10px 14px', fontSize: 12, color: THEME.gold, marginBottom: 14, textAlign: 'center' }}>
+          <div style={{ background: 'rgba(164,99,85,0.1)', borderRadius: 12, padding: '10px 14px', fontSize: 12, color: PAGE.accent, marginBottom: 14, textAlign: 'center' }}>
             🌱 基本信息已保存，继续补充完整资料吧
           </div>
         )}
 
-        <div style={{ background: 'rgba(255,255,255,0.6)', backdropFilter: 'blur(30px)', borderRadius: 20, padding: '20px 16px', border: '1px solid rgba(255,255,255,0.8)', boxShadow: '0 8px 32px rgba(0,0,0,0.06)', marginBottom: 16 }}>
+        <motion.div style={{ ...GLASS_CARD, padding: '20px 16px', marginBottom: 16 }}>
           <AnimatePresence mode="wait">
             <motion.div key={step} initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} transition={{ duration: 0.25 }}>
               {step === 0 && <StepBasic data={basicData} onChange={setBasicData} />}
@@ -259,7 +275,7 @@ function ChildEditContent() {
               {step === 3 && <StepHealth data={healthData} onChange={setHealthData} />}
             </motion.div>
           </AnimatePresence>
-        </div>
+        </motion.div>
 
         {saveError && (
           <div style={{ color: '#7a5a35', fontSize: 13, textAlign: 'center', marginBottom: 12, padding: '10px 14px', borderRadius: 12, background: '#fcf7ed', border: '1px solid #f2e2cd' }}>
@@ -271,11 +287,11 @@ function ChildEditContent() {
           {isLastStep ? (
             <>
               <motion.button whileTap={{ scale: 0.97 }} onClick={() => setStep(step - 1)}
-                style={{ flex: 1, padding: '14px', borderRadius: 16, border: '1px solid rgba(0,0,0,0.1)', background: 'transparent', fontSize: 14, color: THEME.muted, cursor: 'pointer' }}>
+                style={{ flex: 1, padding: '14px', borderRadius: 16, border: '1px solid rgba(0,0,0,0.1)', background: 'transparent', fontSize: 14, color: PAGE.muted, cursor: 'pointer' }}>
                 上一步
               </motion.button>
               <motion.button whileTap={{ scale: 0.97 }} onClick={handleSave} disabled={saving || saved}
-                style={{ flex: 2, padding: '14px', borderRadius: 16, border: 'none', background: saved ? '#22C55E' : THEME.navy, color: '#fff', fontSize: 14, fontWeight: 600, cursor: saving ? 'default' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, transition: 'background 0.3s' }}>
+                style={{ flex: 2, padding: '14px', borderRadius: 14, border: 'none', boxShadow: '0 4px 16px rgba(164,99,85,0.25)', background: saved ? '#22C55E' : PAGE.accent, color: '#fff', fontSize: 14, fontWeight: 600, cursor: saving ? 'default' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, transition: 'background 0.3s' }}>
                 {saving ? <Loader size={16} /> : saved ? <Check size={16} /> : <Save size={16} />}
                 {saving ? '保存中…' : saved ? '已保存 🌿' : '保存资料'}
               </motion.button>
@@ -284,12 +300,12 @@ function ChildEditContent() {
             <>
               {step > 0 && (
                 <motion.button whileTap={{ scale: 0.97 }} onClick={() => setStep(step - 1)}
-                  style={{ flex: 1, padding: '14px', borderRadius: 16, border: '1px solid rgba(0,0,0,0.1)', background: 'transparent', fontSize: 14, color: THEME.muted, cursor: 'pointer' }}>
+                  style={{ flex: 1, padding: '14px', borderRadius: 16, border: '1px solid rgba(0,0,0,0.1)', background: 'transparent', fontSize: 14, color: PAGE.muted, cursor: 'pointer' }}>
                   上一步
                 </motion.button>
               )}
               <motion.button whileTap={{ scale: 0.97 }} onClick={() => canProceed && setStep(step + 1)}
-                style={{ flex: 2, padding: '14px', borderRadius: 16, border: 'none', background: canProceed ? THEME.navy : 'rgba(0,0,0,0.08)', color: canProceed ? '#fff' : THEME.muted, fontSize: 14, fontWeight: 600, cursor: canProceed ? 'pointer' : 'default', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+                style={{ flex: 2, padding: '14px', borderRadius: 14, border: 'none', boxShadow: canProceed ? '0 4px 16px rgba(164,99,85,0.25)' : 'none', background: canProceed ? PAGE.accent : 'rgba(0,0,0,0.08)', color: canProceed ? '#fff' : PAGE.muted, fontSize: 14, fontWeight: 600, cursor: canProceed ? 'pointer' : 'default', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
                 下一步 <ArrowRight size={16} />
               </motion.button>
             </>

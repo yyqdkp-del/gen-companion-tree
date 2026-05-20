@@ -107,11 +107,11 @@ export default function AuthPage() {
       >
         <div style={{ textAlign: 'center', padding: '8px 0' }}>
           <div style={{ fontSize: 56, marginBottom: 16 }}>🌿</div>
-          <div style={{ fontSize: 20, fontWeight: 700, color: '#1A3C5E', marginBottom: 8, fontFamily: 'Noto Serif SC, serif' }}>
+          <div style={{ fontSize: 20, fontWeight: 700, color: '#2d322f', marginBottom: 8, fontFamily: 'Noto Serif SC, serif' }}>
             验证邮件已发送
           </div>
           <div style={{ fontSize: 14, color: '#6B8BAA', lineHeight: 1.8, marginBottom: 28 }}>
-            请检查 <strong style={{ color: '#1A3C5E' }}>{email}</strong><br />
+            请检查 <strong style={{ color: '#2d322f' }}>{email}</strong><br />
             点击邮件中的链接完成注册
           </div>
           <button onClick={() => { window.location.href = '/' }} style={styles.btnPrimary}>
@@ -135,7 +135,7 @@ export default function AuthPage() {
           <div style={{ fontSize: 13, letterSpacing: 6, color: '#B08D57', marginBottom: 6, fontFamily: 'Noto Serif SC, serif' }}>
             根·陪伴
           </div>
-          <div style={{ fontSize: 22, fontWeight: 700, color: '#1A3C5E', fontFamily: 'Noto Serif SC, serif' }}>
+          <div style={{ fontSize: 22, fontWeight: 700, color: '#2d322f', fontFamily: 'Noto Serif SC, serif' }}>
             {mode === 'register' ? '创建你的家庭账号' : '欢迎回来'}
           </div>
           <div style={{ fontSize: 13, color: '#6B8BAA', marginTop: 6 }}>
@@ -183,7 +183,7 @@ export default function AuthPage() {
             <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
             <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
           </svg>
-          <span style={{ fontSize: 14, fontWeight: 500, color: '#1A2B3C' }}>
+          <span style={{ fontSize: 14, fontWeight: 500, color: '#2d322f' }}>
             用 Google {mode === 'register' ? '注册' : '登录'}
           </span>
         </motion.button>
@@ -306,7 +306,7 @@ export default function AuthPage() {
 const styles = {
   main: {
     minHeight: '100dvh',
-    background: 'linear-gradient(180deg, #EEF5FB 0%, #F5F0F8 100%)',
+    backgroundColor: '#fbf9f6',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
@@ -320,7 +320,7 @@ const styles = {
     background: '#FFFFFF',
     borderRadius: 24,
     padding: '36px 28px 32px',
-    boxShadow: '0 8px 40px rgba(26,60,94,0.10)',
+    boxShadow: '0 8px 40px rgba(45,63,74,0.10)',
   } as React.CSSProperties,
 
   btnLine: {
@@ -342,7 +342,7 @@ const styles = {
     width: '100%',
     padding: '14px',
     background: '#fff',
-    color: '#1A2B3C',
+    color: '#2d322f',
     border: '1.5px solid #D0DFF0',
     borderRadius: 14,
     fontSize: 14,
@@ -358,7 +358,7 @@ const styles = {
   btnPrimary: {
     width: '100%',
     padding: '15px',
-    background: '#1A3C5E',
+    background: '#a46355',
     color: '#fff',
     border: 'none',
     borderRadius: 14,
@@ -389,14 +389,14 @@ const styles = {
   input: {
     width: '100%',
     padding: '14px 16px',
-    border: '1.5px solid #D0DFF0',
+    border: '1.5px solid rgba(164,99,85,0.15)',
     borderRadius: 12,
     fontSize: 15,
-    color: '#1A2B3C',
+    color: '#2d322f',
     outline: 'none',
     marginBottom: 12,
-    background: '#F8FAFC',
-    transition: 'border 0.2s',
+    background: '#f7f4ee',
+    transition: 'border 0.2s, box-shadow 0.2s',
   } as React.CSSProperties,
 
   checkLabel: {
@@ -409,14 +409,14 @@ const styles = {
 
   checkbox: {
     marginTop: 3,
-    accentColor: '#1A3C5E',
+    accentColor: '#a46355',
     flexShrink: 0,
     width: 16,
     height: 16,
   } as React.CSSProperties,
 
   link: {
-    color: '#1A3C5E',
+    color: '#2d322f',
     textDecoration: 'underline',
     margin: '0 3px',
   } as React.CSSProperties,

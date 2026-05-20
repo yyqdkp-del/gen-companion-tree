@@ -4,7 +4,7 @@ import { motion } from 'framer-motion'
 import { Navigation, Phone, Mail, Calendar, Download, ExternalLink, CreditCard, ShoppingBag, Loader, CheckCircle2 } from 'lucide-react'
 
 const G = { bg: '#E1F5EE', deep: '#1D9E75', dark: '#0F6E56' }
-const THEME = { text: '#2C3E50', muted: '#6B8BAA', navy: '#1A3C5E' }
+const THEME = { text: '#2C3E50', muted: '#6B8BAA', navy: '#2d3f4a' }
 
 export type ActionData = {
   type: string

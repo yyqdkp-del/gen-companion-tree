@@ -12,6 +12,30 @@ import { logOrAlertNetworkError } from '@/lib/errors/logOrAlertNetworkError'
 
 const supabase = createClient()
 
+const GLASS_CARD: CSSProperties = {
+  background: 'rgba(255,255,255,0.8)',
+  backdropFilter: 'blur(10px)',
+  WebkitBackdropFilter: 'blur(10px)',
+  borderRadius: 18,
+  border: '1px solid rgba(255,255,255,0.6)',
+  boxShadow: '0 4px 20px rgba(45,50,47,0.05)',
+}
+
+const PAGE_BG = '#fbf9f6'
+const INK = '#2d322f'
+const ACCENT = '#a46355'
+
+const INPUT_STYLE: CSSProperties = {
+  width: '100%',
+  padding: '10px 12px',
+  borderRadius: 12,
+  border: '1.5px solid rgba(164,99,85,0.15)',
+  background: '#f7f4ee',
+  fontSize: 14,
+  color: INK,
+  boxSizing: 'border-box',
+}
+
 function daysUntil(iso: string | null | undefined): number | null {
   if (!iso) return null
   const t = new Date(iso).getTime()
@@ -133,30 +157,26 @@ export default function VehiclesPage() {
         value={value}
         onChange={e => onChange(e.target.value)}
         placeholder={placeholder}
-        style={{
-          width: '100%', padding: '10px 12px', borderRadius: 10, border: '1px solid rgba(0,0,0,0.1)',
-          background: 'rgba(255,255,255,0.75)', fontSize: 14, color: THEME.text, boxSizing: 'border-box',
-        }}
+        style={INPUT_STYLE}
       />
     </div>
   )
 
   return (
     <main style={{
-      minHeight: '100dvh', background: THEME.bg, fontFamily: "'Noto Sans SC', sans-serif",
+      minHeight: '100dvh', backgroundColor: PAGE_BG, fontFamily: "'Noto Sans SC', sans-serif",
       paddingBottom: NAV_HEIGHT_CSS,
     }}>
       <header style={{
         position: 'sticky', top: 0, zIndex: 20, display: 'flex', alignItems: 'center', gap: 12,
-        padding: '14px 16px', background: 'rgba(167,215,217,0.9)', backdropFilter: 'blur(12px)',
-        borderBottom: '1px solid rgba(255,255,255,0.35)',
+        padding: '14px 16px', ...GLASS_CARD, borderRadius: 0, borderLeft: 'none', borderRight: 'none', borderTop: 'none',
       }}>
         <motion.button type="button" whileTap={{ scale: 0.92 }} onClick={() => router.back()}
-          style={{ border: 'none', background: 'none', cursor: 'pointer', color: THEME.navy }}>
+          style={{ border: 'none', background: 'none', cursor: 'pointer', color: INK }}>
           <ArrowLeft size={22} />
         </motion.button>
-        <Car size={22} color={THEME.navy} />
-        <span style={{ fontSize: 17, fontWeight: 700, color: THEME.navy }}>车辆档案</span>
+        <Car size={22} color={INK} />
+        <span style={{ fontSize: 17, fontWeight: 700, color: INK, fontFamily: "'Noto Serif SC', serif" }}>车辆档案</span>
       </header>
 
       <div style={{ maxWidth: 560, margin: '0 auto', padding: '16px 16px 24px' }}>
@@ -164,8 +184,8 @@ export default function VehiclesPage() {
           <span style={{ fontSize: 13, color: THEME.muted }}>车险 · 年检 · 事故一键办会用到</span>
           <motion.button type="button" whileTap={{ scale: 0.95 }} onClick={openNew}
             style={{
-              display: 'flex', alignItems: 'center', gap: 6, padding: '8px 12px', borderRadius: 12,
-              border: 'none', background: THEME.navy, color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer',
+              display: 'flex', alignItems: 'center', gap: 6, padding: '8px 12px',
+              border: 'none', background: ACCENT, color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer', borderRadius: 14,
             }}>
             <Plus size={16} /> 添加车辆
           </motion.button>
@@ -189,11 +209,7 @@ export default function VehiclesPage() {
               const regS = expiryStyle(regD)
               return (
                 <div key={v.id}
-                  style={{
-                    borderRadius: 16, padding: '14px 16px',
-                    background: 'rgba(255,255,255,0.65)', border: '1px solid rgba(255,255,255,0.85)',
-                    boxShadow: '0 6px 24px rgba(0,0,0,0.06)',
-                  }}>
+                  style={{ ...GLASS_CARD, padding: '14px 16px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
                     <div>
                       <div style={{ fontSize: 16, fontWeight: 700, color: THEME.text }}>
@@ -217,7 +233,7 @@ export default function VehiclesPage() {
                     <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
                       <motion.button type="button" whileTap={{ scale: 0.9 }} onClick={() => v.id && openEdit(v)}
                         style={{ border: 'none', background: 'rgba(0,0,0,0.05)', borderRadius: 10, padding: 8, cursor: 'pointer' }}>
-                        <Pencil size={16} color={THEME.navy} />
+                        <Pencil size={16} color={INK} />
                       </motion.button>
                       <motion.button type="button" whileTap={{ scale: 0.9 }} onClick={() => v.id && remove(v.id)}
                         style={{ border: 'none', background: '#fff2f0', borderRadius: 10, padding: 8, cursor: 'pointer' }}>
@@ -232,11 +248,8 @@ export default function VehiclesPage() {
         )}
 
         {(formOpen) && (
-          <div style={{
-            marginTop: 20, borderRadius: 18, padding: '18px 16px',
-            background: 'rgba(255,255,255,0.75)', border: '1px solid rgba(255,255,255,0.9)',
-          }}>
-            <div style={{ fontSize: 15, fontWeight: 700, color: THEME.navy, marginBottom: 12 }}>
+          <motion.div style={{ marginTop: 20, ...GLASS_CARD, padding: '18px 16px' }}>
+            <div style={{ fontSize: 15, fontWeight: 700, color: INK, marginBottom: 12 }}>
               {editing ? '编辑车辆' : '新车辆'}
             </div>
             <Field label="昵称（如：妈妈的车）" value={form.nickname || ''} onChange={v => setForm({ ...form, nickname: v })} />
@@ -258,11 +271,11 @@ export default function VehiclesPage() {
                 取消
               </motion.button>
               <motion.button type="button" whileTap={{ scale: 0.97 }} disabled={saving} onClick={() => void save()}
-                style={{ flex: 2, padding: 12, borderRadius: 12, border: 'none', background: THEME.navy, color: '#fff', fontWeight: 600, cursor: 'pointer' }}>
+                style={{ flex: 2, padding: 12, borderRadius: 14, border: 'none', background: ACCENT, color: '#fff', fontWeight: 600, cursor: 'pointer', boxShadow: '0 4px 16px rgba(164,99,85,0.25)' }}>
                 {saving ? '保存中…' : '保存'}
               </motion.button>
             </div>
-          </div>
+          </motion.div>
         )}
       </div>
     </main>
