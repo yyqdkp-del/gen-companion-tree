@@ -176,12 +176,13 @@ async function markAsProcessed(supabase: any, email: EmailInput, result: any) {
 }
 
 // ══ 获取家庭档案 ═════════════════════════════════════════════
-async function getFamilyContext(supabase: any): Promise<string> {
+async function getFamilyContext(supabase: any, userId: string): Promise<string> {
+  if (!userId) return '{}'
   try {
     const [profile, children, places] = await Promise.all([
-      supabase.from('family_profile').select('*').limit(1),
-      supabase.from('children').select('id, name, school_name, school_email_domain, grade').limit(5),
-      supabase.from('family_places').select('label, name').limit(10),
+      supabase.from('family_profile').select('*').eq('user_id', userId).limit(1),
+      supabase.from('children').select('id, name, school_name, school_email_domain, grade').eq('user_id', userId).limit(5),
+      supabase.from('family_places').select('label, name').eq('user_id', userId).limit(10),
     ])
     return JSON.stringify({
       profile: profile.data?.[0] || {},
@@ -237,12 +238,19 @@ async function triggerCalendar(event: any) {
 }
 
 // ══ 核心：把解析结果写入三珠 ═════════════════════════════════
-async function syncEmailToThreeDrops(supabase: any, parsed: any, email: EmailInput) {
+async function syncEmailToThreeDrops(supabase: any, parsed: any, email: EmailInput, userId: string) {
+  const uid = email.user_id || userId
+  if (!uid) return
+
   const familyId = 'default'
   const today = getTodayStr()
 
-  // 获取孩子ID
-  const { data: children } = await supabase.from('children').select('id, name').limit(5)
+  // 获取孩子 ID：仅该用户的子女（至多 5 人，默认取首位）
+  const { data: children } = await supabase
+    .from('children')
+    .select('id, name, grade, school_name')
+    .eq('user_id', uid)
+    .limit(5)
   const childId = children?.[0]?.id || null
 
   // ── 1. 写入校历事件 ──────────────────────────────────────
@@ -252,6 +260,7 @@ async function syncEmailToThreeDrops(supabase: any, parsed: any, email: EmailInp
     // 写入 child_school_calendar
     if (childId && parsed.is_school_related) {
       await supabase.from('child_school_calendar').insert({
+        user_id: uid,
         child_id: childId,
         event_type: event.category || 'activity',
         title: event.title,
@@ -275,6 +284,7 @@ async function syncEmailToThreeDrops(supabase: any, parsed: any, email: EmailInp
     if (!todo.title) continue
 
     const { data: todoItem } = await supabase.from('todo_items').insert({
+      user_id: uid,
       family_id: familyId,
       title: todo.title,
       description: `来自邮件：${email.subject}`,
@@ -296,6 +306,7 @@ async function syncEmailToThreeDrops(supabase: any, parsed: any, email: EmailInp
     // 三级提醒链
     if (todoItem && todo.due_date && todo.reminder_days) {
       const reminderInserts = todo.reminder_days.map((days: number) => ({
+        user_id: uid,
         todo_id: todoItem.id,
         family_id: familyId,
         level: days >= 30 ? 1 : days >= 7 ? 2 : 3,
@@ -315,6 +326,7 @@ async function syncEmailToThreeDrops(supabase: any, parsed: any, email: EmailInp
     // 新增校历事件
     if (cu.schedule_add?.title) {
       await supabase.from('child_school_calendar').insert({
+        user_id: uid,
         child_id: childId,
         event_type: 'activity',
         title: cu.schedule_add.title,
@@ -338,6 +350,7 @@ async function syncEmailToThreeDrops(supabase: any, parsed: any, email: EmailInp
         }).eq('id', existing.id)
       } else {
         await supabase.from('child_daily_log').insert({
+          user_id: uid,
           child_id: childId,
           date: today,
           health_notes: cu.health_alert,
@@ -368,6 +381,7 @@ async function syncEmailToThreeDrops(supabase: any, parsed: any, email: EmailInp
         }
       } else {
         await supabase.from('packing_lists').insert({
+          user_id: uid,
           child_id: childId,
           date: need.event_date,
           items: [newItem],
@@ -379,6 +393,7 @@ async function syncEmailToThreeDrops(supabase: any, parsed: any, email: EmailInp
   // ── 4. 写入热点 hotspot_items ────────────────────────────
   if (parsed.hotspot?.create) {
     await supabase.from('hotspot_items').insert({
+      user_id: uid,
       family_id: familyId,
       category: parsed.hotspot.category || 'education',
       urgency: parsed.hotspot.urgency || 'important',
@@ -400,6 +415,7 @@ async function syncEmailToThreeDrops(supabase: any, parsed: any, email: EmailInp
 
   // ── 5. 记录邮件学校通信历史 ─────────────────────────────
   await supabase.from('child_school_comms').insert({
+    user_id: uid,
     child_id: childId,
     email_from: email.from,
     email_subject: email.subject,
@@ -459,16 +475,24 @@ export async function POST(req: NextRequest) {
     const emails: EmailInput[] = Array.isArray(body) ? body : [body]
     const results = []
 
-    // 获取孩子学校域名（用于快速预判）
-    const { data: children } = await supabase
-      .from('children').select('school_email_domain').limit(5)
-    const domains = (children || []).map((c: any) => c.school_email_domain).filter(Boolean)
-
-    // 获取家庭档案（只查一次）
-    const familyContext = await getFamilyContext(supabase)
-
     for (const email of emails) {
       try {
+        const userId = typeof email.user_id === 'string' ? email.user_id.trim() : ''
+        if (!userId) {
+          console.warn('邮件解析跳过：缺少 user_id', email.subject)
+          results.push({ error: 'missing_user_id', subject: email.subject })
+          continue
+        }
+
+        const { data: domainChildren } = await supabase
+          .from('children')
+          .select('school_email_domain')
+          .eq('user_id', userId)
+          .limit(20)
+        const domains = (domainChildren || []).map((c: any) => c.school_email_domain).filter(Boolean)
+
+        const familyContext = await getFamilyContext(supabase, userId)
+
         // 去重检查
         if (email.message_id) {
           const already = await isAlreadyProcessed(supabase, email.message_id)
@@ -509,7 +533,7 @@ export async function POST(req: NextRequest) {
         }
 
         // 写入三珠
-        await syncEmailToThreeDrops(supabase, parsed, email)
+        await syncEmailToThreeDrops(supabase, parsed, email, userId)
 
         // 记录已处理
         await markAsProcessed(supabase, email, parsed)

@@ -117,6 +117,10 @@ export default function KapokTreeholePage() {
     try {
       const res = await fetchWithAuth('/api/treehouse/mom', {
         method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-client-hour': new Date().getHours().toString(),
+        },
         body: JSON.stringify({
           messages: nextMessages
             .filter((message) => message.id !== 'welcome')

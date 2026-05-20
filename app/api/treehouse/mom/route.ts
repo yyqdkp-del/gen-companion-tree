@@ -9,24 +9,78 @@ import { getAuthUser } from '@/lib/auth/getAuthUser'
 const anthropic = new Anthropic()
 
 const CRISIS_KEYWORDS = [
+  // 中文
   '自杀', '不想活', '去死', '结束生命', '活不下去',
   '跳楼', '割腕', '吃药死', '不想活了', '死了算了',
   '轻生', '了结', '消失算了', '不存在了',
+  // 英文
+  'kill myself', 'end my life', 'want to die',
+  'suicide', 'self harm', 'hurt myself',
+  'cant go on', "can't go on", 'no reason to live',
 ]
 
-const CRISIS_RESPONSE = `听到你说的这些话，我非常担心你。
+function getCrisisResponse(location?: string): string {
+  const country = (location ?? '').toLowerCase()
 
-你现在的感受很重要，我想确认你是安全的。
+  if (country.includes('singapore') || country.includes('新加坡')) {
+    return `听到你说的这些话，我非常担心你。
 
 如果你现在有伤害自己的想法，请立刻联系：
-🆘 国际危机热线：988（美国）
-🆘 加拿大危机热线：1-833-456-4566
-🆘 中文心理援助：400-161-9995
+🆘 新加坡危机热线：1800-221-4444（SOS）
+🆘 心理健康热线：6389-2222
+🆘 紧急：995
 
-我在这里陪着你，但我也希望你能得到专业的帮助。你愿意告诉我你现在在哪里吗？`
+我在这里陪着你 🌸`
+  }
+
+  if (country.includes('thailand') || country.includes('泰国') || country.includes('清迈')) {
+    return `听到你说的这些话，我非常担心你。
+
+如果你现在有伤害自己的想法，请立刻联系：
+🆘 泰国心理热线：1323
+🆘 中文援助：+66-2-713-6793
+🆘 紧急：191
+
+我在这里陪着你 🌸`
+  }
+
+  if (country.includes('malaysia') || country.includes('马来西亚') || country.includes('吉隆坡')) {
+    return `听到你说的这些话，我非常担心你。
+
+如果你现在有伤害自己的想法，请立刻联系：
+🆘 马来西亚危机热线：015-6006-8777（Befrienders）
+🆘 心理健康：03-2935-9935
+🆘 紧急：999
+
+我在这里陪着你 🌸`
+  }
+
+  if (country.includes('canada') || country.includes('加拿大') || country.includes('toronto')) {
+    return `听到你说的这些话，我非常担心你。
+
+如果你现在有伤害自己的想法，请立刻联系：
+🆘 加拿大危机热线：1-833-456-4566
+🆘 多伦多：416-408-4357
+🆘 紧急：911
+
+我在这里陪着你 🌸`
+  }
+
+  return `听到你说的这些话，我非常担心你。
+
+如果你现在有伤害自己的想法，请立刻联系当地紧急服务或心理援助热线。
+🆘 国际心理援助：https://www.befrienders.org
+🆘 中文心理援助：400-161-9995（中国大陆）
+
+我在这里陪着你 🌸`
+}
 
 function detectCrisis(text: string): boolean {
-  return CRISIS_KEYWORDS.some((kw) => text.includes(kw))
+  const lower = text.toLowerCase()
+  return CRISIS_KEYWORDS.some((kw) => {
+    if (/[\u4e00-\u9fff]/.test(kw)) return text.includes(kw)
+    return lower.includes(kw.toLowerCase())
+  })
 }
 
 const KAPOK_SYSTEM_PROMPT = `你是木棉（Kapok），一个专门陪伴海外华人妈妈的 AI 树洞伴侣。
@@ -125,22 +179,30 @@ export async function POST(req: NextRequest) {
   const latestUserMessage = [...messages].reverse().find((message) => message.role === 'user')
   const userMessage = latestUserMessage?.content ?? ''
 
-  if (detectCrisis(userMessage)) {
-    const sessionId = getSessionId(user.id)
-    await saveConversation(user.id, sessionId, [
-      ...(latestUserMessage ? [latestUserMessage] : []),
-      { role: 'assistant', content: CRISIS_RESPONSE },
-    ])
-    return NextResponse.json({
-      message: CRISIS_RESPONSE,
-      is_crisis: true,
-    })
-  }
-
   const serviceSupabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
   )
+
+  if (detectCrisis(userMessage)) {
+    const { data: location } = await serviceSupabase
+      .from('user_locations')
+      .select('country, city')
+      .eq('user_id', user.id)
+      .maybeSingle()
+
+    const locationStr = `${location?.country || ''} ${location?.city || ''}`
+    const crisisMessage = getCrisisResponse(locationStr)
+    const sessionId = getSessionId(user.id)
+    await saveConversation(user.id, sessionId, [
+      ...(latestUserMessage ? [latestUserMessage] : []),
+      { role: 'assistant', content: crisisMessage },
+    ])
+    return NextResponse.json({
+      message: crisisMessage,
+      is_crisis: true,
+    })
+  }
 
   const { data: memoriesRows, error: memoriesErr } = await serviceSupabase
     .from('mom_memories')
@@ -156,7 +218,14 @@ export async function POST(req: NextRequest) {
   const memoryContext = memoriesRows?.length
     ? `\n\n【关于这位妈妈，我记得的事情】\n${memoriesRows.map((m) => `- ${m.content}`).join('\n')}`
     : ''
-  const hour = new Date().getHours()
+  const clientHourHeader = req.headers.get('x-client-hour')
+  let hour = new Date().getHours()
+  if (clientHourHeader !== null && clientHourHeader !== '') {
+    const parsed = parseInt(clientHourHeader, 10)
+    if (!Number.isNaN(parsed) && parsed >= 0 && parsed <= 23) {
+      hour = parsed
+    }
+  }
   const isLateNight = hour >= 22 || hour <= 5
   const systemPrompt =
     (isLateNight
