@@ -3,7 +3,46 @@ import React from 'react'
 import { Field, SelectField } from '@/app/_shared/_components/FormField'
 import { THEME } from '@/app/_shared/_constants/theme'
 
+const VISA_TYPES = [
+  { value: '', label: '请选择签证类型' },
+  // 泰国
+  { value: 'TR', label: '泰国旅游签 (TR)' },
+  { value: 'ED', label: '泰国教育签 (ED)' },
+  { value: 'LTR', label: '泰国长期居留签 (LTR)' },
+  { value: 'TH_OTHER', label: '泰国其他签证' },
+  // 马来西亚
+  { value: 'MM2H', label: '马来西亚 MM2H' },
+  { value: 'MY_EP', label: '马来西亚工作准证 (EP)' },
+  { value: 'MY_OTHER', label: '马来西亚其他签证' },
+  // 新加坡
+  { value: 'SG_EP', label: '新加坡工作准证 (EP)' },
+  { value: 'SG_DP', label: '新加坡家属准证 (DP)' },
+  { value: 'SG_OTHER', label: '新加坡其他签证' },
+  // 加拿大
+  { value: 'CA_PR', label: '加拿大永久居民 (PR)' },
+  { value: 'CA_WP', label: '加拿大工作许可 (WP)' },
+  { value: 'CA_OTHER', label: '加拿大其他签证' },
+  // 其他
+  { value: 'OTHER', label: '其他签证' },
+]
+
+function showsThailandTm30(visaType: string | undefined) {
+  if (!visaType) return false
+  return (
+    visaType === 'TR' ||
+    visaType === 'ED' ||
+    visaType === 'LTR' ||
+    visaType.startsWith('TH') ||
+    visaType === 'NON-O' ||
+    visaType === 'NON-B'
+  )
+}
+
 function StepPassport({ data, onChange }: { data: any; onChange: (d: any) => void }) {
+  const visaType = data.visa_type as string | undefined
+  const showVisaNote = visaType === 'OTHER' || (!!visaType && visaType.endsWith('_OTHER'))
+  const showTm30 = showsThailandTm30(visaType)
+
   return (
     <div>
       <div style={{ fontSize: 15, fontWeight: 600, color: '#2d322f', marginBottom: 4 }}>证件信息 📋</div>
@@ -18,23 +57,30 @@ function StepPassport({ data, onChange }: { data: any; onChange: (d: any) => voi
       <Field label="护照签发地" value={data.passport_issue_place} onChange={v => onChange({ ...data, passport_issue_place: v })} placeholder="北京" />
       <Field label="护照所属国家" value={data.passport_country} onChange={v => onChange({ ...data, passport_country: v })} placeholder="中国" />
       <div style={{ height: 1, background: 'rgba(0,0,0,0.07)', margin: '20px 0' }} />
-      <div style={{ fontSize: 12, color: '#8a7355', fontWeight: 700, marginBottom: 12 }}>泰国签证</div>
+      <div style={{ fontSize: 12, color: '#8a7355', fontWeight: 700, marginBottom: 12 }}>签证信息</div>
       <SelectField
         label="当前签证类型"
-        value={data.visa_type}
+        value={data.visa_type ?? ''}
         onChange={v => onChange({ ...data, visa_type: v })}
-        options={[
-          { value: '', label: '请选择' },
-          { value: 'TR', label: 'TR · 旅游签证' },
-          { value: 'ED', label: 'ED · 教育签证' },
-          { value: 'NON-O', label: 'Non-O · 家属签证' },
-          { value: 'NON-B', label: 'Non-B · 商务签证' },
-          { value: 'LTR', label: 'LTR · 长居签证' },
-          { value: 'other', label: '其他' },
-        ]}
+        options={VISA_TYPES}
       />
+      {showVisaNote && (
+        <Field
+          label="签证类型说明"
+          value={data.visa_type_note || ''}
+          onChange={v => onChange({ ...data, visa_type_note: v })}
+          placeholder="请填写具体签证类型"
+        />
+      )}
       <Field label="签证到期日" value={data.visa_expiry} onChange={v => onChange({ ...data, visa_expiry: v })} type="date" />
-      <Field label="TM30 报到号码" value={data.tm30_number} onChange={v => onChange({ ...data, tm30_number: v })} placeholder="如有填写" />
+      {showTm30 && (
+        <Field
+          label="TM30 编号"
+          value={data.tm30_number || ''}
+          onChange={v => onChange({ ...data, tm30_number: v })}
+          placeholder="如有填写"
+        />
+      )}
       <div style={{ height: 1, background: 'rgba(0,0,0,0.07)', margin: '20px 0' }} />
       <div style={{ fontSize: 12, color: '#8a7355', fontWeight: 700, marginBottom: 12 }}>保险信息（可选）</div>
       <Field label="保险号" value={data.insurance_number} onChange={v => onChange({ ...data, insurance_number: v })} placeholder="保单号 / 会员号" />

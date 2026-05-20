@@ -1,7 +1,6 @@
 'use client'
 import React from 'react'
 import { Field, SelectField } from '@/app/_shared/_components/FormField'
-import { THEME } from '@/app/_shared/_constants/theme'
 
 function StepMember({ data, onChange }: { data: any; onChange: (d: any) => void }) {
   return (

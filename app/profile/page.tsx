@@ -55,16 +55,17 @@ function ProfileContent() {
   const [passportData, setPassportData] = useState({
     passport_number: '', passport_expiry: '', passport_issue_place: '',
     passport_issue_date: '', passport_country: '',
-    visa_type: '', visa_expiry: '', tm30_number: '',
+    visa_type: '', visa_type_note: '', visa_expiry: '', tm30_number: '',
     insurance_number: '', insurance_company: '', insurance_expiry: '',
   })
   const [addressData, setAddressData] = useState({
     home_address_en: '', home_address_zh: '',
     school_name: '', school_address: '', hospital_name: '',
-    resident_city: '',
+    resident_city: '', resident_city_custom: '',
   })
   const [emergencyData, setEmergencyData] = useState({
     emergency_name: '', emergency_relation: '', emergency_phone: '',
+    emergency_name_2: '', emergency_relation_2: '', emergency_phone_2: '',
     blood_type: '', allergies: '', chronic_conditions: '',
   })
 
@@ -97,6 +98,7 @@ function ProfileContent() {
           passport_issue_date: data.passport_issue_date || '',
           passport_country: data.passport_country || '',
           visa_type: data.visa_type || '',
+          visa_type_note: data.visa_type_note || '',
           visa_expiry: data.visa_expiry || '',
           tm30_number: data.tm30_number || '',
           insurance_number: data.insurance_number || '',
@@ -110,11 +112,15 @@ function ProfileContent() {
           school_address: data.school_address || '',
           hospital_name: data.hospital_name || '',
           resident_city: data.resident_city || '',  // ← 修复：读回城市
+          resident_city_custom: data.resident_city_custom || '',
         })
         setEmergencyData({
           emergency_name: data.emergency_name || '',
           emergency_relation: data.emergency_relation || '',
           emergency_phone: data.emergency_phone || '',
+          emergency_name_2: data.emergency_name_2 || '',
+          emergency_relation_2: data.emergency_relation_2 || '',
+          emergency_phone_2: data.emergency_phone_2 || '',
           blood_type: data.blood_type || '',
           allergies: data.allergies || '',
           chronic_conditions: data.chronic_conditions || '',
@@ -192,6 +198,11 @@ function ProfileContent() {
       const uid = session?.user?.id
       if (!uid) { router.push('/'); return }
 
+      const resolvedCity =
+        addressData.resident_city === 'other'
+          ? (addressData.resident_city_custom?.trim() || null)
+          : (addressData.resident_city || null)
+
       const payload = {
         user_id: uid,
         ...memberData,
@@ -216,7 +227,7 @@ function ProfileContent() {
           user_id: uid, place_type: 'home', name: '家',
           address: addressData.home_address_en,
           address_zh: addressData.home_address_zh,
-          city: addressData.resident_city || null,
+          city: resolvedCity,
           is_primary: true,
         }
         if (existingPlace) {

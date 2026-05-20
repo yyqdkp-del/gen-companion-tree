@@ -89,8 +89,14 @@ export default function TravelPage() {
   const loadProfileCity = useCallback(async () => {
     const { data: { session } } = await supabase.auth.getSession()
     if (!session?.user?.id) return
-    const { data } = await supabase.from('family_profile').select('resident_city').eq('user_id', session.user.id).maybeSingle()
-    if (data?.resident_city) setDeparture(String(data.resident_city))
+    const { data } = await supabase.from('family_profile').select('resident_city,resident_city_custom').eq('user_id', session.user.id).maybeSingle()
+    if (data?.resident_city) {
+      const raw = String(data.resident_city)
+      const dep = raw === 'other' && data.resident_city_custom
+        ? String(data.resident_city_custom)
+        : raw
+      setDeparture(dep)
+    }
   }, [])
 
   const loadHistory = useCallback(async () => {

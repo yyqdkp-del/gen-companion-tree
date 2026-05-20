@@ -30,8 +30,17 @@ function StepAddress({ data, onChange }: { data: any; onChange: (d: any) => void
           { value: 'Vancouver', label: '🇨🇦 温哥华' },
           { value: 'Los Angeles', label: '🇺🇸 洛杉矶' },
           { value: 'Hong Kong', label: '🇭🇰 香港' },
+          { value: 'other', label: '其他城市' },
         ]}
       />
+      {data.resident_city === 'other' && (
+        <Field
+          label="城市名称"
+          value={data.resident_city_custom || ''}
+          onChange={v => onChange({ ...data, resident_city_custom: v })}
+          placeholder="请填写所在城市"
+        />
+      )}
       <Field label="地址（英文）" value={data.home_address_en} onChange={v => onChange({ ...data, home_address_en: v })} placeholder="123 Nimman Rd, Chiang Mai 50200" />
       <Field label="地址（中文，可选）" value={data.home_address_zh} onChange={v => onChange({ ...data, home_address_zh: v })} placeholder="清迈市区尼曼路123号" />
       <div style={{ height: 1, background: 'rgba(0,0,0,0.07)', margin: '20px 0' }} />

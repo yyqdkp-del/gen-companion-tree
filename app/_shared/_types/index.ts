@@ -45,6 +45,8 @@ export type FamilyProfile = {
   /** 护照签发国 / 护照所属国家 */
   passport_country?: string
   visa_type?: string
+  /** 当 visa_type 为 OTHER 或 *_OTHER 时的说明 */
+  visa_type_note?: string
   visa_expiry?: string
   tm30_number?: string
   insurance_number?: string
@@ -56,9 +58,14 @@ export type FamilyProfile = {
   school_address?: string
   hospital_name?: string
   resident_city?: string
+  /** 当 resident_city 为 other 时填写的城市名 */
+  resident_city_custom?: string
   emergency_name?: string
   emergency_relation?: string
   emergency_phone?: string
+  emergency_name_2?: string
+  emergency_relation_2?: string
+  emergency_phone_2?: string
   blood_type?: string
   allergies?: string
   chronic_conditions?: string
