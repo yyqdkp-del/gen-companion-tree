@@ -1,4 +1,5 @@
 import { useCallback } from 'react'
+import { toast } from '@/app/components/Toast'
 import { markTodoDone, snoozeTodo } from '../_services/todoService'
 import type { Reminder } from '../_types'
 
@@ -9,7 +10,7 @@ export function useTodoActions(reminders: Reminder[], onSync: () => void) {
       await markTodoDone(id, category)
       onSync()
     } catch {
-      alert('操作失败，请重试')
+      toast('操作失败，请重试', 'error')
     }
   }, [reminders, onSync])
 
@@ -19,7 +20,7 @@ export function useTodoActions(reminders: Reminder[], onSync: () => void) {
       await snoozeTodo(id, category)
       onSync()
     } catch {
-      alert('操作失败，请重试')
+      toast('操作失败，请重试', 'error')
     }
   }, [reminders, onSync])
 

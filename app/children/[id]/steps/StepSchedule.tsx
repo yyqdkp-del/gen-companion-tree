@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { Loader, Check, X, Plus, Camera } from 'lucide-react'
 import { THEME } from '@/app/_shared/_constants/theme'
 import { fetchWithAuth } from '@/lib/auth/fetchWithAuth'
+import { toast } from '@/app/components/Toast'
 
 const DAYS = [
   { key: 'mon', label: '周一' },
@@ -160,7 +161,7 @@ function StepSchedule({ data, onChange }: { data: any; onChange: (d: any) => voi
         img.src = url
       })
       if (!base64 || base64.length < 100) {
-        alert('图片读取失败，请重试')
+        toast('图片读取失败，请重试', 'error')
         setParsing(false)
         return
       }

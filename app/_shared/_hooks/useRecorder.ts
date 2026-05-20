@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback } from 'react'
+import { toast } from '@/app/components/Toast'
 
 type RecorderState = {
   isRecording: boolean
@@ -40,7 +41,7 @@ export function useRecorder(
       setRecordingSeconds(0)
       timerRef.current = setInterval(() => setRecordingSeconds(s => s + 1), 1000)
     } catch {
-      alert('请允许麦克风权限')
+      toast('请允许麦克风权限', 'info')
     }
   }, [onAudioReady])
 

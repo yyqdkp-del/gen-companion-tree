@@ -30,6 +30,7 @@ import { addChild } from '@/app/_shared/_services/childService'
 import { getJsonAuthHeaders } from '@/lib/auth/clientAuthHeaders'
 import { fetchWithAuth } from '@/lib/auth/fetchWithAuth'
 import { logOrAlertNetworkError } from '@/lib/errors/logOrAlertNetworkError'
+import { toast } from '@/app/components/Toast'
 import { sanitizeFileName } from '@/lib/storage/sanitizeFileName'
 
 const ChildAvatar = nextDynamic(() => import('@/app/components/ChildAvatar'), { ssr: false })
@@ -360,7 +361,7 @@ export default function BasePage() {
       if (!res.ok) throw new Error('巡逻失败')
     } catch (e) {
       if ((e as Error).name !== 'AbortError') {
-        if (!logOrAlertNetworkError(e)) alert('刷新失败，请重试')
+        if (!logOrAlertNetworkError(e)) toast('刷新失败，请重试', 'error')
       }
     } finally {
       patrolTimerRef.current = setTimeout(() => {

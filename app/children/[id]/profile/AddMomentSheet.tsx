@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { fetchWithAuth } from '@/lib/auth/fetchWithAuth'
 import { uploadFile } from '@/app/_shared/_services/uploadService'
+import { toast } from '@/app/components/Toast'
 
 interface Props {
   childId: string
@@ -26,7 +27,7 @@ export default function AddMomentSheet({ childId, onClose, onSaved }: Props) {
       const url = await uploadFile(file, 'moments')
       setPhotoUrl(url)
     } catch {
-      alert('上传失败，请重试')
+      toast('上传失败，请重试', 'error')
     } finally {
       setUploading(false)
     }
@@ -34,7 +35,7 @@ export default function AddMomentSheet({ childId, onClose, onSaved }: Props) {
 
   const handleSave = async () => {
     if (!title.trim()) {
-      alert('请填写标题')
+      toast('请填写标题', 'info')
       return
     }
     setSaving(true)
@@ -55,7 +56,7 @@ export default function AddMomentSheet({ childId, onClose, onSaved }: Props) {
         onClose()
       } else {
         const j = await res.json().catch(() => ({}))
-        alert((j as { error?: string }).error || '保存失败，请重试')
+        toast((j as { error?: string }).error || '保存失败，请重试', 'error')
       }
     } finally {
       setSaving(false)

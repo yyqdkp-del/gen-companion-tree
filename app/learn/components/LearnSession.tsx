@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { CHINESE_THEME as T } from '@/app/_shared/_constants/chineseTheme'
 import { useApp } from '@/app/context/AppContext'
 import { fetchWithAuth } from '@/lib/auth/fetchWithAuth'
+import { toast } from '@/app/components/Toast'
 
 const GLASS_CARD: React.CSSProperties = {
   background: 'rgba(255,255,255,0.82)',
@@ -1010,7 +1011,7 @@ function StepUse({ data, char, childName, canvasRef, onComplete }: {
     const SpeechRecognition = (window as any).SpeechRecognition
       || (window as any).webkitSpeechRecognition
     if (!SpeechRecognition) {
-      alert('你的浏览器不支持语音输入，请手动输入')
+      toast('你的浏览器不支持语音输入，请手动输入', 'info')
       return
     }
     const recognition = new SpeechRecognition()
