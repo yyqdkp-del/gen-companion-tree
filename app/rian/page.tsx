@@ -321,58 +321,56 @@ const reminders = useMemo<Reminder[]>(() => {
         )}
       </AnimatePresence>
 
-      {/* 跨代成长周报卡片 */}
-      {currentChild && (
-        <div
-          role="button"
-          tabIndex={0}
-          onClick={() => setShowWeeklyReport(true)}
-          onKeyDown={e => {
-            if (e.key === 'Enter' || e.key === ' ') setShowWeeklyReport(true)
-          }}
-          style={{
-            position: 'absolute',
-            bottom: '12%',
-            left: '5%',
-            right: '5%',
-            zIndex: 18,
-            background:
-              'linear-gradient(135deg, rgba(164,99,85,0.08) 0%, rgba(92,122,94,0.06) 100%)',
-            borderRadius: 18,
-            padding: '16px 18px',
-            border: '1px solid rgba(164,99,85,0.12)',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 14,
-          }}
-        >
-          <div style={{ fontSize: 36 }}>💌</div>
-          <div style={{ flex: 1 }}>
-            <div
-              style={{
-                fontSize: 15,
-                fontWeight: 500,
-                color: '#2d322f',
-                fontFamily: "'Noto Serif SC', serif",
-                marginBottom: 4,
-              }}
-            >
-              给爷爷奶奶的成长周报
+      {/* 跨代成长周报卡片（文档流，位于水珠区域上方） */}
+      <div style={{ position: 'relative', zIndex: 25, margin: '28vh 5% 0' }}>
+        {currentChild && (
+          <div
+            role="button"
+            tabIndex={0}
+            onClick={() => setShowWeeklyReport(true)}
+            onKeyDown={e => {
+              if (e.key === 'Enter' || e.key === ' ') setShowWeeklyReport(true)
+            }}
+            style={{
+              background:
+                'linear-gradient(135deg, rgba(164,99,85,0.08) 0%, rgba(92,122,94,0.06) 100%)',
+              borderRadius: 18,
+              padding: '16px 18px',
+              marginBottom: 12,
+              border: '1px solid rgba(164,99,85,0.12)',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 14,
+            }}
+          >
+            <div style={{ fontSize: 36 }}>💌</div>
+            <div style={{ flex: 1 }}>
+              <div
+                style={{
+                  fontSize: 15,
+                  fontWeight: 500,
+                  color: '#2d322f',
+                  fontFamily: "'Noto Serif SC', serif",
+                  marginBottom: 4,
+                }}
+              >
+                给爷爷奶奶的成长周报
+              </div>
+              <div
+                style={{
+                  fontSize: 12,
+                  color: 'rgba(45,50,47,0.5)',
+                  fontFamily: 'sans-serif',
+                }}
+              >
+                AI生成本周成长故事，一键分享到微信
+              </div>
             </div>
-            <div
-              style={{
-                fontSize: 12,
-                color: 'rgba(45,50,47,0.5)',
-                fontFamily: 'sans-serif',
-              }}
-            >
-              AI生成本周成长故事，一键分享到微信
-            </div>
+            <div style={{ fontSize: 18, color: 'rgba(45,50,47,0.3)' }}>→</div>
           </div>
-          <div style={{ fontSize: 18, color: 'rgba(45,50,47,0.3)' }}>→</div>
-        </div>
-      )}
+        )}
+      </div>
 
       {/* 水珠 */}
       {!loading && !allDone && reminders.map((r, i) => {
