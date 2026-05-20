@@ -81,7 +81,7 @@ export default function CardsPage() {
       </div>
 
       <div style={{ maxWidth: 520, margin: '0 auto', padding: '16px 14px' }}>
-        {/* 签证卡片 */}
+        {/* 证件与签证 */}
         <div
           style={{
             background: 'rgba(255,255,255,0.82)',
@@ -103,7 +103,7 @@ export default function CardsPage() {
               textTransform: 'uppercase',
             }}
           >
-            🛂 签证与护照
+            🛂 证件与签证
           </div>
           <div
             style={{
@@ -114,11 +114,11 @@ export default function CardsPage() {
               lineHeight: 1.6,
             }}
           >
-            签证填写指引、到期提醒、护照信息一览
+            签证填写指引、到期提醒、护照信息
           </div>
           <button
             type="button"
-            onClick={() => openCard('visa')}
+            onClick={() => void openCard('visa')}
             style={{
               width: '100%',
               padding: '12px',
@@ -131,11 +131,11 @@ export default function CardsPage() {
               cursor: 'pointer',
             }}
           >
-            查看签证卡片
+            查看签证指引
           </button>
         </div>
 
-        {/* 医疗卡片 - 每个孩子一张 */}
+        {/* 孩子医疗卡 */}
         <div
           style={{
             background: 'rgba(255,255,255,0.82)',
@@ -157,7 +157,7 @@ export default function CardsPage() {
               textTransform: 'uppercase',
             }}
           >
-            🏥 就诊医疗卡
+            🏥 孩子医疗卡
           </div>
           <div
             style={{
@@ -168,21 +168,36 @@ export default function CardsPage() {
               lineHeight: 1.6,
             }}
           >
-            包含过敏原、用药记录、血型、紧急联系人，支持多语言打印
+            血型、过敏原、用药记录、紧急联系人，支持多语言，就医时出示或打印
           </div>
           {loading ? (
             <div style={{ textAlign: 'center', padding: 16, color: 'rgba(45,50,47,0.4)', fontSize: 13 }}>载入中...</div>
           ) : children.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: 16, color: 'rgba(45,50,47,0.4)', fontSize: 13 }}>
-              请先添加孩子档案
-            </div>
+            <button
+              type="button"
+              onClick={() => router.push('/children')}
+              style={{
+                width: '100%',
+                padding: '12px 16px',
+                background: 'transparent',
+                border: '1px dashed rgba(164,99,85,0.35)',
+                borderRadius: 14,
+                fontSize: 14,
+                color: '#a46355',
+                fontFamily: 'sans-serif',
+                cursor: 'pointer',
+                textAlign: 'center',
+              }}
+            >
+              先添加孩子档案 →
+            </button>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               {children.map((child) => (
                 <button
                   type="button"
                   key={child.id}
-                  onClick={() => openCard('medical', child.id)}
+                  onClick={() => void openCard('medical', child.id)}
                   style={{
                     padding: '12px 16px',
                     background: 'rgba(164,99,85,0.06)',
@@ -200,78 +215,12 @@ export default function CardsPage() {
                 >
                   <span style={{ fontSize: 24 }}>{child.emoji || '👶'}</span>
                   <div>
-                    <div style={{ fontWeight: 500 }}>{child.name} 的就诊卡</div>
+                    <div style={{ fontWeight: 500 }}>{child.name} 的医疗卡</div>
                     <div style={{ fontSize: 12, color: 'rgba(45,50,47,0.5)', marginTop: 2 }}>多语言 · 可打印</div>
                   </div>
                 </button>
               ))}
             </div>
-          )}
-        </div>
-
-        {/* 紧急医疗卡 */}
-        <div
-          style={{
-            background: 'rgba(255,255,255,0.82)',
-            backdropFilter: 'blur(12px)',
-            borderRadius: 22,
-            padding: '20px',
-            marginBottom: 14,
-            border: '1px solid rgba(255,255,255,0.6)',
-            boxShadow: '0 8px 32px rgba(45,50,47,0.05)',
-          }}
-        >
-          <div
-            style={{
-              fontSize: 10,
-              letterSpacing: 3,
-              color: '#a46355',
-              marginBottom: 12,
-              fontFamily: 'sans-serif',
-              textTransform: 'uppercase',
-            }}
-          >
-            🆘 紧急医疗卡
-          </div>
-          <div
-            style={{
-              fontSize: 14,
-              color: 'rgba(45,50,47,0.6)',
-              fontFamily: 'sans-serif',
-              marginBottom: 16,
-              lineHeight: 1.6,
-            }}
-          >
-            中文/英文/当地语言三语急救信息，随身保存或打印
-          </div>
-          {loading ? (
-            <div style={{ textAlign: 'center', padding: 16, color: 'rgba(45,50,47,0.4)', fontSize: 13 }}>载入中...</div>
-          ) : children.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: 16, color: 'rgba(45,50,47,0.4)', fontSize: 13 }}>
-              请先添加孩子档案
-            </div>
-          ) : (
-            children.map((child) => (
-              <button
-                type="button"
-                key={child.id}
-                onClick={() => openCard('medical', child.id)}
-                style={{
-                  width: '100%',
-                  padding: '12px',
-                  background: 'rgba(164,99,85,0.08)',
-                  border: '1px solid rgba(164,99,85,0.2)',
-                  borderRadius: 14,
-                  fontSize: 14,
-                  color: '#a46355',
-                  fontFamily: "'Noto Serif SC', serif",
-                  cursor: 'pointer',
-                  marginBottom: 8,
-                }}
-              >
-                {child.emoji || '👶'} {child.name} 的紧急卡
-              </button>
-            ))
           )}
         </div>
       </div>

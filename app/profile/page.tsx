@@ -274,6 +274,51 @@ function ProfileContent() {
 
       <div style={{ padding: '20px 20px 0', maxWidth: 640, margin: '0 auto' }}>
 
+        {/* 快捷入口 - 在进度条之前 */}
+        <div
+          style={{
+            display: 'flex',
+            gap: 8,
+            padding: '10px 14px',
+            borderBottom: '1px solid rgba(45,50,47,0.06)',
+          }}
+        >
+          <button
+            type="button"
+            onClick={() => router.push('/profile/cards')}
+            style={{
+              flex: 1,
+              padding: '9px 10px',
+              background: 'rgba(164,99,85,0.06)',
+              border: '1px solid rgba(164,99,85,0.12)',
+              borderRadius: 12,
+              fontSize: 12,
+              color: '#a46355',
+              fontFamily: 'sans-serif',
+              cursor: 'pointer',
+            }}
+          >
+            🗂️ 证件与医疗卡
+          </button>
+          <button
+            type="button"
+            onClick={() => router.push('/children')}
+            style={{
+              flex: 1,
+              padding: '9px 10px',
+              background: 'rgba(45,50,47,0.04)',
+              border: '1px solid rgba(45,50,47,0.08)',
+              borderRadius: 12,
+              fontSize: 12,
+              color: '#2d322f',
+              fontFamily: 'sans-serif',
+              cursor: 'pointer',
+            }}
+          >
+            👶 孩子档案
+          </button>
+        </div>
+
         {/* 进度条 */}
         <div style={{ display: 'flex', gap: 6, marginBottom: 28 }}>
           {STEPS.map((s, i) => (
@@ -338,34 +383,6 @@ function ProfileContent() {
             {oauthBanner.type === 'ok' ? '✅ ' : '⚠️ '}{oauthBanner.text}
           </div>
         )}
-
-        <motion.button
-          type="button"
-          whileTap={{ scale: 0.98 }}
-          onClick={() => router.push('/profile/cards')}
-          style={{
-            width: '100%',
-            padding: '16px',
-            background: 'rgba(255,255,255,0.82)',
-            backdropFilter: 'blur(12px)',
-            border: '1px solid rgba(255,255,255,0.6)',
-            borderRadius: 18,
-            display: 'flex',
-            alignItems: 'center',
-            gap: 14,
-            cursor: 'pointer',
-            marginBottom: 12,
-          }}
-        >
-          <span style={{ fontSize: 32 }}>🗂️</span>
-          <div style={{ textAlign: 'left' }}>
-            <div style={{ fontSize: 15, fontWeight: 500, color: INK, fontFamily: "'Noto Serif SC', serif" }}>证件与医疗卡片</div>
-            <div style={{ fontSize: 12, color: 'rgba(45,50,47,0.5)', fontFamily: 'sans-serif', marginTop: 2 }}>
-              签证提醒 · 就诊信息 · 紧急医疗卡
-            </div>
-          </div>
-          <div style={{ marginLeft: 'auto', color: 'rgba(45,50,47,0.3)', fontSize: 18 }}>→</div>
-        </motion.button>
 
         <div style={{ ...PROFILE_GLASS, padding: '18px 16px', marginBottom: 18 }}>
           <div style={{ fontSize: 15, fontWeight: 600, color: INK, marginBottom: 6 }}>Google 服务连接</div>
