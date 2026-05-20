@@ -28,21 +28,14 @@ export async function GET() {
   const utcMin = now.getUTCMinutes()
   const tasks: string[] = []
 
-  // ── Worker 每分钟都跑（处理输入队列）──
-  await trigger('/api/rian/worker')
-  tasks.push('worker')
-  
-// notify 每小时检查出发提醒
-await trigger('/api/cron/notify')
-tasks.push('notify')
-  // ── 提醒检查 每天早上 06:30 清迈 = UTC 23:30 ──
+  // worker 和 notify 只在早安跑一次
   if (utcHour === 23 && utcMin >= 28 && utcMin <= 32) {
+    await trigger('/api/rian/worker')
+    tasks.push('worker')
+    await trigger('/api/cron/notify')
+    tasks.push('notify')
     await trigger('/api/cron/reminders')
     tasks.push('reminders')
-  }
-
-  // ── 早安巡逻 06:30 清迈 = UTC 23:30 ──
-  if (utcHour === 23 && utcMin >= 28 && utcMin <= 32) {
     await trigger('/api/base/patrol', 'POST', { trigger_type: 'cron_morning' })
     tasks.push('patrol_morning')
   }
