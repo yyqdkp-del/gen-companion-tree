@@ -2,7 +2,6 @@
 import React, { useEffect, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { fetchWithAuth } from '@/lib/auth/fetchWithAuth'
-import { CHINESE_THEME as T } from '@/app/_shared/_constants/chineseTheme'
 import { fetchHanziCache } from '@/app/_shared/_services/chineseService'
 import { logOrAlertNetworkError } from '@/lib/errors/logOrAlertNetworkError'
 
@@ -103,11 +102,11 @@ export function WordPopup({ word, onClose, childLevel }: {
               marginBottom: 10 }}>{data.story}</div>}
             {data.scene && <div style={{ fontSize: 12, color: '#5a5a4a', lineHeight: 1.75,
               fontStyle: 'italic', padding: '9px 12px', borderRadius: 10,
-              background: 'rgba(138,115,85,0.07)', marginBottom: 10 }}>{data.scene}</div>}
+              background: 'rgba(164,99,85,0.06)', marginBottom: 10 }}>{data.scene}</div>}
             {data.mom_script && (
               <div style={{ padding: '12px', borderRadius: 12,
-                background: 'rgba(138,115,85,0.08)',
-                border: '1px solid rgba(138,115,85,0.2)',
+                background: 'linear-gradient(135deg, rgba(164,99,85,0.06) 0%, rgba(164,99,85,0.02) 100%)',
+                border: '1px solid rgba(164,99,85,0.12)',
                 fontSize: 13, color: '#2d322f', lineHeight: 1.8, fontStyle: 'italic' }}>
                 👩 {data.mom_script}
               </div>
@@ -228,7 +227,7 @@ export function FamilyPopup({ item, onClose, childLevel }: {
             {item.extra?.cy_story && <div style={{ fontSize: 14, color: '#5a5a4a',
               lineHeight: 1.85, marginBottom: 12 }}>{item.extra.cy_story}</div>}
             <div style={{ padding: '10px 13px', borderRadius: 10,
-              background: 'rgba(138,115,85,0.07)', fontSize: 12, color: '#5a5a4a', lineHeight: 1.7 }}>
+              background: 'rgba(164,99,85,0.06)', border: '1px solid rgba(164,99,85,0.12)', fontSize: 12, color: '#5a5a4a', lineHeight: 1.7 }}>
               💡 试着今天跟孩子用一次这个成语
             </div>
           </div>
@@ -241,7 +240,7 @@ export function FamilyPopup({ item, onClose, childLevel }: {
             {item.extra.cultural_author && <div style={{ fontSize: 12, color: 'rgba(45,50,47,0.45)',
               marginBottom: 10 }}>—— {item.extra.cultural_author}</div>}
             {item.extra.cultural_meaning && <div style={{ fontSize: 13, color: '#5a5a4a',
-              lineHeight: 1.75, marginBottom: 10, borderTop: '1px dashed rgba(138,115,85,0.3)',
+              lineHeight: 1.75, marginBottom: 10, borderTop: '1px dashed rgba(164,99,85,0.25)',
               paddingTop: 10 }}>{item.extra.cultural_meaning}</div>}
             {item.extra.overseas_connection && (
               <div style={{ padding: '9px 12px', borderRadius: 10,

@@ -267,7 +267,7 @@ export default function DecodePage() {
           }}>字理解码器</div>
         </div>
         {childInfo.name && (
-          <div style={{ padding: '3px 10px', borderRadius: 20, background: 'rgba(138,115,85,0.1)', border: '1px solid rgba(138,115,85,0.25)', fontSize: 11, color: THEME.textMid, fontFamily: 'sans-serif', marginRight: 8 }}>
+          <div style={{ padding: '3px 10px', borderRadius: 20, background: 'rgba(164,99,85,0.08)', border: '1px solid rgba(164,99,85,0.2)', fontSize: 11, color: THEME.textMid, fontFamily: 'sans-serif', marginRight: 8 }}>
             {childInfo.name} · {childInfo.level}
           </div>
         )}
@@ -293,7 +293,7 @@ export default function DecodePage() {
                 marginBottom: 12,
               }}>
                 <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
-                  {[{ label: '汉字', count: hanziCount, color: THEME.red, emoji: '🧩' }, { label: '成语', count: chengYuCount, color: THEME.gold, emoji: '🌟' }, { label: '文化句', count: writingCount, color: THEME.green, emoji: '📜' }].map(s => (
+                  {[{ label: '汉字', count: hanziCount, color: THEME.red, emoji: '🧩' }, { label: '成语', count: chengYuCount, color: THEME.orange, emoji: '🌟' }, { label: '文化句', count: writingCount, color: THEME.green, emoji: '📜' }].map(s => (
                     <div key={s.label} style={{
                       flex: 1,
                       textAlign: 'center',
@@ -382,7 +382,7 @@ export default function DecodePage() {
                 <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 8 }}>
                   <div style={{ fontSize: 11, color: THEME.textDim, fontFamily: 'sans-serif', lineHeight: 1.5 }}>
                     输入一个汉字<br />
-                    <span style={{ fontSize: 10, color: 'rgba(122,92,72,0.5)' }}>支持手写/拼音输入法</span>
+                    <span style={{ fontSize: 10, color: THEME.textDim }}>支持手写/拼音输入法</span>
                   </div>
                   <motion.button whileTap={{ scale: 0.96 }}
                     onClick={() => { const c = [...input].find(c => /\p{Script=Han}/u.test(c)) || input.trim(); if (c) { setInput(c); generate(c) } }}
@@ -421,7 +421,7 @@ export default function DecodePage() {
                 onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); generate() } }}
                 placeholder="孩子说了什么？英文中文都行&#10;如：very many people / 一下子就做完了"
                 rows={3}
-                style={{ width: '100%', background: '#f7f4ee', border: '1.5px solid rgba(164,99,85,0.15)', borderRadius: 12, padding: '11px 13px', fontSize: 14, color: THEME.text, outline: 'none', resize: 'none', fontFamily: 'sans-serif', lineHeight: 1.7, marginBottom: 10, boxSizing: 'border-box' }} />
+                style={{ width: '100%', background: THEME.paper, border: '1.5px solid rgba(176,112,80,0.22)', borderRadius: 12, padding: '11px 13px', fontSize: 14, color: THEME.text, outline: 'none', resize: 'none', fontFamily: 'sans-serif', lineHeight: 1.7, marginBottom: 10, boxSizing: 'border-box', caretColor: THEME.orange }} />
               <motion.button whileTap={{ scale: 0.96 }} onClick={() => generate()} disabled={loading || !input.trim()}
                 style={{ width: '100%', padding: '12px', background: !input.trim() ? 'rgba(45,50,47,0.15)' : THEME.red, color: '#fff', border: 'none', borderRadius: 14, fontSize: 14, fontFamily: "'Noto Serif SC', serif", cursor: !input.trim() ? 'not-allowed' : 'pointer', marginBottom: 10 }}>
                 {loading ? '生成中…' : '🌟 生成成语脚本'}
@@ -432,10 +432,10 @@ export default function DecodePage() {
                     style={{
                       padding: '6px 14px',
                       borderRadius: 20,
-                      background: 'rgba(164,99,85,0.06)',
-                      border: '1px solid rgba(164,99,85,0.15)',
+                      background: 'rgba(176,112,80,0.08)',
+                      border: '1px solid rgba(176,112,80,0.2)',
                       fontSize: 12,
-                      color: '#a46355',
+                      color: THEME.orange,
                       cursor: 'pointer',
                       fontFamily: 'sans-serif',
                       transition: 'all 0.15s ease',
@@ -454,7 +454,7 @@ export default function DecodePage() {
                 onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); generate() } }}
                 placeholder="孩子今天经历了什么？让他说，你来打&#10;如：今天去夜市，人超多，我吃了芒果糯米饭"
                 rows={3}
-                style={{ width: '100%', background: '#f7f4ee', border: '1.5px solid rgba(164,99,85,0.15)', borderRadius: 12, padding: '11px 13px', fontSize: 14, color: THEME.text, outline: 'none', resize: 'none', fontFamily: 'sans-serif', lineHeight: 1.7, marginBottom: 10, boxSizing: 'border-box' }} />
+                style={{ width: '100%', background: THEME.paper, border: '1.5px solid rgba(92,122,94,0.22)', borderRadius: 12, padding: '11px 13px', fontSize: 14, color: THEME.text, outline: 'none', resize: 'none', fontFamily: 'sans-serif', lineHeight: 1.7, marginBottom: 10, boxSizing: 'border-box', caretColor: THEME.green }} />
               <motion.button whileTap={{ scale: 0.96 }} onClick={() => generate()} disabled={loading || !input.trim()}
                 style={{ width: '100%', padding: '12px', background: !input.trim() ? 'rgba(45,50,47,0.15)' : '#2D6A4F', color: '#fff', border: 'none', borderRadius: 14, fontSize: 14, fontFamily: "'Noto Serif SC', serif", cursor: !input.trim() ? 'not-allowed' : 'pointer', marginBottom: 10 }}>
                 {loading ? '升华中…' : '📜 生成文化句'}
@@ -532,7 +532,7 @@ export default function DecodePage() {
               <AnimatePresence>
                 {copied && (
                   <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
-                    style={{ position: 'fixed', top: 72, left: '50%', transform: 'translateX(-50%)', background: THEME.text, color: '#fff', padding: '9px 18px', borderRadius: 20, fontSize: 12, fontFamily: 'sans-serif', zIndex: 200, whiteSpace: 'nowrap' }}>
+                    style={{ position: 'fixed', top: 72, left: '50%', transform: 'translateX(-50%)', background: 'linear-gradient(135deg, #a46355 0%, #8a5548 100%)', color: '#fff', padding: '9px 18px', borderRadius: 20, fontSize: 12, fontFamily: 'sans-serif', zIndex: 200, whiteSpace: 'nowrap', boxShadow: '0 6px 20px rgba(164,99,85,0.28)' }}>
                     ✅ 台词已复制，去跟孩子说吧！
                   </motion.div>
                 )}
@@ -588,9 +588,9 @@ export default function DecodePage() {
               {activeTab === 'hanzi' ? '字' : activeTab === 'chengyu' ? '成' : '文'}
             </div>
             <div style={{ fontSize: 13, lineHeight: 1.9, fontFamily: 'sans-serif' }}>
-              {activeTab === 'hanzi' && <>输入任意汉字，秒懂字的灵魂<br /><span style={{ color: THEME.gold }}>字理拆解 · 中英互通 · 妈妈台词</span></>}
-              {activeTab === 'chengyu' && <>孩子怎么说，我们找成语<br /><span style={{ color: THEME.gold }}>中英对照 · 三步解码 · 今天就用</span></>}
-              {activeTab === 'writing' && <>孩子的故事，连接古人的智慧<br /><span style={{ color: THEME.gold }}>口述升华 · 文化根脉 · 情感连接</span></>}
+              {activeTab === 'hanzi' && <>输入任意汉字，秒懂字的灵魂<br /><span style={{ color: THEME.red }}>字理拆解 · 中英互通 · 妈妈台词</span></>}
+              {activeTab === 'chengyu' && <>孩子怎么说，我们找成语<br /><span style={{ color: THEME.orange }}>中英对照 · 三步解码 · 今天就用</span></>}
+              {activeTab === 'writing' && <>孩子的故事，连接古人的智慧<br /><span style={{ color: THEME.green }}>口述升华 · 文化根脉 · 情感连接</span></>}
             </div>
           </div>
         )}
