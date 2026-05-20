@@ -246,10 +246,25 @@ export default function DecodePage() {
         <AnimatePresence>
           {showProgress && (
             <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} style={{ overflow: 'hidden', marginBottom: 12 }}>
-              <div style={{ background: THEME.white, borderRadius: 16, padding: '14px 16px', border: '1px solid rgba(200,160,96,0.2)' }}>
+              <div style={{
+                background: 'rgba(255,255,255,0.8)',
+                backdropFilter: 'blur(10px)',
+                borderRadius: 18,
+                padding: '16px',
+                border: '1px solid rgba(255,255,255,0.6)',
+                boxShadow: '0 4px 20px rgba(45,50,47,0.05)',
+                marginBottom: 12,
+              }}>
                 <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
                   {[{ label: '汉字', count: hanziCount, color: THEME.red, emoji: '🧩' }, { label: '成语', count: chengYuCount, color: THEME.gold, emoji: '🌟' }, { label: '文化句', count: writingCount, color: THEME.green, emoji: '📜' }].map(s => (
-                    <div key={s.label} style={{ flex: 1, textAlign: 'center', padding: '8px 4px', borderRadius: 10, background: `${s.color}0D`, border: `1px solid ${s.color}25` }}>
+                    <div key={s.label} style={{
+                      flex: 1,
+                      textAlign: 'center',
+                      padding: '10px 4px',
+                      borderRadius: 12,
+                      background: 'rgba(164,99,85,0.05)',
+                      border: '1px solid rgba(164,99,85,0.1)',
+                    }}>
                       <div style={{ fontSize: 18 }}>{s.emoji}</div>
                       <div style={{ fontSize: 18, fontWeight: 700, color: s.color, fontFamily: 'sans-serif' }}>{s.count}</div>
                       <div style={{ fontSize: 10, color: THEME.textDim, fontFamily: 'sans-serif' }}>{s.label}</div>
@@ -259,7 +274,17 @@ export default function DecodePage() {
                 {hanziCount > 0 && (
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
                     {learnedItems.filter(i => i.type === 'hanzi' && i.char).slice(0, 20).map((item, i) => (
-                      <span key={i} style={{ padding: '3px 10px', borderRadius: 12, background: 'rgba(192,57,43,0.07)', fontSize: 15, fontFamily: "'Noto Serif SC', serif", color: THEME.text, cursor: 'pointer' }}
+                      <span key={i} style={{
+                        padding: '4px 12px',
+                        borderRadius: 12,
+                        background: 'rgba(255,255,255,0.7)',
+                        border: '1px solid rgba(164,99,85,0.1)',
+                        fontSize: 16,
+                        fontFamily: "'Noto Serif SC', serif",
+                        color: '#2d322f',
+                        cursor: 'pointer',
+                        boxShadow: '0 2px 6px rgba(45,50,47,0.05)',
+                      }}
                         onClick={() => { handleTabChange('hanzi'); generate(item.char) }}>
                         {item.char}
                       </span>

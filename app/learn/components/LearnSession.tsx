@@ -38,7 +38,7 @@ function VoiceControl({ text }: { text: string }) {
     <motion.button whileTap={{ scale: 0.9 }} onClick={toggle}
       style={{ width: 36, height: 36, borderRadius: '50%',
         background: playing ? 'rgba(192,57,43,0.15)' : 'rgba(200,160,96,0.1)',
-        border: `1px solid ${playing ? T.red : 'rgba(200,160,96,0.3)'}`,
+        border: `1px solid ${playing ? '#a46355' : 'rgba(200,160,96,0.3)'}`,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         cursor: 'pointer', fontSize: 16 }}>
       {playing ? '⏹' : '🔊'}
@@ -53,11 +53,18 @@ function ProgressBar({ current }: { current: number }) {
       {STEPS.map((s, i) => (
         <div key={s.key} style={{ flex: 1, display: 'flex',
           flexDirection: 'column', alignItems: 'center', gap: 4 }}>
-          <div style={{ width: '100%', height: 4, borderRadius: 2,
-            background: i <= current ? T.red : 'rgba(192,57,43,0.12)',
-            transition: 'background 0.3s' }} />
+          <motion.div style={{ width: '100%', height: 4, borderRadius: 4,
+            background: 'rgba(45,50,47,0.06)', overflow: 'hidden' }}>
+            <div style={{
+              width: i <= current ? '100%' : '0%',
+              height: '100%',
+              background: '#a46355',
+              borderRadius: 4,
+              transition: 'width 0.3s ease',
+            }} />
+          </motion.div>
           <span style={{ fontSize: 10,
-            color: i === current ? T.red : T.textDim,
+            color: i === current ? '#a46355' : 'rgba(45,50,47,0.45)',
             fontFamily: 'sans-serif',
             fontWeight: i === current ? 700 : 400 }}>
             {s.emoji} {s.label}
@@ -122,9 +129,17 @@ function StepOrigin({ data, char, onNext }: {
           initial={{ scale: 0.5, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
           transition={{ type: 'spring', stiffness: 100, damping: 10 }}>
-          <div style={{ fontSize: 96, fontFamily: "'Noto Serif SC', serif",
-            color: T.text, lineHeight: 1 }}>{char}</div>
-          <div style={{ fontSize: 13, color: T.textDim,
+          <div style={{
+            fontSize: 'clamp(80px, 20vw, 120px)',
+            fontFamily: "'Noto Serif SC', serif",
+            color: '#2d322f',
+            lineHeight: 1,
+            textAlign: 'center',
+            textShadow: '0 8px 32px rgba(45,50,47,0.12)',
+            letterSpacing: '-0.02em',
+            margin: '32px 0',
+          }}>{char}</div>
+          <div style={{ fontSize: 13, color: 'rgba(45,50,47,0.45)',
             fontFamily: 'sans-serif', marginTop: 4 }}>{data.pinyin}</div>
         </motion.div>
         <VoiceControl text={voiceText} />
@@ -132,7 +147,7 @@ function StepOrigin({ data, char, onNext }: {
 
       {/* 演变阶段 */}
       <div style={{ marginBottom: 16 }}>
-        <div style={{ fontSize: 11, color: T.red, letterSpacing: 3,
+        <div style={{ fontSize: 11, color: '#a46355', letterSpacing: 3,
           marginBottom: 10, fontFamily: 'sans-serif' }}>🏺 造字演变</div>
 
         {/* 阶段选择器 */}
@@ -141,17 +156,17 @@ function StepOrigin({ data, char, onNext }: {
             <motion.button key={i} whileTap={{ scale: 0.95 }}
               onClick={() => setActiveStage(i)}
               style={{ flex: 1, padding: '8px 4px', borderRadius: 10,
-                border: `1px solid ${i === activeStage ? T.red : 'rgba(200,160,96,0.2)'}`,
-                background: i === activeStage ? 'rgba(192,57,43,0.08)' : T.paper,
+                border: `1px solid ${i === activeStage ? '#a46355' : 'rgba(200,160,96,0.2)'}`,
+                background: i === activeStage ? 'rgba(192,57,43,0.08)' : '#f7f4ee',
                 cursor: 'pointer', textAlign: 'center' }}>
               <div style={{ fontSize: i === activeStage ? 26 : 20,
                 fontFamily: "'Noto Serif SC', serif",
-                color: i === activeStage ? T.red : T.textMid,
+                color: i === activeStage ? '#a46355' : '#5a5a4a',
                 lineHeight: 1, marginBottom: 4,
                 opacity: i === activeStage ? 1 : 0.5 + i * 0.2 }}>
                 {s.form}
               </div>
-              <div style={{ fontSize: 9, color: i === activeStage ? T.red : T.textDim,
+              <div style={{ fontSize: 9, color: i === activeStage ? '#a46355' : 'rgba(45,50,47,0.45)',
                 fontFamily: 'sans-serif', fontWeight: i === activeStage ? 700 : 400 }}>
                 {s.stage}
               </div>
@@ -165,11 +180,11 @@ function StepOrigin({ data, char, onNext }: {
           {stages.map((s: any, i: number) => (
             <React.Fragment key={i}>
               <div style={{ fontSize: 20, fontFamily: "'Noto Serif SC', serif",
-                color: i === activeStage ? T.red : T.textMid,
+                color: i === activeStage ? '#a46355' : '#5a5a4a',
                 opacity: i === activeStage ? 1 : 0.4,
                 transition: 'all 0.2s' }}>{s.form}</div>
               {i < stages.length - 1 && (
-                <div style={{ fontSize: 14, color: T.textDim }}>→</div>
+                <div style={{ fontSize: 14, color: 'rgba(45,50,47,0.45)' }}>→</div>
               )}
             </React.Fragment>
           ))}
@@ -183,9 +198,9 @@ function StepOrigin({ data, char, onNext }: {
             style={{ padding: '14px 16px', borderRadius: 12,
               background: 'rgba(192,57,43,0.05)',
               borderLeft: '3px solid rgba(192,57,43,0.3)',
-              fontSize: 14, color: T.text, lineHeight: 1.9,
+              fontSize: 14, color: '#2d322f', lineHeight: 1.9,
               fontFamily: 'sans-serif' }}>
-            <strong style={{ color: T.red }}>{stages[activeStage].stage}</strong>
+            <strong style={{ color: '#a46355' }}>{stages[activeStage].stage}</strong>
             {' '}——{' '}{stages[activeStage].desc}
           </motion.div>
         </AnimatePresence>
@@ -198,7 +213,7 @@ function StepOrigin({ data, char, onNext }: {
           style={{ padding: '12px 16px', borderRadius: 12,
             background: 'rgba(200,160,96,0.08)',
             border: '1px solid rgba(200,160,96,0.2)',
-            fontSize: 14, color: T.gold, fontStyle: 'italic',
+            fontSize: 14, color: '#8a7355', fontStyle: 'italic',
             fontFamily: 'sans-serif', marginBottom: 16 }}>
           🎵 {data.memory_trick}
         </motion.div>
@@ -206,7 +221,7 @@ function StepOrigin({ data, char, onNext }: {
 
       <motion.button whileTap={{ scale: 0.96 }} onClick={onNext}
         style={{ width: '100%', padding: '16px', borderRadius: 16,
-          border: 'none', background: T.red, color: '#fff',
+          border: 'none', background: '#a46355', color: '#fff',
           fontSize: 16, fontWeight: 700, cursor: 'pointer',
           fontFamily: "'Noto Serif SC', serif",
           boxShadow: '0 4px 16px rgba(192,57,43,0.3)' }}>
@@ -220,7 +235,7 @@ function StepOrigin({ data, char, onNext }: {
 const LIUSHU_CFG: Record<string, { color: string; bg: string; desc: string }> = {
   '象形': { color: '#C03A2B', bg: 'rgba(192,57,43,0.08)', desc: '照着东西的样子画出来' },
   '指事': { color: '#BA6A00', bg: 'rgba(186,106,0,0.08)', desc: '用符号指示抽象概念' },
-  '会意': { color: '#2D6A4F', bg: 'rgba(45,106,79,0.08)', desc: '两个或多个部件合起来表意' },
+  '会意': { color: '#5c7a5e', bg: 'rgba(45,106,79,0.08)', desc: '两个或多个部件合起来表意' },
   '形声': { color: '#1A3C5E', bg: 'rgba(26,60,94,0.08)', desc: '一部分表意，一部分表音' },
   '转注': { color: '#7A5C48', bg: 'rgba(122,92,72,0.08)', desc: '意义相通的字互相解释' },
   '假借': { color: '#5C6E00', bg: 'rgba(92,110,0,0.08)', desc: '借用同音字表达新意思' },
@@ -245,14 +260,21 @@ function StepStructure({ data, char, onNext }: {
       {/* 顶部：字 + 语音 */}
       <div style={{ display: 'flex', alignItems: 'center',
         justifyContent: 'space-between', marginBottom: 12 }}>
-        <div style={{ fontSize: 72, fontFamily: "'Noto Serif SC', serif",
-          color: T.text, lineHeight: 1 }}>{char}</div>
+        <div style={{
+          fontSize: 'clamp(80px, 20vw, 120px)',
+          fontFamily: "'Noto Serif SC', serif",
+          color: '#2d322f',
+          lineHeight: 1,
+          textAlign: 'center',
+          textShadow: '0 8px 32px rgba(45,50,47,0.12)',
+          letterSpacing: '-0.02em',
+        }}>{char}</div>
         <VoiceControl text={voiceText} />
       </div>
 
       {/* 六书分类 */}
       {data.liushu && (() => {
-        const cfg = LIUSHU_CFG[data.liushu.type] || { color: T.gold, bg: 'rgba(200,160,96,0.08)', desc: '' }
+        const cfg = LIUSHU_CFG[data.liushu.type] || { color: '#8a7355', bg: 'rgba(200,160,96,0.08)', desc: '' }
         const [showMomExplain, setShowMomExplain] = React.useState(false)
         return (
           <div style={{ marginBottom: 14 }}>
@@ -266,7 +288,7 @@ function StepStructure({ data, char, onNext }: {
                 color: cfg.color, fontFamily: "'Noto Serif SC', serif" }}>
                 {data.liushu.type}
               </span>
-              <span style={{ fontSize: 11, color: T.textDim, fontFamily: 'sans-serif' }}>
+              <span style={{ fontSize: 11, color: 'rgba(45,50,47,0.45)', fontFamily: 'sans-serif' }}>
                 {cfg.desc}
               </span>
             </div>
@@ -275,7 +297,7 @@ function StepStructure({ data, char, onNext }: {
             <div style={{ padding: '14px', borderRadius: 12,
               background: cfg.bg,
               borderLeft: `3px solid ${cfg.color}`,
-              fontSize: 14, color: T.text, lineHeight: 2,
+              fontSize: 14, color: '#2d322f', lineHeight: 2,
               fontFamily: 'sans-serif', marginBottom: 8 }}>
               {data.liushu.child_explain || data.liushu.explanation}
             </div>
@@ -319,7 +341,7 @@ function StepStructure({ data, char, onNext }: {
         )
       })()}
 
-      <div style={{ fontSize: 12, color: T.textDim, fontFamily: 'sans-serif',
+      <div style={{ fontSize: 12, color: 'rgba(45,50,47,0.45)', fontFamily: 'sans-serif',
         marginBottom: 12 }}>点击部件，了解它的含义</div>
 
       {/* 部件 */}
@@ -333,14 +355,14 @@ function StepStructure({ data, char, onNext }: {
                 stop()
               }}
               style={{ padding: '12px 16px', borderRadius: 14,
-                background: activeIdx === i ? 'rgba(192,57,43,0.1)' : T.paper,
+                background: activeIdx === i ? 'rgba(192,57,43,0.1)' : '#f7f4ee',
                 border: `1.5px solid ${activeIdx === i
                   ? 'rgba(192,57,43,0.4)' : 'rgba(200,160,96,0.25)'}`,
                 cursor: 'pointer', textAlign: 'center',
                 transition: 'all 0.2s', minWidth: 70 }}>
               <div style={{ fontSize: 32, fontFamily: "'Noto Serif SC', serif",
-                color: T.red, lineHeight: 1 }}>{p.char}</div>
-              <div style={{ fontSize: 10, color: T.textDim,
+                color: '#a46355', lineHeight: 1 }}>{p.char}</div>
+              <div style={{ fontSize: 10, color: 'rgba(45,50,47,0.45)',
                 marginTop: 4, fontFamily: 'sans-serif' }}>{p.name}</div>
             </motion.button>
           ))}
@@ -356,7 +378,7 @@ function StepStructure({ data, char, onNext }: {
             <div style={{ padding: '12px 16px', borderRadius: 12,
               background: 'rgba(192,57,43,0.06)',
               borderLeft: '3px solid rgba(192,57,43,0.3)',
-              fontSize: 13, color: T.text, lineHeight: 1.8,
+              fontSize: 13, color: '#2d322f', lineHeight: 1.8,
               fontFamily: 'sans-serif' }}>
               <strong>{parts[activeIdx].char}</strong> ——{' '}
               {parts[activeIdx].image || parts[activeIdx].meaning || '古人观察自然所得'}
@@ -380,17 +402,17 @@ function StepStructure({ data, char, onNext }: {
       <motion.div whileTap={{ scale: 0.98 }}
         onClick={() => setShowMom(o => !o)}
         style={{ padding: '12px 16px', borderRadius: 14,
-          background: showMom ? 'rgba(200,160,96,0.08)' : T.paper,
+          background: showMom ? 'rgba(200,160,96,0.08)' : '#f7f4ee',
           border: `1px solid ${showMom ? 'rgba(200,160,96,0.35)' : 'rgba(200,160,96,0.2)'}`,
           cursor: 'pointer', marginBottom: 12,
           display: 'flex', justifyContent: 'space-between',
           alignItems: 'center' }}>
         <span style={{ fontSize: 13, fontWeight: 700,
-          color: T.textMid, fontFamily: 'sans-serif' }}>
+          color: '#5a5a4a', fontFamily: 'sans-serif' }}>
           👩 妈妈台词
         </span>
         <motion.span animate={{ rotate: showMom ? 180 : 0 }}
-          style={{ fontSize: 14, color: T.gold,
+          style={{ fontSize: 14, color: '#8a7355',
             display: 'inline-block' }}>⌄</motion.span>
       </motion.div>
 
@@ -403,7 +425,7 @@ function StepStructure({ data, char, onNext }: {
             <div style={{ padding: '16px', borderRadius: 14,
               background: 'linear-gradient(135deg, rgba(200,160,96,0.1), rgba(192,57,43,0.04))',
               border: '1px solid rgba(200,160,96,0.25)' }}>
-              <div style={{ fontSize: 14, color: T.text, lineHeight: 2,
+              <div style={{ fontSize: 14, color: '#2d322f', lineHeight: 2,
                 fontStyle: 'italic', fontFamily: 'sans-serif' }}>
                 「{data.mom_script}」
               </div>
@@ -413,12 +435,12 @@ function StepStructure({ data, char, onNext }: {
                     <div key={i} style={{ display: 'flex', gap: 8,
                       marginBottom: 6, alignItems: 'flex-start' }}>
                       <div style={{ width: 18, height: 18, borderRadius: '50%',
-                        background: T.gold, color: '#fff',
+                        background: '#8a7355', color: '#fff',
                         display: 'flex', alignItems: 'center',
                         justifyContent: 'center', fontSize: 10,
                         flexShrink: 0, marginTop: 2,
                         fontFamily: 'sans-serif' }}>{i + 1}</div>
-                      <div style={{ fontSize: 12, color: T.textMid,
+                      <div style={{ fontSize: 12, color: '#5a5a4a',
                         lineHeight: 1.75, fontFamily: 'sans-serif' }}>{q}</div>
                     </div>
                   ))}
@@ -431,7 +453,7 @@ function StepStructure({ data, char, onNext }: {
 
       <motion.button whileTap={{ scale: 0.96 }} onClick={onNext}
         style={{ width: '100%', padding: '16px', borderRadius: 16,
-          border: 'none', background: T.red, color: '#fff',
+          border: 'none', background: '#a46355', color: '#fff',
           fontSize: 16, fontWeight: 700, cursor: 'pointer',
           fontFamily: "'Noto Serif SC', serif",
           boxShadow: '0 4px 16px rgba(192,57,43,0.3)' }}>
@@ -617,12 +639,12 @@ function StepWrite({ data, char, canvasRef, onNext }: {
             <div style={{ display: 'flex', alignItems: 'center',
               justifyContent: 'space-between', marginBottom: 8 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span style={{ fontSize: 11, color: T.red,
+                <span style={{ fontSize: 11, color: '#a46355',
                   fontFamily: 'sans-serif', fontWeight: 700 }}>
                   第 {activeStroke + 1} 画 / 共 {strokeCount || strokes.length} 画
                 </span>
                 <span style={{ fontSize: 18, fontFamily: "'Noto Serif SC', serif",
-                  color: T.red, fontWeight: 700 }}>
+                  color: '#a46355', fontWeight: 700 }}>
                   {currentStroke}
                 </span>
               </div>
@@ -630,11 +652,11 @@ function StepWrite({ data, char, canvasRef, onNext }: {
             </div>
             {strokeInfo && (
               <>
-                <div style={{ fontSize: 15, color: T.text, fontFamily: 'sans-serif',
+                <div style={{ fontSize: 15, color: '#2d322f', fontFamily: 'sans-serif',
                   marginBottom: 4, fontWeight: 500 }}>
                   {strokeInfo.icon} {strokeInfo.desc}
                 </div>
-                <div style={{ fontSize: 12, color: T.textDim,
+                <div style={{ fontSize: 12, color: 'rgba(45,50,47,0.45)',
                   fontFamily: 'sans-serif' }}>
                   方向：{strokeInfo.direction}
                 </div>
@@ -645,7 +667,7 @@ function StepWrite({ data, char, canvasRef, onNext }: {
               background: 'rgba(192,57,43,0.1)', overflow: 'hidden' }}>
               <motion.div
                 animate={{ width: `${(completedStrokes.length / Math.max(strokes.length, 1)) * 100}%` }}
-                style={{ height: '100%', background: T.red, borderRadius: 2 }} />
+                style={{ height: '100%', background: '#a46355', borderRadius: 2 }} />
             </div>
           </motion.div>
         ) : showCelebration ? (
@@ -657,11 +679,11 @@ function StepWrite({ data, char, canvasRef, onNext }: {
               border: '1px solid rgba(45,106,79,0.3)',
               marginBottom: 12 }}>
             <div style={{ fontSize: 32, marginBottom: 6 }}>🌟</div>
-            <div style={{ fontSize: 16, fontWeight: 700, color: '#2D6A4F',
+            <div style={{ fontSize: 16, fontWeight: 700, color: '#5c7a5e',
               fontFamily: "'Noto Serif SC', serif" }}>
               写完了！共 {strokeCount} 画
             </div>
-            <div style={{ fontSize: 12, color: T.textDim,
+            <div style={{ fontSize: 12, color: 'rgba(45,50,47,0.45)',
               fontFamily: 'sans-serif', marginTop: 4 }}>
               你的手迹会出现在学习卡片上
             </div>
@@ -679,14 +701,14 @@ function StepWrite({ data, char, canvasRef, onNext }: {
                 background: completedStrokes.includes(i)
                   ? 'rgba(45,106,79,0.1)'
                   : i === activeStroke
-                    ? T.red : 'rgba(200,160,96,0.08)',
+                    ? '#a46355' : 'rgba(200,160,96,0.08)',
                 border: `1px solid ${completedStrokes.includes(i)
                   ? 'rgba(45,106,79,0.3)'
-                  : i === activeStroke ? T.red : 'rgba(200,160,96,0.2)'}`,
+                  : i === activeStroke ? '#a46355' : 'rgba(200,160,96,0.2)'}`,
                 fontSize: 11,
                 color: completedStrokes.includes(i)
-                  ? '#2D6A4F'
-                  : i === activeStroke ? '#fff' : T.textMid,
+                  ? '#5c7a5e'
+                  : i === activeStroke ? '#fff' : '#5a5a4a',
                 fontFamily: 'sans-serif', transition: 'all 0.2s',
                 fontWeight: i === activeStroke ? 700 : 400 }}>
               {completedStrokes.includes(i) ? '✓' : i + 1}. {s}
@@ -712,7 +734,7 @@ function StepWrite({ data, char, canvasRef, onNext }: {
             transition={{ duration: 1.5, repeat: Infinity }}
             style={{ position: 'absolute', top: '50%', left: '50%',
               transform: 'translate(-50%, -50%)',
-              fontSize: 12, color: T.textDim, fontFamily: 'sans-serif',
+              fontSize: 12, color: 'rgba(45,50,47,0.45)', fontFamily: 'sans-serif',
               textAlign: 'center', pointerEvents: 'none',
               background: 'rgba(253,251,247,0.7)',
               padding: '4px 10px', borderRadius: 8 }}>
@@ -727,7 +749,7 @@ function StepWrite({ data, char, canvasRef, onNext }: {
           style={{ flex: 1, padding: '12px', borderRadius: 12,
             border: `1px solid rgba(200,160,96,0.3)`,
             background: 'transparent', fontSize: 13,
-            color: T.textMid, cursor: 'pointer',
+            color: '#5a5a4a', cursor: 'pointer',
             fontFamily: 'sans-serif' }}>
           🗑 重写
         </motion.button>
@@ -735,7 +757,7 @@ function StepWrite({ data, char, canvasRef, onNext }: {
         {strokes.length > 0 && !allDone && !showCelebration && (
           <motion.button whileTap={{ scale: 0.96 }} onClick={handleStrokeDone}
             style={{ flex: 2, padding: '12px', borderRadius: 12,
-              border: 'none', background: T.gold,
+              border: 'none', background: '#8a7355',
               color: '#fff', fontSize: 13, fontWeight: 700,
               cursor: 'pointer', fontFamily: 'sans-serif',
               boxShadow: '0 3px 12px rgba(200,160,96,0.3)' }}>
@@ -746,7 +768,7 @@ function StepWrite({ data, char, canvasRef, onNext }: {
         <motion.button whileTap={{ scale: 0.96 }} onClick={onNext}
           style={{ flex: 2, padding: '12px', borderRadius: 12,
             border: 'none',
-            background: (hasDrawn || showCelebration) ? T.red : 'rgba(192,57,43,0.3)',
+            background: (hasDrawn || showCelebration) ? '#a46355' : 'rgba(192,57,43,0.3)',
             color: '#fff', fontSize: 13, fontWeight: 700,
             cursor: (hasDrawn || showCelebration) ? 'pointer' : 'default',
             fontFamily: "'Noto Serif SC', serif",
@@ -1078,7 +1100,7 @@ function StepUse({ data, char, childName, canvasRef, onComplete }: {
   if (cardUrl) {
     return (
       <div style={{ padding: '0 24px', textAlign: 'center' }}>
-        <div style={{ fontSize: 13, color: T.textDim, marginBottom: 12,
+        <div style={{ fontSize: 13, color: 'rgba(45,50,47,0.45)', marginBottom: 12,
           fontFamily: 'sans-serif' }}>
           🎉 今日学习完成！
         </div>
@@ -1093,7 +1115,7 @@ function StepUse({ data, char, childName, canvasRef, onComplete }: {
           <div style={{ padding: '14px 16px', borderRadius: 14,
             background: 'rgba(45,106,79,0.08)',
             border: '1px solid rgba(45,106,79,0.2)',
-            fontSize: 14, color: '#2D6A4F', lineHeight: 1.8,
+            fontSize: 14, color: '#5c7a5e', lineHeight: 1.8,
             fontFamily: 'sans-serif', marginBottom: 16, textAlign: 'left' }}>
             🌟 {aiComment}
           </div>
@@ -1103,7 +1125,7 @@ function StepUse({ data, char, childName, canvasRef, onComplete }: {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           <motion.button whileTap={{ scale: 0.96 }} onClick={shareCard}
             style={{ width: '100%', padding: '14px', borderRadius: 14,
-              border: 'none', background: T.red, color: '#fff',
+              border: 'none', background: '#a46355', color: '#fff',
               fontSize: 15, fontWeight: 700, cursor: 'pointer',
               fontFamily: "'Noto Serif SC', serif",
               boxShadow: '0 4px 16px rgba(192,57,43,0.3)',
@@ -1116,15 +1138,15 @@ function StepUse({ data, char, childName, canvasRef, onComplete }: {
               style={{ flex: 1, padding: '12px', borderRadius: 12,
                 border: `1px solid rgba(200,160,96,0.4)`,
                 background: 'transparent', fontSize: 13,
-                color: T.textMid, cursor: 'pointer',
+                color: '#5a5a4a', cursor: 'pointer',
                 fontFamily: 'sans-serif' }}>
               💾 保存到相册
             </motion.button>
             <motion.button whileTap={{ scale: 0.96 }}
               onClick={() => onComplete(sentence)}
               style={{ flex: 1, padding: '12px', borderRadius: 12,
-                border: `1px solid ${T.gold}`, background: 'transparent',
-                fontSize: 13, color: T.gold, fontWeight: 600,
+                border: `1px solid ${'#8a7355'}`, background: 'transparent',
+                fontSize: 13, color: '#8a7355', fontWeight: 600,
                 cursor: 'pointer', fontFamily: 'sans-serif' }}>
               完成学习
             </motion.button>
@@ -1138,9 +1160,9 @@ function StepUse({ data, char, childName, canvasRef, onComplete }: {
     <div style={{ padding: '0 24px' }}>
       <div style={{ display: 'flex', alignItems: 'center',
         justifyContent: 'space-between', marginBottom: 16 }}>
-        <div style={{ fontSize: 16, fontWeight: 600, color: T.text,
+        <div style={{ fontSize: 16, fontWeight: 600, color: '#2d322f',
           fontFamily: 'sans-serif' }}>
-          用「<span style={{ color: T.red,
+          用「<span style={{ color: '#a46355',
             fontFamily: "'Noto Serif SC', serif",
             fontSize: 20 }}>{char}</span>」造一个句子
         </div>
@@ -1148,7 +1170,7 @@ function StepUse({ data, char, childName, canvasRef, onComplete }: {
       </div>
 
       {data.scene && (
-        <div style={{ fontSize: 12, color: T.textDim, lineHeight: 1.7,
+        <div style={{ fontSize: 12, color: 'rgba(45,50,47,0.45)', lineHeight: 1.7,
           fontFamily: 'sans-serif', marginBottom: 12,
           padding: '8px 12px', borderRadius: 10,
           background: 'rgba(200,160,96,0.06)' }}>
@@ -1164,8 +1186,8 @@ function StepUse({ data, char, childName, canvasRef, onComplete }: {
           rows={3}
           style={{ flex: 1, padding: '14px', borderRadius: 14,
             border: '1px solid rgba(200,160,96,0.3)',
-            background: T.paper, fontSize: 15,
-            color: T.text, fontFamily: "'Noto Serif SC', serif",
+            background: '#f7f4ee', fontSize: 15,
+            color: '#2d322f', fontFamily: "'Noto Serif SC', serif",
             lineHeight: 1.7, outline: 'none', resize: 'none',
             boxSizing: 'border-box' as const,
             textAlign: 'left' }} />
@@ -1178,8 +1200,8 @@ function StepUse({ data, char, childName, canvasRef, onComplete }: {
           } : {}}
           transition={{ repeat: Infinity, duration: 1.2 }}
           style={{ width: 56, borderRadius: 14, border: 'none',
-            background: isRecording ? T.red : 'rgba(192,57,43,0.1)',
-            color: isRecording ? '#fff' : T.red,
+            background: isRecording ? '#a46355' : 'rgba(192,57,43,0.1)',
+            color: isRecording ? '#fff' : '#a46355',
             fontSize: 24, cursor: 'pointer',
             flexShrink: 0, alignSelf: 'stretch' }}>
           {isRecording ? '⏹' : '🎤'}
@@ -1187,7 +1209,7 @@ function StepUse({ data, char, childName, canvasRef, onComplete }: {
       </div>
 
       {isRecording && (
-        <div style={{ fontSize: 12, color: T.red, textAlign: 'center',
+        <div style={{ fontSize: 12, color: '#a46355', textAlign: 'center',
           fontFamily: 'sans-serif', marginBottom: 8 }}>
           正在听孩子说话...
         </div>
@@ -1197,7 +1219,7 @@ function StepUse({ data, char, childName, canvasRef, onComplete }: {
         disabled={loading}
         style={{ width: '100%', padding: '16px', borderRadius: 16,
           border: 'none',
-          background: sentence.trim() ? T.green : T.red,
+          background: sentence.trim() ? '#5c7a5e' : '#a46355',
           color: '#fff', fontSize: 16, fontWeight: 700,
           cursor: loading ? 'default' : 'pointer',
           fontFamily: "'Noto Serif SC', serif",
@@ -1229,25 +1251,44 @@ export default function LearnSession({
     <motion.div initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: 20 }}
-      style={{ position: 'fixed', inset: 0, background: T.bg,
-        zIndex: 400, display: 'flex', flexDirection: 'column',
+      style={{
+        position: 'fixed',
+        inset: 0,
+        backgroundColor: '#fbf9f6',
+        backgroundImage: `
+    radial-gradient(at 80% 10%, rgba(228,237,228,0.3) 0px, transparent 50%),
+    radial-gradient(at 20% 90%, rgba(245,214,209,0.2) 0px, transparent 50%)
+  `,
+        zIndex: 100,
+        overflow: 'hidden',
+        display: 'flex',
+        flexDirection: 'column',
         fontFamily: 'sans-serif',
-        paddingBottom: 'max(env(safe-area-inset-bottom), 20px)' }}>
+        paddingBottom: 'max(env(safe-area-inset-bottom), 20px)',
+      }}>
 
       {/* 顶部导航 */}
-      <div style={{ display: 'flex', justifyContent: 'space-between',
-        alignItems: 'center', padding: '16px 20px 8px' }}>
+      <div style={{
+        background: 'rgba(251,249,246,0.92)',
+        backdropFilter: 'blur(20px)',
+        WebkitBackdropFilter: 'blur(20px)',
+        borderBottom: '1px solid rgba(45,50,47,0.06)',
+        padding: '12px 16px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+      }}>
         <button onClick={onClose}
           style={{ background: 'none', border: 'none',
-            fontSize: 13, color: T.textDim,
+            fontSize: 13, color: 'rgba(45,50,47,0.45)',
             cursor: 'pointer', fontFamily: 'sans-serif' }}>
           ← 退出
         </button>
-        <div style={{ fontSize: 14, fontWeight: 700, color: T.text,
+        <div style={{ fontSize: 14, fontWeight: 700, color: '#2d322f',
           fontFamily: "'Noto Serif SC', serif" }}>
           {step.emoji} {step.label}
         </div>
-        <div style={{ fontSize: 12, color: T.textDim,
+        <div style={{ fontSize: 12, color: 'rgba(45,50,47,0.45)',
           fontFamily: 'sans-serif' }}>
           {currentStep + 1} / {STEPS.length}
         </div>
