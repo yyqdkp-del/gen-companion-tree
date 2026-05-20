@@ -739,7 +739,15 @@ function AcademicContent() {
     const storedChild = localStorage.getItem('active_child')
     if (stored) {
       setChildId(stored)
-      if (storedChild) setChildName(JSON.parse(storedChild)?.name || '')
+      if (storedChild) {
+        let parsed: { name?: string } | null = null
+        try {
+          parsed = JSON.parse(storedChild)
+        } catch {
+          parsed = null
+        }
+        setChildName(parsed?.name || '')
+      }
     }
 
     if (stored) {
@@ -760,7 +768,15 @@ function AcademicContent() {
     const { data: { session } } = await supabase.auth.getSession()
     const accessToken = session?.access_token
     const storedChild = localStorage.getItem('active_child')
-    const geofence = storedChild ? JSON.parse(storedChild)?.geofence || null : null
+    let parsedChild: { geofence?: unknown } | null = null
+    if (storedChild) {
+      try {
+        parsedChild = JSON.parse(storedChild)
+      } catch {
+        parsedChild = null
+      }
+    }
+    const geofence = parsedChild?.geofence || null
 
     const [childRes, activitiesRes, achievementsRes, assessmentRes, essaysRes] = await Promise.all([
       supabase.from('children').select('*').eq('id', childId).single(),

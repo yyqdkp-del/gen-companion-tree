@@ -37,8 +37,14 @@ export default function AuthPage() {
     try {
       const raw = localStorage.getItem('child_assessment')
       if (!raw) return
-      const { name, grade, school } = JSON.parse(raw)
-      if (!name) return
+      let data: { name?: string; grade?: string; school?: string } | null = null
+      try {
+        data = JSON.parse(raw)
+      } catch {
+        data = null
+      }
+      if (!data?.name) return
+      const { name, grade, school } = data
       await supabase.from('children').insert({ user_id: userId, name, grade, school_short: school })
       localStorage.removeItem('child_assessment')
     } catch {}

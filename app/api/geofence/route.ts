@@ -3,7 +3,13 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getUserLocation, updateUserLocationByGPS } from '@/lib/geofence'
 
 export async function POST(req: NextRequest) {
-  const { userId, lat, lng } = await req.json()
+  let body: any = {}
+  try {
+    body = await req.json()
+  } catch {
+    body = {}
+  }
+  const { userId, lat, lng } = body
 
   try {
     let location

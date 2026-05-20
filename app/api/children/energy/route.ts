@@ -1,20 +1,27 @@
 export const dynamic = 'force-dynamic'
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { getAuthUser } from '@/lib/auth/getAuthUser'
 import { getUserLocation } from '@/lib/geofence'
 import { getDayOfWeekInTimeZone, getTodayStr, getTodayStrInTimeZone } from '@/lib/date/localDate'
 
 export async function POST(req: NextRequest) {
+  const { user, error } = await getAuthUser(req)
+  if (error || !user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+  const userId = user.id
+
   const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
-  const { child_id, user_id } = await req.json()
+  const { child_id } = await req.json()
 
   let today: string
   let dow: number
   try {
-    const loc = await getUserLocation(user_id)
+    const loc = await getUserLocation(userId)
     today = getTodayStrInTimeZone(loc.timezone)
     dow = getDayOfWeekInTimeZone(loc.timezone)
   } catch {

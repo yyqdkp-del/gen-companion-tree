@@ -36,6 +36,10 @@ export async function fetchAppData(uid: string, signal?: AbortSignal) {
     throw new DOMException('Aborted', 'AbortError')
   }
 
+  if (childRes.error) console.error('children fetch error:', childRes.error)
+  if (todoRes.error) console.error('todos fetch error:', todoRes.error)
+  if (hotspotRes.error) console.error('hotspots fetch error:', hotspotRes.error)
+
   return {
     kids:     childRes.data   || [],
     todos:    todoRes.data    || [],

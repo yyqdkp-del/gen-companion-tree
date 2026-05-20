@@ -392,6 +392,10 @@ async function executeTool(
 
     case 'add_schedule': {
       const childId = findChildId(input.child_name)
+      if (!childId) {
+        console.warn('add_schedule: no child found, skipping')
+        return null
+      }
       await supabase.from('child_school_calendar').insert({
         child_id: childId,
         user_id: userId,
@@ -725,6 +729,14 @@ ${grokInfo || '暂无'}
     })
 
     const data = await response.json()
+    if (!response.ok) {
+      console.error('Claude API error:', response.status, data)
+      await supabase.from('raw_inputs').update({
+        status: 'failed',
+        processed: false,
+      }).eq('id', jobId)
+      return
+    }
     const toolUses = data.content?.filter((c: any) => c.type === 'tool_use') || []
     console.log(`Job ${jobId}: Claude调用了 ${toolUses.length} 个工具: ${toolUses.map((t: any) => t.name).join(', ')}`)
 

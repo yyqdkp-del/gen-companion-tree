@@ -1,8 +1,14 @@
 export const dynamic = 'force-dynamic'
 import { NextRequest, NextResponse } from 'next/server'
+import { getAuthUser } from '@/lib/auth/getAuthUser'
 import { sendPushToUser } from '@/lib/push'
 
 export async function POST(req: NextRequest) {
+  const { user, error } = await getAuthUser(req)
+  if (error || !user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
   try {
     const { user_id, title, body, url, urgent, tag, actions } = await req.json()
 
