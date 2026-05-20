@@ -286,6 +286,7 @@ export default function BasePage() {
   const [mounted, setMounted] = useState(false)
   const [greeting, setGreeting] = useState<Greeting | null>(null)
   const [keyboardOpen, setKeyboardOpen] = useState(false)
+  const [showProfileBanner, setShowProfileBanner] = useState(false)
 
   const { enrichedKids, refresh: refreshKids } = useChildData(userId)
   const { markDone, snooze } = useTodoActions(todos, ctxSync)
@@ -305,6 +306,12 @@ export default function BasePage() {
     void refreshKids()
     router.replace('/', { scroll: false })
   }, [searchParams, refreshKids, router])
+
+  useEffect(() => {
+    const skipped = localStorage.getItem('onboarding_skipped')
+    const hasKids = kids.length > 0
+    setShowProfileBanner(!!skipped && !hasKids)
+  }, [kids])
 
   useEffect(() => {
     setMounted(true)
@@ -504,6 +511,36 @@ export default function BasePage() {
           setShowOnboarding(false)
           localStorage.setItem('onboarding_completed', 'true')
         }} />
+      )}
+
+      {showProfileBanner && (
+        <div
+          role="button"
+          tabIndex={0}
+          onClick={() => router.push('/children')}
+          onKeyDown={e => {
+            if (e.key === 'Enter' || e.key === ' ') router.push('/children')
+          }}
+          style={{
+            position: 'fixed',
+            top: 'max(env(safe-area-inset-top), 0px)',
+            left: 0,
+            right: 0,
+            zIndex: 60,
+            background: 'rgba(164,99,85,0.9)',
+            backdropFilter: 'blur(10px)',
+            padding: '10px 16px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            cursor: 'pointer',
+          }}
+        >
+          <span style={{ fontSize: 13, color: '#fff', fontFamily: 'sans-serif' }}>
+            📋 完善孩子档案，让根更懂你
+          </span>
+          <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.8)' }}>→</span>
+        </div>
       )}
 
       {mounted && greeting && (

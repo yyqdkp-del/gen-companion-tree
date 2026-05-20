@@ -155,6 +155,27 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
             >
               开始设置（约1分钟）
             </button>
+            <button
+              type="button"
+              onClick={() => {
+                localStorage.setItem('onboarding_skipped', 'true')
+                localStorage.setItem('onboarding_done', 'true')
+                onComplete()
+              }}
+              style={{
+                background: 'none',
+                border: 'none',
+                padding: '12px',
+                fontSize: 13,
+                color: 'rgba(45,50,47,0.4)',
+                fontFamily: 'sans-serif',
+                cursor: 'pointer',
+                textDecoration: 'underline',
+                marginTop: 8,
+              }}
+            >
+              先体验，稍后填写
+            </button>
           </div>
         )}
 

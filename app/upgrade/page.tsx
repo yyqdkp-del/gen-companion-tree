@@ -115,6 +115,64 @@ export default function UpgradePage() {
           ))}
         </div>
 
+        {/* 省钱计算器 */}
+        <div style={{
+          background: 'rgba(92,122,94,0.06)',
+          border: '1px solid rgba(92,122,94,0.15)',
+          borderRadius: 16,
+          padding: '16px 18px',
+          marginBottom: 20,
+        }}>
+          <div style={{
+            fontSize: 13,
+            color: '#5c7a5e',
+            fontFamily: "'Noto Serif SC', serif",
+            fontWeight: 500,
+            marginBottom: 12,
+          }}>
+            💰 和补习班比一比
+          </div>
+          {[
+            { label: '一节中文私教课', cost: '$50', period: '/节' },
+            { label: '线上中文课程', cost: '$30', period: '/月' },
+            { label: '根陪伴 Pro', cost: '$9.99', period: '/月', highlight: true },
+          ].map((item, i) => (
+            <div key={i} style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              padding: '8px 0',
+              borderBottom: i < 2 ? '1px solid rgba(45,50,47,0.06)' : 'none',
+            }}>
+              <span style={{
+                fontSize: 13,
+                color: item.highlight ? '#5c7a5e' : 'rgba(45,50,47,0.6)',
+                fontFamily: 'sans-serif',
+                fontWeight: item.highlight ? 500 : 400,
+              }}>
+                {item.label}
+              </span>
+              <span style={{
+                fontSize: 14,
+                color: item.highlight ? '#5c7a5e' : 'rgba(45,50,47,0.5)',
+                fontFamily: "'Montserrat', sans-serif",
+                fontWeight: item.highlight ? 600 : 400,
+              }}>
+                {item.cost}<span style={{ fontSize: 11 }}>{item.period}</span>
+              </span>
+            </div>
+          ))}
+          <div style={{
+            marginTop: 10,
+            fontSize: 12,
+            color: '#5c7a5e',
+            fontFamily: 'sans-serif',
+            textAlign: 'center',
+          }}>
+            ✓ AI 随时在线 · 无需预约 · 孩子自己学
+          </div>
+        </div>
+
         {/* 升级按钮 */}
         <button
           type="button"
@@ -153,7 +211,7 @@ export default function UpgradePage() {
         <div style={{ fontSize: 13, color: 'rgba(45,50,47,0.5)', fontFamily: 'sans-serif', marginBottom: 12 }}>
           免费版包含：
         </div>
-        {['每月5次汉字解码', '木棉树洞每天3条消息', '基础家庭档案', '热点巡逻'].map((f, i) => (
+        {['每天3次汉字解码', '木棉树洞每天3条消息', '基础家庭档案', '热点巡逻'].map((f, i) => (
           <div key={i} style={{
             fontSize: 13,
             color: 'rgba(45,50,47,0.5)',

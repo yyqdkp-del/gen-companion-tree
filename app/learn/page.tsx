@@ -17,6 +17,7 @@ import TabBar, { type TabType } from './components/TabBar'
 import { track } from '@/lib/analytics/track'
 import { SAFE_BOTTOM_INSET, STICKY_HEADER_PADDING_TOP } from '@/app/_shared/_constants/layout'
 import TourGuide, { type TourStep } from '@/app/components/TourGuide'
+import { toast } from '@/app/components/Toast'
 
 const supabase = createClient()
 
@@ -69,6 +70,7 @@ export default function DecodePage() {
   const [showProgress, setShowProgress] = useState(false)
   const [locationScene, setLocationScene] = useState('海外华人家庭')
   const [userLocation, setUserLocation] = useState<UserLocation | null>(null)
+  const [remaining, setRemaining] = useState<number | null>(null)
   const loadMsgRef = useRef<NodeJS.Timeout | null>(null)
   const decodeAbortRef = useRef<AbortController | null>(null)
 
@@ -149,6 +151,16 @@ export default function DecodePage() {
     }
   }, [])
 
+  useEffect(() => {
+    fetchWithAuth('/api/limits/check?feature=hanzi_decode')
+      .then(r => r.json())
+      .then(data => {
+        if (!data.is_pro) setRemaining(data.remaining ?? null)
+        else setRemaining(null)
+      })
+      .catch(() => {})
+  }, [])
+
   const handleTabChange = (t: TabType) => {
     decodeAbortRef.current?.abort()
     setActiveTab(t); setData(null); setError(''); setInput('')
@@ -167,6 +179,24 @@ export default function DecodePage() {
     if (activeTab === 'hanzi' && !HAN_RE.test(query)) {
       setError('请输入汉字')
       return
+    }
+
+    if (activeTab === 'hanzi') {
+      try {
+        const limitRes = await fetchWithAuth('/api/limits/check?feature=hanzi_decode')
+        const limitData = await limitRes.json()
+        if (!limitData.is_pro) setRemaining(limitData.remaining ?? null)
+        if (!limitData.allowed) {
+          toast(
+            `今日汉字解码次数已用完（${limitData.limit}次/天），升级 Pro 解锁无限次数`,
+            'info',
+          )
+          router.push('/upgrade')
+          return
+        }
+      } catch (e) {
+        logOrAlertNetworkError(e)
+      }
     }
 
     decodeAbortRef.current?.abort()
@@ -201,6 +231,22 @@ export default function DecodePage() {
       }
       if (json.error) throw new Error(json.error)
       setData(json)
+
+      if (activeTab === 'hanzi') {
+        fetchWithAuth('/api/limits/check', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ feature: 'hanzi_decode' }),
+        })
+          .catch(() => {})
+          .finally(() => {
+            fetchWithAuth('/api/limits/check?feature=hanzi_decode')
+              .then(r => r.json())
+              .then(d => { if (!d.is_pro) setRemaining(d.remaining ?? null) })
+              .catch(() => {})
+          })
+      }
+
       void track({
         event_type: 'hanzi_decoded',
         page: '/learn',
@@ -427,6 +473,21 @@ export default function DecodePage() {
                   </motion.button>
                 </div>
               </div>
+
+              {remaining !== null && remaining < 3 && (
+                <div style={{
+                  fontSize: 12,
+                  color: remaining === 0 ? '#a46355' : 'rgba(45,50,47,0.4)',
+                  fontFamily: 'sans-serif',
+                  textAlign: 'center',
+                  marginTop: 8,
+                  marginBottom: 4,
+                }}>
+                  {remaining === 0
+                    ? '今日次数已用完 · 升级 Pro 无限使用'
+                    : `今日还剩 ${remaining} 次免费解码`}
+                </div>
+              )}
 
               {/* 智能推荐 */}
               <SmartQuickChars level={childInfo.level || 'R2'} learnedChars={learnedChars} onSelect={c => { setInput(c); setData(null); generate(c) }} />
