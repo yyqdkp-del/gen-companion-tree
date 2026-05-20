@@ -159,7 +159,7 @@ export default function KapokTreeholePage() {
           height: var(--vh, 100dvh);
           display: flex;
           flex-direction: column;
-          overflow: hidden;
+          overflow-y: auto;
           color: #fff7e8;
           background-color: #0a0d14;
           background-image:
@@ -233,7 +233,8 @@ export default function KapokTreeholePage() {
           z-index: 1;
           flex: 1;
           overflow-y: auto;
-          padding: 22px 18px max(24px, calc(env(safe-area-inset-bottom) + 12px));
+          padding: 22px 18px;
+          padding-bottom: calc(120px + max(env(safe-area-inset-bottom), 20px));
           scrollbar-width: none;
         }
 

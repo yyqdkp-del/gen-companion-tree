@@ -420,17 +420,6 @@ export default function BasePage() {
           }}>
             {greeting.text}
           </div>
-          <div style={{
-            fontFamily: "'Montserrat', sans-serif",
-            fontWeight: 400,
-            fontSize: 11,
-            color: 'rgba(45, 50, 47, 0.45)',
-            letterSpacing: '0.2em',
-            marginTop: 6,
-            textTransform: 'uppercase',
-          }}>
-            {greeting.sub}
-          </div>
         </div>
       )}
 
