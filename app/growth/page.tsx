@@ -50,7 +50,7 @@ export default function GrowthPage() {
     }}>
       <div style={{
         position: 'absolute', inset: 0,
-        backgroundImage: "url('/forest-bg.png')",
+        backgroundImage: "url('/forest-bg.webp')",
         backgroundSize: 'cover',
         backgroundPosition: 'center top',
         backgroundRepeat: 'no-repeat',
