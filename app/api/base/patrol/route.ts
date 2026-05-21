@@ -153,6 +153,52 @@ async function callGemini(snapshot: any, location: string, officialSites: string
   }
 }
 
+function buildPatrolSystem(familyContext: string): string {
+  return `你是海外华人家庭的本地私人管家。
+生成热点时严格遵守以下规则：
+
+【必须推送的高价值信息】
+1. 签证/移民政策变化（任何官方公告）
+2. 学区/周边治安事件
+3. 儿童传染病预警（手足口、登革热、流感等）
+4. 学校停课/紧急通知
+5. 升学关键节点（报名截止、抽签结果）
+6. 法规更新（影响日常生活的）
+
+【可推送的中价值信息】
+7. 汇率大幅波动（超过2%才值得推）
+8. 周末亲子活动（需注明"适合带娃"）
+9. 华人常用服务新开/关闭
+
+【不要推送的低价值信息】
+- 正常天气（除非PM2.5>100或停课级暴雨）
+- 普通交通路况（除非影响接送）
+- 日常汇率波动
+- 普通餐厅开业
+
+【标题格式】必须用三段式：
+【类别标签】核心事件｜影响：XXX｜建议：XXX
+
+示例：
+【签证预警】泰国ED签证严查挂靠｜影响：出入境可能被盘问｜建议：准备好学校出勤证明
+【健康预警】清迈登革热病例上升｜影响：蚊虫活跃期｜建议：检查孩子疫苗记录，备驱蚊液
+【教育节点】NIST小一报名本周截止｜影响：2026年入学｜建议：立即准备护照和居住证明
+
+【个性化要求】
+根据家庭档案调整推送：
+- 有小学年龄孩子 → 优先推升学信息
+- 泰国ED签证 → 优先推签证政策
+- 有老人同住 → 推适老活动
+
+${familyContext}
+
+输出要求：
+1. 合并输入数据，去重；不包含待办任务
+2. 最多8条，按紧急度排序；只写有据可查的外部事实
+3. summary、relevance_reason 用闺蜜语气，说清楚与这个家庭的关联
+4. 不同来源交叉验证，官方/高可信优先`
+}
+
 // ── Claude 整合润色 ──
 async function callClaude(
   grokData: string,
@@ -162,6 +208,7 @@ async function callClaude(
   familyContext: string,
 ): Promise<any[]> {
   const children = snapshot.children?.map((c: any) => `${c.name}(${c.school_name})`).join('、') || '孩子'
+  const patrolSystem = buildPatrolSystem(familyContext)
 
   try {
     const res = await fetch('https://api.anthropic.com/v1/messages', {
@@ -176,7 +223,11 @@ async function callClaude(
         max_tokens: 2000,
         messages: [{
           role: 'user',
-          content: `你是「根」，${location}陪读家庭最懂你的AI闺蜜。
+          content: `${patrolSystem}
+
+服务地区：${location}
+孩子：${children}
+关注兴趣：${snapshot.interests?.map((i: any) => i.topic).slice(0, 5).join('、') || '无'}
 
 Grok实时数据：
 ${grokData || '（无数据）'}
@@ -184,24 +235,9 @@ ${grokData || '（无数据）'}
 Gemini本地数据：
 ${geminiData || '（无数据）'}
 
-家庭信息：
-- 地区：${location}
-- 孩子：${children}
-- 关注兴趣：${snapshot.interests?.map((i: any) => i.topic).slice(0, 5).join('、') || '无'}
-
-${familyContext}
-
-要求：
-1. 合并两份数据，去除重复内容
-2. 绝对不包含任何待办任务相关内容
-3. 最多8条，按紧急度排序
-4. 只写外部真实发生的事，不编造
-5. 闺蜜语气，具体有用，每条说清楚和这个家庭的关联
-6. 不同来源交叉验证，可信度高的优先
-
 严格只返回JSON数组，不加任何其他文字：
 [{
-  "title": "简短标题（10字以内）",
+  "title": "【类别标签】核心事件｜影响：XXX｜建议：XXX（必须三段式）",
   "category": "safety|education|visa|finance|health|shopping|mom|weather",
   "urgency": "urgent|important|lifestyle",
   "summary": "根发现...（2-3句，具体数据，闺蜜语气）",

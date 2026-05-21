@@ -452,16 +452,28 @@ export default function BasePage() {
     : todoEngine.badge > 0 ? `${todoEngine.badge}条` : '静默'
 
   const HOTSPOT_URGENCY_RANK: Record<string, number> = { urgent: 0, important: 1, lifestyle: 2 }
-  const topHotspot = [...hotspots]
+  const unreadHotspots = [...hotspots]
     .filter((h: HotspotItem) => h.status === 'unread' || !h.status)
     .sort((a, b) =>
       (HOTSPOT_URGENCY_RANK[a.urgency] ?? 2) - (HOTSPOT_URGENCY_RANK[b.urgency] ?? 2),
-    )[0]
+    )
+  const urgentHotspot = unreadHotspots.find((h: HotspotItem) =>
+    h.title?.includes('签证') ||
+    h.title?.includes('预警') ||
+    h.title?.includes('停课'),
+  )
+  const topHotspot = urgentHotspot || unreadHotspots[0]
 
-  const hotspotValue = patrolling ? '巡逻中'
-    : topHotspot?.title && topHotspot.title.length > 8 ? `${topHotspot.title.slice(0, 8)}…`
-      : topHotspot?.title
-        || (hotspotEngine.badge > 0 ? `${hotspotEngine.badge}条` : '根')
+  const hotspotValue = patrolling
+    ? '巡逻中'
+    : topHotspot?.title
+      ? (() => {
+          const core = topHotspot.title.replace(/【.+?】/, '').split('｜')[0].trim()
+          return core.length > 10 ? `${core.slice(0, 10)}…` : core
+        })()
+      : hotspotEngine.badge > 0
+        ? `${hotspotEngine.badge}条`
+        : '根'
 
   if (loading || !sessionReady) {
     return (

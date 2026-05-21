@@ -27,6 +27,18 @@ const HOTSPOT_GLASS: React.CSSProperties = {
 const RIAN_GOLD = '#8a7355'
 const RIAN_NAVY = '#2d322f'
 
+function getHotspotColor(title: string) {
+  if (title.includes('签证') || title.includes('移民') || title.includes('政策'))
+    return { bg: 'rgba(164,99,85,0.1)', border: 'rgba(164,99,85,0.3)', color: '#a46355' }
+  if (title.includes('健康') || title.includes('疾病') || title.includes('预警'))
+    return { bg: 'rgba(200,80,80,0.08)', border: 'rgba(200,80,80,0.25)', color: '#c85050' }
+  if (title.includes('教育') || title.includes('学校') || title.includes('升学'))
+    return { bg: 'rgba(92,122,94,0.08)', border: 'rgba(92,122,94,0.25)', color: '#5c7a5e' }
+  if (title.includes('安全') || title.includes('治安'))
+    return { bg: 'rgba(180,100,50,0.08)', border: 'rgba(180,100,50,0.25)', color: '#b46432' }
+  return { bg: 'rgba(45,50,47,0.04)', border: 'rgba(45,50,47,0.12)', color: 'rgba(45,50,47,0.6)' }
+}
+
 function timeAgo(dateStr: string): string {
   const diff = Math.max(0, Date.now() - new Date(dateStr).getTime())
   const mins = Math.floor(diff / 60000)
@@ -47,6 +59,11 @@ function HotspotCard({ item, onRead, onActionModal, onConvertTodo }: {
   const [converting, setConverting] = useState(false)
   const [convertError, setConvertError] = useState(false)
   const cfg = URGENCY_CFG[item.urgency]
+  const titleStr = item.title || ''
+  const tagMatch = titleStr.match(/【(.+?)】/)
+  const tag = tagMatch?.[1]
+  const colors = getHotspotColor(titleStr)
+  const displayTitle = titleStr.replace(/【.+?】/, '').trim() || titleStr
   const consumed = isConsumed(item.status)
   const isUrgent = item.urgency === 'urgent'
   const isImportant = item.urgency === 'important'
@@ -86,7 +103,7 @@ function HotspotCard({ item, onRead, onActionModal, onConvertTodo }: {
         ...HOTSPOT_GLASS,
         marginBottom: 10,
         overflow: 'hidden',
-        border: consumed ? '1px solid rgba(255,255,255,0.5)' : `1px solid ${cfg.border}55`,
+        border: consumed ? '1px solid rgba(255,255,255,0.5)' : `1px solid ${colors.border}`,
         opacity: consumed ? 0.6 : 1,
         transition: 'opacity 0.3s',
       }}>
@@ -96,6 +113,21 @@ function HotspotCard({ item, onRead, onActionModal, onConvertTodo }: {
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, flex: 1, minWidth: 0 }}>
             <span style={{ fontSize: 16, flexShrink: 0 }}>{CAT_EMOJI[item.category] || CAT_EMOJI.default}</span>
             <div style={{ flex: 1, minWidth: 0 }}>
+              {tag && (
+                <span style={{
+                  fontSize: 11,
+                  padding: '2px 8px',
+                  borderRadius: 8,
+                  background: colors.bg,
+                  border: `1px solid ${colors.border}`,
+                  color: colors.color,
+                  fontFamily: 'sans-serif',
+                  marginBottom: 6,
+                  display: 'inline-block',
+                }}>
+                  {tag}
+                </span>
+              )}
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3, flexWrap: 'wrap' }}>
                 <span style={{ fontSize: 10, padding: '2px 7px', borderRadius: 6,
                   background: `${cfg.color}18`, color: cfg.color, fontWeight: 600, flexShrink: 0 }}>
@@ -107,7 +139,7 @@ function HotspotCard({ item, onRead, onActionModal, onConvertTodo }: {
                   minWidth: 0,
                   flex: 1,
                 }}>
-                  {item.title}
+                  {displayTitle}
                 </span>
               </div>
               {item.relevance_reason && (
