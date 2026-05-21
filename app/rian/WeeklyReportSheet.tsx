@@ -262,7 +262,7 @@ export default function WeeklyReportSheet({ childId, childName, onClose }: Props
                     letterSpacing: '0.15em',
                   }}
                 >
-                  💌 孩子写给爷爷奶奶的信
+                  💌 妈妈说
                 </div>
                 <p
                   style={{
@@ -290,7 +290,7 @@ export default function WeeklyReportSheet({ childId, childName, onClose }: Props
                       letterSpacing: '0.15em',
                     }}
                   >
-                    🏆 本周小成就
+                    这周的小高光
                   </div>
                   {content.achievements.map((a, i) => (
                     <div
@@ -304,7 +304,7 @@ export default function WeeklyReportSheet({ childId, childName, onClose }: Props
                         minWidth: 0,
                       }}
                     >
-                      <span style={{ flexShrink: 0 }}>✨</span>
+                      <span style={{ flexShrink: 0, color: '#a46355' }}>·</span>
                       <span style={{ wordBreak: 'break-word', overflowWrap: 'break-word', minWidth: 0 }}>{a}</span>
                     </div>
                   ))}

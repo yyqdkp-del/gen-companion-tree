@@ -63,32 +63,45 @@ export async function POST(req: NextRequest) {
     .lte('learned_at', weekEnd.toISOString())
     .limit(10)
 
-  const prompt = `你是一个专门帮海外华人家庭写给国内长辈的成长周报助手。
+  const childName = child.name as string
+  let childAge = ''
+  if (child.birthdate) {
+    const birth = new Date(child.birthdate as string)
+    if (!Number.isNaN(birth.getTime())) {
+      const age = Math.floor(
+        (Date.now() - birth.getTime()) / (365.25 * 24 * 60 * 60 * 1000),
+      )
+      if (age > 0 && age < 25) childAge = String(age)
+    }
+  }
+  if (!childAge && child.grade) childAge = String(child.grade)
 
-孩子信息：
-- 姓名：${child.name}
-- 年龄/年级：${child.grade || '未填写'}
+  const hanziList =
+    hanziSessions
+      ?.filter((s) => s.input_type === 'hanzi')
+      .map((s) => s.input_text)
+      .filter(Boolean) as string[] || []
+  const todoList = todos?.map((t) => t.title).filter(Boolean) as string[] || []
 
-本周完成的家庭事项（${todos?.length || 0}条）：
-${todos?.map(t => `- ${t.title}`).join('\n') || '暂无记录'}
+  const prompt = `你是一位海外华人妈妈，正在给国内的爷爷奶奶写本周孩子的成长记录。
 
-本周学习的汉字（${hanziSessions?.length || 0}个）：
-${hanziSessions?.filter(s => s.input_type === 'hanzi').map(s => s.input_text).join('、') || '暂无'}
+孩子信息：${childName}，${childAge || ''}岁
+本周学习的汉字：${hanziList.join('、') || '暂无记录'}
+本周完成的事情：${todoList.join('、') || '暂无记录'}
 
-请生成一份温暖的成长周报，要求：
-1. 用孩子第一人称口吻写，像孩子在给爷爷奶奶写信
-2. 语言温暖、简洁，不超过150字
-3. 提到1-2个具体的本周成就或有趣的事
-4. 结尾有一句撒娇的话
-5. 如果没有记录，编写一段温暖的问候
+请用妈妈的口吻写，不要假装是孩子写信。
+要求：
+1. 开头是妈妈对爷奶说话，不是「亲爱的爷爷奶奶，我是XXX」
+2. 描述1-2个具体的真实学习瞬间，要有画面感
+3. 说一件让妈妈感动或惊喜的小事
+4. 结尾表达孩子对爷奶的想念（简短，不煽情）
+5. 整体不超过150字，像一条微信消息
+6. 语气自然、口语化，像真实的妈妈在说话
 
-只返回JSON，不要其他文字：
-{
-  "letter": "孩子口吻的信件内容",
-  "achievements": ["成就1", "成就2"],
-  "week_summary": "一句话总结本周",
-  "child_name": "${child.name}"
-}`
+示例风格：
+「爸妈，这周Noah学了「飞」字，学完自己张开手臂跑了一圈，说自己是飞鸟。我当时差点笑出声。他现在每天主动要学一个字，说想给你们写信。这周一共学了10个，「鱼」字写得最好看，因为想起跟爷爷钓鱼。他说等见到你们要亲自念给你们听。」
+
+请直接输出信件内容，不要任何标题或格式。`
 
   const message = await anthropic.messages.create({
     model: 'claude-sonnet-4-20250514',
@@ -96,17 +109,27 @@ ${hanziSessions?.filter(s => s.input_type === 'hanzi').map(s => s.input_text).jo
     messages: [{ role: 'user', content: prompt }],
   })
 
-  const text = message.content[0].type === 'text' ? message.content[0].text : '{}'
-  let content: Record<string, unknown> = {}
-  try {
-    content = JSON.parse(text.replace(/```json|```/g, '').trim())
-  } catch {
-    content = {
-      letter: text,
-      achievements: [],
-      week_summary: '本周成长记录',
-      child_name: child.name,
-    }
+  const text = message.content[0].type === 'text' ? message.content[0].text : ''
+  const letter = text.replace(/^["「]|["」]$/g, '').trim()
+
+  const achievements: string[] = []
+  if (hanziList.length > 0) {
+    achievements.push(
+      hanziList.length <= 5
+        ? `学了 ${hanziList.length} 个汉字：${hanziList.join('、')}`
+        : `学了 ${hanziList.length} 个汉字，包括 ${hanziList.slice(0, 5).join('、')} 等`,
+    )
+  }
+  todoList.slice(0, 4).forEach((title) => achievements.push(title))
+
+  const content: Record<string, unknown> = {
+    letter: letter || '爸妈，这周孩子过得很好，想你们了。',
+    achievements,
+    week_summary:
+      hanziList.length > 0 || todoList.length > 0
+        ? `${childName}这周学了 ${hanziList.length} 个字，完成了 ${todoList.length} 件事`
+        : `${childName}本周的成长记录`,
+    child_name: childName,
   }
 
   const shareToken = crypto.randomBytes(16).toString('hex')
