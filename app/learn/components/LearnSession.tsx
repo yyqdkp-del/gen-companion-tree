@@ -838,213 +838,198 @@ async function generateCard(
   const ctx = cardCanvas.getContext('2d')!
   ctx.scale(dpr, dpr)
 
+  // 背景
   ctx.fillStyle = '#faf7f2'
   ctx.fillRect(0, 0, W, H)
 
+  // 左侧装饰线
   ctx.fillStyle = '#a46355'
-  ctx.fillRect(0, 0, 6, H)
+  ctx.fillRect(0, 0, 5, H)
 
-  ctx.fillStyle = 'rgba(164,99,85,0.15)'
-  ctx.fillRect(W - 3, 0, 3, H)
-
-  ctx.fillStyle = 'rgba(164,99,85,0.08)'
-  ctx.fillRect(0, 0, W, 70)
-
+  // 顶部品牌栏
+  ctx.fillStyle = 'rgba(164,99,85,0.07)'
+  ctx.fillRect(0, 0, W, 72)
   ctx.fillStyle = '#a46355'
-  ctx.font = '400 16px "Noto Serif SC", serif'
+  ctx.font = '400 17px "Noto Serif SC", serif'
   ctx.textAlign = 'left'
-  ctx.fillText('根 · 中文', 30, 42)
-
-  const today = new Date().toLocaleDateString('zh-CN', {
-    year: 'numeric', month: 'long', day: 'numeric',
-  })
+  ctx.fillText('根 · 中文', 28, 44)
+  const today = new Date().toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' })
   ctx.fillStyle = 'rgba(45,50,47,0.35)'
   ctx.font = '300 14px sans-serif'
   ctx.textAlign = 'right'
-  ctx.fillText(today, W - 30, 42)
+  ctx.fillText(today, W - 28, 44)
 
-  ctx.fillStyle = 'rgba(164,99,85,0.06)'
+  // 主字背景圆
+  ctx.fillStyle = 'rgba(164,99,85,0.07)'
   ctx.beginPath()
-  ctx.arc(W / 2, 210, 130, 0, Math.PI * 2)
+  ctx.arc(W / 2, 220, 140, 0, Math.PI * 2)
   ctx.fill()
 
+  // 主字
   ctx.fillStyle = '#a46355'
-  ctx.font = '900 200px "Noto Serif SC", serif'
+  ctx.font = '900 210px "Noto Serif SC", serif'
   ctx.textAlign = 'center'
-  ctx.fillText(char, W / 2, 290)
+  ctx.fillText(char, W / 2, 305)
 
-  ctx.fillStyle = 'rgba(45,50,47,0.45)'
-  ctx.font = '300 28px "Montserrat", sans-serif'
-  ctx.textAlign = 'center'
-  ctx.fillText(pinyin, W / 2, 335)
+  // 拼音
+  ctx.fillStyle = 'rgba(45,50,47,0.5)'
+  ctx.font = '300 30px sans-serif'
+  ctx.fillText(pinyin, W / 2, 352)
 
-  ctx.fillStyle = 'rgba(45,50,47,0.6)'
+  // 释义
+  ctx.fillStyle = 'rgba(45,50,47,0.55)'
   ctx.font = '400 22px "Noto Serif SC", serif'
-  ctx.textAlign = 'center'
-  ctx.fillText(meaning.slice(0, 20), W / 2, 375)
+  ctx.fillText(meaning.slice(0, 18), W / 2, 392)
 
-  ctx.strokeStyle = 'rgba(164,99,85,0.2)'
+  // 分隔
+  ctx.strokeStyle = 'rgba(164,99,85,0.18)'
   ctx.lineWidth = 1
-  ctx.beginPath()
-  ctx.moveTo(60, 395)
-  ctx.lineTo(W - 60, 395)
-  ctx.stroke()
+  ctx.beginPath(); ctx.moveTo(60, 415); ctx.lineTo(W - 60, 415); ctx.stroke()
+  ctx.fillStyle = '#a46355'
+  ctx.font = '13px serif'
+  ctx.fillText('◆', W / 2, 426)
 
-  ctx.fillStyle = 'rgba(45,50,47,0.35)'
+  // 字形演变标题
+  ctx.fillStyle = 'rgba(45,50,47,0.38)'
   ctx.font = '300 13px sans-serif'
-  ctx.textAlign = 'center'
-  ctx.fillText('— 字形演变 —', W / 2, 425)
+  ctx.fillText('— 字形演变 —', W / 2, 452)
 
+  // 演变五阶
   const stages = [
-    { label: '甲骨文', opacity: 0.25 },
-    { label: '金文', opacity: 0.35 },
-    { label: '小篆', opacity: 0.5 },
-    { label: '隶书', opacity: 0.7 },
-    { label: '楷书', opacity: 1.0 },
+    { label: '甲骨文', alpha: 0.2, size: 20 },
+    { label: '金文', alpha: 0.35, size: 23 },
+    { label: '小篆', alpha: 0.52, size: 26 },
+    { label: '隶书', alpha: 0.72, size: 29 },
+    { label: '楷书', alpha: 1.0, size: 33 },
   ]
-
-  const stageW = (W - 80) / stages.length
+  const sw = (W - 80) / 5
   stages.forEach((s, i) => {
-    const x = 40 + stageW * i + stageW / 2
-
-    ctx.fillStyle = `rgba(164,99,85,${s.opacity})`
-    ctx.font = `${i === 4 ? '700' : '400'} ${18 + i * 3}px "Noto Serif SC", serif`
+    const x = 40 + sw * i + sw / 2
+    ctx.fillStyle = `rgba(164,99,85,${s.alpha})`
+    ctx.font = `${i === 4 ? '700' : '400'} ${s.size}px "Noto Serif SC", serif`
     ctx.textAlign = 'center'
-    ctx.fillText(char, x, 490)
-
-    ctx.fillStyle = 'rgba(45,50,47,0.35)'
+    ctx.fillText(char, x, 500)
+    ctx.fillStyle = 'rgba(45,50,47,0.3)'
     ctx.font = '10px sans-serif'
-    ctx.fillText(s.label, x, 518)
-
-    if (i < stages.length - 1) {
-      ctx.fillStyle = 'rgba(164,99,85,0.2)'
-      ctx.font = '12px sans-serif'
-      ctx.fillText('›', x + stageW / 2, 487)
+    ctx.fillText(s.label, x, 522)
+    if (i < 4) {
+      ctx.fillStyle = 'rgba(164,99,85,0.22)'
+      ctx.font = '14px sans-serif'
+      ctx.fillText('›', x + sw / 2, 497)
     }
   })
 
-  ctx.strokeStyle = 'rgba(164,99,85,0.15)'
+  // 分隔
+  ctx.strokeStyle = 'rgba(164,99,85,0.12)'
   ctx.lineWidth = 0.8
-  ctx.beginPath()
-  ctx.moveTo(60, 535)
-  ctx.lineTo(W - 60, 535)
-  ctx.stroke()
+  ctx.beginPath(); ctx.moveTo(60, 540); ctx.lineTo(W - 60, 540); ctx.stroke()
 
-  ctx.fillStyle = 'rgba(45,50,47,0.35)'
+  // 造句标题
+  ctx.fillStyle = 'rgba(45,50,47,0.38)'
   ctx.font = '300 13px sans-serif'
   ctx.textAlign = 'center'
-  ctx.fillText('— 情境造句 —', W / 2, 560)
+  ctx.fillText('— 情境造句 —', W / 2, 564)
 
-  ctx.fillStyle = 'rgba(164,99,85,0.25)'
-  ctx.font = '700 60px "Noto Serif SC", serif'
+  // 造句区背景
+  ctx.fillStyle = 'rgba(164,99,85,0.04)'
+  ctx.beginPath()
+  ctx.roundRect(40, 575, W - 80, 200, 12)
+  ctx.fill()
+  ctx.strokeStyle = 'rgba(164,99,85,0.12)'
+  ctx.lineWidth = 1
+  ctx.stroke()
+
+  // 左引号
+  ctx.fillStyle = 'rgba(164,99,85,0.22)'
+  ctx.font = '700 52px "Noto Serif SC", serif'
   ctx.textAlign = 'left'
-  ctx.fillText('「', 30, 630)
+  ctx.fillText('「', 32, 640)
 
+  // 造句文字
   ctx.fillStyle = '#2d322f'
-  ctx.font = '400 34px "Noto Serif SC", serif'
+  ctx.font = '400 36px "Noto Serif SC", serif'
   ctx.textAlign = 'center'
-
-  const maxLineW = W - 160
-  const sentenceChars = sentence.split('')
-  let line = ''
-  let lineY = 615
-  let lineCount = 0
-
-  for (const c of sentenceChars) {
-    const test = line + c
-    if (ctx.measureText(test).width > maxLineW && line !== '') {
-      if (lineCount === 2) {
-        ctx.fillText(line + '…', W / 2, lineY)
-        line = ''
-        break
-      }
-      ctx.fillText(line, W / 2, lineY)
-      line = c
-      lineY += 52
-      lineCount++
-    } else {
-      line = test
-    }
+  const maxLW = W - 170
+  const sc = sentence.split('')
+  let sLine = '', sY = 630, sCount = 0
+  for (const c of sc) {
+    const test = sLine + c
+    if (ctx.measureText(test).width > maxLW && sLine) {
+      if (sCount === 2) { ctx.fillText(sLine + '…', W / 2, sY); sLine = ''; break }
+      ctx.fillText(sLine, W / 2, sY)
+      sLine = c; sY += 52; sCount++
+    } else { sLine = test }
   }
-  if (line) ctx.fillText(line, W / 2, lineY)
+  if (sLine) ctx.fillText(sLine, W / 2, sY)
 
-  ctx.fillStyle = 'rgba(164,99,85,0.25)'
-  ctx.font = '700 60px "Noto Serif SC", serif'
+  // 右引号
+  ctx.fillStyle = 'rgba(164,99,85,0.22)'
+  ctx.font = '700 52px "Noto Serif SC", serif'
   ctx.textAlign = 'right'
-  ctx.fillText('」', W - 30, lineY + 20)
+  ctx.fillText('」', W - 32, sY + 18)
 
-  const afterSentenceY = lineY + 50
-  ctx.strokeStyle = 'rgba(164,99,85,0.15)'
+  const afterS = Math.max(sY + 60, 790)
+
+  // 分隔
+  ctx.strokeStyle = 'rgba(164,99,85,0.12)'
   ctx.lineWidth = 0.8
-  ctx.beginPath()
-  ctx.moveTo(60, afterSentenceY)
-  ctx.lineTo(W - 60, afterSentenceY)
-  ctx.stroke()
+  ctx.beginPath(); ctx.moveTo(60, afterS); ctx.lineTo(W - 60, afterS); ctx.stroke()
 
-  const tipStartY = afterSentenceY + 20
-
-  ctx.fillStyle = 'rgba(45,50,47,0.35)'
+  // 文化贴士标题
+  ctx.fillStyle = 'rgba(45,50,47,0.38)'
   ctx.font = '300 13px sans-serif'
   ctx.textAlign = 'center'
-  ctx.fillText('— 文化小贴士 —', W / 2, tipStartY + 20)
+  ctx.fillText('— 文化小贴士 —', W / 2, afterS + 24)
 
+  // 贴士背景
+  ctx.fillStyle = 'rgba(92,122,94,0.05)'
+  ctx.beginPath()
+  ctx.roundRect(40, afterS + 34, W - 80, 100, 10)
+  ctx.fill()
+  ctx.strokeStyle = 'rgba(92,122,94,0.18)'
+  ctx.lineWidth = 0.8
+  ctx.stroke()
+
+  // 贴士内容
   const tip = culturalStory
-    ? culturalStory.replace(/[\n\r]/g, ' ').slice(0, 55) + (culturalStory.length > 55 ? '…' : '')
-    : `「${char}」字蕴含着中华文化的智慧与美好。`
-
-  ctx.fillStyle = 'rgba(45,50,47,0.65)'
+    ? culturalStory.replace(/[\n\r]/g, ' ').slice(0, 52) + (culturalStory.length > 52 ? '…' : '')
+    : `「${char}」承载着中华文化的智慧与美好。`
+  ctx.fillStyle = 'rgba(45,50,47,0.62)'
   ctx.font = '400 20px "Noto Serif SC", serif'
   ctx.textAlign = 'center'
-
-  const tipChars = tip.split('')
-  let tipLine = ''
-  let tipLineY = tipStartY + 52
-  let tipCount = 0
-
-  for (const c of tipChars) {
-    const test = tipLine + c
-    if (ctx.measureText(test).width > W - 120 && tipLine !== '') {
-      ctx.fillText(tipLine, W / 2, tipLineY)
-      tipLine = c
-      tipLineY += 32
-      tipCount++
-      if (tipCount >= 2) break
-    } else {
-      tipLine = test
-    }
+  const tc = tip.split('')
+  let tLine = '', tY = afterS + 72, tCount = 0
+  for (const c of tc) {
+    const test = tLine + c
+    if (ctx.measureText(test).width > W - 130 && tLine) {
+      ctx.fillText(tLine, W / 2, tY)
+      tLine = c; tY += 30; tCount++
+      if (tCount >= 2) break
+    } else { tLine = test }
   }
-  if (tipCount < 2 && tipLine) ctx.fillText(tipLine, W / 2, tipLineY)
+  if (tCount < 2 && tLine) ctx.fillText(tLine, W / 2, tY)
 
+  // 底部区
   ctx.fillStyle = 'rgba(164,99,85,0.06)'
-  ctx.fillRect(0, H - 150, W, 150)
-
-  ctx.strokeStyle = 'rgba(164,99,85,0.2)'
+  ctx.fillRect(0, H - 148, W, 148)
+  ctx.strokeStyle = 'rgba(164,99,85,0.18)'
   ctx.lineWidth = 1
-  ctx.beginPath()
-  ctx.moveTo(0, H - 150)
-  ctx.lineTo(W, H - 150)
-  ctx.stroke()
+  ctx.beginPath(); ctx.moveTo(0, H - 148); ctx.lineTo(W, H - 148); ctx.stroke()
 
-  const displayName = childName || '小朋友'
+  const dName = childName || '小朋友'
   ctx.fillStyle = '#2d322f'
-  ctx.font = '600 26px "Noto Serif SC", serif'
+  ctx.font = '600 25px "Noto Serif SC", serif'
   ctx.textAlign = 'center'
-  ctx.fillText(`${displayName} 学会了「${char}」`, W / 2, H - 105)
+  ctx.fillText(`${dName} 学会了「${char}」`, W / 2, H - 104)
 
-  const cityName = city && city.length < 12 ? city : ''
-  ctx.fillStyle = 'rgba(45,50,47,0.4)'
-  ctx.font = '300 18px sans-serif'
-  ctx.textAlign = 'center'
-  ctx.fillText(
-    cityName ? `${cityName} · ${today}` : today,
-    W / 2,
-    H - 72,
-  )
+  const cName = city && city.length < 12 ? city : ''
+  ctx.fillStyle = 'rgba(45,50,47,0.38)'
+  ctx.font = '300 17px sans-serif'
+  ctx.fillText(cName ? `${cName} · ${today}` : today, W / 2, H - 74)
 
   ctx.fillStyle = 'rgba(164,99,85,0.4)'
-  ctx.font = '300 15px "Noto Serif SC", serif'
-  ctx.textAlign = 'center'
-  ctx.fillText('让中文的根，扎在异乡的土地上', W / 2, H - 38)
+  ctx.font = '300 14px "Noto Serif SC", serif'
+  ctx.fillText('让中文的根，扎在异乡的土地上', W / 2, H - 44)
 
   return cardCanvas.toDataURL('image/png', 0.95)
 }

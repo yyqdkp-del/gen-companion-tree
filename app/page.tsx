@@ -559,8 +559,8 @@ export default function BasePage() {
         <div style={{
           position: 'fixed',
           top: showProfileBanner
-            ? 'calc(max(env(safe-area-inset-top), 12px) + 48px)'
-            : 'max(env(safe-area-inset-top), 12px)',
+            ? 'calc(max(env(safe-area-inset-top), 12px) + 96px)'
+            : 'calc(max(env(safe-area-inset-top), 12px) + 72px)',
           right: '22%',
           left: 'auto',
           zIndex: 10,
@@ -571,7 +571,7 @@ export default function BasePage() {
           <div style={{
             fontFamily: "'Noto Serif SC', serif",
             fontWeight: 300,
-            fontSize: 'clamp(22px, 5.5vw, 28px)',
+            fontSize: '14px',
             color: '#2d322f',
             letterSpacing: '0.03em',
             lineHeight: 1.4,

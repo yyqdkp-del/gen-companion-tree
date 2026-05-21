@@ -100,6 +100,23 @@ export default function TreehousePage() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, thinking])
 
+  useEffect(() => {
+    const vv = window.visualViewport
+    if (!vv) return
+    const handle = () => {
+      const kbH = Math.max(0, window.innerHeight - vv.height - vv.offsetTop)
+      document.documentElement.style.setProperty('--treehouse-kb', `${kbH}px`)
+    }
+    vv.addEventListener('resize', handle)
+    vv.addEventListener('scroll', handle)
+    handle()
+    return () => {
+      vv.removeEventListener('resize', handle)
+      vv.removeEventListener('scroll', handle)
+      document.documentElement.style.removeProperty('--treehouse-kb')
+    }
+  }, [])
+
   // ── 加载孩子上下文 ──
   const loadContext = useCallback(async () => {
     const { data: children } = await supabase.from('children').select('*')
@@ -598,7 +615,8 @@ export default function TreehousePage() {
       {/* ── 底部输入区 ── */}
       <div style={{
         position: 'relative', zIndex: 10,
-        padding: '12px 16px 40px',
+        padding: '12px 16px',
+        paddingBottom: 'calc(max(env(safe-area-inset-bottom), 20px) + 90px + var(--treehouse-kb, 0px))',
         background: 'linear-gradient(to top, rgba(2,6,23,0.95) 0%, transparent 100%)',
         flexShrink: 0,
       }}>
