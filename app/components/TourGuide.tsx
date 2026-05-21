@@ -86,7 +86,7 @@ export default function TourGuide({ tourId, steps, onComplete }: TourGuideProps)
             style={{
               position: 'fixed',
               ...(step.position === 'bottom'
-                ? { bottom: 100, left: 16, right: 16 }
+                ? { bottom: 'calc(110px + max(env(safe-area-inset-bottom), 20px))', left: 16, right: 16 }
                 : step.position === 'top'
                   ? { top: 100, left: 16, right: 16 }
                   : { top: '50%', left: 16, right: 16, transform: 'translateY(-50%)' }),

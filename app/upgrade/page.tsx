@@ -30,7 +30,7 @@ export default function UpgradePage() {
 
   return (
     <main style={{
-      minHeight: '100vh',
+      minHeight: '100dvh',
       backgroundColor: '#fbf9f6',
       backgroundImage: `
         radial-gradient(at 90% 10%, rgba(245,214,209,0.25) 0px, transparent 50%),

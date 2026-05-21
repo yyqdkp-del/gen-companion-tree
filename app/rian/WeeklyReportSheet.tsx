@@ -167,6 +167,7 @@ export default function WeeklyReportSheet({ childId, childName, onClose }: Props
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
+            flexShrink: 0,
           }}
         >
           <span
@@ -311,89 +312,86 @@ export default function WeeklyReportSheet({ childId, childName, onClose }: Props
                 </div>
               )}
 
-              {shareUrl && (
-                <div style={{
-                  position: 'sticky',
-                  bottom: 0,
-                  background: 'rgba(251,249,246,0.95)',
-                  backdropFilter: 'blur(10px)',
-                  WebkitBackdropFilter: 'blur(10px)',
-                  padding: '12px 16px',
-                  paddingBottom: 'max(env(safe-area-inset-bottom), 16px)',
-                  borderTop: '1px solid rgba(45,50,47,0.06)',
-                  marginTop: 'auto',
-                }}>
-                  {isProUser ? (
-                    <>
-                      <button
-                        type="button"
-                        onClick={handleCopy}
-                        style={{
-                          width: '100%',
-                          padding: '14px',
-                          borderRadius: 18,
-                          border: 'none',
-                          background: '#a46355',
-                          color: '#fff',
-                          fontSize: 15,
-                          fontWeight: 600,
-                          cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          gap: 8,
-                          marginBottom: 10,
-                        }}
-                      >
-                        {copied ? <Check size={18} /> : <Copy size={18} />}
-                        {copied ? '链接已复制' : '复制微信分享链接'}
-                      </button>
-                      <p
-                        style={{
-                          fontSize: 11,
-                          color: THEME.muted,
-                          textAlign: 'center',
-                          lineHeight: 1.6,
-                          margin: 0,
-                        }}
-                      >
-                        复制后粘贴到微信发给爷爷奶奶，链接 7 天内有效
-                      </p>
-                    </>
-                  ) : (
-                    <div style={{
-                      padding: '12px 16px',
-                      background: 'rgba(164,99,85,0.06)',
-                      borderRadius: 14,
-                      border: '1px solid rgba(164,99,85,0.15)',
-                      textAlign: 'center',
-                    }}>
-                      <div style={{ fontSize: 13, color: '#a46355', fontFamily: 'sans-serif', marginBottom: 8 }}>
-                        升级 Pro 解锁分享功能
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => router.push('/upgrade')}
-                        style={{
-                          padding: '8px 20px',
-                          background: '#a46355',
-                          color: '#fff',
-                          border: 'none',
-                          borderRadius: 12,
-                          fontSize: 13,
-                          cursor: 'pointer',
-                          fontFamily: "'Noto Serif SC', serif",
-                        }}
-                      >
-                        免费试用30天 →
-                      </button>
-                    </div>
-                  )}
-                </div>
-              )}
             </>
           )}
         </div>
+
+        {shareUrl && !loading && !error && content && (
+          <div style={{
+            padding: '12px 16px',
+            paddingBottom: 'max(env(safe-area-inset-bottom), 16px)',
+            borderTop: '1px solid rgba(45,50,47,0.06)',
+            background: '#fbf9f6',
+            flexShrink: 0,
+          }}>
+            {isProUser ? (
+              <>
+                <button
+                  type="button"
+                  onClick={handleCopy}
+                  style={{
+                    width: '100%',
+                    padding: '14px',
+                    borderRadius: 18,
+                    border: 'none',
+                    background: '#a46355',
+                    color: '#fff',
+                    fontSize: 15,
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 8,
+                    marginBottom: 10,
+                  }}
+                >
+                  {copied ? <Check size={18} /> : <Copy size={18} />}
+                  {copied ? '链接已复制' : '复制微信分享链接'}
+                </button>
+                <p
+                  style={{
+                    fontSize: 11,
+                    color: THEME.muted,
+                    textAlign: 'center',
+                    lineHeight: 1.6,
+                    margin: 0,
+                  }}
+                >
+                  复制后粘贴到微信发给爷爷奶奶，链接 7 天内有效
+                </p>
+              </>
+            ) : (
+              <div style={{
+                padding: '12px 16px',
+                background: 'rgba(164,99,85,0.06)',
+                borderRadius: 14,
+                border: '1px solid rgba(164,99,85,0.15)',
+                textAlign: 'center',
+              }}>
+                <div style={{ fontSize: 13, color: '#a46355', fontFamily: 'sans-serif', marginBottom: 8 }}>
+                  升级 Pro 解锁分享功能
+                </div>
+                <button
+                  type="button"
+                  onClick={() => router.push('/upgrade')}
+                  style={{
+                    padding: '8px 20px',
+                    background: '#a46355',
+                    color: '#fff',
+                    border: 'none',
+                    borderRadius: 12,
+                    fontSize: 13,
+                    cursor: 'pointer',
+                    fontFamily: "'Noto Serif SC', serif",
+                  }}
+                >
+                  免费试用30天 →
+                </button>
+              </div>
+            )}
+          </div>
+        )}
       </motion.div>
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </motion.div>

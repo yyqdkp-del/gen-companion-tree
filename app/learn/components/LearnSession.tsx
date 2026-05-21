@@ -1050,10 +1050,11 @@ async function generateCard(
 }
 
 // ── 第四步：我会用了（语音输入 + 分享卡片）──
-function StepUse({ data, char, childName, canvasRef, onComplete }: {
+function StepUse({ data, char, childName, canvasRef, onComplete, onBottomBarChange }: {
   data: any; char: string; childName?: string
   canvasRef: React.RefObject<HTMLCanvasElement | null>
   onComplete: (s: string) => void
+  onBottomBarChange?: (node: React.ReactNode) => void
 }) {
   const { speak } = useApp()
   const [sentence, setSentence] = useState('')
@@ -1171,10 +1172,66 @@ function StepUse({ data, char, childName, canvasRef, onComplete }: {
     }
   }
 
+  const shareFooter = cardUrl ? (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxWidth: 360, margin: '0 auto' }}>
+      <motion.button whileTap={{ scale: 0.96 }} onClick={shareCard}
+        style={{ width: '100%', padding: '14px', borderRadius: 14,
+          border: 'none', background: '#a46355', color: '#fff',
+          fontSize: 15, fontWeight: 700, cursor: 'pointer',
+          fontFamily: "'Noto Serif SC', serif",
+          boxShadow: '0 4px 16px rgba(164,99,85,0.3)',
+          display: 'flex', alignItems: 'center',
+          justifyContent: 'center', gap: 8 }}>
+        <span>📤</span> 分享给家人
+      </motion.button>
+      <div style={{ display: 'flex', gap: 8 }}>
+        <motion.button whileTap={{ scale: 0.96 }} onClick={downloadCard}
+          style={{ flex: 1, padding: '12px', borderRadius: 12,
+            border: `1px solid rgba(164,99,85,0.4)`,
+            background: 'transparent', fontSize: 13,
+            color: '#5a5a4a', cursor: 'pointer',
+            fontFamily: 'sans-serif' }}>
+          💾 保存到相册
+        </motion.button>
+        <motion.button whileTap={{ scale: 0.96 }}
+          onClick={() => onComplete(sentence)}
+          style={{ flex: 1, padding: '12px', borderRadius: 12,
+            border: `1px solid ${'#8a7355'}`, background: 'transparent',
+            fontSize: 13, color: '#8a7355', fontWeight: 600,
+            cursor: 'pointer', fontFamily: 'sans-serif' }}>
+          完成学习
+        </motion.button>
+      </div>
+    </div>
+  ) : (
+    <motion.button whileTap={{ scale: 0.96 }} onClick={handleComplete}
+      disabled={loading}
+      style={{
+        ...PRIMARY_BTN,
+        background: sentence.trim()
+          ? 'linear-gradient(135deg, #5c7a5e 0%, #4a6650 100%)'
+          : PRIMARY_BTN.background,
+        opacity: loading ? 0.7 : 1,
+        cursor: loading ? 'default' : 'pointer',
+        boxShadow: sentence.trim()
+          ? '0 6px 20px rgba(92,122,94,0.28)'
+          : PRIMARY_BTN.boxShadow,
+        transition: 'background 0.3s, box-shadow 0.3s',
+        maxWidth: 360,
+        margin: '0 auto',
+      }}>
+      {loading ? '生成中...' : sentence.trim() ? '🌟 生成学习卡片' : '跳过完成'}
+    </motion.button>
+  )
+
+  useEffect(() => {
+    onBottomBarChange?.(shareFooter)
+    return () => { onBottomBarChange?.(null) }
+  }, [onBottomBarChange, cardUrl, loading, sentence, isRecording])
+
   if (cardUrl) {
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100%' }}>
-        <div style={{ padding: '0 24px', textAlign: 'center', flex: 1 }}>
+      <div style={{ padding: '0 24px', textAlign: 'center' }}>
           <div style={{ fontSize: 13, color: 'rgba(45,50,47,0.45)', marginBottom: 12,
             fontFamily: 'sans-serif' }}>
             🎉 今日学习完成！
@@ -1193,49 +1250,6 @@ function StepUse({ data, char, childName, canvasRef, onComplete }: {
               🌟 {aiComment}
             </div>
           )}
-        </div>
-
-        <div style={{
-          position: 'sticky',
-          bottom: 0,
-          background: 'rgba(251,249,246,0.95)',
-          backdropFilter: 'blur(10px)',
-          WebkitBackdropFilter: 'blur(10px)',
-          padding: '12px 16px',
-          paddingBottom: 'max(env(safe-area-inset-bottom), 16px)',
-          borderTop: '1px solid rgba(45,50,47,0.06)',
-        }}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxWidth: 360, margin: '0 auto' }}>
-            <motion.button whileTap={{ scale: 0.96 }} onClick={shareCard}
-              style={{ width: '100%', padding: '14px', borderRadius: 14,
-                border: 'none', background: '#a46355', color: '#fff',
-                fontSize: 15, fontWeight: 700, cursor: 'pointer',
-                fontFamily: "'Noto Serif SC', serif",
-                boxShadow: '0 4px 16px rgba(164,99,85,0.3)',
-                display: 'flex', alignItems: 'center',
-                justifyContent: 'center', gap: 8 }}>
-              <span>📤</span> 分享给家人
-            </motion.button>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <motion.button whileTap={{ scale: 0.96 }} onClick={downloadCard}
-                style={{ flex: 1, padding: '12px', borderRadius: 12,
-                  border: `1px solid rgba(164,99,85,0.4)`,
-                  background: 'transparent', fontSize: 13,
-                  color: '#5a5a4a', cursor: 'pointer',
-                  fontFamily: 'sans-serif' }}>
-                💾 保存到相册
-              </motion.button>
-              <motion.button whileTap={{ scale: 0.96 }}
-                onClick={() => onComplete(sentence)}
-                style={{ flex: 1, padding: '12px', borderRadius: 12,
-                  border: `1px solid ${'#8a7355'}`, background: 'transparent',
-                  fontSize: 13, color: '#8a7355', fontWeight: 600,
-                  cursor: 'pointer', fontFamily: 'sans-serif' }}>
-                完成学习
-              </motion.button>
-            </div>
-          </div>
-        </div>
       </div>
     )
   }
@@ -1266,6 +1280,11 @@ function StepUse({ data, char, childName, canvasRef, onComplete }: {
       <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
         <textarea value={sentence}
           onChange={e => setSentence(e.target.value)}
+          onFocus={(e) => {
+            setTimeout(() => {
+              e.target.scrollIntoView({ behavior: 'smooth', block: 'center' })
+            }, 300)
+          }}
           placeholder={`孩子说，妈妈帮忙打\n或者按话筒让孩子直接说`}
           rows={3}
           style={{ flex: 1, padding: '14px', borderRadius: 14,
@@ -1298,23 +1317,6 @@ function StepUse({ data, char, childName, canvasRef, onComplete }: {
           正在听孩子说话...
         </div>
       )}
-
-      <motion.button whileTap={{ scale: 0.96 }} onClick={handleComplete}
-        disabled={loading}
-        style={{
-          ...PRIMARY_BTN,
-          background: sentence.trim()
-            ? 'linear-gradient(135deg, #5c7a5e 0%, #4a6650 100%)'
-            : PRIMARY_BTN.background,
-          opacity: loading ? 0.7 : 1,
-          cursor: loading ? 'default' : 'pointer',
-          boxShadow: sentence.trim()
-            ? '0 6px 20px rgba(92,122,94,0.28)'
-            : PRIMARY_BTN.boxShadow,
-          transition: 'background 0.3s, box-shadow 0.3s',
-        }}>
-        {loading ? '生成中...' : sentence.trim() ? '🌟 生成学习卡片' : '跳过完成'}
-      </motion.button>
     </div>
   )
 }
@@ -1324,6 +1326,7 @@ export default function LearnSession({
   data, char, childName, onComplete, onClose
 }: Props) {
   const [currentStep, setCurrentStep] = useState(0)
+  const [bottomBar, setBottomBar] = useState<React.ReactNode>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const step = STEPS[currentStep]
 
@@ -1331,6 +1334,10 @@ export default function LearnSession({
     if (currentStep < STEPS.length - 1) {
       setCurrentStep(s => s + 1)
     }
+  }, [currentStep])
+
+  useEffect(() => {
+    if (currentStep !== 3) setBottomBar(null)
   }, [currentStep])
 
   return (
@@ -1350,11 +1357,11 @@ export default function LearnSession({
         display: 'flex',
         flexDirection: 'column',
         fontFamily: 'sans-serif',
-        paddingBottom: 'max(env(safe-area-inset-bottom), 20px)',
       }}>
 
       {/* 顶部导航 */}
       <div style={{
+        flexShrink: 0,
         background: 'rgba(251,249,246,0.92)',
         backdropFilter: 'blur(20px)',
         WebkitBackdropFilter: 'blur(20px)',
@@ -1380,10 +1387,12 @@ export default function LearnSession({
         </div>
       </div>
 
-      <ProgressBar current={currentStep} />
+      <div style={{ flexShrink: 0 }}>
+        <ProgressBar current={currentStep} />
+      </div>
 
       {/* 内容 */}
-      <div style={{ flex: 1, overflowY: 'auto', paddingBottom: 20 }}>
+      <div style={{ flex: 1, overflowY: 'auto', minHeight: 0, paddingBottom: 12 }}>
         <AnimatePresence mode="wait">
           <motion.div key={currentStep}
             initial={{ opacity: 0, x: 40 }}
@@ -1403,11 +1412,26 @@ export default function LearnSession({
             {currentStep === 3 && (
               <StepUse data={data} char={char}
                 childName={childName} canvasRef={canvasRef}
-                onComplete={onComplete} />
+                onComplete={onComplete}
+                onBottomBarChange={setBottomBar} />
             )}
           </motion.div>
         </AnimatePresence>
       </div>
+
+      {currentStep === 3 && bottomBar && (
+        <div style={{
+          flexShrink: 0,
+          padding: '12px 16px',
+          paddingBottom: 'max(env(safe-area-inset-bottom), 16px)',
+          background: 'rgba(251,249,246,0.95)',
+          backdropFilter: 'blur(10px)',
+          WebkitBackdropFilter: 'blur(10px)',
+          borderTop: '1px solid rgba(45,50,47,0.06)',
+        }}>
+          {bottomBar}
+        </div>
+      )}
     </motion.div>
   )
 }

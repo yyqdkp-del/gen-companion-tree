@@ -558,7 +558,9 @@ export default function BasePage() {
       {mounted && greeting && (
         <div style={{
           position: 'fixed',
-          top: 'max(52px, env(safe-area-inset-top, 52px))',
+          top: showProfileBanner
+            ? 'calc(max(env(safe-area-inset-top), 12px) + 48px)'
+            : 'max(env(safe-area-inset-top), 12px)',
           right: '22%',
           left: 'auto',
           zIndex: 10,
@@ -603,7 +605,7 @@ export default function BasePage() {
         </p>
       </header>
 
-      <div style={{ position: 'absolute', top: '50%', left: '50%',
+      <div style={{ position: 'absolute', top: '42%', left: '50%',
           transform: 'translate(-50%, -50%)',
           display: 'flex', flexDirection: 'column', alignItems: 'center',
           gap: 'clamp(20px, 5vw, 36px)' }}>

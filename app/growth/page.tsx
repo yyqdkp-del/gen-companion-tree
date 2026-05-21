@@ -3,6 +3,7 @@ import React, { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
 import { useApp } from '@/app/context/AppContext'
+import { PAGE_BOTTOM_PADDING } from '@/app/_shared/_constants/layout'
 import nextDynamic from 'next/dynamic'
 
 export const dynamic = 'force-dynamic'
@@ -59,6 +60,8 @@ export default function GrowthPage() {
       overflow: 'hidden',
       backgroundColor: '#fbf9f6',
       fontFamily: "'Noto Serif SC', Georgia, serif",
+      display: 'flex',
+      flexDirection: 'column',
     }}>
       <div style={{
         position: 'absolute', inset: 0,
@@ -68,95 +71,100 @@ export default function GrowthPage() {
 
       <ChildAvatar />
 
-      <motion.button
-        initial={{ opacity: 0, y: -10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 1.0 }}
-        whileHover={{ scale: 1.06 }}
-        whileTap={{ scale: 0.93 }}
-        onClick={() => router.push('/growth/academic')}
-        style={{
-          position: 'absolute',
-          left: '50%', top: '30vh',
-          transform: 'translateX(-50%)',
-          zIndex: 50,
-          background: 'rgba(255,255,255,0.8)',
-          border: '1px solid rgba(255,255,255,0.6)',
-          borderRadius: 18,
-          backdropFilter: 'blur(10px)',
-          boxShadow: '0 4px 20px rgba(45,50,47,0.05)',
-          cursor: 'pointer',
-          width: 'min(280px, 75vw)',
-          padding: '14px 18px',
-          display: 'flex', alignItems: 'center', gap: 14,
-        }}
-      >
-        <div style={{
-          width: 44, height: 44, borderRadius: 22,
-          background: 'rgba(164,99,85,0.12)',
-          border: '1px solid rgba(164,99,85,0.25)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: 24, flexShrink: 0,
-        }}>🏆</div>
-        <div style={{ flex: 1, textAlign: 'left' }}>
+      <div style={{
+        position: 'relative',
+        zIndex: 50,
+        flex: 1,
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: `0 16px ${PAGE_BOTTOM_PADDING}`,
+        gap: 20,
+        minHeight: 0,
+      }}>
+        <motion.button
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 1.0 }}
+          whileHover={{ scale: 1.06 }}
+          whileTap={{ scale: 0.93 }}
+          onClick={() => router.push('/growth/academic')}
+          style={{
+            background: 'rgba(255,255,255,0.8)',
+            border: '1px solid rgba(255,255,255,0.6)',
+            borderRadius: 18,
+            backdropFilter: 'blur(10px)',
+            boxShadow: '0 4px 20px rgba(45,50,47,0.05)',
+            cursor: 'pointer',
+            width: 'min(280px, 75vw)',
+            padding: '14px 18px',
+            display: 'flex', alignItems: 'center', gap: 14,
+          }}
+        >
           <div style={{
-            fontSize: 15, fontWeight: 700, color: '#2d322f',
-            letterSpacing: '0.08em',
-            lineHeight: 1.3,
-          }}>
-            {activeKid ? `${activeKid.name}的学业` : '学业成长'}
+            width: 44, height: 44, borderRadius: 22,
+            background: 'rgba(164,99,85,0.12)',
+            border: '1px solid rgba(164,99,85,0.25)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: 24, flexShrink: 0,
+          }}>🏆</div>
+          <div style={{ flex: 1, textAlign: 'left' }}>
+            <div style={{
+              fontSize: 15, fontWeight: 700, color: '#2d322f',
+              letterSpacing: '0.08em',
+              lineHeight: 1.3,
+            }}>
+              {activeKid ? `${activeKid.name}的学业` : '学业成长'}
+            </div>
+            <div style={{ fontSize: 11, color: 'rgba(45,50,47,0.5)', marginTop: 3, letterSpacing: '0.06em' }}>
+              升学规划 · 成长档案
+            </div>
           </div>
-          <div style={{ fontSize: 11, color: 'rgba(45,50,47,0.5)', marginTop: 3, letterSpacing: '0.06em' }}>
-            升学规划 · 成长档案
-          </div>
-        </div>
-        <div style={{ fontSize: 18, color: 'rgba(45,50,47,0.35)', flexShrink: 0 }}>›</div>
-      </motion.button>
+          <div style={{ fontSize: 18, color: 'rgba(45,50,47,0.35)', flexShrink: 0 }}>›</div>
+        </motion.button>
 
-      <motion.button
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 1.2 }}
-        whileHover={{ scale: 1.06 }}
-        whileTap={{ scale: 0.93 }}
-        onClick={() => router.push('/learn')}
-        style={{
-          position: 'absolute',
-          left: '50%', top: 'min(56vh, calc(100dvh - 180px))',
-          transform: 'translateX(-50%)',
-          zIndex: 50,
-          background: 'rgba(255,255,255,0.8)',
-          border: '1px solid rgba(255,255,255,0.6)',
-          borderRadius: 18,
-          backdropFilter: 'blur(10px)',
-          boxShadow: '0 4px 20px rgba(45,50,47,0.05)',
-          cursor: 'pointer',
-          width: 'min(280px, 75vw)',
-          padding: '14px 18px',
-          display: 'flex', alignItems: 'center', gap: 14,
-        }}
-      >
-        <div style={{
-          width: 44, height: 44, borderRadius: 22,
-          background: 'rgba(164,99,85,0.12)',
-          border: '1px solid rgba(164,99,85,0.25)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: 24, flexShrink: 0,
-        }}>📖</div>
-        <div style={{ flex: 1, textAlign: 'left' }}>
+        <motion.button
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 1.2 }}
+          whileHover={{ scale: 1.06 }}
+          whileTap={{ scale: 0.93 }}
+          onClick={() => router.push('/learn')}
+          style={{
+            background: 'rgba(255,255,255,0.8)',
+            border: '1px solid rgba(255,255,255,0.6)',
+            borderRadius: 18,
+            backdropFilter: 'blur(10px)',
+            boxShadow: '0 4px 20px rgba(45,50,47,0.05)',
+            cursor: 'pointer',
+            width: 'min(280px, 75vw)',
+            padding: '14px 18px',
+            display: 'flex', alignItems: 'center', gap: 14,
+          }}
+        >
           <div style={{
-            fontSize: 15, fontWeight: 700, color: '#2d322f',
-            letterSpacing: '0.08em',
-            lineHeight: 1.3,
-          }}>
-            根·中文
+            width: 44, height: 44, borderRadius: 22,
+            background: 'rgba(164,99,85,0.12)',
+            border: '1px solid rgba(164,99,85,0.25)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: 24, flexShrink: 0,
+          }}>📖</div>
+          <div style={{ flex: 1, textAlign: 'left' }}>
+            <div style={{
+              fontSize: 15, fontWeight: 700, color: '#2d322f',
+              letterSpacing: '0.08em',
+              lineHeight: 1.3,
+            }}>
+              根·中文
+            </div>
+            <div style={{ fontSize: 11, color: 'rgba(45,50,47,0.5)', marginTop: 3, letterSpacing: '0.06em' }}>
+              字理解码 · 成语 · 文化句
+            </div>
           </div>
-          <div style={{ fontSize: 11, color: 'rgba(45,50,47,0.5)', marginTop: 3, letterSpacing: '0.06em' }}>
-            字理解码 · 成语 · 文化句
-          </div>
-        </div>
-        <div style={{ fontSize: 18, color: 'rgba(45,50,47,0.35)', flexShrink: 0 }}>›</div>
-      </motion.button>
+          <div style={{ fontSize: 18, color: 'rgba(45,50,47,0.35)', flexShrink: 0 }}>›</div>
+        </motion.button>
+      </div>
 
       <FallingLeaves />
 

@@ -69,6 +69,24 @@ export default function KapokTreeholePage() {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, isThinking])
 
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.visualViewport) {
+        const keyboardHeight = window.innerHeight - window.visualViewport.height
+        document.documentElement.style.setProperty(
+          '--mom-keyboard-height',
+          `${Math.max(0, keyboardHeight)}px`,
+        )
+      }
+    }
+    window.visualViewport?.addEventListener('resize', handleResize)
+    handleResize()
+    return () => {
+      window.visualViewport?.removeEventListener('resize', handleResize)
+      document.documentElement.style.removeProperty('--mom-keyboard-height')
+    }
+  }, [])
+
   const postMemorySlice = useCallback(async () => {
     const filtered = messagesRef.current.filter((m) => m.id !== 'welcome')
     const slice = filtered.slice(-10).map(({ role, content }) => ({ role, content }))
@@ -236,7 +254,7 @@ export default function KapokTreeholePage() {
           height: var(--vh, 100dvh);
           display: flex;
           flex-direction: column;
-          overflow-y: auto;
+          overflow: hidden;
           color: #fff7e8;
           background-color: #0a0d14;
           background-image:
@@ -311,7 +329,7 @@ export default function KapokTreeholePage() {
           flex: 1;
           overflow-y: auto;
           padding: 22px 18px;
-          padding-bottom: calc(120px + max(env(safe-area-inset-bottom), 20px));
+          padding-bottom: calc(120px + max(env(safe-area-inset-bottom), 20px) + var(--mom-keyboard-height, 0px));
           scrollbar-width: none;
         }
 
@@ -375,10 +393,13 @@ export default function KapokTreeholePage() {
         }
 
         .input-area {
-          position: relative;
+          position: fixed;
+          left: 0;
+          right: 0;
+          bottom: calc(max(env(safe-area-inset-bottom), 16px) + var(--mom-keyboard-height, 0px));
           z-index: 1;
           flex-shrink: 0;
-          padding: 14px 16px max(28px, calc(env(safe-area-inset-bottom) + 16px));
+          padding: 14px 16px 16px;
           background: linear-gradient(to top, rgba(10, 13, 20, 0.96), rgba(10, 13, 20, 0));
         }
 
