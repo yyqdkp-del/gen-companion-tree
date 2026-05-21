@@ -833,7 +833,7 @@ function drawCityElement(ctx: CanvasRenderingContext2D, city: string, W: number,
 }
 
 // ── 分享卡片生成（家书版）──
-function generateCard(
+async function generateCard(
   char: string,
   pinyin: string,
   meaning: string,
@@ -842,7 +842,8 @@ function generateCard(
   canvasRef: React.RefObject<HTMLCanvasElement | null>,
   city?: string,
   childAge?: string,
-): string {
+): Promise<string> {
+  await document.fonts.ready
   const cardCanvas = document.createElement('canvas')
   const W = 750; const H = 1200
   cardCanvas.width = W; cardCanvas.height = H
@@ -873,7 +874,7 @@ function generateCard(
   ctx.shadowColor = 'rgba(164,99,85,0.12)'
   ctx.shadowBlur = 24
   ctx.font = `900 260px "Noto Serif SC", serif`
-  ctx.fillStyle = '#2d322f'
+  ctx.fillStyle = '#a46355'
   ctx.textAlign = 'center'
   ctx.fillText(char, W / 2, 340)
   ctx.shadowBlur = 0
@@ -891,7 +892,7 @@ function generateCard(
     ctx.globalAlpha = 0.15
     ctx.fillStyle = '#a46355'
     ctx.fillRect(wx, wy, wSize, wSize)
-    ctx.globalAlpha = 0.6
+    ctx.globalAlpha = 0.85
     ctx.drawImage(writingCanvas, wx, wy, wSize, wSize)
     ctx.globalAlpha = 1
     ctx.font = '300 18px sans-serif'
@@ -921,6 +922,7 @@ function generateCard(
     if (current) lines.push(current)
 
     // 最多3行
+    const truncated = lines.length > 3
     const displayLines = lines.slice(0, 3)
     const lineH = 62
     const totalH = displayLines.length * lineH
@@ -937,6 +939,10 @@ function generateCard(
     ctx.fillStyle = '#2d322f'
     displayLines.forEach((line, i) => {
       ctx.fillText(line, W / 2, startY + i * lineH)
+      if (i === 2 && truncated) {
+        const lw = ctx.measureText(line).width
+        ctx.fillText('…', W / 2 + lw / 2 + 8, startY + i * lineH)
+      }
     })
   } else {
     // 没有造句时显示含义
@@ -1059,7 +1065,7 @@ function StepUse({ data, char, childName, canvasRef, onComplete }: {
       speak(comment)
 
       // 生成卡片
-      const url = generateCard(
+      const url = await generateCard(
         char,
         data.pinyin || '',
         data.meaning || '',
@@ -1111,57 +1117,67 @@ function StepUse({ data, char, childName, canvasRef, onComplete }: {
 
   if (cardUrl) {
     return (
-      <div style={{ padding: '0 24px', textAlign: 'center' }}>
-        <div style={{ fontSize: 13, color: 'rgba(45,50,47,0.45)', marginBottom: 12,
-          fontFamily: 'sans-serif' }}>
-          🎉 今日学习完成！
+      <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100%' }}>
+        <div style={{ padding: '0 24px', textAlign: 'center', flex: 1 }}>
+          <div style={{ fontSize: 13, color: 'rgba(45,50,47,0.45)', marginBottom: 12,
+            fontFamily: 'sans-serif' }}>
+            🎉 今日学习完成！
+          </div>
+
+          <img src={cardUrl} alt="学习卡片"
+            style={{ width: '100%', maxWidth: 320, borderRadius: 16,
+              boxShadow: '0 8px 32px rgba(26,18,8,0.15)', marginBottom: 16 }} />
+
+          {aiComment && (
+            <div style={{ padding: '14px 16px', borderRadius: 14,
+              background: 'rgba(164,99,85,0.08)',
+              border: '1px solid rgba(164,99,85,0.2)',
+              fontSize: 14, color: '#5c7a5e', lineHeight: 1.8,
+              fontFamily: 'sans-serif', marginBottom: 16, textAlign: 'left' }}>
+              🌟 {aiComment}
+            </div>
+          )}
         </div>
 
-        {/* 卡片预览 */}
-        <img src={cardUrl} alt="学习卡片"
-          style={{ width: '100%', maxWidth: 320, borderRadius: 16,
-            boxShadow: '0 8px 32px rgba(26,18,8,0.15)', marginBottom: 16 }} />
-
-        {/* AI 评价 */}
-        {aiComment && (
-          <div style={{ padding: '14px 16px', borderRadius: 14,
-            background: 'rgba(164,99,85,0.08)',
-            border: '1px solid rgba(164,99,85,0.2)',
-            fontSize: 14, color: '#5c7a5e', lineHeight: 1.8,
-            fontFamily: 'sans-serif', marginBottom: 16, textAlign: 'left' }}>
-            🌟 {aiComment}
-          </div>
-        )}
-
-        {/* 操作按钮 */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <motion.button whileTap={{ scale: 0.96 }} onClick={shareCard}
-            style={{ width: '100%', padding: '14px', borderRadius: 14,
-              border: 'none', background: '#a46355', color: '#fff',
-              fontSize: 15, fontWeight: 700, cursor: 'pointer',
-              fontFamily: "'Noto Serif SC', serif",
-              boxShadow: '0 4px 16px rgba(164,99,85,0.3)',
-              display: 'flex', alignItems: 'center',
-              justifyContent: 'center', gap: 8 }}>
-            <span>📤</span> 分享给家人
-          </motion.button>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <motion.button whileTap={{ scale: 0.96 }} onClick={downloadCard}
-              style={{ flex: 1, padding: '12px', borderRadius: 12,
-                border: `1px solid rgba(164,99,85,0.4)`,
-                background: 'transparent', fontSize: 13,
-                color: '#5a5a4a', cursor: 'pointer',
-                fontFamily: 'sans-serif' }}>
-              💾 保存到相册
+        <div style={{
+          position: 'sticky',
+          bottom: 0,
+          background: 'rgba(251,249,246,0.95)',
+          backdropFilter: 'blur(10px)',
+          WebkitBackdropFilter: 'blur(10px)',
+          padding: '12px 16px',
+          paddingBottom: 'max(env(safe-area-inset-bottom), 16px)',
+          borderTop: '1px solid rgba(45,50,47,0.06)',
+        }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxWidth: 360, margin: '0 auto' }}>
+            <motion.button whileTap={{ scale: 0.96 }} onClick={shareCard}
+              style={{ width: '100%', padding: '14px', borderRadius: 14,
+                border: 'none', background: '#a46355', color: '#fff',
+                fontSize: 15, fontWeight: 700, cursor: 'pointer',
+                fontFamily: "'Noto Serif SC', serif",
+                boxShadow: '0 4px 16px rgba(164,99,85,0.3)',
+                display: 'flex', alignItems: 'center',
+                justifyContent: 'center', gap: 8 }}>
+              <span>📤</span> 分享给家人
             </motion.button>
-            <motion.button whileTap={{ scale: 0.96 }}
-              onClick={() => onComplete(sentence)}
-              style={{ flex: 1, padding: '12px', borderRadius: 12,
-                border: `1px solid ${'#8a7355'}`, background: 'transparent',
-                fontSize: 13, color: '#8a7355', fontWeight: 600,
-                cursor: 'pointer', fontFamily: 'sans-serif' }}>
-              完成学习
-            </motion.button>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <motion.button whileTap={{ scale: 0.96 }} onClick={downloadCard}
+                style={{ flex: 1, padding: '12px', borderRadius: 12,
+                  border: `1px solid rgba(164,99,85,0.4)`,
+                  background: 'transparent', fontSize: 13,
+                  color: '#5a5a4a', cursor: 'pointer',
+                  fontFamily: 'sans-serif' }}>
+                💾 保存到相册
+              </motion.button>
+              <motion.button whileTap={{ scale: 0.96 }}
+                onClick={() => onComplete(sentence)}
+                style={{ flex: 1, padding: '12px', borderRadius: 12,
+                  border: `1px solid ${'#8a7355'}`, background: 'transparent',
+                  fontSize: 13, color: '#8a7355', fontWeight: 600,
+                  cursor: 'pointer', fontFamily: 'sans-serif' }}>
+                完成学习
+              </motion.button>
+            </div>
           </div>
         </div>
       </div>

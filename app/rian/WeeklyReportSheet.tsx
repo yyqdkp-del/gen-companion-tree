@@ -9,6 +9,7 @@ import { FLOAT_SHEET_BOTTOM } from '@/app/_shared/_constants/layout'
 import { fetchWithAuth } from '@/lib/auth/fetchWithAuth'
 import { logOrAlertNetworkError } from '@/lib/errors/logOrAlertNetworkError'
 import { track } from '@/lib/analytics/track'
+import { toast } from '@/app/components/Toast'
 
 type ReportContent = {
   letter?: string
@@ -83,7 +84,24 @@ export default function WeeklyReportSheet({ childId, childName, onClose }: Props
       })
       setTimeout(() => setCopied(false), 2000)
     } catch {
-      setError('无法复制链接，请手动长按复制')
+      toast('复制失败，请手动复制链接', 'error')
+      try {
+        const input = document.createElement('input')
+        input.value = shareUrl
+        document.body.appendChild(input)
+        input.select()
+        document.execCommand('copy')
+        document.body.removeChild(input)
+        setCopied(true)
+        void track({
+          event_type: 'weekly_report_shared',
+          page: '/rian',
+          meta: { child_id: childId },
+        })
+        setTimeout(() => setCopied(false), 2000)
+      } catch {
+        // keep report visible; user can long-press URL if shown elsewhere
+      }
     }
   }
 
@@ -103,7 +121,9 @@ export default function WeeklyReportSheet({ childId, childName, onClose }: Props
         background: 'rgba(180,200,210,0.35)',
         backdropFilter: 'blur(6px)',
       }}
-      onClick={onClose}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose()
+      }}
     >
       <motion.div
         initial={{ y: 100, opacity: 0 }}
@@ -119,7 +139,7 @@ export default function WeeklyReportSheet({ childId, childName, onClose }: Props
           backdropFilter: 'blur(40px)',
           borderRadius: '24px 24px 0 0',
           overflow: 'hidden',
-          maxHeight: '82vh',
+          maxHeight: '82dvh',
           display: 'flex',
           flexDirection: 'column',
         }}
@@ -175,8 +195,12 @@ export default function WeeklyReportSheet({ childId, childName, onClose }: Props
         </div>
 
         <div style={{
-          overflowY: 'auto', flex: 1, padding: '14px 16px 16px',
-          paddingBottom: 'max(16px, max(env(safe-area-inset-bottom), 20px))',
+          flex: 1,
+          overflowY: 'auto',
+          minHeight: 0,
+          padding: '14px 16px 0',
+          display: 'flex',
+          flexDirection: 'column',
           wordBreak: 'break-word',
           overflowWrap: 'break-word',
           whiteSpace: 'pre-wrap',
@@ -288,73 +312,84 @@ export default function WeeklyReportSheet({ childId, childName, onClose }: Props
               )}
 
               {shareUrl && (
-                isProUser ? (
-                  <div style={{ marginTop: 8 }}>
-                    <button
-                      type="button"
-                      onClick={handleCopy}
-                      style={{
-                        width: '100%',
-                        padding: '14px',
-                        borderRadius: 18,
-                        border: 'none',
-                        background: '#a46355',
-                        color: '#fff',
-                        fontSize: 15,
-                        fontWeight: 600,
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: 8,
-                        marginBottom: 10,
-                      }}
-                    >
-                      {copied ? <Check size={18} /> : <Copy size={18} />}
-                      {copied ? '链接已复制' : '复制微信分享链接'}
-                    </button>
-                    <p
-                      style={{
-                        fontSize: 11,
-                        color: THEME.muted,
-                        textAlign: 'center',
-                        lineHeight: 1.6,
-                        margin: 0,
-                      }}
-                    >
-                      复制后粘贴到微信发给爷爷奶奶，链接 7 天内有效
-                    </p>
-                  </div>
-                ) : (
-                  <div style={{
-                    padding: '12px 16px',
-                    background: 'rgba(164,99,85,0.06)',
-                    borderRadius: 14,
-                    border: '1px solid rgba(164,99,85,0.15)',
-                    textAlign: 'center',
-                    marginTop: 8,
-                  }}>
-                    <div style={{ fontSize: 13, color: '#a46355', fontFamily: 'sans-serif', marginBottom: 8 }}>
-                      升级 Pro 解锁分享功能
+                <div style={{
+                  position: 'sticky',
+                  bottom: 0,
+                  background: 'rgba(251,249,246,0.95)',
+                  backdropFilter: 'blur(10px)',
+                  WebkitBackdropFilter: 'blur(10px)',
+                  padding: '12px 16px',
+                  paddingBottom: 'max(env(safe-area-inset-bottom), 16px)',
+                  borderTop: '1px solid rgba(45,50,47,0.06)',
+                  marginTop: 'auto',
+                }}>
+                  {isProUser ? (
+                    <>
+                      <button
+                        type="button"
+                        onClick={handleCopy}
+                        style={{
+                          width: '100%',
+                          padding: '14px',
+                          borderRadius: 18,
+                          border: 'none',
+                          background: '#a46355',
+                          color: '#fff',
+                          fontSize: 15,
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: 8,
+                          marginBottom: 10,
+                        }}
+                      >
+                        {copied ? <Check size={18} /> : <Copy size={18} />}
+                        {copied ? '链接已复制' : '复制微信分享链接'}
+                      </button>
+                      <p
+                        style={{
+                          fontSize: 11,
+                          color: THEME.muted,
+                          textAlign: 'center',
+                          lineHeight: 1.6,
+                          margin: 0,
+                        }}
+                      >
+                        复制后粘贴到微信发给爷爷奶奶，链接 7 天内有效
+                      </p>
+                    </>
+                  ) : (
+                    <div style={{
+                      padding: '12px 16px',
+                      background: 'rgba(164,99,85,0.06)',
+                      borderRadius: 14,
+                      border: '1px solid rgba(164,99,85,0.15)',
+                      textAlign: 'center',
+                    }}>
+                      <div style={{ fontSize: 13, color: '#a46355', fontFamily: 'sans-serif', marginBottom: 8 }}>
+                        升级 Pro 解锁分享功能
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => router.push('/upgrade')}
+                        style={{
+                          padding: '8px 20px',
+                          background: '#a46355',
+                          color: '#fff',
+                          border: 'none',
+                          borderRadius: 12,
+                          fontSize: 13,
+                          cursor: 'pointer',
+                          fontFamily: "'Noto Serif SC', serif",
+                        }}
+                      >
+                        免费试用30天 →
+                      </button>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => router.push('/upgrade')}
-                      style={{
-                        padding: '8px 20px',
-                        background: '#a46355',
-                        color: '#fff',
-                        border: 'none',
-                        borderRadius: 12,
-                        fontSize: 13,
-                        cursor: 'pointer',
-                        fontFamily: "'Noto Serif SC', serif",
-                      }}
-                    >
-                      免费试用30天 →
-                    </button>
-                  </div>
-                )
+                  )}
+                </div>
               )}
             </>
           )}
