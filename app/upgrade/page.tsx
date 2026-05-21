@@ -83,7 +83,7 @@ export default function UpgradePage() {
               {plan.name}
             </div>
             <div style={{ fontSize: 13, color: 'rgba(45,50,47,0.5)', fontFamily: 'sans-serif', marginTop: 4 }}>
-              按月订阅，随时取消
+              30天免费试用，到期自动续费，随时取消
             </div>
           </div>
           <div style={{ textAlign: 'right' }}>
@@ -193,7 +193,7 @@ export default function UpgradePage() {
             transition: 'all 0.2s ease',
           }}
         >
-          {loading ? '跳转中...' : `立即升级 $${plan.price}/月`}
+          {loading ? '跳转中...' : `免费试用30天 → 之后 $${plan.price}/月`}
         </button>
       </div>
 

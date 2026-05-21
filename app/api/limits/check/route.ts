@@ -19,13 +19,23 @@ export async function GET(req: NextRequest) {
   const today = new Date().toISOString().split('T')[0]
   const supabase = getServiceSupabase()
 
-  const { data: sub } = await supabase
-    .from('subscriptions')
-    .select('status, plan')
-    .eq('user_id', user.id)
-    .maybeSingle()
+  const [{ data: sub }, { data: profile }] = await Promise.all([
+    supabase
+      .from('subscriptions')
+      .select('status, plan')
+      .eq('user_id', user.id)
+      .maybeSingle(),
+    supabase
+      .from('family_profile')
+      .select('is_pro')
+      .eq('user_id', user.id)
+      .maybeSingle(),
+  ])
 
-  const isPro = sub?.status === 'active' && sub?.plan === 'pro'
+  const isPro =
+    (sub?.plan === 'pro' &&
+      (sub?.status === 'active' || sub?.status === 'trialing')) ||
+    profile?.is_pro === true
 
   if (isPro) {
     return NextResponse.json({ allowed: true, is_pro: true, remaining: 999 })
