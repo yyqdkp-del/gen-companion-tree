@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
 import { X, Copy, Check, Loader } from 'lucide-react'
 import { THEME } from '@/app/_shared/_constants/theme'
@@ -23,16 +24,25 @@ type Props = {
 }
 
 export default function WeeklyReportSheet({ childId, childName, onClose }: Props) {
+  const router = useRouter()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [content, setContent] = useState<ReportContent | null>(null)
   const [shareUrl, setShareUrl] = useState('')
   const [copied, setCopied] = useState(false)
+  const [isProUser, setIsProUser] = useState(false)
 
   const generate = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
+      const limitRes = await fetchWithAuth('/api/stripe/status')
+      const limitData = await limitRes.json().catch(() => ({}))
+      if (limitData.is_pro) {
+        setIsProUser(true)
+      } else {
+        setIsProUser(false)
+      }
       const res = await fetchWithAuth('/api/growth/weekly-report', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -278,42 +288,73 @@ export default function WeeklyReportSheet({ childId, childName, onClose }: Props
               )}
 
               {shareUrl && (
-                <div style={{ marginTop: 8 }}>
-                  <button
-                    type="button"
-                    onClick={handleCopy}
-                    style={{
-                      width: '100%',
-                      padding: '14px',
-                      borderRadius: 18,
-                      border: 'none',
-                      background: '#a46355',
-                      color: '#fff',
-                      fontSize: 15,
-                      fontWeight: 600,
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: 8,
-                      marginBottom: 10,
-                    }}
-                  >
-                    {copied ? <Check size={18} /> : <Copy size={18} />}
-                    {copied ? '链接已复制' : '复制微信分享链接'}
-                  </button>
-                  <p
-                    style={{
-                      fontSize: 11,
-                      color: THEME.muted,
-                      textAlign: 'center',
-                      lineHeight: 1.6,
-                      margin: 0,
-                    }}
-                  >
-                    复制后粘贴到微信发给爷爷奶奶，链接 7 天内有效
-                  </p>
-                </div>
+                isProUser ? (
+                  <div style={{ marginTop: 8 }}>
+                    <button
+                      type="button"
+                      onClick={handleCopy}
+                      style={{
+                        width: '100%',
+                        padding: '14px',
+                        borderRadius: 18,
+                        border: 'none',
+                        background: '#a46355',
+                        color: '#fff',
+                        fontSize: 15,
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: 8,
+                        marginBottom: 10,
+                      }}
+                    >
+                      {copied ? <Check size={18} /> : <Copy size={18} />}
+                      {copied ? '链接已复制' : '复制微信分享链接'}
+                    </button>
+                    <p
+                      style={{
+                        fontSize: 11,
+                        color: THEME.muted,
+                        textAlign: 'center',
+                        lineHeight: 1.6,
+                        margin: 0,
+                      }}
+                    >
+                      复制后粘贴到微信发给爷爷奶奶，链接 7 天内有效
+                    </p>
+                  </div>
+                ) : (
+                  <div style={{
+                    padding: '12px 16px',
+                    background: 'rgba(164,99,85,0.06)',
+                    borderRadius: 14,
+                    border: '1px solid rgba(164,99,85,0.15)',
+                    textAlign: 'center',
+                    marginTop: 8,
+                  }}>
+                    <div style={{ fontSize: 13, color: '#a46355', fontFamily: 'sans-serif', marginBottom: 8 }}>
+                      升级 Pro 解锁分享功能
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => router.push('/upgrade')}
+                      style={{
+                        padding: '8px 20px',
+                        background: '#a46355',
+                        color: '#fff',
+                        border: 'none',
+                        borderRadius: 12,
+                        fontSize: 13,
+                        cursor: 'pointer',
+                        fontFamily: "'Noto Serif SC', serif",
+                      }}
+                    >
+                      免费试用30天 →
+                    </button>
+                  </div>
+                )
               )}
             </>
           )}

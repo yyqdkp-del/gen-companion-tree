@@ -7,6 +7,7 @@ import {
   ArrowLeft, ArrowRight, Check, Loader, ChevronRight,
   Sparkles, ChevronDown, ChevronUp, Plus, Target,
 } from 'lucide-react'
+import { toast } from '@/app/components/Toast'
 
 const supabase = createClient()
 
@@ -685,16 +686,22 @@ function SpikeSection({ report, childId, vision }: any) {
 // ── 档案记录 ──
 function RecordsSection({ childId, router }: any) {
   const modules = [
-    { icon: '🏆', label: '荣誉奖项', desc: '比赛 · 考级 · 竞赛 · 申请权重', color: T.gold, path: '/growth/academic/achievements' },
-    { icon: '📊', label: '学术记录', desc: '成绩轨迹 · 考试 · 语言成绩', color: '#a46355', path: '/growth/academic/records' },
-    { icon: '🎯', label: '课外活动', desc: '兴趣班 · 参与年限 · Spike积累', color: '#A78BFA', path: childId ? `/children/${childId}/activities` : '/children' },
-    { icon: '📝', label: '文书素材库', desc: '故事碎片 · 申请角度 · 文书准备', color: '#b88e5e', path: '/growth/academic/essays' },
+    { icon: '🏆', label: '荣誉奖项', desc: '比赛 · 考级 · 竞赛 · 申请权重', color: T.gold, path: '/growth/academic/achievements', comingSoon: true },
+    { icon: '📊', label: '学术记录', desc: '成绩轨迹 · 考试 · 语言成绩', color: '#a46355', path: '/growth/academic/records', comingSoon: true },
+    { icon: '🎯', label: '课外活动', desc: '兴趣班 · 参与年限 · Spike积累', color: '#A78BFA', path: childId ? `/children/${childId}/activities` : '/children', comingSoon: false },
+    { icon: '📝', label: '文书素材库', desc: '故事碎片 · 申请角度 · 文书准备', color: '#b88e5e', path: '/growth/academic/essays', comingSoon: true },
   ]
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
       {modules.map((m, i) => (
         <motion.div key={m.label} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.07 }}
-          whileTap={{ scale: 0.98 }} onClick={() => router.push(m.path)}
+          whileTap={{ scale: 0.98 }} onClick={() => {
+            if (m.comingSoon) {
+              toast('功能即将推出', 'info')
+              return
+            }
+            router.push(m.path)
+          }}
           style={{ background: T.bgCard, borderRadius: 16, padding: '16px', border: `1px solid ${T.border}`, display: 'flex', alignItems: 'center', gap: 14, cursor: 'pointer' }}>
           <div style={{ width: 44, height: 44, borderRadius: 12, background: `${m.color}15`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, flexShrink: 0 }}>{m.icon}</div>
           <div style={{ flex: 1 }}>

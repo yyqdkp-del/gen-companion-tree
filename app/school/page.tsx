@@ -138,6 +138,39 @@ export default function SchoolPage() {
           ))}
         </div>
 
+        <div
+          role="button"
+          tabIndex={0}
+          onClick={() => {
+            const event = new CustomEvent('openCamera', { detail: { source: 'school' } })
+            window.dispatchEvent(event)
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault()
+              const event = new CustomEvent('openCamera', { detail: { source: 'school' } })
+              window.dispatchEvent(event)
+            }
+          }}
+          style={{
+            background: '#a46355',
+            borderRadius: 16,
+            padding: '16px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 10,
+            cursor: 'pointer',
+            marginTop: 8,
+            boxShadow: '0 4px 16px rgba(164,99,85,0.3)',
+          }}
+        >
+          <span style={{ fontSize: 24 }}>📷</span>
+          <span style={{ fontSize: 15, color: '#fff', fontFamily: "'Noto Serif SC', serif" }}>
+            拍照上传学校通知
+          </span>
+        </div>
+
         {history.length > 0 && (
           <div style={{ marginTop: 24 }}>
             <div style={{

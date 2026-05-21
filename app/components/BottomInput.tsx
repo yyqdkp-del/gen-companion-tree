@@ -1,5 +1,5 @@
 'use client'
-import React, { useState, useRef, useCallback } from 'react'
+import React, { useState, useRef, useCallback, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Mic, Camera, Send, Square, Loader, Upload } from 'lucide-react'
 import { usePathname } from 'next/navigation'
@@ -29,6 +29,14 @@ export default function BottomInput() {
   const cameraInputRef = useRef<HTMLInputElement>(null)
 
   const isTreehouse = pathname === '/treehouse'
+
+  useEffect(() => {
+    const handleOpenCamera = () => {
+      setInputMode('vision_file')
+    }
+    window.addEventListener('openCamera', handleOpenCamera)
+    return () => window.removeEventListener('openCamera', handleOpenCamera)
+  }, [])
 
   const uid = useCallback(() =>
     userId || (typeof window !== 'undefined' ? localStorage.getItem('app_user_id') : '') || ''
