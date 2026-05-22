@@ -56,12 +56,21 @@ function matchGeofenceByCity(city: string, countryCode?: string): Geofence {
   )
   if (exact) return exact
 
-  // 模糊匹配
+  // 模糊匹配（城市名互为子串）
   const fuzzy = GEOFENCES.find(f =>
     f.city.toLowerCase().includes(cityLower) ||
     cityLower.includes(f.city.toLowerCase())
   )
   if (fuzzy) return fuzzy
+
+  // 关键词匹配（如档案填「多伦多」→ Toronto 围栏）
+  const byKeyword = GEOFENCES.find(f =>
+    f.local_sources.news_keywords.some(kw => {
+      const kl = kw.toLowerCase()
+      return kl === cityLower || kl.includes(cityLower) || cityLower.includes(kl)
+    }),
+  )
+  if (byKeyword) return byKeyword
 
   // 同国家首都
   if (countryCode) {
