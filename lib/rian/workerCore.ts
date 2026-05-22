@@ -9,58 +9,54 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY || '',
 )
 
-// ══ 工具定义 ══
+// ══ 工具定义（精简，降低 Claude 输入体积）══
 const TOOLS = [
   {
     name: 'add_todo',
-    description: '添加需要妈妈主动行动的待办事项。只有真正需要妈妈做某件事（缴费/预约/申请/购买/签字）才调用。纯日历事件、纯信息记录不要调用这个。',
+    description: '妈妈须主动办的事：缴费/预约/购买/签字。纯校历勿用。',
     input_schema: {
       type: 'object',
       properties: {
-        title: { type: 'string', description: '待办标题，简洁清楚' },
+        title: { type: 'string' },
         dimension: { type: 'string', enum: ['compliance', 'estate', 'logistics', 'education', 'social', 'wealth', 'medical', 'mobility', 'selfcare'] },
-        who: { type: 'string', description: '涉及的家庭成员' },
-        due_date: { type: 'string', description: 'ISO格式截止日期' },
-        repeat: {
-          type: 'string',
-          enum: ['daily', 'weekly', 'monthly', 'weekdays'],
-          description: '周期性重复：每天/每周/每月/工作日；一次性待办不要填',
-        },
-        priority: { type: 'number', enum: [1, 2, 3], description: '1=普通(30天以上) 2=重要(8-30天) 3=紧急(7天内)' },
+        who: { type: 'string' },
+        due_date: { type: 'string' },
+        repeat: { type: 'string', enum: ['daily', 'weekly', 'monthly', 'weekdays'] },
+        priority: { type: 'number', enum: [1, 2, 3], description: '1远 2中 3急' },
         notes: { type: 'string' },
-        claude_advice: { type: 'string', description: '日安的完整行动建议，具体可执行，站在妈妈角度' },
+        claude_advice: { type: 'string' },
         action_items: { type: 'array', items: { type: 'string' } },
         carry_items: { type: 'array', items: { type: 'string' } },
         warnings: { type: 'array', items: { type: 'string' } },
-        search_keywords: { type: 'array', items: { type: 'string' }, description: '办理时需要实时搜索的关键词，3-5个精准词' },
-        ai_draft: { type: 'string', description: '如需发邮件/消息，预先生成的草稿' },
+        search_keywords: { type: 'array', items: { type: 'string' } },
+        ai_draft: { type: 'string' },
       },
-      required: ['title', 'priority', 'dimension']
-    }
+      required: ['title', 'priority', 'dimension'],
+    },
   },
   {
     name: 'add_schedule',
-    description: '添加孩子的校历事件。适用于：运动会、家长会、考试、假期、校外活动、兴趣班。存入校历；出游(trip)/活动(activity)类事件会同时生成一条提醒待办。只有明确需要缴费才另外生成缴费待办。',
+    description: '孩子校历。trip/activity 自动待办；有缴费填 requires_payment。',
     input_schema: {
       type: 'object',
       properties: {
         title: { type: 'string' },
         child_name: { type: 'string' },
-        date_start: { type: 'string', description: 'ISO格式日期 如2026-05-01' },
+        date_start: { type: 'string', description: 'YYYY-MM-DD' },
         date_end: { type: 'string' },
         event_type: { type: 'string', enum: ['activity', 'exam', 'holiday', 'meeting', 'class', 'trip', 'other'] },
         location: { type: 'string' },
         description: { type: 'string' },
-        requires_action: { type: 'string', description: '妈妈需要做什么，没有填null' },
+        requires_action: { type: 'string' },
         requires_items: { type: 'array', items: { type: 'string' } },
-        requires_payment: { type: 'number', description: '缴费金额，没有填null' },
+        requires_payment: { type: 'number' },
       },
-      required: ['title', 'date_start', 'event_type']
-    }
+      required: ['title', 'date_start', 'event_type'],
+    },
   },
   {
     name: 'add_health',
-    description: '记录孩子健康/医疗信息。病历图片必须调用。',
+    description: '病历/健康记录；图片必调。',
     input_schema: {
       type: 'object',
       properties: {
@@ -70,17 +66,17 @@ const TOOLS = [
         description: { type: 'string' },
         doctor_name: { type: 'string' },
         hospital: { type: 'string' },
-        follow_up_date: { type: 'string', description: '复诊日期，有则填' },
+        follow_up_date: { type: 'string' },
         notes: { type: 'string' },
         current_status: { type: 'string', enum: ['normal', 'sick', 'recovering'] },
         medication_taken: { type: 'boolean' },
       },
-      required: ['type', 'description']
-    }
+      required: ['type', 'description'],
+    },
   },
   {
     name: 'add_document',
-    description: '记录家庭重要证件/文件到期信息。护照、签证、保险、驾照等。',
+    description: '证件/签证/保险到期。',
     input_schema: {
       type: 'object',
       properties: {
@@ -90,12 +86,12 @@ const TOOLS = [
         expiry_date: { type: 'string' },
         notes: { type: 'string' },
       },
-      required: ['doc_type', 'title']
-    }
+      required: ['doc_type', 'title'],
+    },
   },
   {
     name: 'add_shopping',
-    description: '添加需要购买或准备的物品。',
+    description: '要买或要准备的物品。',
     input_schema: {
       type: 'object',
       properties: {
@@ -110,35 +106,35 @@ const TOOLS = [
               event_date: { type: 'string' },
               for_child: { type: 'string' },
             },
-            required: ['name', 'need_buy']
-          }
+            required: ['name', 'need_buy'],
+          },
         },
       },
-      required: ['items']
-    }
+      required: ['items'],
+    },
   },
   {
     name: 'add_reminder',
-    description: '设置提醒。定时提醒、每日提醒（用药）、重要日期前提醒。',
+    description: '定时/重复提醒。',
     input_schema: {
       type: 'object',
       properties: {
         title: { type: 'string' },
-        trigger_date: { type: 'string' },
+        trigger_date: { type: 'string', description: 'YYYY-MM-DD' },
         trigger_time: { type: 'string' },
         repeat: { type: 'string', enum: ['none', 'daily', 'weekly', 'monthly'] },
         message: { type: 'string' },
       },
-      required: ['title', 'trigger_date']
-    }
+      required: ['title', 'trigger_date'],
+    },
   },
   {
     name: 'update_child_status',
-    description: '更新孩子今日状态。提到孩子心情、健康、睡眠时调用。',
+    description: '孩子今日健康/心情/睡眠。',
     input_schema: {
       type: 'object',
       properties: {
-        child_name: { type: 'string' },
+        child_name: { type: 'string', description: '必填' },
         health_status: { type: 'string', enum: ['normal', 'sick', 'recovering'] },
         health_notes: { type: 'string' },
         mood_status: { type: 'string', enum: ['happy', 'calm', 'anxious', 'upset'] },
@@ -148,12 +144,12 @@ const TOOLS = [
         medication_taken: { type: 'boolean' },
         notable: { type: 'string' },
       },
-      required: ['child_name']
-    }
+      required: ['child_name'],
+    },
   },
   {
     name: 'learn_pattern',
-    description: '记录家庭习惯和行为规律。发现重复模式、兴趣偏好时调用。',
+    description: '家庭习惯/兴趣规律。',
     input_schema: {
       type: 'object',
       properties: {
@@ -167,13 +163,13 @@ const TOOLS = [
             properties: {
               topic: { type: 'string' },
               weight_delta: { type: 'number' },
-              signal_type: { type: 'string', enum: ['mention', 'question', 'action'] }
-            }
-          }
+              signal_type: { type: 'string', enum: ['mention', 'question', 'action'] },
+            },
+          },
         },
       },
-      required: ['pattern_type', 'description']
-    }
+      required: ['pattern_type', 'description'],
+    },
   },
 ]
 
@@ -231,26 +227,35 @@ async function grokSearch(query: string): Promise<string> {
   }
 }
 
-// ══ 家庭档案 ══
-async function getFamilyContext(userId: string): Promise<string> {
-  try {
-    const [children, recentTodos, recentLogs, habits, interests, places] = await Promise.all([
-      supabase.from('children').select('*').eq('user_id', userId),
-      supabase.from('todo_items').select('title,category,priority,status,due_date').eq('user_id', userId).neq('status', 'done').order('created_at', { ascending: false }).limit(10),
-      supabase.from('child_daily_log').select('*').eq('user_id', userId).order('date', { ascending: false }).limit(3),
-      supabase.from('family_habits').select('*').eq('user_id', userId).limit(10),
-      supabase.from('interest_weights').select('topic, weight').eq('user_id', userId).order('weight', { ascending: false }).limit(10),
-      supabase.from('family_places').select('name, city').eq('user_id', userId).limit(10),
-    ])
-    return JSON.stringify({
-      children: children.data || [],
-      currentTodos: recentTodos.data || [],
-      recentChildLogs: recentLogs.data || [],
-      habits: habits.data || [],
-      interests: interests.data || [],
-      places: places.data || [],
-    })
-  } catch (e) { return '{}' }
+type JobContext = {
+  profile: { visa_type?: string; member_nationality?: string; resident_city?: string } | null
+  children: { id: string; name: string; grade?: string; school_name?: string }[]
+  todos: { title: string; due_date?: string; priority?: string }[]
+}
+
+async function loadJobContext(userId: string): Promise<JobContext> {
+  const [profileRes, childrenRes, todosRes] = await Promise.all([
+    supabase.from('family_profile').select('visa_type,member_nationality,resident_city').eq('user_id', userId).maybeSingle(),
+    supabase.from('children').select('id,name,grade,school_name').eq('user_id', userId).limit(3),
+    supabase.from('todo_items').select('title,due_date,priority').eq('user_id', userId).eq('status', 'pending').limit(5),
+  ])
+  return {
+    profile: profileRes.data,
+    children: childrenRes.data || [],
+    todos: todosRes.data || [],
+  }
+}
+
+/** system 用短上下文，控制在约 80 字内 */
+function compactFamilySnippet(ctx: JobContext, today: string): string {
+  const kids = ctx.children.map((c) => c.name).filter(Boolean).join('/') || '无'
+  const visa = ctx.profile?.visa_type || ''
+  return `孩:${kids}|待:${ctx.todos.length}|签:${visa}|今:${today}`
+}
+
+function buildWorkerSystemPrompt(ctx: JobContext, today: string): string {
+  const snippet = compactFamilySnippet(ctx, today)
+  return `日安管家。${snippet}。校历add_schedule(trip/activity自动待办)；须妈妈办add_todo；病历add_health；购物add_shopping；状态update_child_status。多工具可并行。`
 }
 
 // ══ Grok 触发判断 ══
@@ -649,88 +654,49 @@ async function recordSchoolParsingHistory(userId: string, jobId: string, inputTy
 // ══ 处理单个 job ══
 export async function processJob(job: any) {
   const { id: jobId, user_id: userId, input_type, raw_content, file_url } = job
-  let today: string
-  try {
-    const loc = await getUserLocation(userId)
-    today = getTodayStrInTimeZone(loc.timezone)
-  } catch {
-    today = getTodayStr()
-  }
 
   try {
-    // 标记处理中
-    await supabase.from('raw_inputs').update({ status: 'processing' }).eq('id', jobId)
+    const [, loc, jobCtx] = await Promise.all([
+      supabase.from('raw_inputs').update({ status: 'processing' }).eq('id', jobId),
+      getUserLocation(userId).catch(() => null),
+      loadJobContext(userId),
+    ])
+    const today = loc ? getTodayStrInTimeZone(loc.timezone) : getTodayStr()
+    const childrenData = jobCtx.children
 
-    // 音频转文字
     let processedContent = raw_content
     if (input_type === 'audio' && file_url) {
       const transcribed = await transcribeAudio(file_url)
       if (transcribed) {
         processedContent = transcribed
-        await supabase.from('raw_inputs').update({ raw_content: transcribed }).eq('id', jobId)
+        void supabase.from('raw_inputs').update({ raw_content: transcribed }).eq('id', jobId)
       }
     }
 
-    // 并行：家庭档案 + Grok搜索
-    const grokQuery = buildGrokQuery(processedContent || '')
-    const [familyContext, grokInfo] = await Promise.all([
-      getFamilyContext(userId),
-      grokQuery ? grokSearch(grokQuery) : Promise.resolve(''),
-    ])
-
-    const { data: childrenData } = await supabase.from('children').select('id, name').eq('user_id', userId)
-
-    // 构建消息
     const messages: any[] = []
     if (input_type === 'image' && file_url) {
       messages.push({
-        role: 'user', content: [
+        role: 'user',
+        content: [
           { type: 'image', source: { type: 'url', url: file_url } },
-          { type: 'text', text: processedContent || '请分析这张图片，提取所有需要跟进的事件、日程、健康信息等' }
-        ]
+          { type: 'text', text: processedContent || '提取事件/日程/健康，逐条调工具' },
+        ],
       })
     } else {
       messages.push({ role: 'user', content: processedContent })
     }
 
-    // Claude 全智能分析
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'x-api-key': process.env.ANTHROPIC_API_KEY || '',
-        'anthropic-version': '2023-06-01'
+        'anthropic-version': '2023-06-01',
       },
       body: JSON.stringify({
         model: 'claude-sonnet-4-6',
-        max_tokens: 8000,
-        system: `你是日安，清迈陪读家庭的全能AI管家。你了解这个家庭，站在妈妈的角度思考和行动。
-
-## 家庭档案
-${familyContext}
-
-## 实时外部信息
-${grokInfo || '暂无'}
-
-## 你的工作方式
-分析用户输入，调用合适的工具记录信息。可以同时调用多个工具。
-
-## 关键原则
-- 校历事件用 add_schedule，不要用 add_todo。出游/活动类 add_schedule 会自动生成提醒待办；需要缴费才另外调用 add_todo
-- 病历用 add_health，复诊日期自动生成提醒
-- 需要购买的物品用 add_shopping
-- 只有妈妈真正需要做某件事才用 add_todo
-- 图片中每个事件单独调用工具，不合并
-- add_schedule 必须填写 requires_items：根据活动类型智能推断携带物品（体育课→运动鞋、水壶；游泳→泳衣、泳帽、毛巾；美术→围裙；野餐→餐盒、饮料；考试→文具、准考证；校外活动→午餐盒、防晒、雨具）
-- claude_advice 要站在妈妈角度，具体实用，像闺蜜建议一样
-
-## 图片处理
-- 校历：每一行一个 add_schedule，识别所有日期和事件
-- 病历：add_health 记录诊断 + update_child_status 更新状态
-- 账单：add_todo 设置缴费待办
-- 通知：判断是否需要回复或行动
-
-今天日期：${today}`,
+        max_tokens: 800,
+        system: buildWorkerSystemPrompt(jobCtx, today),
         messages,
         tools: TOOLS,
         tool_choice: { type: 'auto' },
@@ -748,19 +714,16 @@ ${grokInfo || '暂无'}
     }
     const toolUses = data.content?.filter((c: any) => c.type === 'tool_use') || []
 
-    // 执行所有工具
-    const todoIds: string[] = []
-    for (const toolUse of toolUses) {
-      const todoId = await executeTool(toolUse.name, toolUse.input, userId, jobId, childrenData || [], today)
-      if (todoId) todoIds.push(todoId)
-    }
+    const todoIdResults = await Promise.all(
+      toolUses.map((toolUse: { name: string; input: any }) =>
+        executeTool(toolUse.name, toolUse.input, userId, jobId, childrenData, today),
+      ),
+    )
+    const todoIds = todoIdResults.filter((id): id is string => Boolean(id))
 
-    await recordSchoolParsingHistory(userId, jobId, input_type, processedContent || '', toolUses, todoIds.length)
+    void recordSchoolParsingHistory(userId, jobId, input_type, processedContent || '', toolUses, todoIds.length)
+    void preheatGrok(todoIds, toolUses).catch((e) => console.error('预热失败:', e))
 
-    // 异步预热 Grok（后台跑，不阻塞完成标记）
-    preheatGrok(todoIds, toolUses).catch(e => console.error('预热失败:', e))
-
-    // 标记完成
     await supabase.from('raw_inputs').update({
       processed: true,
       status: 'done',
