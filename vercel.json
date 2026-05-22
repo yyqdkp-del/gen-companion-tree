@@ -2,15 +2,7 @@
   "crons": [
     {
       "path": "/api/cron/scheduler",
-      "schedule": "28 23 * * *"
-    },
-    {
-      "path": "/api/cron/scheduler",
-      "schedule": "28 7 * * *"
-    },
-    {
-      "path": "/api/cron/scheduler",
-      "schedule": "28 13 * * *"
+      "schedule": "0 * * * *"
     },
     {
       "path": "/api/cron/visa-reminder",
