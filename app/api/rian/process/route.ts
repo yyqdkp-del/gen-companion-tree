@@ -1,7 +1,9 @@
 export const dynamic = 'force-dynamic'
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { waitUntil } from '@vercel/functions'
 import { getAuthUser } from '@/lib/auth/getAuthUser'
+import { runProcessJobById } from '@/lib/rian/workerCore'
 
 export async function POST(req: NextRequest) {
   try {
@@ -33,18 +35,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: false, error: '存入失败' }, { status: 500 })
     }
 
-    // 写入 raw_inputs 成功后，立即触发 worker（不等结果，避免仅依赖 cron）
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL
-    if (appUrl) {
-      fetch(`${appUrl}/api/rian/worker`, {
-        method: 'GET',
-        headers: {
-          'x-cron-secret': process.env.CRON_SECRET || '',
-        },
-      }).catch((e) => console.warn('silent catch:', e))
-    }
+    // 写入后立即在后台跑 worker 逻辑（同进程，不依赖 HTTP / 冷启动）
+    waitUntil(
+      runProcessJobById(job.id).catch((e) => {
+        console.error('runProcessJobById failed:', job.id, e?.message || e)
+      }),
+    )
 
-    // 立刻返回，不等待处理
+    // 立刻返回，不阻塞 Claude 等长任务
     return NextResponse.json({
       ok: true,
       job_id: job.id,
