@@ -168,6 +168,13 @@ export async function enrichChildren(
         is_active: row.is_active !== false,
       }))
       const activities = [...profileActivities, ...tableActivities]
+      const todayActivities = activities.filter((a: any) => {
+        if (a.is_active === false) return false
+        if (Array.isArray(a.days) && a.days.includes(todayKey)) return true
+        if (typeof a.day_of_week === 'number' && a.day_of_week === todayDow) return true
+        if (typeof a.day === 'number' && a.day === todayDow) return true
+        return false
+      })
 
       // 推导 urgent_items（按 title+日期去重）
       const todayEvts = evts.filter((e: any) => e.date_start === today)
@@ -189,6 +196,17 @@ export async function enrichChildren(
         addUrgent({ title: '生病中，注意休息', level: 'red' }, '')
       }
 
+      if (log?.mood_status === 'upset') {
+        addUrgent({ title: '今天情绪不太好，多关注', level: 'orange' }, '')
+      }
+
+      // 考试当天 → red
+      todayEvts
+        .filter((e: any) => e.event_type === 'exam')
+        .forEach((e: any) => {
+          addUrgent({ title: `考试：${e.title}`, level: 'red' }, e.date_start)
+        })
+
       // 今日需要行动 → orange
       todayEvts.filter((e: any) => e.requires_action).forEach((e: any) => {
         addUrgent({ title: e.title, level: 'orange' }, e.date_start)
@@ -199,8 +217,8 @@ export async function enrichChildren(
         addUrgent({ title: `💰 ${e.title} ฿${e.requires_payment}`, level: 'orange' }, e.date_start)
       })
 
-      // 今日考试或体检 → orange
-      todayEvts.filter((e: any) => ['exam', 'medical'].includes(e.event_type)).forEach((e: any) => {
+      // 今日医疗 → orange
+      todayEvts.filter((e: any) => e.event_type === 'medical').forEach((e: any) => {
         addUrgent({ title: e.title, level: 'orange' }, e.date_start)
       })
 
@@ -209,12 +227,24 @@ export async function enrichChildren(
         addUrgent({ title: e.title, level: 'yellow' }, e.date_start)
       })
 
+      const classEvents = today_classes.map((cls: any) => ({
+        event_type: 'class' as const,
+        title: typeof cls === 'object' ? (cls.subject || cls.title || '课程') : String(cls),
+      }))
+      const activityEvents = todayActivities.map((a: any) => ({
+        event_type: 'extracurricular' as const,
+        title: a.name || a.title || '活动',
+      }))
+      const allTodayEvents = [...todayEvts, ...classEvents, ...activityEvents]
+
       // energy 计算 — 使用精力引擎
-      const isWeekend = [0, 6].includes(new Date().getDay())
+      const isWeekend = [0, 6].includes(new Date(`${today}T12:00:00`).getDay())
       const energyResult = calculateEnergy({
         healthStatus:    log?.health_status,
         moodStatus:      log?.mood_status,
-        todayEvents:     todayEvts,
+        sleepStart:      log?.sleep_start,
+        sleepEnd:        log?.sleep_end,
+        todayEvents:     allTodayEvents,
         usualBedtime:    c.usual_bedtime,
         weekendBedtime:  c.weekend_bedtime,
         schoolStartTime: c.school_start_time,

@@ -10,6 +10,7 @@ const LEVEL_COLOR = {
   yellow: { border: 'rgba(250,204,21,0.45)',  bg: 'rgba(250,204,21,0.07)',  text: '#ca8a04' },
   orange: { border: 'rgba(251,146,60,0.5)',   bg: 'rgba(251,146,60,0.08)',  text: '#ea580c' },
   red:    { border: 'rgba(251,113,133,0.55)', bg: 'rgba(251,113,133,0.09)', text: '#dc2626' },
+  unknown: { border: 'rgba(156,163,175,0.4)', bg: 'rgba(156,163,175,0.08)', text: '#6b7280' },
 }
 
 const LEVEL_DOT = {
@@ -17,6 +18,7 @@ const LEVEL_DOT = {
   yellow: '🟡',
   orange: '🟠',
   red:    '🔴',
+  unknown: '⚪',
 }
 
 type Props = {

@@ -21,16 +21,17 @@ export type EnergyInput = {
   }[]
 }
 
-export type EnergyLevel = 'green' | 'yellow' | 'orange' | 'red'
+export type EnergyLevel = 'green' | 'yellow' | 'orange' | 'red' | 'unknown'
 
 export type EnergyResult = {
-  score: number              // 0-100
+  score: number | null       // 0-100；无数据时为 null
   level: EnergyLevel
-  label: string              // 状态好 | 有点累 | 需要休息 | 今天放轻松
+  label: string              // 状态好 | 有点累 | 需要休息 | 今天放轻松 | 暂无数据
   advice: string             // 给妈妈的具体建议
   bedtime: string            // 建议上床时间
   skipActivities: boolean    // 是否建议取消课外活动
   skipReason?: string        // 取消原因
+  reason?: string            // unknown 时说明
 }
 
 // ── 睡眠时长计算 ──────────────────────────
@@ -155,6 +156,25 @@ function shouldSkip(
 
 // ── 主函数 ────────────────────────────────
 export function calculateEnergy(input: EnergyInput): EnergyResult {
+  const hasAnyData =
+    Boolean(input.healthStatus) ||
+    Boolean(input.moodStatus) ||
+    Boolean(input.sleepStart) ||
+    Boolean((input.todayEvents && input.todayEvents.length > 0)) ||
+    Boolean(input.usualBedtime)
+
+  if (!hasAnyData) {
+    return {
+      score: null,
+      level: 'unknown',
+      label: '暂无数据',
+      advice: '完善孩子作息或记录今日状态后，精力评估会更准确。',
+      bedtime: '21:30',
+      skipActivities: false,
+      reason: '暂无数据',
+    }
+  }
+
   const sleepHours = inferSleepHours(input)
   const events     = input.todayEvents || []
 
@@ -209,14 +229,16 @@ export function calculateEnergy(input: EnergyInput): EnergyResult {
 }
 
 // ── 辅助函数（供水珠和UI使用）────────────
-export function getEnergyColor(score: number): string {
+export function getEnergyColor(score: number | null | undefined): string {
+  if (score == null) return '#9ca3af'
   if (score >= 75) return '#8ca88d'
   if (score >= 55) return '#b88e5e'
   if (score >= 35) return '#e6a89e'
   return '#d58074'
 }
 
-export function getEnergyLevel(score: number): EnergyLevel {
+export function getEnergyLevel(score: number | null | undefined): EnergyLevel {
+  if (score == null) return 'unknown'
   if (score >= 75) return 'green'
   if (score >= 55) return 'yellow'
   if (score >= 35) return 'orange'
