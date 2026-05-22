@@ -409,19 +409,15 @@ async function executeTool(
         requires_payment: input.requires_payment || null,
         source: 'rian',
       })
-      // 出游/活动类：写入校历后额外加提醒待办
+      // trip/activity 类型额外生成提醒待办
       if (input.event_type === 'trip' || input.event_type === 'activity') {
         await supabase.from('todo_items').insert({
           user_id: userId,
           title: `📅 ${input.title}`,
-          description: input.description || null,
-          category: 'logistics',
-          due_date: input.date_start,
+          due_date: input.date_start || null,
           priority: 'yellow',
           status: 'pending',
-          source: 'rian',
-          source_ref_id: rawInputId,
-          one_tap_ready: false,
+          description: input.description || '',
         })
       }
       // 只有明确需要缴费才生成待办
