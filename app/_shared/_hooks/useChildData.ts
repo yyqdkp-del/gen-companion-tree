@@ -7,11 +7,12 @@ export function useChildData(userId: string | null) {
   const cacheRef = useRef<Record<string, any>>({})
   const today = useLocalTodayStr()
 
-  const refresh = useCallback(async () => {
-    if (!userId) return
+  const refresh = useCallback(async (): Promise<any[]> => {
+    if (!userId) return []
     const kids = await enrichChildren(userId, today)
     setEnrichedKids(kids)
     kids.forEach((c: any) => { cacheRef.current[c.id] = c })
+    return kids
   }, [userId, today])
 
   useEffect(() => { refresh() }, [refresh])

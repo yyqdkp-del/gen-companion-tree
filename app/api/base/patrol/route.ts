@@ -321,6 +321,22 @@ async function archiveOldHotspots(userId: string) {
     .neq('status', 'dismissed')
 }
 
+async function resolveProfileCity(userId: string): Promise<string | null> {
+  const { data: profile } = await supabase
+    .from('family_profile')
+    .select('resident_city, resident_city_custom')
+    .eq('user_id', userId)
+    .maybeSingle()
+
+  const raw =
+    profile?.resident_city === 'other'
+      ? profile?.resident_city_custom
+      : profile?.resident_city
+
+  const trimmed = typeof raw === 'string' ? raw.trim() : ''
+  return trimmed || null
+}
+
 // ── POST：立即 202，后台跑巡逻（waitUntil 保证 Vercel 上任务继续执行）──
 async function runPatrolForUsers(userIds: string[], _patrolTime: string) {
   const results: Array<Record<string, unknown>> = []
@@ -328,8 +344,11 @@ async function runPatrolForUsers(userIds: string[], _patrolTime: string) {
   for (const userId of userIds) {
     try {
       const userLocation = await getUserLocation(userId)
+      const profileCity = await resolveProfileCity(userId)
+      const location = profileCity
+        ? profileCity
+        : `${userLocation.city} ${userLocation.country}`
       const todayYmd = getTodayStrInTimeZone(userLocation.timezone)
-      const location = `${userLocation.city} ${userLocation.country}`
       const patrolPrompt = userLocation.local_config.patrol_prompt
 
       await archiveOldHotspots(userId)
@@ -338,7 +357,7 @@ async function runPatrolForUsers(userIds: string[], _patrolTime: string) {
       const [grokData, geminiData, familyContext] = await Promise.all([
         callGrok(snapshot, location, patrolPrompt),
         callGemini(snapshot, location, userLocation.local_config.official_sites),
-        fetchFamilyContextForHotspots(userId, userLocation.city),
+        fetchFamilyContextForHotspots(userId, profileCity || userLocation.city),
       ])
 
       const hotspots = await callClaude(grokData, geminiData, snapshot, location, familyContext)

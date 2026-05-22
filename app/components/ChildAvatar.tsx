@@ -1,7 +1,7 @@
 'use client'
 import { motion } from 'framer-motion'
-import { useApp } from '@/app/context/AppContext'
 import { useRouter } from 'next/navigation'
+import { useApp } from '@/app/context/AppContext'
 
 function getEnergyColor(energy: number) {
   if (energy >= 80) return '#4CAF50'
@@ -9,16 +9,33 @@ function getEnergyColor(energy: number) {
   return '#FF5722'
 }
 
-export default function ChildAvatar() {
-  const { kids, activeKid, setActiveKid } = useApp()
+export type ChildAvatarProps = {
+  kids?: any[]
+  enrichedKids?: any[]
+  activeKid?: any | null
+  onSwitch?: (kid: any) => void
+}
+
+export default function ChildAvatar({
+  kids: kidsProp,
+  enrichedKids,
+  activeKid: activeKidProp,
+  onSwitch,
+}: ChildAvatarProps) {
   const router = useRouter()
+  const { kids: ctxKids, activeKid: ctxActiveKid, setActiveKid } = useApp()
+  const kids = kidsProp ?? ctxKids
+  const activeKid = activeKidProp ?? ctxActiveKid
+  const switchKid = onSwitch ?? setActiveKid
 
   const handleClick = () => {
     if (!kids.length) { router.push('/children'); return }
     if (kids.length === 1) return
     const currentIndex = kids.findIndex((k: any) => k.id === activeKid?.id)
     const nextIndex = (currentIndex + 1) % kids.length
-    setActiveKid(kids[nextIndex])
+    const raw = kids[nextIndex]
+    const nextKid = enrichedKids?.find((k: any) => k.id === raw.id) || raw
+    switchKid(nextKid)
   }
 
   return (
@@ -79,7 +96,7 @@ export default function ChildAvatar() {
 
           {kids.length > 1 && (
             <div style={{ display: 'flex', gap: 4, marginTop: 4 }}>
-              {kids.map((k: any, i: number) => (
+              {kids.map((k: any) => (
                 <div key={k.id} style={{
                   width: 5, height: 5, borderRadius: '50%',
                   background: activeKid?.id === k.id ? 'rgba(255,255,255,0.95)' : 'rgba(255,255,255,0.35)',

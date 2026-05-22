@@ -2,7 +2,7 @@
 import { createClient } from '@/lib/supabase/client'
 const supabase = createClient()
 import InstallPWA from '@/app/components/InstallPWA'
-import React, { Suspense, useEffect, useState, useRef, useCallback } from 'react'
+import React, { Suspense, useEffect, useState, useRef, useCallback, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import nextDynamic from 'next/dynamic'
 import {
@@ -289,8 +289,38 @@ export default function BasePage() {
   const [showProfileBanner, setShowProfileBanner] = useState(false)
 
   const { enrichedKids, refresh: refreshKids } = useChildData(userId)
-  const { markDone, snooze } = useTodoActions(todos, ctxSync)
-  const todoEngine = useTodoEngine(todos)
+  const [optimisticDoneIds, setOptimisticDoneIds] = useState<Set<string>>(() => new Set())
+
+  const optimisticRemove = useCallback((id: string) => {
+    setOptimisticDoneIds(prev => new Set([...prev, id]))
+  }, [])
+  const optimisticRestore = useCallback((id: string) => {
+    setOptimisticDoneIds(prev => {
+      if (!prev.has(id)) return prev
+      const next = new Set(prev)
+      next.delete(id)
+      return next
+    })
+  }, [])
+
+  const displayTodos = useMemo(
+    () => todos.filter(t => !optimisticDoneIds.has(t.id)),
+    [todos, optimisticDoneIds],
+  )
+
+  useEffect(() => {
+    setOptimisticDoneIds(prev => {
+      if (!prev.size) return prev
+      const next = new Set([...prev].filter(id => todos.some(t => t.id === id)))
+      return next.size === prev.size ? prev : next
+    })
+  }, [todos])
+
+  const { markDone, snooze } = useTodoActions(todos, ctxSync, {
+    remove: optimisticRemove,
+    restore: optimisticRestore,
+  })
+  const todoEngine = useTodoEngine(displayTodos)
   const { groups: todoGroups } = todoEngine
   const hotspotEngine = useHotspotEngine(hotspots)
 
@@ -448,8 +478,8 @@ export default function BasePage() {
   const todoValue = topTodo
     ? topTodo.title?.replace(/^📅\s*/, '').slice(0, 10) || '待办'
     : todoGroups?.soon?.length > 0
-      ? todoGroups.soon[0].title?.replace(/^📅\s*/, '').slice(0, 10) || '近期安排'
-      : '静默'
+      ? `近期${todoGroups.soon.length}件`
+      : '今日清闲'
 
   const todoSubValue = topTodo
     ? todoGroups.today.length > 1
@@ -534,7 +564,7 @@ export default function BasePage() {
 `,
     }}>
       <Suspense fallback={null}>
-        <HomeRefreshFromQuery onRefresh={refreshKids} />
+        <HomeRefreshFromQuery onRefresh={() => { void refreshKids() }} />
       </Suspense>
       {showOnboarding && (
         <Onboarding onComplete={() => {
@@ -606,7 +636,12 @@ export default function BasePage() {
         根·陪伴
       </div>
 
-      <ChildAvatar />
+      <ChildAvatar
+        kids={kids}
+        enrichedKids={enrichedKids}
+        activeKid={activeKid}
+        onSwitch={setActiveKid}
+      />
 
       <header style={{ position: 'fixed',
         top: 'max(48px, env(safe-area-inset-top, 48px))',
@@ -675,10 +710,16 @@ export default function BasePage() {
             onSel={(c: any) => setActiveKid(c)}
             onClose={() => closeModal()}
             onAdd={() => openModal('addChild')}
-            userId={userId} />
+            userId={userId}
+            onStatusSaved={async () => {
+              const list = await refreshKids()
+              const id = activeKid?.id || localStorage.getItem('active_child_id')
+              const next = list.find((c: any) => c.id === id) || list[0]
+              if (next) setActiveKid(next)
+            }} />
         )}
         {modal === 'todo' && (
-          <TodoSheet key="todo" todos={todos} onClose={() => closeModal()}
+          <TodoSheet key="todo" todos={displayTodos} onClose={() => closeModal()}
             onAction={(t: TodoItem) => { setOneTapTodo(t); openModal('oneTap') }}
             onDone={async (id: string) => { await markDone(id) }} />
         )}

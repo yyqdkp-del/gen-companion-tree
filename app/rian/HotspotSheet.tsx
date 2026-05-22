@@ -243,7 +243,11 @@ type Props = {
 export default function HotspotSheet({ hotspots, onClose, onPatrol, patrolling, onRead, userId, onSync }: Props) {
   const [selectedHotspot, setSelectedHotspot] = useState<HotspotItem | null>(null)
   const [showPrefs, setShowPrefs] = useState(false)
+  const [unreadOnly, setUnreadOnly] = useState(false)
   const { sorted, urgentCount, unreadCount } = useHotspotEngine(hotspots)
+  const displayHotspots = unreadOnly
+    ? sorted.filter(h => h.status !== 'read' && h.status !== 'dismissed')
+    : sorted
   const { speak, stop } = useApp()
   const spokenRef = useRef<string | null>(null)
 
@@ -325,14 +329,33 @@ export default function HotspotSheet({ hotspots, onClose, onPatrol, patrolling, 
             </div>
           )}
 
+          <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '0 14px 8px' }}>
+            <button
+              type="button"
+              onClick={() => setUnreadOnly(v => !v)}
+              style={{
+                fontSize: 12,
+                color: unreadOnly ? '#a46355' : 'rgba(45,50,47,0.4)',
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                fontFamily: 'sans-serif',
+              }}
+            >
+              {unreadOnly ? '✓ 仅未读' : '全部'}
+            </button>
+          </div>
+
           <div style={{ overflowY: 'auto', flex: 1,
             WebkitOverflowScrolling: 'touch' as any, padding: '10px 14px 0' }}>
-            {sorted.length === 0 ? (
+            {displayHotspots.length === 0 ? (
               <div style={{ textAlign: 'center', opacity: 0.35, padding: '40px 0' }}>
                 <div style={{ fontSize: 36, marginBottom: 12 }}>🌸</div>
-                <div style={{ fontSize: 13, color: THEME.text }}>今天暂无热点提示</div>
+                <div style={{ fontSize: 13, color: THEME.text }}>
+                  {unreadOnly ? '暂无未读热点' : '今天暂无热点提示'}
+                </div>
               </div>
-            ) : sorted.map(item => (
+            ) : displayHotspots.map(item => (
               <HotspotCard key={item.id} item={item}
                 onRead={() => onRead(item.id)}
                 onActionModal={() => setSelectedHotspot(item)}

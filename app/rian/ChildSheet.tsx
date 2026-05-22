@@ -281,9 +281,10 @@ type Props = {
   childList: Child[]; sel: Child | null; onSel: (c: Child) => void
   onClose: () => void; onAdd: () => void; userId: string
   todos?: any[]; onOneTap?: (todo: any) => void
+  onStatusSaved?: () => void | Promise<void>
 }
 
-export default function ChildSheet({ childList, sel, onSel, onClose, onAdd, userId }: Props) {
+export default function ChildSheet({ childList, sel, onSel, onClose, onAdd, userId, onStatusSaved }: Props) {
   const today    = getTodayKey()
   const tomorrow = getTomorrow()
   const in7days  = getIn7Days()
@@ -319,6 +320,7 @@ export default function ChildSheet({ childList, sel, onSel, onClose, onAdd, user
   const handleSaveStatus = async (h: HealthStatus, m: MoodStatus) => {
     await saveStatus(h, m)
     setShowStatusEditor(false)
+    await onStatusSaved?.()
   }
 
   const todayEvents      = calendar.filter(e => e.date_start === today)
