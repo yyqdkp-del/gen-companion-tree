@@ -37,6 +37,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
         <meta name="apple-mobile-web-app-title" content="根 · Companion" />
+        <HotjarScript />
       </head>
       <body>
         <AppProvider>
@@ -48,6 +49,29 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <RegisterSW />
       </body>
     </html>
+  )
+}
+
+function HotjarScript() {
+  const raw = process.env.NEXT_PUBLIC_HOTJAR_ID?.trim()
+  const hjid = raw ? Number.parseInt(raw, 10) : NaN
+  if (!Number.isFinite(hjid) || hjid <= 0) return null
+
+  return (
+    <script
+      dangerouslySetInnerHTML={{
+        __html: `
+          (function(h,o,t,j,a,r){
+            h.hj=h.hj||function(){(h.hj.q=h.hj.q||[]).push(arguments)};
+            h._hjSettings={hjid:${hjid},hjsv:6};
+            a=o.getElementsByTagName('head')[0];
+            r=o.createElement('script');r.async=1;
+            r.src=t+h._hjSettings.hjid+j+h._hjSettings.hjsv;
+            a.appendChild(r);
+          })(window,document,'https://static.hotjar.com/c/hotjar-','.js?sv=');
+        `,
+      }}
+    />
   )
 }
 

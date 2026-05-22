@@ -288,7 +288,7 @@ export default function BasePage() {
   const [keyboardOpen, setKeyboardOpen] = useState(false)
   const [showProfileBanner, setShowProfileBanner] = useState(false)
 
-  const { enrichedKids, refresh: refreshKids } = useChildData(userId)
+  const { enrichedKids, refresh: refreshKids } = useChildData(userId, { deferMs: 1000 })
   const [optimisticDoneIds, setOptimisticDoneIds] = useState<Set<string>>(() => new Set())
 
   const optimisticRemove = useCallback((id: string) => {
@@ -520,7 +520,9 @@ export default function BasePage() {
       ? `${unreadHotspots.length} 条未读`
       : ''
 
-  if (loading || !sessionReady) {
+  const showBootSkeleton = !sessionReady || (loading && kids.length === 0 && todos.length === 0)
+
+  if (showBootSkeleton) {
     return (
       <main style={{
         position: 'fixed', inset: 0,
@@ -537,7 +539,7 @@ export default function BasePage() {
           <div style={{ width: 90, height: 90, borderRadius: '40% 60% 50% 40%', background: 'rgba(164,99,85,0.08)', animation: 'pulse 1.5s ease infinite 0.4s' }} />
         </div>
         <div style={{ fontSize: 13, color: 'rgba(45,50,47,0.4)', fontFamily: 'sans-serif', letterSpacing: '0.2em' }}>
-          根·启动中
+          {!sessionReady ? '根·启动中' : '根·同步中'}
         </div>
         <style>{`
           @keyframes pulse {

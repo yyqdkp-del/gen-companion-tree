@@ -2,7 +2,7 @@
 import { createClient } from '@/lib/supabase/client'
 const supabase = createClient()
 import { createContext, useContext, useState, useEffect, useRef, useCallback, useMemo, ReactNode } from 'react'
-import { fetchAppData } from '@/app/_shared/_services/syncService'
+import { fetchAppData, readAppCoreCache, writeAppCoreCache } from '@/app/_shared/_services/syncService'
 import { useSpeech } from '@/app/_shared/_hooks/useSpeech'
 import { useRouter } from 'next/navigation'
 import type { Session } from '@supabase/supabase-js'
@@ -116,11 +116,34 @@ const setActiveKid = useCallback((kid: any) => {
     setTodos(prev => prev.filter(t => t.id !== id))
   }, [])
 
-  const sync = useCallback(async (forceUid?: string) => {
+  const applyCoreData = useCallback((uid: string, kids: any[], todos: any[], hotspots: any[]) => {
+    setKids(kids)
+    setTodos(todos)
+    setHotspots(hotspots)
+    writeAppCoreCache(uid, { kids, todos, hotspots })
+    phIdentify(uid, { has_children: kids.length > 0 })
+  }, [])
+
+  const hydrateFromCache = useCallback((uid: string) => {
+    const cached = readAppCoreCache(uid)
+    if (!cached) return false
+    setKids(cached.kids as any[])
+    setTodos(cached.todos as any[])
+    setHotspots(cached.hotspots as any[])
+    setLoading(false)
+    return true
+  }, [])
+
+  const sync = useCallback(async (forceUid?: string, options?: { background?: boolean }) => {
     const uid = forceUid || userIdRef.current || (typeof window !== 'undefined' ? localStorage.getItem('app_user_id') : '') || ''
     if (!uid) {
       setLoading(false)
       return
+    }
+
+    if (!options?.background) {
+      const hadCache = hydrateFromCache(uid)
+      if (!hadCache) setLoading(true)
     }
 
     syncAbortRef.current?.abort()
@@ -132,10 +155,7 @@ const setActiveKid = useCallback((kid: any) => {
       const { kids, todos, hotspots } = await fetchAppData(uid, controller.signal)
       if (controller.signal.aborted) return
       if (gen !== syncGenRef.current) return
-      setKids(kids)
-      setTodos(todos)
-      setHotspots(hotspots)
-      phIdentify(uid, { has_children: kids.length > 0 })
+      applyCoreData(uid, kids, todos, hotspots)
     } catch (e: unknown) {
       if (controller.signal.aborted) return
       const name = e instanceof Error ? e.name : ''
@@ -144,7 +164,7 @@ const setActiveKid = useCallback((kid: any) => {
     } finally {
       if (gen === syncGenRef.current) setLoading(false)
     }
-  }, [])
+  }, [applyCoreData, hydrateFromCache])
 
   const debouncedSync = useCallback(() => {
     if (syncDebounceRef.current) clearTimeout(syncDebounceRef.current)
@@ -163,15 +183,22 @@ const setActiveKid = useCallback((kid: any) => {
   }, [])
 
   useEffect(() => {
+    const bootLoggedIn = (uid: string, session: Session) => {
+      setUserIdSafe(uid)
+      const hadCache = hydrateFromCache(uid)
+      setSessionReady(true)
+      void sync(uid, { background: hadCache })
+      void subscribePush(session)
+    }
+
     const initSession = async () => {
       try {
         const { data: { session } } = await supabase.auth.getSession()
         if (session?.user?.id) {
-          setUserIdSafe(session.user.id)
-          sync(session.user.id)
-          void subscribePush(session)
+          bootLoggedIn(session.user.id, session)
           return
         }
+
         if ('caches' in window) {
           try {
             const cache = await caches.open('auth-v1')
@@ -184,28 +211,29 @@ const setActiveKid = useCallback((kid: any) => {
                   refresh_token: bundle.refresh_token,
                 })
                 if (s?.user?.id) {
-                  setUserIdSafe(s.user.id)
-                  sync(s.user.id)
-                  void subscribePush(s)
+                  bootLoggedIn(s.user.id, s)
                   return
                 }
               }
             }
           } catch (e) { logOrAlertNetworkError(e) }
         }
+
         const { data: refreshData } = await supabase.auth.refreshSession()
         if (refreshData.session?.user?.id) {
-          setUserIdSafe(refreshData.session.user.id)
-          sync(refreshData.session.user.id)
-          void subscribePush(refreshData.session)
+          bootLoggedIn(refreshData.session.user.id, refreshData.session)
           return
         }
+
+        setLoading(false)
         setTimeout(() => { if (!userIdRef.current) router.push('/auth') }, 3000)
       } finally {
         setSessionReady(true)
       }
     }
     void initSession()
+    // 仅启动时执行一次
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   useEffect(() => {
