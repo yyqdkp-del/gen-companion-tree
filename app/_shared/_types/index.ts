@@ -140,6 +140,7 @@ export type HotspotItem = {
   urgency: UrgencyLevel
   category: string
   relevance_reason?: string
+  action?: string
   action_available: boolean
   action_type?: string
   action_data?: { url?: string }

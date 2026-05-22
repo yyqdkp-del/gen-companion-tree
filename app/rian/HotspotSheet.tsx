@@ -170,6 +170,21 @@ function HotspotCard({ item, onRead, onActionModal, onConvertTodo }: {
                 margin: '10px 0 12px', whiteSpace: 'pre-wrap' }}>
                 {item.summary}
               </p>
+              {item.action && (
+                <div style={{
+                  marginTop: 8,
+                  padding: '8px 12px',
+                  background: 'rgba(92,122,94,0.06)',
+                  borderRadius: 10,
+                  border: '1px solid rgba(92,122,94,0.15)',
+                  fontSize: 12,
+                  color: '#5c7a5e',
+                  fontFamily: 'sans-serif',
+                  lineHeight: 1.6,
+                }}>
+                  ✓ {item.action}
+                </div>
+              )}
               {convertError && (
                 <p style={{ fontSize: 11, color: '#7d3f37', marginBottom: 8 }}>添加失败，请重试</p>
               )}

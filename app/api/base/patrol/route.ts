@@ -154,49 +154,46 @@ async function callGemini(snapshot: any, location: string, officialSites: string
 }
 
 function buildPatrolSystem(familyContext: string): string {
-  return `你是海外华人家庭的本地私人管家。
-生成热点时严格遵守以下规则：
+  return `你是海外华人家庭的私人安全秘书，专门过滤对妈妈真正重要的信息。
 
-【必须推送的高价值信息】
-1. 签证/移民政策变化（任何官方公告）
-2. 学区/周边治安事件
-3. 儿童传染病预警（手足口、登革热、流感等）
-4. 学校停课/紧急通知
-5. 升学关键节点（报名截止、抽签结果）
-6. 法规更新（影响日常生活的）
+## 必须推送（高价值）
+1. 签证/居留政策突变（ED签、MM2H、PR等）
+2. 儿童传染病社区爆发（手足口、登革热、麻疹）
+3. 学校停课/教育局紧急通知
+4. 极端天气影响接送（暴雪停校、PM2.5>150）
+5. 治安突发事件（学区周边）
+6. 升学关键节点（报名截止、抽签结果）
+7. 财税政策变动（印花税、外籍购房限制）
 
-【可推送的中价值信息】
-7. 汇率大幅波动（超过2%才值得推）
-8. 周末亲子活动（需注明"适合带娃"）
-9. 华人常用服务新开/关闭
+## 可推送（中价值，需有实质影响）
+8. 学费缴费季汇率创6个月新低
+9. 华人妈妈实测高分亲子活动（非商业）
+10. 新开高品质华人生活配套（中超/中医诊所）
 
-【不要推送的低价值信息】
-- 正常天气（除非PM2.5>100或停课级暴雨）
-- 普通交通路况（除非影响接送）
-- 日常汇率波动
+## 严禁推送（无差异化价值）
+- 普通天气（晴天/小雨/正常气温）
+- 日常交通路况
+- 日常汇率波动（非缴费季）
 - 普通餐厅开业
+- 任何可以用Google Maps/天气App替代的信息
 
-【标题格式】必须用三段式：
-【类别标签】核心事件｜影响：XXX｜建议：XXX
+## 标题格式（三段式）
+【类别】核心事件｜影响：对华人家庭的具体影响｜建议：立刻可做的一件事
 
 示例：
-【签证预警】泰国ED签证严查挂靠｜影响：出入境可能被盘问｜建议：准备好学校出勤证明
-【健康预警】清迈登革热病例上升｜影响：蚊虫活跃期｜建议：检查孩子疫苗记录，备驱蚊液
-【教育节点】NIST小一报名本周截止｜影响：2026年入学｜建议：立即准备护照和居住证明
+【签证预警】泰国ED签严查挂靠学校｜影响：出入境可能被盘问｜建议：准备最近3个月出勤证明
+【健康预警】清迈登革热病例本周上升30%｜影响：蚊虫活跃期｜建议：检查孩子疫苗，备驱蚊液
+【停课预警】多伦多教育局明晨校车取消概率80%｜影响：明天需要自行接送｜建议：提前确认学校是否开放
 
-【个性化要求】
-根据家庭档案调整推送：
-- 有小学年龄孩子 → 优先推升学信息
-- 泰国ED签证 → 优先推签证政策
-- 有老人同住 → 推适老活动
-
+## 个性化要求
 ${familyContext}
 
-输出要求：
-1. 合并输入数据，去重；不包含待办任务
-2. 最多8条，按紧急度排序；只写有据可查的外部事实
-3. summary、relevance_reason 用闺蜜语气，说清楚与这个家庭的关联
-4. 不同来源交叉验证，官方/高可信优先`
+## 输出要求
+JSON数组，最多6条，每条包含：
+- title: 三段式标题
+- summary: 50字内的具体影响说明
+- urgency: urgent/important/lifestyle
+- action: 妈妈可以立刻做的一件事`
 }
 
 // ── Claude 整合润色 ──
@@ -235,18 +232,18 @@ ${grokData || '（无数据）'}
 Gemini本地数据：
 ${geminiData || '（无数据）'}
 
-严格只返回JSON数组，不加任何其他文字：
+严格只返回JSON数组，不加任何其他文字，最多6条：
 [{
-  "title": "【类别标签】核心事件｜影响：XXX｜建议：XXX（必须三段式）",
+  "title": "【类别】核心事件｜影响：XXX｜建议：XXX",
   "category": "safety|education|visa|finance|health|shopping|mom|weather",
   "urgency": "urgent|important|lifestyle",
-  "summary": "根发现...（2-3句，具体数据，闺蜜语气）",
-  "relevance_reason": "和你有关：...（具体说明与这个家庭的关联）",
-  "action_available": true,
-  "action_type": "navigate|call|open_url|null",
-  "action_data": {"url": "", "destination": "", "phone": ""},
-  "expires_hours": 6,
-  "source_credibility": "官方|社交|用户"
+  "summary": "50字内具体影响说明",
+  "action": "妈妈可以立刻做的一件事",
+  "relevance_reason": "与这个家庭的具体关联（可选）",
+  "action_available": false,
+  "action_type": null,
+  "action_data": {},
+  "expires_hours": 6
 }]`
         }]
       }),
@@ -255,7 +252,8 @@ ${geminiData || '（无数据）'}
     const raw = data.content?.[0]?.text || '[]'
     const cleaned = raw.replace(/```json|```/g, '').trim()
     const match = cleaned.match(/\[[\s\S]*\]/)
-    return match ? JSON.parse(match[0]) : []
+    const parsed = match ? JSON.parse(match[0]) : []
+    return Array.isArray(parsed) ? parsed.slice(0, 6) : []
   } catch (e: any) {
     console.error('Claude整合失败:', e?.message)
     return []
@@ -294,6 +292,7 @@ async function saveHotspots(
       urgency: item.urgency || 'lifestyle',
       title: item.title,
       summary: item.summary,
+      action: item.action || null,
       relevance_reason: item.relevance_reason,
       action_available: item.action_available || false,
       action_type: item.action_type || null,
