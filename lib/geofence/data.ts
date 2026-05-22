@@ -142,13 +142,14 @@ export const GEOFENCES: Geofence[] = [
     calling_code: '+65',
     form_types: ['medical_form', 'school_absence', 'school_registration'],
     local_sources: {
-      news_keywords: ['Singapore', '新加坡', 'MOM Singapore', 'MOE Singapore', 'ICA Singapore'],
+      news_keywords: ['Singapore', '新加坡', 'singapore', 'MOM Singapore', 'MOE Singapore', 'ICA Singapore'],
       official_sites: [
+        'https://www.moe.gov.sg',
+        'https://www.gov.sg',
         'https://www.ica.gov.sg',
         'https://www.mom.gov.sg',
-        'https://www.moe.gov.sg',
       ],
-      patrol_prompt: '新加坡今日情况：天气、MRT交通、移民局ICA政策更新、教育部MOE通知、健康预警、活动',
+      patrol_prompt: 'Singapore Chinese families education MOE: weather, MRT traffic, ICA/MOE policy, health alerts, local activities',
       emergency: {
         police: '999',
         ambulance: '995',
@@ -173,12 +174,13 @@ export const GEOFENCES: Geofence[] = [
     calling_code: '+60',
     form_types: ['medical_form', 'school_absence'],
     local_sources: {
-      news_keywords: ['Kuala Lumpur', '吉隆坡', 'KL', 'Malaysia immigration', 'MOE Malaysia'],
+      news_keywords: ['Kuala Lumpur', '吉隆坡', 'kuala lumpur', 'KL', 'Malaysia', 'Malaysia immigration', 'MOE Malaysia'],
       official_sites: [
-        'https://www.imi.gov.my',
         'https://www.moe.gov.my',
+        'https://www.dbkl.gov.my',
+        'https://www.imi.gov.my',
       ],
-      patrol_prompt: '吉隆坡今日情况：天气、交通（LRT/MRT）、移民局政策、教育通知、健康预警、活动',
+      patrol_prompt: 'Kuala Lumpur Malaysia Chinese families: weather, LRT/MRT traffic, immigration policy, MOE education notices, health alerts',
       emergency: {
         police: '999',
         ambulance: '999',
@@ -355,6 +357,38 @@ export const GEOFENCES: Geofence[] = [
 
   // ── 北美 ──
   {
+    id: 'ca-toronto',
+    name: 'Toronto',
+    city: 'Toronto',
+    country: 'Canada',
+    country_code: 'CA',
+    timezone: 'America/Toronto',
+    language: 'zh',
+    lat: 43.6532,
+    lng: -79.3832,
+    radius_km: 55,
+    currency: 'CAD',
+    currency_symbol: 'C$',
+    calling_code: '+1',
+    form_types: ['medical_form', 'school_absence', 'bank_account'],
+    local_sources: {
+      news_keywords: ['多伦多', 'toronto', 'Toronto', 'TDSB', 'IRCC Canada', 'Ontario education'],
+      official_sites: [
+        'https://www.tdsb.on.ca',
+        'https://www.tcdsb.org',
+        'https://www.toronto.ca',
+        'https://www.canada.ca/en/immigration-refugees-citizenship.html',
+      ],
+      patrol_prompt: 'Toronto Ontario Canada Chinese families: weather, IRCC immigration, TDSB/TCDSB school notices, TTC traffic, health alerts',
+      emergency: {
+        police: '911',
+        ambulance: '911',
+        fire: '911',
+      },
+    },
+  },
+
+  {
     id: 'ca-vancouver',
     name: 'Vancouver',
     city: 'Vancouver',
@@ -370,12 +404,14 @@ export const GEOFENCES: Geofence[] = [
     calling_code: '+1',
     form_types: ['medical_form', 'school_absence', 'bank_account'],
     local_sources: {
-      news_keywords: ['Vancouver', '温哥华', 'IRCC Canada', 'BC immigration', 'Vancouver school'],
+      news_keywords: ['温哥华', 'vancouver', 'Vancouver', 'IRCC Canada', 'BC immigration', 'Vancouver school'],
       official_sites: [
+        'https://www.vsb.bc.ca',
+        'https://vancouver.ca',
         'https://www.canada.ca/en/immigration-refugees-citizenship.html',
         'https://www2.gov.bc.ca',
       ],
-      patrol_prompt: '温哥华今日情况：天气、IRCC移民政策、BC省教育通知、交通、健康预警',
+      patrol_prompt: 'Vancouver BC Canada Chinese families: weather, IRCC immigration, VSB school notices, traffic, health alerts',
       emergency: {
         police: '911',
         ambulance: '911',
