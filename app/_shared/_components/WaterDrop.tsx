@@ -35,6 +35,7 @@ type Props = {
   icon: React.ReactNode
   label: string
   value?: string
+  subValue?: string
   badge?: number
   pulse?: boolean
   onClick: () => void
@@ -45,7 +46,7 @@ type Props = {
 }
 
 export default function WaterDrop({
-  state, icon, label, value, badge, pulse, onClick, size = 96, delay = 0, className, index = 0
+  state, icon, label, value, subValue, badge, pulse, onClick, size = 96, delay = 0, className, index = 0
 }: Props) {
   const c = COLORS[state] || COLORS.calm
   const [reducedMotion, setReducedMotion] = useState(false)
@@ -120,6 +121,22 @@ export default function WaterDrop({
             <span style={{ fontSize: size > 100 ? 14 : 12, fontWeight: 600, color: c.text }}>
               {value}
             </span>
+          )}
+          {subValue && (
+            <div style={{
+              fontSize: 10,
+              color: 'rgba(45,50,47,0.45)',
+              fontFamily: 'sans-serif',
+              textAlign: 'center',
+              marginTop: 3,
+              letterSpacing: '0.05em',
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              maxWidth: 80,
+              textOverflow: 'ellipsis',
+            }}>
+              {subValue}
+            </div>
           )}
           <span style={{ fontSize: 7.5, fontWeight: 700, color: c.text,
             opacity: 0.32, letterSpacing: '0.12em', textTransform: 'uppercase' }}>

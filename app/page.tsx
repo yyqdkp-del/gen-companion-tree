@@ -291,6 +291,7 @@ export default function BasePage() {
   const { enrichedKids, refresh: refreshKids } = useChildData(userId)
   const { markDone, snooze } = useTodoActions(todos, ctxSync)
   const todoEngine = useTodoEngine(todos)
+  const { groups: todoGroups } = todoEngine
   const hotspotEngine = useHotspotEngine(hotspots)
 
   useEffect(() => {
@@ -423,33 +424,48 @@ export default function BasePage() {
 
   const childValue = !activeKid ? '—'
     : todayActivities.length > 0
-      ? `${todayActivities[0].name ?? todayActivities[0].title ?? '活动'}`
+      ? (todayActivities[0].name ?? todayActivities[0].title ?? '活动')?.slice(0, 8) || '活动'
       : todayClasses.length > 0
-        ? `${typeof todayClasses[0] === 'object' ? (todayClasses[0].subject || '上课中') : todayClasses[0]}`
-        : (activeKid as any).energy != null
-          ? `${(activeKid as any).energy}%`
-          : '—'
+        ? (typeof todayClasses[0] === 'object'
+          ? todayClasses[0].subject?.slice(0, 8) || '上课中'
+          : String(todayClasses[0]).slice(0, 8)) || '上课中'
+        : (activeKid as any).urgent_items?.filter((i: UrgentItem) =>
+          i.level === 'red' || i.level === 'orange',
+        ).length > 0
+          ? '有紧急事项'
+          : (activeKid as any).energy != null
+            ? `精力 ${(activeKid as any).energy}%`
+            : '—'
 
   const childSubValue = !activeKid ? ''
-    : todayActivities.length > 0
-      ? `今天有${todayActivities.length}个活动`
-      : todayClasses.length > 0
-        ? `今天${todayClasses.length}节课`
+    : todayActivities.length > 1
+      ? `+${todayActivities.length - 1} 个活动`
+      : todayClasses.length > 0 && todayActivities.length === 0
+        ? `今天 ${todayClasses.length} 节课`
         : (activeKid as any).school_end_time
-          ? `放学${(activeKid as any).school_end_time}`
+          ? `放学 ${(activeKid as any).school_end_time}`
           : ''
 
-  const todayDeadline = todos.filter((t: TodoItem) => {
-    if (t.status === 'done') return false
-    if (!t.due_date) return false
-    const due = new Date(t.due_date)
-    const today = new Date()
-    return due.toDateString() === today.toDateString()
-  }).length
+  const topTodo = [...(todoGroups?.today || [])].sort((a, b) => {
+    const order: Record<string, number> = { red: 3, orange: 2, yellow: 1 }
+    return (order[b.priority] || 0) - (order[a.priority] || 0)
+  })[0]
 
-  const todoValue = todayDeadline > 0
-    ? `${todayDeadline}件今日截止`
-    : todoEngine.badge > 0 ? `${todoEngine.badge}条` : '静默'
+  const todoValue = topTodo
+    ? topTodo.title?.replace(/^📅\s*/, '').slice(0, 10) || '待办'
+    : todoGroups?.soon?.length > 0
+      ? todoGroups.soon[0].title?.replace(/^📅\s*/, '').slice(0, 10) || '近期安排'
+      : '静默'
+
+  const todoSubValue = topTodo
+    ? todoGroups.today.length > 1
+      ? `今日还有 ${todoGroups.today.length - 1} 件`
+      : topTodo.due_date
+        ? `截止 ${new Date(topTodo.due_date).toLocaleDateString('zh-CN', { month: 'numeric', day: 'numeric' })}`
+        : ''
+    : todoGroups?.soon?.length > 0
+      ? `近期 ${todoGroups.soon.length} 件`
+      : ''
 
   const HOTSPOT_URGENCY_RANK: Record<string, number> = { urgent: 0, important: 1, lifestyle: 2 }
   const unreadHotspots = [...hotspots]
@@ -474,6 +490,11 @@ export default function BasePage() {
       : hotspotEngine.badge > 0
         ? `${hotspotEngine.badge}条`
         : '根'
+
+  const hotspotSubValue = patrolling ? '巡逻中'
+    : unreadHotspots.length > 0
+      ? `${unreadHotspots.length} 条未读`
+      : ''
 
   if (loading || !sessionReady) {
     return (
@@ -612,23 +633,10 @@ export default function BasePage() {
           <div style={{ position: 'relative', display: 'inline-flex', flexDirection: 'column', alignItems: 'center' }}>
             <WaterDrop state={childState} icon={<Heart size={24} />} label="孩子"
               value={childValue}
+              subValue={childSubValue}
               badge={childUrgent} pulse={childUrgent > 0}
               onClick={() => { void track({ event_type: 'droplet_click', meta: { type: 'child' } }); openModal('child') }} size={124} delay={0}
               className="animate-droplet-1" />
-            {childSubValue && (
-              <div style={{
-                fontSize: 10,
-                color: 'rgba(45,50,47,0.5)',
-                fontFamily: 'sans-serif',
-                textAlign: 'center',
-                marginTop: 2,
-                letterSpacing: '0.05em',
-                whiteSpace: 'nowrap',
-              }}
-              >
-                {childSubValue}
-              </div>
-            )}
             {activeKid && (activeKid.total_hanzi ?? 0) > 0 && (
               <div style={{
                 marginTop: childSubValue ? 4 : 6,
@@ -648,12 +656,14 @@ export default function BasePage() {
           <div style={{ display: 'flex', gap: 'clamp(28px, 8vw, 52px)', alignItems: 'center' }}>
             <WaterDrop state={todoEngine.state} icon={<Bell size={20} />} label="待办"
               value={todoValue}
+              subValue={todoSubValue}
               badge={todoEngine.badge} pulse={todoEngine.badge > 0}
               onClick={() => { void track({ event_type: 'droplet_click', meta: { type: 'todo' } }); openModal('todo') }} size={98} delay={1.8}
               className="animate-droplet-2" />
             <WaterDrop state={hotspotEngine.state}
               icon={patrolling ? <Loader size={20} /> : <Zap size={20} />}
               label="热点" value={hotspotValue}
+              subValue={hotspotSubValue}
               badge={hotspotEngine.badge} pulse={hotspotEngine.badge > 0}
               onClick={() => { void track({ event_type: 'droplet_click', meta: { type: 'hotspot' } }); openModal('hotspot') }} size={98} delay={3.4}
               className="animate-droplet-3" />
