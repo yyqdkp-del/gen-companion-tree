@@ -42,7 +42,7 @@ const TOOLS = [
   },
   {
     name: 'add_schedule',
-    description: '添加孩子的校历事件。适用于：运动会、家长会、考试、假期、校外活动、兴趣班。这些存入校历，不进待办。只有明确需要缴费才同时生成待办。',
+    description: '添加孩子的校历事件。适用于：运动会、家长会、考试、假期、校外活动、兴趣班。存入校历；出游(trip)/活动(activity)类事件会同时生成一条提醒待办。只有明确需要缴费才另外生成缴费待办。',
     input_schema: {
       type: 'object',
       properties: {
@@ -409,6 +409,21 @@ async function executeTool(
         requires_payment: input.requires_payment || null,
         source: 'rian',
       })
+      // 出游/活动类：写入校历后额外加提醒待办
+      if (input.event_type === 'trip' || input.event_type === 'activity') {
+        await supabase.from('todo_items').insert({
+          user_id: userId,
+          title: `📅 ${input.title}`,
+          description: input.description || null,
+          category: 'logistics',
+          due_date: input.date_start,
+          priority: 'yellow',
+          status: 'pending',
+          source: 'rian',
+          source_ref_id: rawInputId,
+          one_tap_ready: false,
+        })
+      }
       // 只有明确需要缴费才生成待办
       if (input.requires_payment && input.requires_payment > 0) {
         await supabase.from('todo_items').insert({
@@ -707,7 +722,7 @@ ${grokInfo || '暂无'}
 分析用户输入，调用合适的工具记录信息。可以同时调用多个工具。
 
 ## 关键原则
-- 校历事件用 add_schedule，不要用 add_todo。除非需要缴费才同时调用 add_todo
+- 校历事件用 add_schedule，不要用 add_todo。出游/活动类 add_schedule 会自动生成提醒待办；需要缴费才另外调用 add_todo
 - 病历用 add_health，复诊日期自动生成提醒
 - 需要购买的物品用 add_shopping
 - 只有妈妈真正需要做某件事才用 add_todo
