@@ -2,7 +2,7 @@
 import { createClient } from '@/lib/supabase/client'
 const supabase = createClient()
 import InstallPWA from '@/app/components/InstallPWA'
-import React, { useEffect, useState, useRef, useCallback } from 'react'
+import React, { Suspense, useEffect, useState, useRef, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import nextDynamic from 'next/dynamic'
 import {
@@ -33,7 +33,8 @@ import { logOrAlertNetworkError } from '@/lib/errors/logOrAlertNetworkError'
 import { toast } from '@/app/components/Toast'
 import TourGuide, { type TourStep } from '@/app/components/TourGuide'
 import { sanitizeFileName } from '@/lib/storage/sanitizeFileName'
-import { useSearchParams, useRouter } from 'next/navigation'
+import { useRouter } from 'next/navigation'
+import HomeRefreshFromQuery from '@/app/components/HomeRefreshFromQuery'
 
 const ChildAvatar = nextDynamic(() => import('@/app/components/ChildAvatar'), { ssr: false })
 
@@ -270,7 +271,6 @@ const HOME_TOUR: TourStep[] = [
 ]
 
 export default function BasePage() {
-  const searchParams = useSearchParams()
   const router = useRouter()
   const { userId, kids, todos, hotspots, loading, sessionReady, sync: ctxSync,
     processStatus, setProcessStatus, activeKid, setActiveKid,
@@ -301,12 +301,6 @@ export default function BasePage() {
       setActiveKid(current)
     }
   }, [enrichedKids, setActiveKid])
-
-  useEffect(() => {
-    if (!searchParams.get('refresh')) return
-    void refreshKids()
-    router.replace('/', { scroll: false })
-  }, [searchParams, refreshKids, router])
 
   useEffect(() => {
     const skipped = localStorage.getItem('onboarding_skipped')
@@ -539,6 +533,9 @@ export default function BasePage() {
   radial-gradient(at 50% 50%, rgba(251,249,246,0.8) 0px, transparent 80%)
 `,
     }}>
+      <Suspense fallback={null}>
+        <HomeRefreshFromQuery onRefresh={refreshKids} />
+      </Suspense>
       {showOnboarding && (
         <Onboarding onComplete={() => {
           setShowOnboarding(false)
