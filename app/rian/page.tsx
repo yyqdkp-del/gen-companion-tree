@@ -2,16 +2,10 @@
 import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
-import {
-  FileText, ShoppingCart, Pill, Building2,
-  Plane, CheckCircle2, Clock,
-  X, Mic, Camera, Send, Square, Loader, Upload as UploadIcon
-} from 'lucide-react'
+import { X } from 'lucide-react'
 import nextDynamic from 'next/dynamic'
-import { THEME, URGENCY_COLOR, URGENCY_BORDER } from '@/app/_shared/_constants/theme'
+import { THEME } from '@/app/_shared/_constants/theme'
 import { SAFE_AREA_TOP } from '@/app/_shared/_constants/layout'
-import { DROP_ANIM, POSITIONS } from '@/app/_shared/_constants/animations'
-import { getCategoryIcon } from '@/app/_shared/_constants/categories'
 import { useTodoActions } from '@/app/_shared/_hooks/useTodoActions'
 import { useRecorder } from '@/app/_shared/_hooks/useRecorder'
 import { useUpload, UPLOAD_STATUS_TEXT } from '@/app/_shared/_hooks/useUpload'
@@ -93,6 +87,11 @@ const { userId, kids: ctxKids, todos: ctxTodos, sync: ctxSync } = useApp()
 const todosTyped = ctxTodos as TodoItem[]
 const { groups } = useTodoEngine(todosTyped)
 
+const tempTodos = useMemo(
+  () => (ctxTodos as TodoItem[]).filter((t) => t._isTemp),
+  [ctxTodos],
+)
+
 const mapTodoToReminder = (t: TodoItem): Reminder => ({
   id: t.id,
   title: t.title,
@@ -104,24 +103,17 @@ const mapTodoToReminder = (t: TodoItem): Reminder => ({
   ai_action_data: t.ai_action_data,
 })
 
-// ── 今日水珠：today + soon（前几条） + 临时待办 ──
-const reminders = useMemo<Reminder[]>(() => {
-  const temps = (ctxTodos as any[])
-    .filter((t: any) => t._isTemp)
-    .map((t: any) => mapTodoToReminder(t as TodoItem))
-  const todayReminders = (groups.today || []).map(mapTodoToReminder)
-  const soonReminders = (groups.soon || []).slice(0, 3).map(mapTodoToReminder)
-
-  const priority = (t: Reminder) => (t.urgency_level === 3 ? 0 : t.urgency_level === 2 ? 1 : 2)
-  const merged = [...temps, ...todayReminders, ...soonReminders].filter(Boolean) as Reminder[]
+const actionReminders = useMemo<Reminder[]>(() => {
+  const merged = [...tempTodos, ...groups.today, ...groups.soon]
   const seen = new Set<string>()
-  const deduped = merged.filter((r) => {
-    if (!r?.id || seen.has(r.id)) return false
-    seen.add(r.id)
-    return true
-  })
-  return deduped.sort((a, b) => priority(a) - priority(b))
-}, [ctxTodos, groups.today, groups.soon])
+  return merged
+    .filter((t) => {
+      if (!t?.id || seen.has(t.id)) return false
+      seen.add(t.id)
+      return true
+    })
+    .map(mapTodoToReminder)
+}, [tempTodos, groups.today, groups.soon])
  // ── 时钟 ──
   useEffect(() => {
     setMounted(true)
@@ -133,7 +125,7 @@ const reminders = useMemo<Reminder[]>(() => {
   const loading = false
   const currentChild = children[childIndex]
   
-  const { markDone: markDoneAction, snooze: snoozeAction } = useTodoActions(reminders, ctxSync)
+  const { markDone: markDoneAction, snooze: snoozeAction } = useTodoActions(actionReminders, ctxSync)
   const { uploading, uploadStatus, upload } = useUpload(userId || '', () => {
     ctxSync()
     setInputMode('none')
@@ -272,120 +264,175 @@ const reminders = useMemo<Reminder[]>(() => {
         </div>
       )}
 
-      {/* 跨代成长周报卡片（文档流，位于水珠区域上方） */}
-      <div style={{ position: 'relative', zIndex: 25, margin: 'min(28vh, calc(22vh + env(safe-area-inset-top))) 5% 0' }}>
+      {/* 主内容：周报 + 待办列表（可滚动） */}
+      <div
+        style={{
+          position: 'absolute',
+          top: `calc(${SAFE_AREA_TOP} + 18vh)`,
+          left: 0,
+          right: 0,
+          bottom: 'calc(88px + env(safe-area-inset-bottom))',
+          overflowY: 'auto',
+          zIndex: 25,
+          WebkitOverflowScrolling: 'touch',
+        }}
+      >
         {currentChild && (
-          <div
-            role="button"
-            tabIndex={0}
-            onClick={() => setShowWeeklyReport(true)}
-            onKeyDown={e => {
-              if (e.key === 'Enter' || e.key === ' ') setShowWeeklyReport(true)
-            }}
-            style={{
-              background:
-                'linear-gradient(135deg, rgba(164,99,85,0.08) 0%, rgba(92,122,94,0.06) 100%)',
-              borderRadius: 18,
-              padding: '16px 18px',
-              marginBottom: 12,
-              border: '1px solid rgba(164,99,85,0.12)',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 14,
-              minWidth: 0,
-            }}
-          >
-            <div style={{ fontSize: 36, flexShrink: 0 }}>💌</div>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div
-                style={{
-                  fontSize: 15,
-                  fontWeight: 500,
-                  color: '#2d322f',
-                  fontFamily: "'Noto Serif SC', serif",
-                  marginBottom: 4,
-                  overflow: 'hidden',
-                  whiteSpace: 'nowrap',
-                  textOverflow: 'ellipsis',
-                }}
-              >
-                给爷爷奶奶的成长周报
+          <div style={{ padding: '0 16px', marginBottom: 12 }}>
+            <div
+              role="button"
+              tabIndex={0}
+              onClick={() => setShowWeeklyReport(true)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') setShowWeeklyReport(true)
+              }}
+              style={{
+                background:
+                  'linear-gradient(135deg, rgba(164,99,85,0.08) 0%, rgba(92,122,94,0.06) 100%)',
+                borderRadius: 18,
+                padding: '16px 18px',
+                border: '1px solid rgba(164,99,85,0.12)',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 14,
+                minWidth: 0,
+              }}
+            >
+              <div style={{ fontSize: 36, flexShrink: 0 }}>💌</div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div
+                  style={{
+                    fontSize: 15,
+                    fontWeight: 500,
+                    color: '#2d322f',
+                    fontFamily: "'Noto Serif SC', serif",
+                    marginBottom: 4,
+                    overflow: 'hidden',
+                    whiteSpace: 'nowrap',
+                    textOverflow: 'ellipsis',
+                  }}
+                >
+                  给爷爷奶奶的成长周报
+                </div>
+                <div
+                  style={{
+                    fontSize: 12,
+                    color: 'rgba(45,50,47,0.5)',
+                    fontFamily: 'sans-serif',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    display: '-webkit-box',
+                    WebkitLineClamp: 2,
+                    WebkitBoxOrient: 'vertical' as const,
+                    wordBreak: 'break-word',
+                  }}
+                >
+                  根·生成本周成长故事，一键分享到微信
+                </div>
               </div>
-              <div
-                style={{
-                  fontSize: 12,
-                  color: 'rgba(45,50,47,0.5)',
-                  fontFamily: 'sans-serif',
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  display: '-webkit-box',
-                  WebkitLineClamp: 2,
-                  WebkitBoxOrient: 'vertical' as const,
-                  wordBreak: 'break-word',
-                }}
-              >
-                根·生成本周成长故事，一键分享到微信
-              </div>
+              <div style={{ fontSize: 18, color: 'rgba(45,50,47,0.3)', flexShrink: 0 }}>→</div>
             </div>
-            <div style={{ fontSize: 18, color: 'rgba(45,50,47,0.3)', flexShrink: 0 }}>→</div>
           </div>
         )}
+
+        {!loading && (
+          <>
+            {[...tempTodos, ...groups.today].length > 0 && (
+              <div style={{ padding: '0 16px', marginBottom: 12 }}>
+                <div style={{ fontSize: 12, color: 'rgba(45,50,47,0.4)', fontFamily: 'sans-serif', marginBottom: 8, letterSpacing: '0.1em' }}>
+                  今日待办
+                </div>
+                {[...tempTodos, ...groups.today].map((todo) => (
+                  <div
+                    key={todo.id}
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => setSelectedReminder(mapTodoToReminder(todo))}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') setSelectedReminder(mapTodoToReminder(todo))
+                    }}
+                    style={{
+                      background: 'rgba(255,255,255,0.7)',
+                      backdropFilter: 'blur(10px)',
+                      borderRadius: 14,
+                      padding: '12px 16px',
+                      marginBottom: 8,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 12,
+                      border: '1px solid rgba(45,50,47,0.06)',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <div style={{
+                      width: 8, height: 8, borderRadius: 4, flexShrink: 0,
+                      background: todo.priority === 'red' ? '#c85050' : todo.priority === 'orange' ? '#d4804a' : '#a46355',
+                    }} />
+                    <div style={{ flex: 1, fontSize: 15, color: '#2d322f', fontFamily: "'Noto Serif SC', serif" }}>
+                      {todo.title}
+                    </div>
+                    {todo.due_date && (
+                      <div style={{ fontSize: 12, color: 'rgba(45,50,47,0.4)', fontFamily: 'sans-serif', flexShrink: 0 }}>
+                        {new Date(todo.due_date).toLocaleDateString('zh-CN', { month: 'numeric', day: 'numeric' })}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {groups.soon.length > 0 && (
+              <div style={{ padding: '0 16px', marginBottom: 12 }}>
+                <div style={{ fontSize: 12, color: 'rgba(45,50,47,0.4)', fontFamily: 'sans-serif', marginBottom: 8, letterSpacing: '0.1em' }}>
+                  近期安排
+                </div>
+                {groups.soon.map((todo) => (
+                  <div
+                    key={todo.id}
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => setSelectedReminder(mapTodoToReminder(todo))}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') setSelectedReminder(mapTodoToReminder(todo))
+                    }}
+                    style={{
+                      background: 'rgba(255,255,255,0.5)',
+                      borderRadius: 14,
+                      padding: '12px 16px',
+                      marginBottom: 8,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 12,
+                      border: '1px solid rgba(45,50,47,0.04)',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <div style={{
+                      width: 6, height: 6, borderRadius: 3, flexShrink: 0,
+                      background: 'rgba(45,50,47,0.2)',
+                    }} />
+                    <div style={{ flex: 1, fontSize: 14, color: 'rgba(45,50,47,0.7)', fontFamily: 'sans-serif' }}>
+                      {todo.title}
+                    </div>
+                    {todo.due_date && (
+                      <div style={{ fontSize: 12, color: 'rgba(45,50,47,0.35)', fontFamily: 'sans-serif', flexShrink: 0 }}>
+                        {new Date(todo.due_date).toLocaleDateString('zh-CN', { month: 'numeric', day: 'numeric' })}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {tempTodos.length === 0 && groups.today.length === 0 && groups.soon.length === 0 && (
+              <div style={{ textAlign: 'center', padding: '40px 16px', color: 'rgba(45,50,47,0.3)', fontSize: 14, fontFamily: 'sans-serif' }}>
+                今日清闲，说点什么让根记下来？
+              </div>
+            )}
+          </>
+        )}
       </div>
-
-      {/* 水珠 */}
-      {!loading && reminders.map((r, i) => {
-        const pos = POSITIONS[i % POSITIONS.length]
-        const anim = DROP_ANIM[i % DROP_ANIM.length]
-        const icon = getCategoryIcon(r.category || 'default')
-        const isUrgent = r.urgency_level === 3
-        const size = r.urgency_level === 3 ? 96 : r.urgency_level === 2 ? 84 : 72
-
-        return (
-          <motion.div
-            key={r.id}
-            layout
-initial={false}
-            animate={{
-              opacity: 1, scale: 1,
-              y: [0, -anim.yRange, 0],
-              x: [0, anim.xRange, 0],
-              rotate: [0, anim.rotate, -anim.rotate, 0],
-            }}
-            transition={{
-              opacity: { duration: 0.6, delay: i * 0.15 },
-              scale: { duration: 0.6, delay: i * 0.15 },
-              y: { duration: anim.duration, repeat: Infinity, delay: anim.delay, ease: 'easeInOut' },
-              x: { duration: anim.duration * 1.3, repeat: Infinity, delay: anim.delay + 0.5, ease: 'easeInOut' },
-              rotate: { duration: anim.duration * 0.8, repeat: Infinity, delay: anim.delay, ease: 'easeInOut' },
-            }}
-            style={{ position: 'absolute', top: pos.top, left: (pos as any).left, right: (pos as any).right, zIndex: 20 }}
-            onClick={() => setSelectedReminder(r)}
-          >
-            <div style={{
-              width: `${size}px`, height: `${size}px`,
-              backdropFilter: 'blur(20px)',
-              border: `1px solid ${URGENCY_BORDER[r.urgency_level]}`,
-              borderRadius: '66% 34% 71% 29% / 37% 53% 47% 63%',
-              position: 'relative',
-              display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-              background: `radial-gradient(circle at 35% 35%, rgba(255,255,255,0.35) 0%, ${URGENCY_COLOR[r.urgency_level]} 100%)`,
-              boxShadow: `inset 5px 5px 10px rgba(255,255,255,0.3), 10px 15px 25px rgba(0,0,0,0.06)`,
-              cursor: 'pointer',
-            }}>
-              <div style={{ color: THEME.text, opacity: 0.7, marginBottom: 2 }}>{icon}</div>
-              <span style={{ fontSize: 9, fontWeight: 600, color: THEME.text, textAlign: 'center', padding: '0 5px', lineHeight: 1.2 }}>
-                {r.title.length > 5 ? r.title.slice(0, 5) + '…' : r.title}
-              </span>
-              {isUrgent && (
-                <motion.div animate={{ scale: [1, 1.4, 1], opacity: [1, 0.5, 1] }} transition={{ repeat: Infinity, duration: 1.5 }}
-                  style={{ position: 'absolute', top: 8, right: 10, width: 8, height: 8, background: '#d58074', borderRadius: '50%', border: '2px solid white' }} />
-              )}
-              <div style={{ position: 'absolute', top: 13, left: 18, width: 13, height: 6, background: 'rgba(255,255,255,0.45)', borderRadius: '50%', transform: 'rotate(-35deg)' }} />
-            </div>
-          </motion.div>
-        )
-      })}
 
       {/* 详情弹窗 */}
     <TodoDetailModal
