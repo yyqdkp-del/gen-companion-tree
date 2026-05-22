@@ -141,6 +141,7 @@ export type HotspotItem = {
   category: string
   relevance_reason?: string
   action?: string
+  source_url?: string | null
   action_available: boolean
   action_type?: string
   action_data?: { url?: string }

@@ -5,6 +5,12 @@ import { waitUntil } from '@vercel/functions'
 import { getUserLocation } from '@/lib/geofence'
 import { getAuthUser } from '@/lib/auth/getAuthUser'
 import { getTodayStrInTimeZone } from '@/lib/date/localDate'
+import { isValidHotspotUrl } from '@/lib/hotspot/url'
+
+function normalizePatrolSourceUrl(item: Record<string, unknown>): string {
+  const raw = String(item.source_url || (item.action_data as { url?: string } | undefined)?.url || '').trim()
+  return isValidHotspotUrl(raw) ? raw : ''
+}
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || '',
@@ -193,7 +199,8 @@ JSON数组，最多6条，每条包含：
 - title: 三段式标题
 - summary: 50字内的具体影响说明
 - urgency: urgent/important/lifestyle
-- action: 妈妈可以立刻做的一件事`
+- action: 妈妈可以立刻做的一件事
+- source_url: 必须是真实可访问的 https 链接；不确定则填空字符串 ""，禁止编造或占位假链接`
 }
 
 // ── Claude 整合润色 ──
@@ -239,6 +246,7 @@ ${geminiData || '（无数据）'}
   "urgency": "urgent|important|lifestyle",
   "summary": "50字内具体影响说明",
   "action": "妈妈可以立刻做的一件事",
+  "source_url": "https://官方或新闻原文链接，不确定则填 \"\"",
   "relevance_reason": "与这个家庭的具体关联（可选）",
   "action_available": false,
   "action_type": null,
@@ -253,7 +261,16 @@ ${geminiData || '（无数据）'}
     const cleaned = raw.replace(/```json|```/g, '').trim()
     const match = cleaned.match(/\[[\s\S]*\]/)
     const parsed = match ? JSON.parse(match[0]) : []
-    return Array.isArray(parsed) ? parsed.slice(0, 6) : []
+    if (!Array.isArray(parsed)) return []
+    return parsed.slice(0, 6).map((item: Record<string, unknown>) => {
+      const source_url = normalizePatrolSourceUrl(item)
+      const action_data = (item.action_data && typeof item.action_data === 'object')
+        ? { ...(item.action_data as Record<string, unknown>) }
+        : {}
+      if (source_url) action_data.url = source_url
+      else delete action_data.url
+      return { ...item, source_url, action_data }
+    })
   } catch (e: any) {
     console.error('Claude整合失败:', e?.message)
     return []
@@ -286,20 +303,29 @@ async function saveHotspots(
   if (!toInsert.length) return { ok: true, count: 0 }
 
   const { error } = await supabase.from('hotspot_items').insert(
-    toInsert.map(item => ({
-      user_id: userId,
-      category: item.category || 'lifestyle',
-      urgency: item.urgency || 'lifestyle',
-      title: item.title,
-      summary: item.summary,
-      action: item.action || null,
-      relevance_reason: item.relevance_reason,
-      action_available: item.action_available || false,
-      action_type: item.action_type || null,
-      action_data: item.action_data || {},
-      status: 'unread',
-      expires_at: new Date(Date.now() + (item.expires_hours || 24) * 3600000).toISOString(),
-    }))
+    toInsert.map(item => {
+      const source_url = normalizePatrolSourceUrl(item)
+      const action_data = (item.action_data && typeof item.action_data === 'object')
+        ? { ...(item.action_data as Record<string, unknown>) }
+        : {}
+      if (source_url) action_data.url = source_url
+      else delete action_data.url
+      return {
+        user_id: userId,
+        category: item.category || 'lifestyle',
+        urgency: item.urgency || 'lifestyle',
+        title: item.title,
+        summary: item.summary,
+        action: item.action || null,
+        source_url: source_url || null,
+        relevance_reason: item.relevance_reason,
+        action_available: item.action_available || false,
+        action_type: item.action_type || null,
+        action_data,
+        status: 'unread',
+        expires_at: new Date(Date.now() + (item.expires_hours || 24) * 3600000).toISOString(),
+      }
+    })
   )
 
   if (error) {

@@ -14,6 +14,7 @@ import ActionModal from '@/app/components/ActionModal'
 import HotspotPreferences from '@/app/_shared/_components/HotspotPreferences'
 import { logOrAlertNetworkError } from '@/lib/errors/logOrAlertNetworkError'
 import { track } from '@/lib/analytics/track'
+import { resolveHotspotLink, hotspotSearchUrl } from '@/lib/hotspot/url'
 
 const HOTSPOT_GLASS: React.CSSProperties = {
   background: 'rgba(255,255,255,0.8)',
@@ -68,6 +69,9 @@ function HotspotCard({ item, onRead, onActionModal, onConvertTodo }: {
   const isUrgent = item.urgency === 'urgent'
   const isImportant = item.urgency === 'important'
   const showActionButton = (isUrgent || isImportant) && item.action_available
+  const sourceLink = resolveHotspotLink(item)
+  const externalHref = sourceLink || hotspotSearchUrl(displayTitle || titleStr)
+  const externalLabel = sourceLink ? '打开来源' : '搜索更多'
 
   const handleExpand = (e: React.MouseEvent) => {
     e.stopPropagation()
@@ -210,17 +214,32 @@ function HotspotCard({ item, onRead, onActionModal, onConvertTodo }: {
                     opacity: converting ? 0.6 : 1 }}>
                   {converting ? '添加中…' : <><Plus size={12} /> 加入待办</>}
                 </motion.button>
-                {!item.action_available && item.action_data?.url && (
-                  <motion.button whileTap={{ scale: 0.92 }}
-                    onClick={e => { e.stopPropagation(); window.open(item.action_data?.url, '_blank'); onRead() }}
-                    style={{ display: 'flex', alignItems: 'center', gap: 5,
-                      padding: '8px 14px', borderRadius: 20,
-                      border: `0.5px solid ${cfg.border}`,
-                      background: 'rgba(255,255,255,0.7)',
-                      color: cfg.color, fontSize: 12, fontWeight: 500, cursor: 'pointer' }}>
-                    <ExternalLink size={12} /> 查看详情
-                  </motion.button>
-                )}
+                <motion.a
+                  whileTap={{ scale: 0.92 }}
+                  href={externalHref}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={e => {
+                    e.stopPropagation()
+                    if (!consumed) onRead()
+                  }}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 5,
+                    padding: '8px 14px',
+                    borderRadius: 20,
+                    border: `0.5px solid ${cfg.border}`,
+                    background: 'rgba(255,255,255,0.7)',
+                    color: cfg.color,
+                    fontSize: 12,
+                    fontWeight: 500,
+                    cursor: 'pointer',
+                    textDecoration: 'none',
+                  }}
+                >
+                  <ExternalLink size={12} /> {externalLabel}
+                </motion.a>
               </div>
             </div>
           </motion.div>
