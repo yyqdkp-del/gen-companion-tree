@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/client'
-import { calculateEnergy, getEnergyColor } from '../_engine/energy'
+import { calculateEnergy } from '../_engine/energy'
 import type { TimelineItem, HealthStatus, MoodStatus } from '../_types'
 import { addDaysStr, getTodayStr } from '@/lib/date/localDate'
 
@@ -7,6 +7,34 @@ const supabase = createClient()
 
 const DOW_KEY_BY_NUM: Record<number, string> = {
   0: 'sun', 1: 'mon', 2: 'tue', 3: 'wed', 4: 'thu', 5: 'fri', 6: 'sat',
+}
+
+function parseChildAge(child: { birthdate?: string | null; grade?: string | null }): number | undefined {
+  if (child.birthdate) {
+    const birth = new Date(child.birthdate)
+    if (!Number.isNaN(birth.getTime())) {
+      const now = new Date()
+      let age = now.getFullYear() - birth.getFullYear()
+      if (now.getMonth() < birth.getMonth() || (now.getMonth() === birth.getMonth() && now.getDate() < birth.getDate())) {
+        age -= 1
+      }
+      return age > 0 ? age : undefined
+    }
+  }
+  if (child.grade) {
+    const m = String(child.grade).match(/(\d+)/)
+    if (m) {
+      const g = parseInt(m[1], 10)
+      if (g >= 1 && g <= 12) return g + 5
+    }
+  }
+  return undefined
+}
+
+function parseGradeNumber(grade?: string | null): number | undefined {
+  if (!grade) return undefined
+  const m = String(grade).match(/(\d+)/)
+  return m ? parseInt(m[1], 10) : undefined
 }
 
 export async function fetchChildSchedule(childId: string, today: string) {
@@ -122,7 +150,8 @@ export async function enrichChildren(
 
   const results = await Promise.allSettled(
     childData.map(async (c: any) => {
-      const [logRes, evtRes, profRes, actsRes] = await Promise.allSettled([
+      const sevenDaysAgo = addDaysStr(new Date(`${today}T12:00:00`), -7)
+      const [logRes, evtRes, profRes, actsRes, weeklyRes] = await Promise.allSettled([
         supabase.from('child_daily_log')
           .select('*').eq('child_id', c.id)
           .eq('user_id', uid).eq('date', today).maybeSingle(),
@@ -136,9 +165,15 @@ export async function enrichChildren(
           .select('activities, class_schedule').eq('child_id', c.id).maybeSingle(),
         supabase.from('child_activities')
           .select('name, days, is_active').eq('child_id', c.id).eq('user_id', uid),
+        supabase.from('child_daily_log')
+          .select('sleep_start, sleep_end, mood_status, health_status, date')
+          .eq('child_id', c.id)
+          .gte('date', sevenDaysAgo)
+          .order('date', { ascending: false }),
       ])
       const log  = logRes.status === 'fulfilled' ? logRes.value.data : null
       const evts = evtRes.status === 'fulfilled' ? (evtRes.value.data || []) : []
+      const weeklyLogs = weeklyRes.status === 'fulfilled' ? (weeklyRes.value.data || []) : []
 
       const profile =
         profRes.status === 'fulfilled' ? profRes.value.data : null
@@ -239,24 +274,32 @@ export async function enrichChildren(
 
       // energy 计算 — 使用精力引擎
       const isWeekend = [0, 6].includes(new Date(`${today}T12:00:00`).getDay())
+      const childAge = parseChildAge(c)
       const energyResult = calculateEnergy({
-        healthStatus:    log?.health_status,
-        moodStatus:      log?.mood_status,
-        sleepStart:      log?.sleep_start,
-        sleepEnd:        log?.sleep_end,
-        todayEvents:     allTodayEvents,
-        usualBedtime:    c.usual_bedtime,
-        weekendBedtime:  c.weekend_bedtime,
+        age: childAge,
+        grade: parseGradeNumber(c.grade),
+        healthStatus: log?.health_status,
+        moodStatus: log?.mood_status,
+        sleepStart: log?.sleep_start,
+        sleepEnd: log?.sleep_end,
+        todayEvents: allTodayEvents,
+        usualBedtime: c.usual_bedtime,
+        weekendBedtime: c.weekend_bedtime,
         schoolStartTime: c.school_start_time,
         isWeekend,
+        weeklyLogs: weeklyLogs || [],
       })
-      const energy = energyResult.score
 
       return {
         id: c.id, name: c.name || '孩子',
         emoji: c.emoji || '👶🏻',
         avatar_url: c.avatar_url || null,
-        energy: energy,
+        energy: energyResult.score,
+        energy_level: energyResult.level,
+        energy_label: energyResult.label,
+        energy_focus: energyResult.focus,
+        energy_advice: energyResult.advice,
+        weekly_fatigue: energyResult.weeklyFatigue,
         health_status: log?.health_status || 'normal',
         mood_status: log?.mood_status || 'calm',
         school_name: c.school_name,

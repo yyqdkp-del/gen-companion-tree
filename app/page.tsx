@@ -447,28 +447,10 @@ export default function BasePage() {
   const todayClasses = (activeKid as any)?.today_classes || []
 
   const childValue = !activeKid ? '—'
-    : todayActivities.length > 0
-      ? (todayActivities[0].name ?? todayActivities[0].title ?? '活动')?.slice(0, 8) || '活动'
-      : todayClasses.length > 0
-        ? (typeof todayClasses[0] === 'object'
-          ? todayClasses[0].subject?.slice(0, 8) || '上课中'
-          : String(todayClasses[0]).slice(0, 8)) || '上课中'
-        : (activeKid as any).urgent_items?.filter((i: UrgentItem) =>
-          i.level === 'red' || i.level === 'orange',
-        ).length > 0
-          ? '有紧急事项'
-          : (activeKid as any).energy != null
-            ? `精力 ${(activeKid as any).energy}%`
-            : '—'
+    : (activeKid as any).energy_label || (activeKid as any).energy_focus?.slice(0, 10) || '—'
 
   const childSubValue = !activeKid ? ''
-    : todayActivities.length > 1
-      ? `+${todayActivities.length - 1} 个活动`
-      : todayClasses.length > 0 && todayActivities.length === 0
-        ? `今天 ${todayClasses.length} 节课`
-        : (activeKid as any).school_end_time
-          ? `放学 ${(activeKid as any).school_end_time}`
-          : ''
+    : (activeKid as any).energy_focus?.slice(0, 15) || ''
 
   const topTodo = [...(todoGroups?.today || [])].sort((a, b) => {
     const order: Record<string, number> = { red: 3, orange: 2, yellow: 1 }

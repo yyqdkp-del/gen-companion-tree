@@ -43,56 +43,47 @@ export default function ChildEnergyCard({ name, energy, onClick }: Props) {
         transition: 'all 0.2s',
       }}>
 
-      {/* 第一行：名字 + 状态标签 */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+      <motion.div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <motion.div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <span style={{ fontSize: 14 }}>{LEVEL_DOT[energy.level]}</span>
           <span style={{ fontSize: 13, fontWeight: 600, color: THEME.text }}>{name}</span>
           <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 8,
             background: c.border, color: c.text, fontWeight: 600 }}>
             {energy.label}
           </span>
-        </div>
+        </motion.div>
 
-        {/* 警示标签 */}
         {isAlert && (
           <span style={{ fontSize: 10, padding: '2px 7px', borderRadius: 6,
             background: `${c.text}15`, color: c.text, fontWeight: 600 }}>
             ⚠ 需注意
           </span>
         )}
-      </div>
+      </motion.div>
 
-      {/* 第二行：建议 + 朗读 */}
-      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6 }}>
-        <div style={{ flex: 1, fontSize: 12, color: THEME.gold, lineHeight: 1.5, fontWeight: 500 }}>
+      <motion.div style={{ fontSize: 11, color: c.text, fontWeight: 600, lineHeight: 1.4 }}>
+        {energy.focus}
+      </motion.div>
+
+      <motion.div style={{ display: 'flex', alignItems: 'flex-start', gap: 6 }}>
+        <motion.div style={{ flex: 1, fontSize: 12, color: THEME.gold, lineHeight: 1.5, fontWeight: 500 }}>
           {energy.advice}
-        </div>
+        </motion.div>
         <button onClick={e => { e.stopPropagation(); speak(energy.advice) }}
           style={{ background: 'none', border: 'none', cursor: 'pointer',
             fontSize: 14, opacity: 0.5, padding: '2px', flexShrink: 0 }}
           title="朗读">🔊</button>
-      </div>
+      </motion.div>
 
-      {/* 第三行：取消活动原因（仅橙/红显示）*/}
-      {energy.skipActivities && energy.skipReason && (
-        <div style={{ fontSize: 11, color: c.text,
-          background: `${c.text}10`, padding: '5px 8px',
-          borderRadius: 7, lineHeight: 1.4 }}>
-          {energy.skipReason}
-        </div>
-      )}
-
-      {/* 第四行：上床时间 + 点击更新 */}
-      <div style={{ display: 'flex', justifyContent: 'space-between',
+      <motion.div style={{ display: 'flex', justifyContent: 'space-between',
         alignItems: 'center', marginTop: 2 }}>
         <span style={{ fontSize: 10, color: THEME.muted }}>
-          建议上床 {energy.bedtime}
+          本周疲劳 {energy.weeklyFatigue}/10
         </span>
         <span style={{ fontSize: 10, color: THEME.gold, fontWeight: 500 }}>
           点击更新状态 ›
         </span>
-      </div>
+      </motion.div>
     </motion.div>
   )
 }
