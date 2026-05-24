@@ -161,6 +161,6 @@ export type TimelineItem = {
 
 export type DailyLog = {
   id?: string
-  health_status: HealthStatus
-  mood_status: MoodStatus
+  health_status?: HealthStatus
+  mood_status?: MoodStatus
 }

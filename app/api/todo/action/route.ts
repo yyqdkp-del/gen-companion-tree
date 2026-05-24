@@ -5,6 +5,7 @@ export const dynamic = 'force-dynamic'
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { getAuthUser } from '@/lib/auth/getAuthUser'
+import { fetchResidentCity } from '@/lib/family/resolveResidentCity'
 
 const MAKE_WEBHOOK_URL = process.env.NEXT_PUBLIC_MAKE_WEBHOOK_URL || ''
 
@@ -89,7 +90,7 @@ async function addToShoppingList(todo: any): Promise<boolean> {
 }
 
 // ══ 写入Google Calendar ════════════════════════════════════
-async function addToCalendar(todo: any): Promise<boolean> {
+async function addToCalendar(todo: any, location = ''): Promise<boolean> {
   if (!todo.due_date) return false
   const startTime = new Date(todo.due_date + 'T09:00:00')
   const endTime = new Date(todo.due_date + 'T11:00:00')
@@ -98,7 +99,7 @@ async function addToCalendar(todo: any): Promise<boolean> {
     start_time: startTime.toISOString(),
     end_time: endTime.toISOString(),
     description: todo.ai_draft || todo.description || '',
-    location: '清迈',
+    location: location || '',
   })
 }
 
@@ -151,6 +152,7 @@ export async function POST(req: NextRequest) {
 
     const action = actionType || todo.ai_action_type
     const actionData = todo.ai_action_data || {}
+    const city = await fetchResidentCity(supabase, user.id)
 
     let result = ''
     let success = false
@@ -201,7 +203,7 @@ export async function POST(req: NextRequest) {
         break
 
       case 'calendar':
-        success = await addToCalendar(todo)
+        success = await addToCalendar(todo, city)
         message = success
           ? '根已写入日历 ✅'
           : '日历写入失败，请检查Make.com连接'

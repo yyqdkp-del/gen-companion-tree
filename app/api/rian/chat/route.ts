@@ -2,6 +2,7 @@ export const dynamic = 'force-dynamic'
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { getAuthUser } from '@/lib/auth/getAuthUser'
+import { fetchResidentCity } from '@/lib/family/resolveResidentCity'
 
 const MAKE_WEBHOOK_URL = process.env.NEXT_PUBLIC_MAKE_WEBHOOK_URL || ''
 
@@ -70,7 +71,7 @@ async function updateFamilyProfile(supabase: any, docType: string, extracted: an
 }
 
 // ══ 自动发Make.com（非阻塞） ══
-async function triggerMake(events: any[], input_type: string) {
+async function triggerMake(events: any[], input_type: string, city = '') {
   if (!MAKE_WEBHOOK_URL) return
 
   for (const e of events) {
@@ -96,7 +97,7 @@ async function triggerMake(events: any[], input_type: string) {
             e.carry_items ? `携带：${e.carry_items.join('、')}` : null,
             e.warnings?.join('、'),
           ].filter(Boolean).join('\n'),
-          location: '清迈',
+          location: city || '',
           dimension,
         }),
       }).catch(err => console.error('Make calendar error:', err))
@@ -150,7 +151,7 @@ async function triggerMake(events: any[], input_type: string) {
 }
 
 // ══ 识别用户意图并触发对应执行（保留原有逻辑） ══
-async function executeAction(question: string, context: string): Promise<string | null> {
+async function executeAction(question: string, context: string, city = ''): Promise<string | null> {
   const q = question.toLowerCase()
 
   const titleMatch = context.match(/事件：(.+?)\n/)
@@ -188,7 +189,7 @@ async function executeAction(question: string, context: string): Promise<string 
         start_time: startTime.toISOString(),
         end_time: endTime.toISOString(),
         description: desc.replace(/\n/g, ' '),
-        location: '清迈',
+        location: city || '',
       }),
     })
     return 'calendar'
@@ -255,14 +256,16 @@ export async function POST(req: NextRequest) {
       process.env.SUPABASE_SERVICE_ROLE_KEY || ''
     )
 
+    const city = await fetchResidentCity(supabase, userId)
+
     // 先尝试执行操作
-    const actionType = await executeAction(question, context)
+    const actionType = await executeAction(question, context, city)
 
     // 如果有事件数据传入，自动触发Make.com
     if (event_data?.length > 0) {
       const docType = detectDocumentType(context)
       await updateFamilyProfile(supabase, docType, event_data, userId)
-      triggerMake(event_data, 'chat') // 非阻塞
+      triggerMake(event_data, 'chat', city) // 非阻塞
     }
 
     const messages = [
@@ -270,7 +273,8 @@ export async function POST(req: NextRequest) {
       { role: 'user', content: question }
     ]
 
-    let systemPrompt = `你是日安，清迈家庭全能管家。
+    const familyLabel = city ? `${city}家庭` : '海外华人家庭'
+    let systemPrompt = `你是日安，${familyLabel}全能管家。
 当前处理的事件背景：${context}
 
 你的职责：

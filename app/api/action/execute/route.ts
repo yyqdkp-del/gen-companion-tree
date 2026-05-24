@@ -5,6 +5,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { getAuthUser } from '@/lib/auth/getAuthUser'
 import { fetchFormTemplates, enrichActionsWithFormTemplates } from '@/lib/action/enrichPDF'
+import { familyServicePromptLabel, resolveResidentCityFromFamilyData } from '@/lib/family/resolveResidentCity'
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -218,7 +219,8 @@ async function upsertActionQueue(
 // ══ 构建 TODO Prompt ══
 function buildTodoPrompt(todo: any, brainInstruction: any, familyData: any): string {
   const dimension = brainInstruction?.dimension || 'education'
-  return `你是日安执行引擎，为清迈陪读家庭生成一键执行包。
+  const familyLabel = familyServicePromptLabel(resolveResidentCityFromFamilyData(familyData))
+  return `你是日安执行引擎，${familyLabel}生成一键执行包。
 
 待办：${todo.title}
 维度：${dimension}
@@ -247,7 +249,8 @@ function buildSchedulePrompt(
   dimension: string,
   familyData: any
 ): string {
-  return `你是日安执行引擎，为清迈陪读家庭生成孩子活动一键执行包。
+  const familyLabel = familyServicePromptLabel(resolveResidentCityFromFamilyData(familyData))
+  return `你是日安执行引擎，${familyLabel}生成孩子活动一键执行包。
 
 孩子：${childName}
 活动：${event.title}
@@ -272,7 +275,8 @@ actions最多4个。`
 
 // ══ 构建 Hotspot Prompt ══
 function buildHotspotPrompt(hotspot: any, familyData: any): string {
-  return `你是日安执行引擎，为清迈陪读家庭生成热点资讯一键执行包。
+  const familyLabel = familyServicePromptLabel(resolveResidentCityFromFamilyData(familyData))
+  return `你是日安执行引擎，${familyLabel}生成热点资讯一键执行包。
 
 热点标题：${hotspot.title}
 类别：${hotspot.category}

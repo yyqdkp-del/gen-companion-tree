@@ -1,6 +1,8 @@
 export const dynamic = 'force-dynamic'
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthUser } from '@/lib/auth/getAuthUser'
+import { createClient } from '@supabase/supabase-js'
+import { fetchResidentCity } from '@/lib/family/resolveResidentCity'
 
 const ANON_IP_DAILY_LIMIT = 3
 type AssessIpBucket = { day: string; count: number }
@@ -112,11 +114,25 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: '缺少问卷答案', _failed: true }, { status: 400 })
   }
 
-  const localCtx = geofence?.city
-    ? `孩子所在城市：${geofence.city}（${geofence.country || ''}）。
+  let localCtx: string
+  if (geofence?.city) {
+    localCtx = `孩子所在城市：${geofence.city}（${geofence.country || ''}）。
 local_line 字段必须结合 ${geofence.city} 的真实生活场景，
 比如当地的自然环境、学校文化、社区生活，禁止套用其他城市的场景。`
-    : `孩子所在城市：清迈（泰国）。local_line 请结合清迈榕树、山林、国际学校的生活场景。`
+  } else {
+    let profileCity = ''
+    if (authenticated) {
+      const supabase = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+        process.env.SUPABASE_SERVICE_ROLE_KEY || '',
+      )
+      const { user } = await getAuthUser(req)
+      if (user) profileCity = await fetchResidentCity(supabase, user.id)
+    }
+    localCtx = profileCity
+      ? `孩子所在城市：${profileCity}。local_line 请结合${profileCity}的真实生活场景。`
+      : '孩子所在城市未填写。local_line 请结合海外华人陪读家庭的通用生活场景，不要默认某一具体城市。'
+  }
 
   const inferredLevel = inferLevel(answers)
 

@@ -5,6 +5,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { getAuthUser } from '@/lib/auth/getAuthUser'
 import { fetchFormTemplates, enrichActionsWithFormTemplates } from '@/lib/action/enrichPDF'
+import { familyServicePromptLabel, resolveResidentCityFromFamilyData } from '@/lib/family/resolveResidentCity'
 
 const MAKE_WEBHOOK_URL = process.env.NEXT_PUBLIC_MAKE_WEBHOOK_URL || ''
 
@@ -160,7 +161,8 @@ function buildTodoPrompt(todo: any, brainInstruction: any, familyData: any, grok
     selfcare:   '自我：课程社群推荐、计划表、习惯提醒',
   }
   const dimension = brainInstruction?.dimension || 'other'
-  return `你是日安执行引擎，为清迈陪读家庭生成一键执行包。
+  const familyLabel = familyServicePromptLabel(resolveResidentCityFromFamilyData(familyData))
+  return `你是日安执行引擎，${familyLabel}生成一键执行包。
 
 待办：${todo.title}
 维度：${dimension}
@@ -189,7 +191,8 @@ function buildSchedulePrompt(event: any, childName: string, dimension: string, f
     medical:   '医疗：就诊材料、携带物品、医院导航电话、问诊描述、复诊提醒',
   }
 
-  return `你是日安执行引擎，为清迈陪读家庭生成孩子活动一键执行包。
+  const familyLabel = familyServicePromptLabel(resolveResidentCityFromFamilyData(familyData))
+  return `你是日安执行引擎，${familyLabel}生成孩子活动一键执行包。
 
 孩子：${childName}
 活动：${event.title}

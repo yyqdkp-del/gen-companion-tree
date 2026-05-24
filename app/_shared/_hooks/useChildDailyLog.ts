@@ -2,30 +2,20 @@ import { useState, useEffect, useCallback } from 'react'
 import { fetchDailyLog, saveDailyLog } from '../_services/childService'
 import type { DailyLog, HealthStatus, MoodStatus } from '../_types'
 
+const emptyLog = (): DailyLog => ({})
+
 export function useChildDailyLog(
   childId: string | undefined,
   userId: string,
   today: string,
-  defaultHealth?: HealthStatus,
-  defaultMood?: MoodStatus,
 ) {
-  const [dailyLog, setDailyLog] = useState<DailyLog>({
-    health_status: defaultHealth ?? 'normal',
-    mood_status:   defaultMood   ?? 'calm',
-  })
+  const [dailyLog, setDailyLog] = useState<DailyLog>(emptyLog())
 
   useEffect(() => {
     if (!childId) return
-    // 切换孩子时先重置，避免短暂显示上一个孩子的状态
-    setDailyLog({
-      health_status: defaultHealth ?? 'normal',
-      mood_status:   defaultMood   ?? 'calm',
-    })
+    setDailyLog(emptyLog())
     fetchDailyLog(childId, today).then(data => {
-      setDailyLog(data ?? {
-        health_status: defaultHealth ?? 'normal',
-        mood_status:   defaultMood   ?? 'calm',
-      })
+      setDailyLog(data ?? emptyLog())
     })
   }, [childId, today])
 

@@ -108,7 +108,7 @@ export async function POST(req: NextRequest) {
   // 修复四：优先用围栏城市，其次用 location_scene，最后降级
   const scene = geofence?.city
     ? `${geofence.city}华人陪读家庭`
-    : location_scene || '清迈华人陪读家庭'
+    : location_scene || '海外华人陪读家庭'
 
   const childCtx = child_name
     ? `孩子叫${child_name}，${child_grade || ''}，当前中文水平${child_level || 'R2'}。`

@@ -5,12 +5,14 @@ export const dynamic = 'force-dynamic'
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { addDaysToYmd, getTodayStr } from '@/lib/date/localDate'
+import { fetchResidentCity } from '@/lib/family/resolveResidentCity'
 
 const MAKE_WEBHOOK_URL = process.env.NEXT_PUBLIC_MAKE_WEBHOOK_URL || ''
 
 // ══ Claude邮件解析Prompt ══════════════════════════════════════
-function buildEmailPrompt(email: EmailInput, familyContext: string): string {
-  return `你是日安，专为清迈陪读家庭服务的AI管家。
+function buildEmailPrompt(email: EmailInput, familyContext: string, city: string): string {
+  const familyIntro = city ? `专为${city}陪读家庭` : '专为海外华人陪读家庭'
+  return `你是日安，${familyIntro}服务的AI管家。
 
 ## 家庭档案
 ${familyContext}
@@ -210,7 +212,7 @@ function quickSchoolCheck(email: EmailInput, childrenDomains: string[]): boolean
 }
 
 // ══ 触发Make.com日历写入 ════════════════════════════════════
-async function triggerCalendar(event: any) {
+async function triggerCalendar(event: any, city = '') {
   if (!MAKE_WEBHOOK_URL || !event.date_start) return
   try {
     const start = new Date(event.date_start + (event.time ? `T${event.time}:00` : 'T09:00:00'))
@@ -230,7 +232,7 @@ async function triggerCalendar(event: any) {
           event.requires_items?.length ? `携带：${event.requires_items.join('、')}` : null,
           event.requires_payment ? `缴费：${event.requires_payment}铢` : null,
         ].filter(Boolean).join('\n'),
-        location: event.location || '清迈',
+        location: event.location || city || '',
         dimension: 'education',
       }),
     })
@@ -238,7 +240,7 @@ async function triggerCalendar(event: any) {
 }
 
 // ══ 核心：把解析结果写入三珠 ═════════════════════════════════
-async function syncEmailToThreeDrops(supabase: any, parsed: any, email: EmailInput, userId: string) {
+async function syncEmailToThreeDrops(supabase: any, parsed: any, email: EmailInput, userId: string, city = '') {
   const uid = email.user_id || userId
   if (!uid) return
 
@@ -276,7 +278,7 @@ async function syncEmailToThreeDrops(supabase: any, parsed: any, email: EmailInp
     }
 
     // 触发Make日历
-    await triggerCalendar(event)
+    await triggerCalendar(event, city)
   }
 
   // ── 2. 写入待办 todo_items ───────────────────────────────
@@ -430,7 +432,7 @@ async function syncEmailToThreeDrops(supabase: any, parsed: any, email: EmailInp
 }
 
 // ══ Claude解析邮件 ═══════════════════════════════════════════
-async function parseEmailWithClaude(email: EmailInput, familyContext: string): Promise<any> {
+async function parseEmailWithClaude(email: EmailInput, familyContext: string, city: string): Promise<any> {
   const response = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
@@ -443,7 +445,7 @@ async function parseEmailWithClaude(email: EmailInput, familyContext: string): P
       max_tokens: 3000,
       messages: [{
         role: 'user',
-        content: buildEmailPrompt(email, familyContext)
+        content: buildEmailPrompt(email, familyContext, city)
       }],
     }),
   })
@@ -492,6 +494,7 @@ export async function POST(req: NextRequest) {
         const domains = (domainChildren || []).map((c: any) => c.school_email_domain).filter(Boolean)
 
         const familyContext = await getFamilyContext(supabase, userId)
+        const city = await fetchResidentCity(supabase, userId)
 
         // 去重检查
         if (email.message_id) {
@@ -521,7 +524,7 @@ export async function POST(req: NextRequest) {
         }
 
         // Claude解析
-        const parsed = await parseEmailWithClaude(email, familyContext)
+        const parsed = await parseEmailWithClaude(email, familyContext, city)
 
         if (parsed.email_type === 'spam' || parsed.confidence < 0.3) {
           results.push({ spam: true, subject: email.subject })
@@ -529,7 +532,7 @@ export async function POST(req: NextRequest) {
         }
 
         // 写入三珠
-        await syncEmailToThreeDrops(supabase, parsed, email, userId)
+        await syncEmailToThreeDrops(supabase, parsed, email, userId, city)
 
         // 记录已处理
         await markAsProcessed(supabase, email, parsed)

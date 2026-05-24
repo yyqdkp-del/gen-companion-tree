@@ -216,12 +216,13 @@ function EventList({ events, onSelect }: { events: any[]; onSelect: (e: any) => 
 }
 
 function StatusEditor({ log, onSave, onClose }: {
-  log: { health_status: string; mood_status: string }
+  log: { health_status?: string | null; mood_status?: string | null }
   onSave: (h: HealthStatus, m: MoodStatus) => void
   onClose: () => void
 }) {
-  const [health, setHealth] = useState(log.health_status || 'normal')
-  const [mood,   setMood]   = useState(log.mood_status   || 'calm')
+  const [health, setHealth] = useState<string | null>(log.health_status || null)
+  const [mood, setMood] = useState<string | null>(log.mood_status || null)
+  const canSave = health != null && mood != null
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
       style={{ position: 'fixed', inset: 0, zIndex: 500,
@@ -267,10 +268,12 @@ function StatusEditor({ log, onSave, onClose }: {
           ))}
         </div>
         <motion.button whileTap={{ scale: 0.97 }}
-          onClick={() => onSave(health as HealthStatus, mood as MoodStatus)}
+          onClick={() => { if (canSave) onSave(health as HealthStatus, mood as MoodStatus) }}
+          disabled={!canSave}
           style={{ width: '100%', padding: '14px', borderRadius: 14, border: 'none',
-            background: '#2d322f', color: '#fff', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
-          保存
+            background: canSave ? '#2d322f' : 'rgba(45,50,47,0.2)', color: '#fff', fontSize: 14, fontWeight: 600,
+            cursor: canSave ? 'pointer' : 'not-allowed' }}>
+          {canSave ? '保存' : '请选择健康与心情'}
         </motion.button>
       </motion.div>
     </motion.div>
@@ -293,8 +296,6 @@ export default function ChildSheet({ childList, sel, onSel, onClose, onAdd, user
   const { timeline, calendar, loading } = useChildSchedule(sel?.id, today)
   const { dailyLog, saveStatus }        = useChildDailyLog(
     sel?.id, userId, today,
-    sel?.health_status as HealthStatus,
-    sel?.mood_status   as MoodStatus,
   )
 
   const [showStatusEditor, setShowStatusEditor] = useState(false)
@@ -333,8 +334,7 @@ export default function ChildSheet({ childList, sel, onSel, onClose, onAdd, user
   const todayMainEventType = todayEvents[0]?.event_type || 'class'
   const todayPackCount   = [...new Set(todayPackEvents.flatMap(e => Array.isArray(e.requires_items) ? e.requires_items : []))].length
 
-  const currentHealth = healthOptions.find(o => o.value === dailyLog.health_status) || healthOptions[0]
-  const currentMood   = moodOptions.find(o => o.value === dailyLog.mood_status)     || moodOptions[1]
+  const hasLoggedStatus = dailyLog.health_status != null && dailyLog.mood_status != null
 
   return (
     <>
@@ -428,6 +428,11 @@ export default function ChildSheet({ childList, sel, onSel, onClose, onAdd, user
                   energy={energyResult}
                   onClick={() => setShowStatusEditor(true)}
                 />
+                {!hasLoggedStatus && (
+                  <p style={{ fontSize: 11, color: 'rgba(45,50,47,0.4)', textAlign: 'center', margin: '-4px 0 10px' }}>
+                    今天未记录
+                  </p>
+                )}
 
                 {loading ? (
                   <div style={{ textAlign: 'center', padding: '20px 0',
