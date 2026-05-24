@@ -26,29 +26,39 @@ test.describe('根陪伴 Browser Automation 完整测试', () => {
       console.log('1. 打开登录页...')
       await page.goto(`${BASE_URL}/auth?mode=login`)
       await page.waitForTimeout(2000)
-      await page.screenshot({ path: 'tests/screenshots/01-login.png' })
+      await page.screenshot({ path: 'tests/screenshots/01-auth-page.png' })
 
-      const emailInput = page.locator('input[type="email"]').first()
-      if (await emailInput.isVisible()) {
-        await emailInput.fill(EMAIL)
-        const passwordInput = page.locator('input[type="password"]').first()
-        await passwordInput.fill(PASSWORD)
-        await page.screenshot({ path: 'tests/screenshots/02-login-filled.png' })
+      const emailInput = page.locator('input[type="email"], input[placeholder*="邮箱"], input[placeholder*="email"]').first()
+      await emailInput.waitFor({ state: 'visible', timeout: 5000 })
+      await emailInput.fill(EMAIL)
 
-        const loginBtn = page.getByRole('button', { name: /登录/ }).first()
-        if (await loginBtn.isVisible()) {
-          await loginBtn.click()
-        } else {
-          await page.keyboard.press('Enter')
-        }
-        await page.waitForURL(url => !url.pathname.startsWith('/auth'), { timeout: 20_000 }).catch(() => {})
+      const passwordInput = page.locator('input[type="password"]').first()
+      await passwordInput.fill(PASSWORD)
+      await page.screenshot({ path: 'tests/screenshots/02-filled.png' })
+
+      const loginBtn = page.getByRole('button', { name: /登录 →/ })
+      if (await loginBtn.isVisible()) {
+        await loginBtn.click()
+      } else {
+        await passwordInput.press('Enter')
+      }
+
+      await page.waitForTimeout(3000)
+
+      const currentUrl = page.url()
+      console.log('登录后URL:', currentUrl)
+
+      if (currentUrl.includes('/auth')) {
+        await page.screenshot({ path: 'tests/screenshots/03-after-login.png' })
+        await page.goto(BASE_URL)
         await page.waitForTimeout(3000)
       }
 
+      await page.screenshot({ path: 'tests/screenshots/04-homepage.png', fullPage: true })
+      console.log('当前页面URL:', page.url())
+
       console.log('2. 检查首页三颗水珠...')
-      await page.goto(BASE_URL)
-      await page.waitForTimeout(4000)
-      await page.screenshot({ path: 'tests/screenshots/03-homepage.png', fullPage: true })
+      await page.waitForTimeout(2000)
 
       const timing = await page.evaluate(() => {
         const nav = performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming

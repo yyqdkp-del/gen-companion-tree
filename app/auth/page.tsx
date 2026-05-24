@@ -76,6 +76,9 @@ export default function AuthPage() {
         if (error) { setError('邮箱或密码错误'); setLoading(false); return }
         if (data.user) await saveChildData(data.user.id)
         if (data.session) await saveSessionBundle(data.session)
+
+        await new Promise(resolve => setTimeout(resolve, 500))
+
         window.location.href = '/'
       }
     } catch {
