@@ -40,7 +40,7 @@ type Child = {
   id: string
   name: string
   emoji: string
-  energy: number
+  energy: number | null
   progress: number
   avatar_url?: string
 }
@@ -126,8 +126,8 @@ const actionReminders = useMemo<Reminder[]>(() => {
   const children = ctxKids
   const loading = false
   const currentChild = children[childIndex]
-  const childEnergy = currentChild?.energy ?? null
-  const hasChildEnergy = childEnergy !== null
+  const childEnergy = currentChild?.energy != null ? currentChild.energy : null
+  const showChildEnergy = childEnergy != null
   
   const { markDone: markDoneAction, snooze: snoozeAction } = useTodoActions(actionReminders, ctxSync)
   const { uploading, uploadStatus, upload } = useUpload(userId || '', () => {
@@ -225,13 +225,13 @@ const actionReminders = useMemo<Reminder[]>(() => {
         </motion.div>
         <p style={{ marginTop: 8, fontSize: 10, color: THEME.text, fontWeight: 'bold', letterSpacing: '0.2em', textAlign: 'center' }}>{currentChild?.name || ''}</p>
         <div style={{ width: 56, height: 3, background: 'rgba(255,255,255,0.3)', borderRadius: 2, margin: '3px auto', overflow: 'hidden' }}>
-          {hasChildEnergy ? (
-            <motion.div animate={{ width: `${childEnergy}%`, backgroundColor: getEnergyColor(childEnergy!) }} style={{ height: '100%' }} />
+          {showChildEnergy ? (
+            <motion.div animate={{ width: `${childEnergy}%`, backgroundColor: getEnergyColor(childEnergy) }} style={{ height: '100%' }} />
           ) : (
-            <div style={{ width: '100%', height: '100%', background: 'rgba(45,50,47,0.1)', borderRadius: 2 }} />
+            <div style={{ width: '30%', height: '100%', background: 'rgba(45,50,47,0.12)', borderRadius: 2 }} />
           )}
         </div>
-        {!hasChildEnergy && (
+        {!showChildEnergy && (
           <p style={{ marginTop: 4, fontSize: 10, color: THEME.muted, textAlign: 'center' }}>—</p>
         )}
       </div>

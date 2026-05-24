@@ -124,7 +124,6 @@ function calcTodayIntensity(input: EnergyInput, params: AgeParams): number {
 
 function calcWeeklyFatigue(input: EnergyInput, params: AgeParams): number {
   const logs = input.weeklyLogs || []
-  if (logs.length === 0) return 0
 
   let sleepDebt = 0
   logs.forEach(log => {
@@ -147,21 +146,25 @@ function calcWeeklyFatigue(input: EnergyInput, params: AgeParams): number {
     if (log.mood_status === 'upset') return 1
     return 3
   })
-  const avgMood = moodScores.reduce((a, b) => a + b, 0) / moodScores.length
+  const avgMood = logs.length > 0
+    ? moodScores.reduce((a, b) => a + b, 0) / moodScores.length
+    : 3
   const moodTrendScore = Math.max(0, (3 - avgMood) * 2.5)
 
-  const avgIntensityScore = logs.length > 0
-    ? Math.min(10, logs.reduce((sum, log) => {
-      const moodScore = log.mood_status === 'upset' ? 8
-        : log.mood_status === 'anxious' ? 6
+  const avgBurdenScore = logs.length > 0
+    ? logs.reduce((sum, log) => {
+      const score = log.mood_status === 'upset' ? 8
+        : log.mood_status === 'anxious' ? 7
         : log.mood_status === 'neutral' ? 4
         : log.mood_status === 'calm' ? 3
         : 2
-      return sum + moodScore
-    }, 0) / logs.length)
+      return sum + score
+    }, 0) / logs.length
     : 0
 
-  const fatigue = 0.45 * sleepDebtScore + 0.35 * avgIntensityScore + 0.20 * moodTrendScore
+  const fatigue = sleepDebt > 0 || moodTrendScore > 0
+    ? 0.45 * sleepDebtScore + 0.35 * avgBurdenScore + 0.20 * moodTrendScore
+    : 0
   return Math.min(10, Math.round(fatigue * 10) / 10)
 }
 

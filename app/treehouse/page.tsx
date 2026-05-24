@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { fetchWithAuth } from '@/lib/auth/fetchWithAuth'
 import { logOrAlertNetworkError } from '@/lib/errors/logOrAlertNetworkError'
+import { useApp } from '@/app/context/AppContext'
 import { motion, AnimatePresence } from 'framer-motion'
 
 export const dynamic = 'force-dynamic'
@@ -48,6 +49,7 @@ type LightFlash = { id: string; x: number; y: number }
 
 export default function TreehousePage() {
   const router = useRouter()
+  const { kids: enrichedKids } = useApp()
 
   // ── 密码验证（同一会话内免重复输入 PIN）──
   const [unlocked, setUnlocked] = useState(() => {
@@ -124,16 +126,25 @@ export default function TreehousePage() {
     const { data: reminders } = await supabase.from('reminders').select('*').eq('status', 'pending').limit(5)
     const { data: habits } = await supabase.from('user_habits').select('*').order('created_at', { ascending: false }).limit(10)
 
+    const formatChildStatus = (c: { id?: string; name?: string; energy?: number | null; energy_label?: string }) => {
+      const enriched = enrichedKids.find(k => k.id === c.id) as typeof c | undefined
+      const label = enriched?.energy_label || c.energy_label
+      if (label) return `${c.name}: ${label}`
+      const energy = enriched?.energy ?? c.energy
+      if (energy != null) return `${c.name}: 精力${energy}%`
+      return `${c.name}: 暂无精力数据`
+    }
+
     const timeOfDay = isLateNight ? '深夜' : hour < 12 ? '清晨' : '午后'
     const ctx = `
 【当前时间】${new Date().toLocaleString('zh-CN')}（${timeOfDay}）
-【孩子状态】${(children || []).map(c => c.energy != null ? `${c.name}: 精力${c.energy}%` : `${c.name}: 暂无精力数据`).join('、')}
+【孩子状态】${(children || []).map(formatChildStatus).join('、')}
 【待处理任务】${(tasks || []).map(t => t.title).join('、') || '暂无'}
 【近期提醒】${(reminders || []).map(r => `${r.title}(${r.category})`).join('、') || '暂无'}
 【妈妈近期习惯】${(habits || []).map(h => `${h.action_type}:${h.target_category}`).join('、') || '暂无'}
 `
     setContextData(ctx)
-  }, [isLateNight, hour])
+  }, [isLateNight, hour, enrichedKids])
 
   // ── 逐字显示开场问候 ──
   const showGreeting = useCallback(() => {

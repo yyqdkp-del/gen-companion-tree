@@ -7,7 +7,11 @@ type AssessIpBucket = { day: string; count: number }
 const anonymousAssessIp = new Map<string, AssessIpBucket>()
 
 function assessFailed(message = '评估生成失败，请重试') {
-  return NextResponse.json({ error: message, _failed: true }, { status: 500 })
+  return NextResponse.json({
+    error: message,
+    _failed: true,
+    message: '暂时无法生成评估报告，请稍后再试',
+  }, { status: 500 })
 }
 
 function utcDay(): string {

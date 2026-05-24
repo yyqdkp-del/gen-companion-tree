@@ -235,14 +235,14 @@ export default function ChinesePage() {
         return
       }
 
-      if (!res.ok || data._failed) {
-        setAssessError(typeof data.error === 'string' ? data.error : '评估失败，请重试')
+      if (data._failed || (data.error && !data.level)) {
+        setAssessError(data.error || '评估生成失败，请重试')
         setPhase('quiz')
         return
       }
 
-      if (!data.level) {
-        setAssessError('评估失败，请重试')
+      if (!res.ok) {
+        setAssessError('评估生成失败，请重试')
         setPhase('quiz')
         return
       }

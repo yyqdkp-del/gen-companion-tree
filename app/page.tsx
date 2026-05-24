@@ -427,13 +427,16 @@ export default function BasePage() {
     }
   }
 
-  // 孩子水珠状态：优先 energy_level，其次 urgent_items
+  // 孩子水珠状态：energy_level 优先，urgent_items 次之，yellow 最后
+  const energyLevel = (activeKid as any)?.energy_level
+  const urgentItems = (activeKid as any)?.urgent_items || []
+
   const childState = !activeKid ? 'calm'
-    : (activeKid as any).energy_level === 'red' ? 'red'
-    : (activeKid as any).energy_level === 'orange' ? 'orange'
-    : (activeKid as any).energy_level === 'yellow' ? 'yellow'
-    : (activeKid as any).urgent_items?.some((i: UrgentItem) => i.level === 'red') ? 'red'
-    : (activeKid as any).urgent_items?.some((i: UrgentItem) => i.level === 'orange') ? 'orange'
+    : energyLevel === 'red' ? 'red'
+    : energyLevel === 'orange' ? 'orange'
+    : urgentItems.some((i: UrgentItem) => i.level === 'red') ? 'red'
+    : urgentItems.some((i: UrgentItem) => i.level === 'orange') ? 'orange'
+    : energyLevel === 'yellow' ? 'yellow'
     : 'calm'
   const childUrgent = activeKid?.urgent_items?.filter(
     (i: UrgentItem) => i.level === 'red' || i.level === 'orange',

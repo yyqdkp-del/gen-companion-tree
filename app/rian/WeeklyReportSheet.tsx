@@ -16,6 +16,7 @@ type ReportContent = {
   achievements?: string[]
   week_summary?: string
   child_name?: string
+  no_data?: boolean
 }
 
 type Props = {
@@ -50,12 +51,13 @@ export default function WeeklyReportSheet({ childId, childName, onClose }: Props
         body: JSON.stringify({ child_id: childId }),
       })
       const data = await res.json()
+      if (data.content?.no_data || data.error === 'no_data') {
+        setContent(data.content || { no_data: true })
+        setShareUrl('')
+        return
+      }
       if (!res.ok) {
-        if (data.error === 'no_data') {
-          setError(data.message || '本周暂无足够数据生成周报，请先记录孩子的学习和生活')
-        } else {
-          setError(data.message || data.error || '生成失败，请稍后再试')
-        }
+        setError(data.message || data.error || '生成失败，请稍后再试')
         return
       }
       setContent(data.content || null)
@@ -245,7 +247,18 @@ export default function WeeklyReportSheet({ childId, childName, onClose }: Props
             </div>
           )}
 
-          {!loading && !error && content && (
+          {!loading && !error && content?.no_data && (
+            <motion.div style={{ textAlign: 'center', padding: '32px 12px' }}>
+              <p style={{ fontSize: 14, color: THEME.text, marginBottom: 8, lineHeight: 1.6 }}>
+                本周暂无记录，先去学一个汉字或完成一个待办吧
+              </p>
+              <p style={{ fontSize: 12, color: THEME.muted }}>
+                记录孩子的学习和生活后，根会帮你写成长周报
+              </p>
+            </motion.div>
+          )}
+
+          {!loading && !error && content && !content.no_data && (
             <>
               <p style={{ fontSize: 12, color: THEME.muted, marginBottom: 10 }}>
                 {content.week_summary || `${childName}本周的成长记录`}

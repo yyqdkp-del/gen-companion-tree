@@ -87,8 +87,13 @@ export async function POST(req: NextRequest) {
   if (!hasRealData) {
     return NextResponse.json({
       error: 'no_data',
-      message: '本周暂无足够数据生成周报，请先记录孩子的学习和生活',
-    }, { status: 404 })
+      message: '本周暂无学习记录，请先记录孩子的学习和生活',
+      week_summary: '本周暂无记录',
+      content: {
+        letter: '',
+        no_data: true,
+      },
+    })
   }
 
   const prompt = `你是一位海外华人妈妈，正在给国内的爷爷奶奶写本周孩子的成长记录。

@@ -43,9 +43,9 @@ export default function ChildAvatar({
     switchKid(nextKid)
   }
 
-  const energyPct = activeKid?.energy ?? null
-  const hasEnergy = energyPct !== null
-  const glowColor = getGlowColor(energyPct)
+  const energyPct = (activeKid as any)?.energy
+  const showEnergy = energyPct != null
+  const glowColor = getGlowColor(showEnergy ? energyPct : null)
 
   return (
     <div style={{
@@ -97,13 +97,13 @@ export default function ChildAvatar({
           </p>
 
           <div style={{ width: 56, height: 3, background: 'rgba(255,255,255,0.3)', borderRadius: 2, margin: '3px auto', overflow: 'hidden' }}>
-            {hasEnergy ? (
+            {showEnergy ? (
               <motion.div
                 animate={{ width: `${energyPct}%` }}
-                style={{ height: '100%', background: getEnergyColor(energyPct!) }}
+                style={{ height: '100%', background: getEnergyColor(energyPct) }}
               />
             ) : (
-              <motion.div style={{ width: '100%', height: '100%', background: 'rgba(45,50,47,0.1)', borderRadius: 2 }} />
+              <motion.div style={{ width: '30%', height: '100%', background: 'rgba(45,50,47,0.12)', borderRadius: 2 }} />
             )}
           </div>
 
