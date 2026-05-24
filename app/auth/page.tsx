@@ -23,11 +23,16 @@ export default function AuthPage() {
   
 
   useEffect(() => {
-    // 检测是否是 PWA standalone 模式
-  
     supabase.auth.getSession().then(({ data: { session } }) => {
-  if (session?.user) window.location.href = '/'
-})
+      if (session?.user) {
+        fetch('/api/auth/check', { credentials: 'include' })
+          .then(r => r.json())
+          .then(data => {
+            if (data.authenticated) window.location.href = '/'
+          })
+          .catch(() => {})
+      }
+    })
     const params = new URLSearchParams(window.location.search)
     if (params.get('error')) setError('登录失败，请重试')
     if (params.get('mode') === 'login') setMode('login')
@@ -77,9 +82,22 @@ export default function AuthPage() {
         if (data.user) await saveChildData(data.user.id)
         if (data.session) await saveSessionBundle(data.session)
 
-        await new Promise(resolve => setTimeout(resolve, 500))
+        const checkRes = await fetch('/api/auth/check', { credentials: 'include' })
+        const checkData = await checkRes.json()
 
-        window.location.href = '/'
+        if (checkData.authenticated) {
+          window.location.href = '/'
+        } else {
+          await new Promise(r => setTimeout(r, 500))
+          const retryRes = await fetch('/api/auth/check', { credentials: 'include' })
+          const retryData = await retryRes.json()
+          if (retryData.authenticated) {
+            window.location.href = '/'
+          } else {
+            setError('登录状态同步失败，请重试')
+            setLoading(false)
+          }
+        }
       }
     } catch {
       setError('网络错误，请重试')

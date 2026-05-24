@@ -226,7 +226,11 @@ const setActiveKid = useCallback((kid: any) => {
         }
 
         setLoading(false)
-        setTimeout(() => { if (!userIdRef.current) router.push('/auth') }, 3000)
+        setTimeout(() => {
+          if (!userIdRef.current && !window.location.pathname.includes('/auth')) {
+            router.push('/auth')
+          }
+        }, 3000)
       } finally {
         setSessionReady(true)
       }
