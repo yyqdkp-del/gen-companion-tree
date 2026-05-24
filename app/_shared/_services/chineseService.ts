@@ -60,7 +60,7 @@ export async function fetchLearnedItems(
     const r = typeof s.result === 'string' ? JSON.parse(s.result) : s.result
     return {
       char: r?.char, chengyu: r?.chengyu,
-      type: s.input_type, mastery: 75,
+      type: s.input_type, mastery: null,
       learned_at: s.learned_at,
     }
   })

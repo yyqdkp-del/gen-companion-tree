@@ -30,7 +30,7 @@ const LOCATION_SCENES: Record<string, string> = {
 }
 
 type ChildInfo = { id?: string; name: string; grade: string; level: string; school: string }
-type LearnedItem = { char?: string; chengyu?: string; type: TabType; mastery: number; learned_at: string }
+type LearnedItem = { char?: string; chengyu?: string; type: TabType; mastery: number | null; learned_at: string }
 
 // ══ 字族 + 延伸词汇 ══
 type PopupItem = { word: string; type: 'word' | 'chengyu' | 'cultural'; extra?: any }
@@ -108,7 +108,7 @@ export default function DecodePage() {
       if (sessions) {
         setLearnedItems(sessions.filter((s: any) => s.result).map((s: any) => {
           const r = typeof s.result === 'string' ? JSON.parse(s.result) : s.result
-          return { char: r?.char, chengyu: r?.chengyu, type: s.input_type as TabType, mastery: 75, learned_at: s.learned_at }
+          return { char: r?.char, chengyu: r?.chengyu, type: s.input_type as TabType, mastery: null, learned_at: s.learned_at }
         }))
       }
     } catch { /* ignore */ }
@@ -266,7 +266,7 @@ export default function DecodePage() {
       if (uid) {
         await supabase.from('chinese_sessions').insert({ user_id: uid, child_id: childInfo.id || null, input_text: query, input_type: activeTab, result: json, location_scene: locationScene, learned_at: new Date().toISOString() })
         await supabase.from('family_learning_dna').upsert({ user_id: uid, last_input_type: activeTab, last_learned_at: new Date().toISOString(), total_sessions: learnedItems.length + 1, preferred_scene: locationScene, updated_at: new Date().toISOString() }, { onConflict: 'user_id' })
-        setLearnedItems(prev => [{ char: json.char, chengyu: json.chengyu, type: activeTab, mastery: 80, learned_at: new Date().toISOString() }, ...prev])
+        setLearnedItems(prev => [{ char: json.char, chengyu: json.chengyu, type: activeTab, mastery: null, learned_at: new Date().toISOString() }, ...prev])
       }
     } catch (e: unknown) {
       if ((e as Error)?.name === 'AbortError') return

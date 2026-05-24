@@ -294,7 +294,7 @@ export default function WeeklyReportSheet({ childId, childName, onClose }: Props
                     whiteSpace: 'pre-wrap',
                   }}
                 >
-                  {content.letter || '本周过得很好，想你们了！'}
+                  {content.letter?.trim() || '本周暂无信件内容'}
                 </p>
               </div>
 

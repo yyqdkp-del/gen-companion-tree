@@ -104,7 +104,7 @@ export default function GrandparentClient({
           color: '#2d322f',
           letterSpacing: '0.03em',
         }}>
-          {content.letter || `亲爱的爷爷奶奶，我这周过得很好，想你们了！`}
+          {content.letter?.trim() || '本周暂无信件内容'}
         </div>
       </div>
 

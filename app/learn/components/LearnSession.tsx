@@ -1101,9 +1101,13 @@ function StepUse({ data, char, childName, canvasRef, onComplete, onBottomBarChan
         }),
       })
       const aiData = await res.json()
-      const comment = aiData.reply || '你的造句很棒！继续加油！'
-      setAiComment(comment)
-      speak(comment)
+      const comment = typeof aiData.reply === 'string' ? aiData.reply.trim() : ''
+      if (comment) {
+        setAiComment(comment)
+        speak(comment)
+      } else {
+        setAiComment(null)
+      }
 
       // 生成卡片
       const url = await generateCard(
@@ -1119,8 +1123,7 @@ function StepUse({ data, char, childName, canvasRef, onComplete, onBottomBarChan
       )
       setCardUrl(url)
     } catch {
-      setAiComment('你的造句很棒！继续加油！')
-      speak('你的造句很棒！')
+      setAiComment(null)
     } finally {
       setLoading(false)
     }
@@ -1226,14 +1229,18 @@ function StepUse({ data, char, childName, canvasRef, onComplete, onBottomBarChan
             style={{ width: '100%', maxWidth: 320, borderRadius: 16,
               boxShadow: '0 8px 32px rgba(26,18,8,0.15)', marginBottom: 16 }} />
 
-          {aiComment && (
-            <div style={{ padding: '14px 16px', borderRadius: 14,
+          {aiComment ? (
+            <motion.div style={{ padding: '14px 16px', borderRadius: 14,
               background: 'rgba(164,99,85,0.08)',
               border: '1px solid rgba(164,99,85,0.2)',
               fontSize: 14, color: '#5c7a5e', lineHeight: 1.8,
               fontFamily: 'sans-serif', marginBottom: 16, textAlign: 'left' }}>
               🌟 {aiComment}
-            </div>
+            </motion.div>
+          ) : (
+            <span style={{ display: 'block', fontSize: 13, color: 'rgba(45,50,47,0.4)', marginBottom: 16 }}>
+              评价暂不可用，请重试
+            </span>
           )}
       </div>
     )
