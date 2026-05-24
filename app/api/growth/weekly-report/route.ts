@@ -82,6 +82,14 @@ export async function POST(req: NextRequest) {
       .map((s) => s.input_text)
       .filter(Boolean) as string[] || []
   const todoList = todos?.map((t) => t.title).filter(Boolean) as string[] || []
+  const hasRealData = hanziList.length > 0 || todoList.length > 0
+
+  if (!hasRealData) {
+    return NextResponse.json({
+      error: 'no_data',
+      message: '本周暂无足够数据生成周报，请先记录孩子的学习和生活',
+    }, { status: 404 })
+  }
 
   const prompt = `你是一位海外华人妈妈，正在给国内的爷爷奶奶写本周孩子的成长记录。
 
@@ -123,7 +131,7 @@ export async function POST(req: NextRequest) {
   todoList.slice(0, 4).forEach((title) => achievements.push(title))
 
   const content: Record<string, unknown> = {
-    letter: letter || '爸妈，这周孩子过得很好，想你们了。',
+    letter: letter || '',
     achievements,
     week_summary:
       hanziList.length > 0 || todoList.length > 0

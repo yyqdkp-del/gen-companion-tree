@@ -81,6 +81,8 @@ export default function RianPage() {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const cameraInputRef = useRef<HTMLInputElement>(null)
 const getEnergyColor = (v: number) => v > 70 ? '#8ca88d' : v > 40 ? '#b88e5e' : '#d58074'
+const getChildGlow = (energy: number | null | undefined) =>
+  energy == null ? 'rgba(255,255,255,0.45)' : getEnergyColor(energy)
 
 const { userId, kids: ctxKids, todos: ctxTodos, sync: ctxSync } = useApp()
 
@@ -124,6 +126,8 @@ const actionReminders = useMemo<Reminder[]>(() => {
   const children = ctxKids
   const loading = false
   const currentChild = children[childIndex]
+  const childEnergy = currentChild?.energy ?? null
+  const hasChildEnergy = childEnergy !== null
   
   const { markDone: markDoneAction, snooze: snoozeAction } = useTodoActions(actionReminders, ctxSync)
   const { uploading, uploadStatus, upload } = useUpload(userId || '', () => {
@@ -209,7 +213,7 @@ const actionReminders = useMemo<Reminder[]>(() => {
       <div style={{ position: 'absolute', top: `calc(${SAFE_AREA_TOP} + 5%)`, left: '5%', zIndex: 100 }}>
         <motion.div
           onClick={() => setShowFamilyMenu(!showFamilyMenu)}
-          animate={{ boxShadow: [`0 0 15px ${getEnergyColor(currentChild?.energy ?? 75)}40`, `0 0 35px ${getEnergyColor(currentChild?.energy ?? 75)}80`, `0 0 15px ${getEnergyColor(currentChild?.energy ?? 75)}40`] }}
+          animate={{ boxShadow: [`0 0 15px ${getChildGlow(childEnergy)}40`, `0 0 35px ${getChildGlow(childEnergy)}80`, `0 0 15px ${getChildGlow(childEnergy)}40`] }}
           transition={{ duration: 4, repeat: Infinity }}
           style={{ width: 64, height: 64, borderRadius: '50%', background: 'rgba(255,255,255,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid white', cursor: 'pointer', overflow: 'hidden' }}
         >
@@ -221,8 +225,15 @@ const actionReminders = useMemo<Reminder[]>(() => {
         </motion.div>
         <p style={{ marginTop: 8, fontSize: 10, color: THEME.text, fontWeight: 'bold', letterSpacing: '0.2em', textAlign: 'center' }}>{currentChild?.name || ''}</p>
         <div style={{ width: 56, height: 3, background: 'rgba(255,255,255,0.3)', borderRadius: 2, margin: '3px auto', overflow: 'hidden' }}>
-          <motion.div animate={{ width: `${currentChild?.energy ?? 75}%`, backgroundColor: getEnergyColor(currentChild?.energy ?? 75) }} style={{ height: '100%' }} />
+          {hasChildEnergy ? (
+            <motion.div animate={{ width: `${childEnergy}%`, backgroundColor: getEnergyColor(childEnergy!) }} style={{ height: '100%' }} />
+          ) : (
+            <div style={{ width: '100%', height: '100%', background: 'rgba(45,50,47,0.1)', borderRadius: 2 }} />
+          )}
         </div>
+        {!hasChildEnergy && (
+          <p style={{ marginTop: 4, fontSize: 10, color: THEME.muted, textAlign: 'center' }}>—</p>
+        )}
       </div>
 
       {/* 家族切换菜单 */}

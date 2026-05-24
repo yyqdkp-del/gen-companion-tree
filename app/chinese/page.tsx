@@ -109,19 +109,19 @@ function buildQuestions(loc: UserLocation | null) {
   ]
 }
 
-const FALLBACK_REPORT = {
-  level: 'R3', level_desc: '句子理解期',
-  standard_level: '初等三级',
-  standard_desc: '能读简单句，理解基本语义，开始出现抗拒',
-  insight: '孩子正处于中文学习的关键突破期，已经有了基础，只差一把钥匙。',
-  blockpoint: '汉字对孩子来说还是符号，还没变成有意义的画面和故事。',
-  action: '今晚用「休」字和孩子玩一个游戏：让他猜这个字在说什么故事。',
-  local_line: '清迈的孩子每天看见榕树，「休」就是人靠着树——字就是画。',
-  feature_rec: '从汉字拆解器开始，每天一个字，让汉字从符号变成故事。',
-  cta: '领取你的专属学习路线图，开启第一个汉字故事 🌿',
-  _is_fallback: true,
+type Report = {
+  level: string
+  level_desc: string
+  standard_level: string
+  standard_desc: string
+  insight: string
+  blockpoint: string
+  action: string
+  local_line: string
+  feature_rec: string
+  cta: string
+  _is_fallback?: boolean
 }
-type Report = typeof FALLBACK_REPORT
 
 const LOAD_STEPS = [
   '读取孩子的学习信号',
@@ -136,6 +136,7 @@ export default function ChinesePage() {
   const [answers,  setAnswers]  = useState<Record<string, string>>({})
   const [phase,    setPhase]    = useState<'quiz' | 'loading' | 'report'>('quiz')
   const [report,   setReport]   = useState<Report | null>(null)
+  const [assessError, setAssessError] = useState<string | null>(null)
   const [loadStep, setLoadStep] = useState(0)
   const [textVal,  setTextVal]  = useState('')
   const [userLocation, setUserLocation] = useState<UserLocation | null>(null)
@@ -204,6 +205,7 @@ export default function ChinesePage() {
 
     setPhase('loading')
     setLoadStep(0)
+    setAssessError(null)
     const steps = [600, 1200, 1800, 2400]
     steps.forEach((ms, i) => setTimeout(() => setLoadStep(i + 1), ms))
 
@@ -233,7 +235,19 @@ export default function ChinesePage() {
         return
       }
 
-      const reportData: Report = data.level ? data : FALLBACK_REPORT
+      if (!res.ok || data._failed) {
+        setAssessError(typeof data.error === 'string' ? data.error : '评估失败，请重试')
+        setPhase('quiz')
+        return
+      }
+
+      if (!data.level) {
+        setAssessError('评估失败，请重试')
+        setPhase('quiz')
+        return
+      }
+
+      const reportData: Report = data
 
       // 存档（不含敏感信息落地）
       try {
@@ -258,10 +272,8 @@ export default function ChinesePage() {
       }, 2800)
 
     } catch {
-      setTimeout(() => {
-        setReport(FALLBACK_REPORT)
-        setPhase('report')
-      }, 2800)
+      setAssessError('评估失败，请重试')
+      setPhase('quiz')
     }
   }
 
@@ -270,6 +282,18 @@ export default function ChinesePage() {
   // ── 问卷页 ──
   if (phase === 'quiz') return (
     <main style={{ minHeight:'100dvh', background: THEME.bg, fontFamily:"'Noto Sans SC', sans-serif", paddingBottom:'max(env(safe-area-inset-bottom), 20px)' }}>
+
+      {assessError && (
+        <div style={{ maxWidth:'560px', margin:'0 auto', padding:'12px 16px 0' }}>
+          <div style={{ background:'#FEE2E2', borderRadius:'10px', padding:'12px 14px', fontSize:'13px', color:'#991B1B', display:'flex', alignItems:'center', justifyContent:'space-between', gap:'12px' }}>
+            <span>{assessError}</span>
+            <button onClick={() => setAssessError(null)}
+              style={{ background:'none', border:'none', color: THEME.orange, cursor:'pointer', fontWeight:600, fontSize:'13px', whiteSpace:'nowrap' }}>
+              重新评估 →
+            </button>
+          </div>
+        </div>
+      )}
 
       <div style={{ background: THEME.navy, padding:'14px 20px', display:'flex', alignItems:'center' }}>
         <span style={{ fontFamily:"'Noto Serif SC', serif", fontSize:'18px', fontWeight:700, color:'#fff', letterSpacing:'2px' }}>根·中文</span>

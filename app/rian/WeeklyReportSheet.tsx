@@ -51,7 +51,11 @@ export default function WeeklyReportSheet({ childId, childName, onClose }: Props
       })
       const data = await res.json()
       if (!res.ok) {
-        setError(data.error || '生成失败，请稍后再试')
+        if (data.error === 'no_data') {
+          setError(data.message || '本周暂无足够数据生成周报，请先记录孩子的学习和生活')
+        } else {
+          setError(data.message || data.error || '生成失败，请稍后再试')
+        }
         return
       }
       setContent(data.content || null)

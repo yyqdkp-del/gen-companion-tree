@@ -86,6 +86,6 @@ export async function POST(req: NextRequest) {
     await supabase.from('children').update({ energy: result.energy }).eq('id', childId).eq('user_id', userId)
     return NextResponse.json({ ok: true, energy: result.energy, reason: result.reason })
   } catch {
-    return NextResponse.json({ ok: false, energy: 75 })
+    return NextResponse.json({ ok: false, error: '评估失败' }, { status: 500 })
   }
 }

@@ -329,7 +329,7 @@ export async function addChild(
   const { data } = await supabase.from('children').insert({
     user_id: uid, name: d.name, emoji: d.emoji || '👶🏻',
     avatar_url: d.avatar_url || null,
-    energy: 75, status: 'active',
+    energy: null, status: 'active',
     school_name: d.school_name, grade: d.grade,
   }).select().single()
   return data?.id ?? null

@@ -150,7 +150,18 @@ function calcWeeklyFatigue(input: EnergyInput, params: AgeParams): number {
   const avgMood = moodScores.reduce((a, b) => a + b, 0) / moodScores.length
   const moodTrendScore = Math.max(0, (3 - avgMood) * 2.5)
 
-  const fatigue = 0.45 * sleepDebtScore + 0.35 * 5 + 0.20 * moodTrendScore
+  const avgIntensityScore = logs.length > 0
+    ? Math.min(10, logs.reduce((sum, log) => {
+      const moodScore = log.mood_status === 'upset' ? 8
+        : log.mood_status === 'anxious' ? 6
+        : log.mood_status === 'neutral' ? 4
+        : log.mood_status === 'calm' ? 3
+        : 2
+      return sum + moodScore
+    }, 0) / logs.length)
+    : 0
+
+  const fatigue = 0.45 * sleepDebtScore + 0.35 * avgIntensityScore + 0.20 * moodTrendScore
   return Math.min(10, Math.round(fatigue * 10) / 10)
 }
 

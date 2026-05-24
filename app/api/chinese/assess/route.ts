@@ -6,6 +6,10 @@ const ANON_IP_DAILY_LIMIT = 3
 type AssessIpBucket = { day: string; count: number }
 const anonymousAssessIp = new Map<string, AssessIpBucket>()
 
+function assessFailed(message = '评估生成失败，请重试') {
+  return NextResponse.json({ error: message, _failed: true }, { status: 500 })
+}
+
 function utcDay(): string {
   return new Date().toISOString().slice(0, 10)
 }
@@ -31,20 +35,6 @@ function consumeAnonymousAssessSlot(ip: string): boolean {
   if (b.count >= ANON_IP_DAILY_LIMIT) return false
   b.count += 1
   return true
-}
-
-const FALLBACK_DATA = {
-  level: 'R3',
-  level_desc: '句子理解期',
-  standard_level: '初等三级',
-  standard_desc: '能读简单句，理解基本语义，开始出现抗拒',
-  insight: '孩子正处于中文学习的关键突破期，已经有了基础，只差一把钥匙。',
-  blockpoint: '汉字对孩子来说还是符号，还没变成有意义的画面和故事。',
-  action: '今晚用「休」字和孩子玩一个游戏：让他猜这个字在说什么故事。',
-  local_line: '清迈的孩子每天看见榕树，「休」就是人靠着树——字就是画。',
-  feature_rec: '从汉字拆解器开始，每天一个字，让汉字从符号变成故事。',
-  cta: '领取你的专属学习路线图，开启第一个汉字故事 🌿',
-  _is_fallback: true,
 }
 
 const SYSTEM_PROMPT = `你是根·中文顾问，为海外华人陪读家庭服务。
@@ -73,7 +63,6 @@ R3 = 认字200-500，能读简单句，理解基本语义，开始抗拒写作
 R4 = 认字500+，能读段落，口语强于书面，词汇量遇瓶颈
 R5 = 阅读流畅，书面表达弱，中英切换频繁，写作词穷`
 
-// 确定性预判级别，减少模型自由发挥
 function inferLevel(answers: Record<string, string>): string {
   const charCount = answers['q6'] || ''
   const reading   = answers['q4'] || ''
@@ -104,7 +93,6 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // 输入校验
   let answers: Record<string, string>
   let geofence: { city?: string; country?: string } | null = null
 
@@ -113,14 +101,13 @@ export async function POST(req: NextRequest) {
     answers  = body.answers
     geofence = body.geofence || null
   } catch {
-    return NextResponse.json({ ...FALLBACK_DATA }, { status: 400 })
+    return NextResponse.json({ error: '请求格式错误', _failed: true }, { status: 400 })
   }
 
   if (!answers || typeof answers !== 'object') {
-    return NextResponse.json({ ...FALLBACK_DATA }, { status: 400 })
+    return NextResponse.json({ error: '缺少问卷答案', _failed: true }, { status: 400 })
   }
 
-  // 本地化上下文：直接用围栏传来的城市，不在服务端重新计算
   const localCtx = geofence?.city
     ? `孩子所在城市：${geofence.city}（${geofence.country || ''}）。
 local_line 字段必须结合 ${geofence.city} 的真实生活场景，
@@ -152,10 +139,9 @@ ${localCtx}
       }),
     })
 
-    // HTTP 层错误检查
     if (!response.ok) {
       console.error('Anthropic API error:', response.status, response.statusText)
-      return NextResponse.json({ ...FALLBACK_DATA })
+      return assessFailed()
     }
 
     const data = await response.json()
@@ -164,7 +150,7 @@ ${localCtx}
     const m = raw.match(/\{[\s\S]*\}/)
     if (!m) {
       console.warn('ASSESS: no JSON found, raw:', raw.slice(0, 200))
-      return NextResponse.json({ ...FALLBACK_DATA })
+      return assessFailed()
     }
 
     try {
@@ -172,11 +158,11 @@ ${localCtx}
       return NextResponse.json({ ...parsed, _is_fallback: false })
     } catch {
       console.warn('ASSESS: JSON.parse failed, match:', m[0].slice(0, 200))
-      return NextResponse.json({ ...FALLBACK_DATA })
+      return assessFailed()
     }
 
   } catch (e: any) {
     console.error('ASSESS ERROR:', e?.message || e)
-    return NextResponse.json({ ...FALLBACK_DATA })
+    return assessFailed()
   }
 }

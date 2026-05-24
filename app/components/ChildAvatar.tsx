@@ -9,6 +9,11 @@ function getEnergyColor(energy: number) {
   return '#FF5722'
 }
 
+function getGlowColor(energy: number | null | undefined) {
+  if (energy == null) return 'rgba(255,255,255,0.45)'
+  return getEnergyColor(energy)
+}
+
 export type ChildAvatarProps = {
   kids?: any[]
   enrichedKids?: any[]
@@ -38,6 +43,10 @@ export default function ChildAvatar({
     switchKid(nextKid)
   }
 
+  const energyPct = activeKid?.energy ?? null
+  const hasEnergy = energyPct !== null
+  const glowColor = getGlowColor(energyPct)
+
   return (
     <div style={{
       position: 'fixed',
@@ -63,9 +72,9 @@ export default function ChildAvatar({
             whileTap={{ scale: 0.92 }}
             animate={{
               boxShadow: [
-                `0 0 15px ${getEnergyColor(activeKid?.energy ?? 75)}40`,
-                `0 0 35px ${getEnergyColor(activeKid?.energy ?? 75)}80`,
-                `0 0 15px ${getEnergyColor(activeKid?.energy ?? 75)}40`,
+                `0 0 15px ${glowColor}40`,
+                `0 0 35px ${glowColor}80`,
+                `0 0 15px ${glowColor}40`,
               ],
             }}
             transition={{ duration: 4, repeat: Infinity }}
@@ -88,10 +97,14 @@ export default function ChildAvatar({
           </p>
 
           <div style={{ width: 56, height: 3, background: 'rgba(255,255,255,0.3)', borderRadius: 2, margin: '3px auto', overflow: 'hidden' }}>
-            <motion.div
-              animate={{ width: `${activeKid?.energy ?? 75}%` }}
-              style={{ height: '100%', background: getEnergyColor(activeKid?.energy ?? 75) }}
-            />
+            {hasEnergy ? (
+              <motion.div
+                animate={{ width: `${energyPct}%` }}
+                style={{ height: '100%', background: getEnergyColor(energyPct!) }}
+              />
+            ) : (
+              <motion.div style={{ width: '100%', height: '100%', background: 'rgba(45,50,47,0.1)', borderRadius: 2 }} />
+            )}
           </div>
 
           {kids.length > 1 && (

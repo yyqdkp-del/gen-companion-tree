@@ -427,8 +427,14 @@ export default function BasePage() {
     }
   }
 
-  // 孩子水珠状态来自 dropState；待办/热点状态来自 todoEngine/hotspotEngine
-  const childState = dropState('child', activeKid)
+  // 孩子水珠状态：优先 energy_level，其次 urgent_items
+  const childState = !activeKid ? 'calm'
+    : (activeKid as any).energy_level === 'red' ? 'red'
+    : (activeKid as any).energy_level === 'orange' ? 'orange'
+    : (activeKid as any).energy_level === 'yellow' ? 'yellow'
+    : (activeKid as any).urgent_items?.some((i: UrgentItem) => i.level === 'red') ? 'red'
+    : (activeKid as any).urgent_items?.some((i: UrgentItem) => i.level === 'orange') ? 'orange'
+    : 'calm'
   const childUrgent = activeKid?.urgent_items?.filter(
     (i: UrgentItem) => i.level === 'red' || i.level === 'orange',
   ).length || 0

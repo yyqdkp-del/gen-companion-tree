@@ -54,7 +54,7 @@ export async function POST(req: NextRequest) {
       emoji: typeof body.emoji === 'string' ? body.emoji : '🌟',
       grade: typeof body.grade === 'string' ? body.grade : null,
       school_name: typeof body.school_name === 'string' ? body.school_name : null,
-      energy: 75,
+      energy: null,
       progress: 0,
     })
     .select('id')

@@ -127,7 +127,7 @@ export default function TreehousePage() {
     const timeOfDay = isLateNight ? '深夜' : hour < 12 ? '清晨' : '午后'
     const ctx = `
 【当前时间】${new Date().toLocaleString('zh-CN')}（${timeOfDay}）
-【孩子状态】${(children || []).map(c => `${c.name}: 精力${c.energy ?? 85}%`).join('、')}
+【孩子状态】${(children || []).map(c => c.energy != null ? `${c.name}: 精力${c.energy}%` : `${c.name}: 暂无精力数据`).join('、')}
 【待处理任务】${(tasks || []).map(t => t.title).join('、') || '暂无'}
 【近期提醒】${(reminders || []).map(r => `${r.title}(${r.category})`).join('、') || '暂无'}
 【妈妈近期习惯】${(habits || []).map(h => `${h.action_type}:${h.target_category}`).join('、') || '暂无'}
