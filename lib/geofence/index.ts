@@ -150,15 +150,17 @@ async function saveUserLocation(location: UserLocation): Promise<void> {
 }
 
 // ══ 主接口：获取用户位置 ══
-export async function getUserLocation(userId: string): Promise<UserLocation> {
-  // 1. 先读缓存
+// 没有 GPS、family_places、family_profile 城市时返回 null，
+// 调用方需自行处理（跳过巡逻、提示用户先设置居住城市等）。
+export async function getUserLocation(userId: string): Promise<UserLocation | null> {
+  // 1. 先读缓存（忽略 source='default' 的旧缓存，避免继续返回历史默认城市）
   const { data: cached } = await supabase
     .from('user_locations')
     .select('*')
     .eq('user_id', userId)
     .single()
 
-  if (cached) {
+  if (cached && cached.source !== 'default') {
     const ageHours = (Date.now() - new Date(cached.updated_at).getTime()) / 3600000
     if (ageHours < 24) {
       return cached as UserLocation
@@ -172,13 +174,11 @@ export async function getUserLocation(userId: string): Promise<UserLocation> {
     let fence: Geofence
 
     if (placesResult.lat && placesResult.lng) {
-      // 有坐标，精确匹配
       fence = matchGeofence(placesResult.lat, placesResult.lng)
       const location = buildUserLocation(userId, fence, 'manual', 'high', placesResult.lat, placesResult.lng)
       await saveUserLocation(location)
       return location
     } else if (placesResult.city) {
-      // 只有城市名，模糊匹配
       fence = matchGeofenceByCity(placesResult.city)
       const location = buildUserLocation(userId, fence, 'manual', 'medium')
       await saveUserLocation(location)
@@ -186,11 +186,25 @@ export async function getUserLocation(userId: string): Promise<UserLocation> {
     }
   }
 
-  // 3. 降级：用默认围栏（清迈，因为产品主要用户在清迈）
-  const defaultFence = GEOFENCES.find(f => f.id === 'th-chiangmai') || DEFAULT_GEOFENCE
-  const location = buildUserLocation(userId, defaultFence, 'default', 'low')
-  await saveUserLocation(location)
-  return location
+  // 3. family_profile.resident_city 兜底（用户在档案里填了城市但没建 family_place）
+  const { data: profile } = await supabase
+    .from('family_profile')
+    .select('resident_city, resident_city_custom')
+    .eq('user_id', userId)
+    .maybeSingle()
+  const profileCity = profile?.resident_city === 'other'
+    ? (profile?.resident_city_custom?.trim() || '')
+    : (profile?.resident_city?.trim() || '')
+
+  if (profileCity) {
+    const fence = matchGeofenceByCity(profileCity)
+    const location = buildUserLocation(userId, fence, 'manual', 'medium')
+    await saveUserLocation(location)
+    return location
+  }
+
+  // 4. 无任何位置信息：不再默认清迈/任何城市
+  return null
 }
 
 // ══ 更新位置（GPS）══

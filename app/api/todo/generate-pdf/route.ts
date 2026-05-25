@@ -24,7 +24,35 @@ function calcAge(birthday: string | null): string {
     return String(age)
 }
 
-async function generateTM7PDF(profile: any, address: string, visaType: string): Promise<Uint8Array> {
+type ImmigrationOffice = {
+  name: string
+  address: string
+  contact: string
+}
+
+const TH_IMMIGRATION_OFFICES: Record<string, ImmigrationOffice> = {
+  'chiang mai': {
+    name: 'Chiang Mai Immigration Office',
+    address: '71 M.3 Airport Road, Suthep, Muang, Chiang Mai 50200',
+    contact: 'Tel: 053-201-755  |  Mon-Fri 08:30-16:30  |  Fee: 1,900 THB',
+  },
+  'bangkok': {
+    name: 'Bangkok Immigration Bureau (Chaeng Watthana)',
+    address: 'Government Complex Building B, Chaeng Watthana Rd, Lak Si, Bangkok 10210',
+    contact: 'Tel: 02-141-9889  |  Mon-Fri 08:30-16:30  |  Fee: 1,900 THB',
+  },
+}
+
+function resolveImmigrationOffice(city: string): ImmigrationOffice | null {
+  const key = (city || '').trim().toLowerCase()
+  if (!key) return null
+  for (const [k, office] of Object.entries(TH_IMMIGRATION_OFFICES)) {
+    if (key.includes(k) || k.includes(key)) return office
+  }
+  return null
+}
+
+async function generateTM7PDF(profile: any, address: string, visaType: string, city: string): Promise<Uint8Array> {
     const pdfDoc = await PDFDocument.create()
     const font = await pdfDoc.embedFont(StandardFonts.Helvetica)
     const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold)
@@ -179,10 +207,15 @@ async function generateTM7PDF(profile: any, address: string, visaType: string): 
   // Footer
   page.drawRectangle({ x: 0, y: 0, width, height: 44, color: rgb(0.95, 0.96, 0.98) })
     drawLine(0, 44, width, 44)
-    page.drawText('Chiang Mai Immigration Office  |  71 M.3 Airport Road, Suthep, Muang, Chiang Mai 50200', {
+    const office = resolveImmigrationOffice(city)
+    const footerLine1 = office
+      ? `${office.name}  |  ${office.address}`
+      : 'Submit at your local Thai Immigration Office'
+    const footerLine2 = office?.contact || 'Please confirm office hours and fee before visiting'
+    page.drawText(footerLine1, {
           x: 60, y: 28, size: 8, font, color: rgb(0.4, 0.4, 0.4),
     })
-    page.drawText('Tel: 053-201-755  |  Mon-Fri 08:30-16:30  |  Fee: 1,900 THB', {
+    page.drawText(footerLine2, {
           x: 100, y: 14, size: 8, font, color: rgb(0.4, 0.4, 0.4),
     })
 
@@ -228,7 +261,10 @@ export async function POST(req: NextRequest) {
               ? 'Non-Immigrant O (Guardian)'
                     : profile.visa_type || 'Tourist Visa'
 
-      const pdfBytes = await generateTM7PDF(profile, address, visaType)
+      const residentCity = profile.resident_city === 'other'
+        ? (profile.resident_city_custom || '')
+        : (profile.resident_city || '')
+      const pdfBytes = await generateTM7PDF(profile, address, visaType, residentCity)
 
       const filename = `TM7_${(profile.member_name || 'applicant').replace(/[^a-zA-Z0-9]/g, '_')}_${Date.now()}.pdf`
       const { error: uploadError } = await supabase.storage

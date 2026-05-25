@@ -371,19 +371,28 @@ async function runPatrolForUsers(userIds: string[], _patrolTime: string) {
     try {
       const userLocation = await getUserLocation(userId)
       const profileCity = await resolveProfileCity(userId)
+
+      if (!userLocation && !profileCity) {
+        console.warn(`patrol: skip user ${userId.slice(0, 8)} (no resident city)`)
+        results.push({ userId: userId.slice(0, 8), skipped: 'no_resident_city' })
+        continue
+      }
+
       const location = profileCity
         ? profileCity
-        : `${userLocation.city} ${userLocation.country}`
-      const todayYmd = getTodayStrInTimeZone(userLocation.timezone)
-      const patrolPrompt = userLocation.local_config.patrol_prompt
+        : `${userLocation!.city} ${userLocation!.country}`
+      const todayYmd = userLocation
+        ? getTodayStrInTimeZone(userLocation.timezone)
+        : getTodayStrInTimeZone('UTC')
+      const patrolPrompt = userLocation?.local_config.patrol_prompt || ''
 
       await archiveOldHotspots(userId)
       const snapshot = await getFamilySnapshot(userId)
 
       const [grokData, geminiData, familyContext] = await Promise.all([
         callGrok(snapshot, location, patrolPrompt),
-        callGemini(snapshot, location, userLocation.local_config.official_sites),
-        fetchFamilyContextForHotspots(userId, profileCity || userLocation.city),
+        callGemini(snapshot, location, userLocation?.local_config.official_sites || []),
+        fetchFamilyContextForHotspots(userId, profileCity || userLocation?.city || ''),
       ])
 
       const hotspots = await callClaude(grokData, geminiData, snapshot, location, familyContext)
@@ -465,7 +474,7 @@ export async function GET(req: NextRequest) {
   const userId = user.id
 
   const userLocation = await getUserLocation(userId)
-  const today = getTodayStrInTimeZone(userLocation.timezone)
+  const today = getTodayStrInTimeZone(userLocation?.timezone || 'UTC')
 
   const { data: hotspots } = await supabase
     .from('hotspot_items')

@@ -215,7 +215,7 @@ export async function GET(req: NextRequest) {
   const location = locationRes
 
   const address = p.home_address_en || place.address || '未填写'
-  const countryCode = location.country_code || 'TH'
+  const countryCode = location?.country_code || ''
   const config = getCountryConfig(countryCode)
   const visaInfo = config.visa_types[p.visa_type] || { name: p.visa_type || '未知', duration: '—', purpose: '—' }
   const forms = config.forms
@@ -269,7 +269,7 @@ export async function GET(req: NextRequest) {
 <div class="header">
   <div class="header-title">📋 签证填写指引</div>
   <div class="header-sub">${p.member_name || '用户'} · 生成于 ${new Date().toLocaleDateString('zh-CN')}</div>
-  <div class="location-badge">📍 ${location.city} · ${location.country}</div>
+  ${location ? `<div class="location-badge">📍 ${location.city} · ${location.country}</div>` : ''}
 </div>
 
 <button class="print-btn" onclick="window.print()">🖨️ 打印 / 保存为 PDF</button>

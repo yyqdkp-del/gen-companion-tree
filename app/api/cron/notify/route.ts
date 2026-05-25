@@ -323,6 +323,10 @@ export async function GET(req: NextRequest) {
       try {
         // 获取用户位置和时区
         const userLocation = await getUserLocation(userId)
+        if (!userLocation) {
+          tasks.push(`skip:${userId.slice(0,8)}(no_city)`)
+          continue
+        }
         const timezone = userLocation.timezone
 
         // 按用户时区判断时间

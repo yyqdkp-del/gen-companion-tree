@@ -25,6 +25,12 @@ export async function POST(req: NextRequest) {
     } else {
       location = await getUserLocation(userId)
     }
+    if (!location) {
+      return NextResponse.json(
+        { error: 'no_resident_city', message: '请先在档案中填写居住城市' },
+        { status: 404 },
+      )
+    }
     return NextResponse.json(location)
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 })

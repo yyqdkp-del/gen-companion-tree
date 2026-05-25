@@ -36,8 +36,13 @@ export async function POST(req: NextRequest) {
   let dow: number
   try {
     const loc = await getUserLocation(userId)
-    today = getTodayStrInTimeZone(loc.timezone)
-    dow = getDayOfWeekInTimeZone(loc.timezone)
+    if (loc) {
+      today = getTodayStrInTimeZone(loc.timezone)
+      dow = getDayOfWeekInTimeZone(loc.timezone)
+    } else {
+      today = getTodayStr()
+      dow = new Date().getDay()
+    }
   } catch {
     today = getTodayStr()
     dow = new Date().getDay()

@@ -201,10 +201,13 @@ async function transcribeAudio(fileUrl: string): Promise<string> {
 }
 
 // ══ Grok 搜索 ══
-async function grokSearch(query: string): Promise<string> {
+async function grokSearch(query: string, city = ''): Promise<string> {
   try {
     const controller = new AbortController()
     const timeout = setTimeout(() => controller.abort(), 8000)
+    const systemPrompt = city
+      ? `你是${city}本地情报员。用中文简洁回答，100字以内。`
+      : '你是本地情报员。用中文简洁回答，100字以内。'
     const response = await fetch('https://api.x.ai/v1/chat/completions', {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${process.env.XAI_API_KEY}`, 'Content-Type': 'application/json' },
@@ -213,7 +216,7 @@ async function grokSearch(query: string): Promise<string> {
         model: 'grok-3-fast',
         search_enabled: true,
         messages: [
-          { role: 'system', content: '你是清迈本地情报员。用中文简洁回答，100字以内。' },
+          { role: 'system', content: systemPrompt },
           { role: 'user', content: query }
         ]
       }),
@@ -259,7 +262,7 @@ function buildWorkerSystemPrompt(ctx: JobContext, today: string): string {
 }
 
 // ══ Grok 触发判断 ══
-function buildGrokQuery(content: string): string | null {
+function buildGrokQuery(content: string, city = ''): string | null {
   const keywords: Record<string, string[]> = {
     medical: ['看病', '医院', '复诊', '体检', '生病', '发烧', '药', '诊所'],
     weather: ['出门', '外出', '天气', '下雨', '台风'],
@@ -272,7 +275,8 @@ function buildGrokQuery(content: string): string | null {
     if (words.some(w => content.includes(w))) matched.push(type)
   }
   if (!matched.length) return null
-  const parts = ['今天清迈最新情况：']
+  const prefix = city ? `今天${city}最新情况：` : '本地最新情况：'
+  const parts = [prefix]
   if (matched.includes('medical')) parts.push('各大医院排队时间')
   if (matched.includes('weather')) parts.push('今明天气预报、空气质量')
   if (matched.includes('traffic')) parts.push('主要道路交通状况')
@@ -282,7 +286,7 @@ function buildGrokQuery(content: string): string | null {
 }
 
 // ══ 触发 Make webhook ══
-async function triggerMake(toolName: string, input: any) {
+async function triggerMake(toolName: string, input: any, city = '') {
   if (!MAKE_WEBHOOK_URL) return
   try {
     if (toolName === 'add_schedule' && input.date_start) {
@@ -297,7 +301,7 @@ async function triggerMake(toolName: string, input: any) {
           start_time: startTime.toISOString(),
           end_time: endTime.toISOString(),
           description: input.description,
-          location: input.location || '清迈',
+          location: input.location || city || '',
         }),
       })
     }
@@ -324,6 +328,7 @@ async function executeTool(
   rawInputId: string,
   childrenData: any[],
   today: string,
+  city = '',
 ): Promise<string | null> {
 
   const findChildId = (name?: string) => {
@@ -389,7 +394,7 @@ async function executeTool(
         }
       }
 
-      await triggerMake(toolName, input)
+      await triggerMake(toolName, input, city)
       return todo?.id || null
     }
 
@@ -436,7 +441,7 @@ async function executeTool(
           one_tap_ready: false,
         })
       }
-      await triggerMake(toolName, input)
+      await triggerMake(toolName, input, city)
       return null
     }
 
@@ -594,14 +599,15 @@ async function executeTool(
 }
 
 // ══ 预热 Grok ══
-async function preheatGrok(todoIds: string[], toolUses: any[]) {
+async function preheatGrok(todoIds: string[], toolUses: any[], city = '') {
   const todoTools = toolUses.filter(t => t.name === 'add_todo')
+  const locationSuffix = city ? `，${city}本地最新情况` : '，本地最新情况'
   for (let i = 0; i < todoTools.length; i++) {
     const todoId = todoIds[i]
     const keywords = todoTools[i].input.search_keywords
     if (!todoId || !keywords?.length) continue
     try {
-      const grokResult = await grokSearch(keywords.join('，') + '，清迈本地最新情况')
+      const grokResult = await grokSearch(keywords.join('，') + locationSuffix, city)
       if (!grokResult) continue
       const { data: todo } = await supabase.from('todo_items').select('ai_action_data').eq('id', todoId).single()
       await supabase.from('todo_items').update({
@@ -663,6 +669,7 @@ export async function processJob(job: any) {
     ])
     const today = loc ? getTodayStrInTimeZone(loc.timezone) : getTodayStr()
     const childrenData = jobCtx.children
+    const city = loc?.city || jobCtx.profile?.resident_city || ''
 
     let processedContent = raw_content
     if (input_type === 'audio' && file_url) {
@@ -716,13 +723,13 @@ export async function processJob(job: any) {
 
     const todoIdResults = await Promise.all(
       toolUses.map((toolUse: { name: string; input: any }) =>
-        executeTool(toolUse.name, toolUse.input, userId, jobId, childrenData, today),
+        executeTool(toolUse.name, toolUse.input, userId, jobId, childrenData, today, city),
       ),
     )
     const todoIds = todoIdResults.filter((id): id is string => Boolean(id))
 
     void recordSchoolParsingHistory(userId, jobId, input_type, processedContent || '', toolUses, todoIds.length)
-    void preheatGrok(todoIds, toolUses).catch((e) => console.error('预热失败:', e))
+    void preheatGrok(todoIds, toolUses, city).catch((e) => console.error('预热失败:', e))
 
     await supabase.from('raw_inputs').update({
       processed: true,
