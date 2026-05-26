@@ -1,3 +1,5 @@
+import Link from 'next/link'
+
 export default function NotFound() {
   return (
     <main style={{
@@ -13,14 +15,17 @@ export default function NotFound() {
       <div style={{ fontSize: 20, color: '#2d322f', fontFamily: "'Noto Serif SC', serif" }}>
         页面不存在
       </div>
-      <a href="/" style={{
-        fontSize: 14,
-        color: '#a46355',
-        fontFamily: 'sans-serif',
-        textDecoration: 'none',
-      }}>
+      <Link
+        href="/"
+        style={{
+          fontSize: 14,
+          color: '#a46355',
+          fontFamily: 'sans-serif',
+          textDecoration: 'none',
+        }}
+      >
         回到首页 →
-      </a>
+      </Link>
     </main>
   )
 }

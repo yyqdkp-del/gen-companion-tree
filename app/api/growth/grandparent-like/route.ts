@@ -3,15 +3,16 @@ export const dynamic = 'force-dynamic'
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
-)
-
 export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({}))
   const token = typeof body.token === 'string' ? body.token : ''
   if (!token) return NextResponse.json({ error: 'no token' }, { status: 400 })
+
+  // lazy 初始化 service-role 客户端，避免 build 时 collect-page-data 触发空 env
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+  )
 
   const { data: report } = await supabase
     .from('growth_reports')

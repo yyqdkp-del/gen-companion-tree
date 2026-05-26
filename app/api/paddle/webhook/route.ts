@@ -1,19 +1,27 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { EventName, type EventEntity } from '@paddle/paddle-node-sdk'
-import { createClient } from '@supabase/supabase-js'
+import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import { getPaddle } from '@/lib/paddle/client'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
-)
+// 模块顶层不要直接 new createClient——next build 在 collect-page-data 阶段
+// 会 import 本模块；若构建机器没注入 env 会立刻 throw "supabaseUrl is required"。
+// lazy 初始化 + memoize，保证 handler 之外不会触发。
+let _supabase: SupabaseClient | null = null
+function getSupabase(): SupabaseClient {
+  if (_supabase) return _supabase
+  _supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+  )
+  return _supabase
+}
 
 /** 通过订阅 ID 反查 user_id；webhook 未携带 customData 时使用 */
 async function resolveUserIdBySubscriptionId(subId: string): Promise<string | null> {
-  const { data } = await supabase
+  const { data } = await getSupabase()
     .from('subscriptions')
     .select('user_id')
     .eq('paddle_subscription_id', subId)
@@ -52,6 +60,8 @@ export async function POST(req: NextRequest) {
   }
 
   try {
+    const supabase = getSupabase()
+
     switch (event.eventType) {
       case EventName.SubscriptionCreated:
       case EventName.SubscriptionActivated:

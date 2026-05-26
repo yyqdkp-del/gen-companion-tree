@@ -5,11 +5,6 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { getAuthUser } from '@/lib/auth/getAuthUser'
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
-)
-
 /**
  * POST /api/account/delete
  *
@@ -28,6 +23,13 @@ export async function POST(req: NextRequest) {
   if (authError || !user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
+
+  // service-role 客户端在 handler 内部 lazy 初始化，避免 next build
+  // 在 collect-page-data 阶段（env 可能未注入）就 throw "supabaseUrl is required"
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+  )
 
   const now = new Date()
   const scheduledFor = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000)
