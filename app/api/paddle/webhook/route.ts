@@ -159,3 +159,9 @@ export async function POST(req: NextRequest) {
 
   return NextResponse.json({ received: true })
 }
+
+// Paddle Dashboard 在录入 webhook URL 时会发 GET 探测端点可达性；
+// 单独返回 200 以避免 405，对真实事件没有影响（仍走上面的 POST）。
+export async function GET(_req: NextRequest) {
+  return NextResponse.json({ ok: true, service: 'paddle-webhook' })
+}
