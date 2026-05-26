@@ -1,24 +1,101 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { fetchWithAuth } from '@/lib/auth/fetchWithAuth'
 import { PLANS } from '@/lib/stripe/plans'
 
+type PaddleCheckoutItem = { priceId: string; quantity: number }
+type PaddleCheckoutOptions = {
+  items: PaddleCheckoutItem[]
+  customer?: { email?: string }
+  customData?: Record<string, string | undefined>
+  settings?: { successUrl?: string }
+}
+
+type PaddleSDK = {
+  Environment: { set(env: 'production' | 'sandbox'): void }
+  Initialize(options: { token?: string }): void
+  Checkout: { open(options: PaddleCheckoutOptions): void }
+}
+
+declare global {
+  interface Window {
+    Paddle?: PaddleSDK
+  }
+}
+
+const PADDLE_SCRIPT_SRC = 'https://cdn.paddle.com/paddle/v2/paddle.js'
+
 export default function UpgradePage() {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
+  const [paddleReady, setPaddleReady] = useState(false)
+  const initializedRef = useRef(false)
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    const initialize = () => {
+      if (initializedRef.current) {
+        setPaddleReady(true)
+        return
+      }
+      if (!window.Paddle) return
+      const env: 'production' | 'sandbox' =
+        process.env.NODE_ENV === 'production' ? 'production' : 'sandbox'
+      window.Paddle.Environment.set(env)
+      window.Paddle.Initialize({
+        token: process.env.NEXT_PUBLIC_PADDLE_CLIENT_TOKEN,
+      })
+      initializedRef.current = true
+      setPaddleReady(true)
+    }
+
+    if (window.Paddle) {
+      initialize()
+      return
+    }
+
+    const existing = document.querySelector<HTMLScriptElement>(
+      `script[src="${PADDLE_SCRIPT_SRC}"]`,
+    )
+    if (existing) {
+      existing.addEventListener('load', initialize, { once: true })
+      return
+    }
+
+    const script = document.createElement('script')
+    script.src = PADDLE_SCRIPT_SRC
+    script.async = true
+    script.onload = initialize
+    script.onerror = () => console.error('Paddle.js failed to load')
+    document.head.appendChild(script)
+  }, [])
 
   const handleUpgrade = async () => {
+    if (!window.Paddle) {
+      alert('支付组件尚未加载完成，请稍候再试')
+      return
+    }
     setLoading(true)
     try {
-      const res = await fetchWithAuth('/api/stripe/checkout', {
+      const res = await fetchWithAuth('/api/paddle/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ plan: 'pro' }),
       })
-      const data = await res.json().catch(() => ({}))
-      if (data.url) window.location.href = data.url as string
+      if (!res.ok) {
+        console.error('paddle checkout config failed:', res.status)
+        return
+      }
+      const data = await res.json()
+      window.Paddle.Checkout.open({
+        items: [{ priceId: data.priceId, quantity: 1 }],
+        customer: data.email ? { email: data.email } : undefined,
+        customData: { user_id: data.userId },
+        settings: { successUrl: data.successUrl },
+      })
     } catch (e) {
       console.error(e)
     } finally {
@@ -177,23 +254,27 @@ export default function UpgradePage() {
         <button
           type="button"
           onClick={handleUpgrade}
-          disabled={loading}
+          disabled={loading || !paddleReady}
           style={{
             width: '100%',
             padding: '16px',
-            background: loading ? 'rgba(45,50,47,0.15)' : '#a46355',
+            background: loading || !paddleReady ? 'rgba(45,50,47,0.15)' : '#a46355',
             color: '#fff',
             border: 'none',
             borderRadius: 16,
             fontSize: 16,
             fontFamily: "'Noto Serif SC', serif",
             fontWeight: 500,
-            cursor: loading ? 'not-allowed' : 'pointer',
-            boxShadow: loading ? 'none' : '0 6px 20px rgba(164,99,85,0.3)',
+            cursor: loading || !paddleReady ? 'not-allowed' : 'pointer',
+            boxShadow: loading || !paddleReady ? 'none' : '0 6px 20px rgba(164,99,85,0.3)',
             transition: 'all 0.2s ease',
           }}
         >
-          {loading ? '跳转中...' : `免费试用30天 → 之后 $${plan.price}/月`}
+          {loading
+            ? '跳转中...'
+            : !paddleReady
+              ? '加载支付组件中...'
+              : `免费试用30天 → 之后 $${plan.price}/月`}
         </button>
       </div>
 
@@ -226,7 +307,7 @@ export default function UpgradePage() {
 
       {/* 安全说明 */}
       <div style={{ fontSize: 12, color: 'rgba(45,50,47,0.4)', fontFamily: 'sans-serif', textAlign: 'center', lineHeight: 1.8 }}>
-        由 Stripe 提供安全支付保障<br />
+        由 Paddle 提供安全支付保障<br />
         随时可在设置中取消订阅
       </div>
 
