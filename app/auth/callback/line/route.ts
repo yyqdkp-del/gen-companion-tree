@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
+import { randomBytes } from 'crypto'
 
 
 export async function GET(req: NextRequest) {
@@ -37,9 +38,14 @@ export async function GET(req: NextRequest) {
     })
     const profile = await profileRes.json()
     const fakeEmail = `line_${profile.userId}@line.user`
-    const password = `line_${profile.userId}_${process.env.LINE_CLIENT_SECRET?.slice(0, 8)}`
+    // 每次 LINE 登录都生成一个高熵随机密码：
+    //   - 老代码用 `line_${userId}_${LINE_CLIENT_SECRET.slice(0,8)}` 是确定性的，
+    //     攻击者若拿到 LINE_CLIENT_SECRET 即可拼出任意 LINE 用户的伪密码。
+    //   - 新代码每次旋转，仅在本次请求内有效；存储到 user_line_credentials
+    //     仅供 /api/auth/refresh-pwa 在 PWA 冷启动时重新签发 session。
+    const password = randomBytes(32).toString('base64url')
 
-    // 3. 创建或获取用户
+    // 3. 创建或获取用户；存在则旋转密码以便后续 signInWithPassword 命中
     const { data: createData, error: createError } = await adminSupabase.auth.admin.createUser({
       email: fakeEmail,
       password,
@@ -52,8 +58,32 @@ export async function GET(req: NextRequest) {
       },
     })
 
-    // 新用户建档
-    if (!createError && createData.user) {
+    const isNewUser = !createError && Boolean(createData?.user)
+    let uid: string = createData?.user?.id || ''
+
+    if (!isNewUser) {
+      // 老用户：从 user_line_credentials 反查 user_id，再轮换密码到 auth.users
+      const { data: existingCred } = await adminSupabase
+        .from('user_line_credentials')
+        .select('user_id')
+        .eq('fake_email', fakeEmail)
+        .maybeSingle()
+      if (existingCred?.user_id) {
+        uid = existingCred.user_id
+        const { error: updateErr } = await adminSupabase.auth.admin.updateUserById(uid, { password })
+        if (updateErr) {
+          console.error('LINE password rotation failed:', updateErr.message)
+          throw new Error('Password rotation failed')
+        }
+      } else {
+        // 边缘情况：auth.users 里有但 user_line_credentials 缺失（旧确定性密码迁移期）。
+        // 此时无法定位 user_id，直接报错让用户重试或联系支持。
+        throw new Error('LINE user exists but credentials missing; cannot rotate password')
+      }
+    }
+
+    if (isNewUser && createData?.user) {
+      // 新用户建档
       await adminSupabase.from('family_profile').insert({
         user_id: createData.user.id,
         member_name: profile.displayName,
@@ -67,7 +97,7 @@ export async function GET(req: NextRequest) {
       })
     }
 
-    // 4. 获取 session
+    // 4. 获取 session（用本次生成的密码登录）
     const signInRes = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/auth/v1/token?grant_type=password`, {
       method: 'POST',
       headers: {
@@ -79,12 +109,14 @@ export async function GET(req: NextRequest) {
     const session = await signInRes.json()
     if (!session.access_token) throw new Error('No session')
 
-    // 5. 确认 uid
-    const isNewUser = !createError && createData?.user
-    const uid = session.user?.id || createData?.user?.id || ''
+    // 5. 最终 uid 取 session 优先
+    uid = session.user?.id || uid
     if (!uid) throw new Error('No user id')
 
-    // 6. 存 LINE 凭据（用于 PWA 重建 session）
+    // 6. 存 LINE 凭据（用于 PWA 冷启动重建 session）
+    // 注意：fake_password 此处仍以明文存储，因为 /api/auth/refresh-pwa
+    // 需要原密码调用 signInWithPassword。它每次 LINE 登录都会被新随机值覆盖。
+    // 后续应升级为存 refresh_token 或专用 LINE→Supabase 交换流程，彻底消除明文。
     await adminSupabase.from('user_line_credentials').upsert({
       user_id: uid,
       fake_email: fakeEmail,

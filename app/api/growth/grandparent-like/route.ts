@@ -22,6 +22,22 @@ export async function POST(req: NextRequest) {
 
   if (!report) return NextResponse.json({ error: 'not found' }, { status: 404 })
 
+  // 5 分钟节流：同一报告/同一接收用户在最近 5 分钟内已生成过点赞 hotspot 就直接吞掉，
+  // 防止任何拿到 share_token 的人重复刷计数和塞满妈妈的 inbox。
+  const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString()
+  const { count: recentLikeCount } = await supabase
+    .from('hotspot_items')
+    .select('id', { count: 'exact', head: true })
+    .eq('user_id', report.user_id)
+    .eq('category', 'mom')
+    .eq('urgency', 'lifestyle')
+    .ilike('title', '爷爷奶奶给%')
+    .gte('created_at', fiveMinutesAgo)
+
+  if ((recentLikeCount || 0) > 0) {
+    return NextResponse.json({ ok: true, throttled: true })
+  }
+
   await supabase
     .from('growth_reports')
     .update({ grandparent_likes: (report.grandparent_likes || 0) + 1 })

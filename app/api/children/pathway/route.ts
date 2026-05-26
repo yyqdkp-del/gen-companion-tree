@@ -4,6 +4,7 @@ export const maxDuration = 60
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { waitUntil } from '@vercel/functions'
+import { getAuthUser } from '@/lib/auth/getAuthUser'
 
 // ── 年级到申请倒计时计算 ──
 function gradeToApplyYear(grade: string, path: string): number {
@@ -248,17 +249,14 @@ function calculateCompletion(node: any, data: {
   return Math.round((completed / conditions.length) * 100)
 }
 
-async function generateAndSave(body: any, authHeader: string) {
+async function generateAndSave(body: any, uid: string) {
+  if (!uid) return
   const { child, activities, achievements, essays, assessment, vision, childId, geofence } = body
 
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   )
-
-  const token = authHeader.replace('Bearer ', '')
-  const { data: { user } } = await supabase.auth.getUser(token)
-  const uid = user?.id || null
 
   const currentYear = new Date().getFullYear()
   const grade = child?.grade || 'K3'
@@ -445,14 +443,20 @@ ${JSON.stringify(nodesWithCompletion, null, 2)}
 }
 
 export async function POST(req: NextRequest) {
-  const body = await req.json()
-  const authHeader = req.headers.get('authorization') || ''
+  const { user, error: authError } = await getAuthUser(req)
+  if (authError || !user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
 
+  const body = await req.json().catch(() => null)
+  if (!body) {
+    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
+  }
   if (!body.child || !body.vision) {
     return NextResponse.json({ error: '缺少必要数据' }, { status: 400 })
   }
 
-  waitUntil(generateAndSave(body, authHeader))
+  waitUntil(generateAndSave(body, user.id))
 
   return NextResponse.json({ status: 'processing' })
 }

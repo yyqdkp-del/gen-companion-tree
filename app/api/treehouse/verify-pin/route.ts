@@ -4,6 +4,7 @@ export const runtime = 'nodejs'
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import bcrypt from 'bcryptjs'
+import { timingSafeEqual } from 'crypto'
 import { getAuthUser } from '@/lib/auth/getAuthUser'
 
 /** riqi_access 未纳入 generated Database 类型时使用 */
@@ -68,7 +69,13 @@ export async function POST(req: NextRequest) {
   if (looksLikeBcrypt(stored)) {
     ok = await bcrypt.compare(pin, stored)
   } else {
-    ok = stored === pin
+    // 旧明文 PIN（legacy row）：用 timingSafeEqual 避免按字符提前返回的时序攻击。
+    // 用固定长度的零填充等长缓冲区即便长度不同也跑一次比较，时序稳定。
+    const a = Buffer.alloc(64)
+    const b = Buffer.alloc(64)
+    Buffer.from(stored).copy(a, 0, 0, Math.min(stored.length, 64))
+    Buffer.from(pin).copy(b, 0, 0, Math.min(pin.length, 64))
+    ok = timingSafeEqual(a, b) && stored.length === pin.length
   }
 
   return NextResponse.json({ ok })

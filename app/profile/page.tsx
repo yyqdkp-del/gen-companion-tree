@@ -556,6 +556,28 @@ function ProfileContent() {
               cursor: 'pointer', fontFamily: "'Noto Sans SC', sans-serif" }}>
             退出登录
           </button>
+          <button
+            type="button"
+            onClick={async () => {
+              if (!confirm('确认注销账号？30 天后将永久删除所有数据，期间可联系客服撤销。')) return
+              const res = await fetchWithAuth('/api/account/delete', { method: 'POST' })
+              if (!res.ok) {
+                alert('注销失败，请稍后重试或联系客服')
+                return
+              }
+              await signOut()
+              router.push('/auth')
+            }}
+            style={{
+              display: 'block', width: '100%', marginBottom: 24,
+              background: 'none', border: 'none',
+              color: 'rgba(45,50,47,0.35)', fontSize: 12,
+              cursor: 'pointer', padding: '8px 0',
+              fontFamily: "'Noto Sans SC', sans-serif",
+              textDecoration: 'underline',
+            }}>
+            注销账号
+          </button>
           {isLastStep ? (
             <span onClick={() => router.back()}
               style={{ fontSize: 12, color: THEME.muted, cursor: 'pointer', textDecoration: 'underline', opacity: 0.7 }}>
