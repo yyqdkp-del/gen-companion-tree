@@ -42,8 +42,10 @@ export default function UpgradePage() {
         return
       }
       if (!window.Paddle) return
+      // 测试阶段强制 sandbox；上线真实支付时在 Vercel 设
+      // NEXT_PUBLIC_PADDLE_SANDBOX=false 即可切换到 production，无需改代码。
       const env: 'production' | 'sandbox' =
-        process.env.NODE_ENV === 'production' ? 'production' : 'sandbox'
+        process.env.NEXT_PUBLIC_PADDLE_SANDBOX === 'false' ? 'production' : 'sandbox'
       window.Paddle.Environment.set(env)
       window.Paddle.Initialize({
         token: process.env.NEXT_PUBLIC_PADDLE_CLIENT_TOKEN,
