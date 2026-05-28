@@ -65,5 +65,20 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: error.message }, { status: 500 })
   }
 
+  if (data?.id) {
+    const { error: profileError } = await supabase.from('child_profiles').upsert(
+      {
+        child_id: data.id,
+        user_id: user.id,
+        class_schedule: {},
+        activities: [],
+      },
+      { onConflict: 'child_id' },
+    )
+    if (profileError) {
+      console.warn('[api/children] child_profiles upsert failed:', profileError.message)
+    }
+  }
+
   return NextResponse.json({ ok: true, child_id: data?.id })
 }

@@ -341,5 +341,17 @@ export async function addChild(
     energy: null, status: 'active',
     school_name: d.school_name, grade: d.grade,
   }).select().single()
-  return data?.id ?? null
+  if (!data?.id) return null
+
+  await supabase.from('child_profiles').upsert(
+    {
+      child_id: data.id,
+      user_id: uid,
+      class_schedule: {},
+      activities: [],
+    },
+    { onConflict: 'child_id' },
+  )
+
+  return data.id
 }
