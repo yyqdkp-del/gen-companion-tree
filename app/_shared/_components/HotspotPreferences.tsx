@@ -1,10 +1,11 @@
 'use client'
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X } from 'lucide-react'
 import { THEME } from '../_constants/theme'
 import { createClient } from '@/lib/supabase/client'
 import { logOrAlertNetworkError } from '@/lib/errors/logOrAlertNetworkError'
+import { toast } from '@/app/components/Toast'
 
 const supabase = createClient()
 
@@ -50,6 +51,34 @@ type Props = {
 export default function HotspotPreferences({ userId, onClose, onSave }: Props) {
   const [enabled, setEnabled] = useState<Set<string>>(new Set())
   const [saving, setSaving] = useState(false)
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const persistEnabled = useCallback(async (nextEnabled: Set<string>) => {
+    setSaving(true)
+    try {
+      const allTopics = [...IMPORTANT_TOPICS, ...PERSONAL_TOPICS]
+      await Promise.all(allTopics.map(async t => {
+        const weight = nextEnabled.has(t.topic) ? 80 : 0
+        const { data: existing } = await supabase
+          .from('interest_weights')
+          .select('*').eq('user_id', userId).eq('topic', t.topic).single()
+        if (existing) {
+          await supabase.from('interest_weights')
+            .update({ weight, updated_at: new Date().toISOString() })
+            .eq('user_id', userId).eq('topic', t.topic)
+        } else {
+          await supabase.from('interest_weights')
+            .insert({ user_id: userId, topic: t.topic, weight })
+        }
+      }))
+      toast('偏好已保存', 'success')
+      onSave()
+    } catch (e) {
+      logOrAlertNetworkError(e)
+    } finally {
+      setSaving(false)
+    }
+  }, [onSave, userId])
 
   useEffect(() => {
     // 加载现有设置
@@ -70,40 +99,30 @@ export default function HotspotPreferences({ userId, onClose, onSave }: Props) {
       })
   }, [userId])
 
+  useEffect(() => {
+    return () => {
+      if (saveTimer.current) clearTimeout(saveTimer.current)
+    }
+  }, [])
+
   const toggle = (topic: string) => {
     setEnabled(prev => {
       const next = new Set(prev)
       if (next.has(topic)) next.delete(topic)
       else next.add(topic)
+
+      if (saveTimer.current) clearTimeout(saveTimer.current)
+      saveTimer.current = setTimeout(() => {
+        void persistEnabled(next)
+      }, 1000)
+
       return next
     })
   }
 
   const save = async () => {
-    setSaving(true)
-    try {
-      const allTopics = [...IMPORTANT_TOPICS, ...PERSONAL_TOPICS]
-      await Promise.all(allTopics.map(async t => {
-        const weight = enabled.has(t.topic) ? 80 : 0
-        const { data: existing } = await supabase
-          .from('interest_weights')
-          .select('*').eq('user_id', userId).eq('topic', t.topic).single()
-        if (existing) {
-          await supabase.from('interest_weights')
-            .update({ weight, updated_at: new Date().toISOString() })
-            .eq('user_id', userId).eq('topic', t.topic)
-        } else {
-          await supabase.from('interest_weights')
-            .insert({ user_id: userId, topic: t.topic, weight })
-        }
-      }))
-      onSave()
-      onClose()
-    } catch (e) {
-      logOrAlertNetworkError(e)
-    } finally {
-      setSaving(false)
-    }
+    await persistEnabled(enabled)
+    onClose()
   }
 
   const TopicButton = ({ topic, label, emoji, locked }: {

@@ -372,16 +372,18 @@ function ProfileContent() {
       }
 
       setSaved(true)
-      await runHotspotArchive()
-
       setTimeout(() => {
         if (isEdit) router.back()
         else router.push('/?refresh=1')
-      }, 1500)
+      }, 800)
     } catch (e) {
       if (!logOrAlertNetworkError(e)) setSaveError('保存失败，请检查网络后重试')
     }
     setSaving(false)
+  }
+
+  const handleAnalyze = async () => {
+    await runHotspotArchive()
   }
 
   return (
@@ -612,9 +614,9 @@ function ProfileContent() {
                 style={{ flex: 1, padding: '14px', borderRadius: 16, border: '1px solid rgba(0,0,0,0.1)', background: 'transparent', fontSize: 14, color: THEME.muted, cursor: 'pointer' }}>
                 上一步
               </motion.button>
-              <motion.button whileTap={{ scale: 0.97 }} onClick={() => void handleSave()} disabled={saving || saved || archiving}
+              <motion.button whileTap={{ scale: 0.97 }} onClick={() => void handleSave()} disabled={saving || saved}
                 style={{
-                  flex: 2, padding: '14px', borderRadius: 14, border: 'none',
+                  flex: 1, padding: '14px', borderRadius: 14, border: 'none',
                   background: saved ? '#22C55E' : ACCENT,
                   color: '#ffffff', fontSize: 14, fontWeight: 600,
                   boxShadow: saved ? 'none' : '0 4px 16px rgba(164,99,85,0.25)',
@@ -622,8 +624,31 @@ function ProfileContent() {
                   display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
                   transition: 'background 0.3s',
                 }}>
-                {(saving || archiving) ? <Loader size={16} /> : saved ? <Check size={16} /> : <Save size={16} />}
-                {archiving ? '分析归档中…' : saving ? '保存中…' : saved ? '已保存 🌿' : isEdit ? '保存修改' : '保存并分析'}
+                {saving ? <Loader size={16} /> : saved ? <Check size={16} /> : <Save size={16} />}
+                {saving ? '保存中…' : saved ? '已保存 🌿' : '保存'}
+              </motion.button>
+              <motion.button
+                whileTap={{ scale: 0.97 }}
+                onClick={() => void handleAnalyze()}
+                disabled={archiving || !saved}
+                style={{
+                  flex: 1,
+                  padding: '14px',
+                  borderRadius: 14,
+                  border: '1px solid rgba(0,0,0,0.08)',
+                  background: archiving ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.75)',
+                  color: INK,
+                  fontSize: 14,
+                  fontWeight: 600,
+                  cursor: (archiving || !saved) ? 'default' : 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 8,
+                }}
+              >
+                {archiving ? <Loader size={16} /> : null}
+                {archiving ? '刷新中…' : '刷新热点'}
               </motion.button>
             </>
           ) : (

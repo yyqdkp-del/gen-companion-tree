@@ -1,7 +1,7 @@
 'use client'
 import { createClient } from '@/lib/supabase/client'
 const supabase = createClient()
-import React, { useState, useCallback } from 'react'
+import React, { useState, useCallback, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, Plus, ChevronRight } from 'lucide-react'
 import VoiceBtn from '@/app/components/VoiceBtn'
@@ -18,6 +18,7 @@ import { calculateEnergy, getEnergyColor } from '@/app/_shared/_engine/energy'
 import ChildEnergyCard from '@/app/_shared/_components/ChildEnergyCard'
 import type { Child, TimelineItem, HealthStatus, MoodStatus } from '@/app/_shared/_types'
 import { addDaysStr, getTodayStr } from '@/lib/date/localDate'
+import { toast } from '@/app/components/Toast'
 
 const healthOptions = [
   { value: 'normal',     label: '健康',   color: GREEN.dark, bg: GREEN.bg },
@@ -223,6 +224,17 @@ function StatusEditor({ log, onSave, onClose }: {
   const [health, setHealth] = useState<string | null>(log.health_status || null)
   const [mood, setMood] = useState<string | null>(log.mood_status || null)
   const canSave = health != null && mood != null
+
+  // 两项都选完 → 防抖自动保存（保留手动按钮作为兜底）
+  useEffect(() => {
+    if (!canSave) return
+    const timer = setTimeout(() => {
+      onSave(health as HealthStatus, mood as MoodStatus)
+      toast('今日状态已记录 ✓', 'success')
+    }, 500)
+    return () => clearTimeout(timer)
+  }, [canSave, health, mood, onSave])
+
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
       style={{ position: 'fixed', inset: 0, zIndex: 500,

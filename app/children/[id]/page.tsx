@@ -1,5 +1,5 @@
 'use client'
-import React, { useState, useEffect, Suspense } from 'react'
+import React, { useState, useEffect, Suspense, useCallback } from 'react'
 import { useRouter, useParams, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -56,7 +56,7 @@ function ChildEditContent() {
   const router = useRouter()
   const params = useParams()
   const isNew = params.id === 'new'
-  const childId = isNew ? null : params.id as string
+  const paramChildId = isNew ? null : params.id as string
   const searchParams = useSearchParams()
   const isFromQuick = searchParams.get('from') === 'quick'
   const [step, setStep] = useState(0)
@@ -64,6 +64,9 @@ function ChildEditContent() {
   const [saved, setSaved] = useState(false)
   const [saveError, setSaveError] = useState('')
   const [schools, setSchools] = useState<any[]>([])
+  const [userId, setUserId] = useState<string | null>(null)
+  const [currentChildId, setCurrentChildId] = useState<string | null>(paramChildId)
+  const [isDirty, setIsDirty] = useState(false)
 
   const [basicData, setBasicData] = useState({
     name: '', birthdate: '', emoji: '🌟', languages: [] as string[], avatar_url: '',
@@ -87,10 +90,42 @@ function ChildEditContent() {
     preferred_hospitals: [] as any[],
   })
 
+  const setBasicDataDirty = useCallback((next: any) => {
+    setIsDirty(true)
+    setBasicData(next)
+  }, [])
+  const setSchoolDataDirty = useCallback((next: any) => {
+    setIsDirty(true)
+    setSchoolData(next)
+  }, [])
+  const setHealthDataDirty = useCallback((next: any) => {
+    setIsDirty(true)
+    setHealthData(next)
+  }, [])
+  const setScheduleDataDirty = useCallback((next: any) => {
+    setIsDirty(true)
+    setScheduleData(next)
+  }, [])
+
   useEffect(() => {
     loadSchools()
-    if (!isNew && childId) loadChild()
+    void (async () => {
+      const { data: { session } } = await supabase.auth.getSession()
+      setUserId(session?.user?.id || null)
+    })()
+    if (!isNew && paramChildId) loadChild()
   }, [])
+
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (!isDirty) return
+      e.preventDefault()
+      e.returnValue = ''
+    }
+    window.addEventListener('beforeunload', handleBeforeUnload)
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload)
+  }, [isDirty])
+
   useEffect(() => {
   const handleResize = () => {
     const vh = window.visualViewport?.height || window.innerHeight
@@ -114,7 +149,7 @@ function ChildEditContent() {
   }
 
   const loadChild = async () => {
-    const { data: child } = await supabase.from('children').select('*').eq('id', childId).single()
+    const { data: child } = await supabase.from('children').select('*').eq('id', paramChildId).single()
     if (!child) return
 
     setBasicData({
@@ -146,7 +181,7 @@ function ChildEditContent() {
       preferred_hospitals: child.preferred_hospitals || [],
     })
 
-    const { data: profile } = await supabase.from('child_profiles').select('*').eq('child_id', childId).maybeSingle()
+    const { data: profile } = await supabase.from('child_profiles').select('*').eq('child_id', paramChildId).maybeSingle()
     if (profile) {
       setScheduleData({
         class_schedule: profile.class_schedule || {},
@@ -155,14 +190,131 @@ function ChildEditContent() {
     }
   }
 
+  const autoSaveCurrentStep = useCallback(async () => {
+    if (!userId) return
+    if (step === 0 && !basicData.name.trim()) return
+
+    try {
+      // 新建孩子：第一次保存时先创建 children 拿到 id
+      if (isNew && !currentChildId) {
+        const childPayload = {
+          user_id: userId,
+          name: basicData.name,
+          birthdate: basicData.birthdate || null,
+          birth_date: basicData.birthdate || null,
+          emoji: basicData.emoji,
+          languages: basicData.languages,
+          avatar_url: basicData.avatar_url || null,
+          blood_type: basicData.blood_type,
+          allergies: basicData.allergies_text.trim()
+            ? [basicData.allergies_text.trim()]
+            : ['无'],
+          passport_number: basicData.passport_number.trim() || null,
+          passport_expiry: basicData.passport_expiry || null,
+          nationality: basicData.nationality.trim() || null,
+          school: schoolData.school,
+          school_name: schoolData.school_name || schoolData.school,
+          grade: schoolData.grade,
+          school_start_time: schoolData.school_start_time || null,
+          school_end_time: schoolData.school_end_time || null,
+          transport_method: schoolData.transport_method,
+          usual_bedtime: healthData.usual_bedtime,
+          weekend_bedtime: healthData.weekend_bedtime,
+          medical_conditions: healthData.medical_conditions,
+          medications_current: healthData.medications_current,
+          preferred_hospitals: healthData.preferred_hospitals,
+        }
+        const { data, error } = await supabase
+          .from('children')
+          .insert(childPayload)
+          .select('id')
+          .single()
+        if (error) throw error
+        if (data?.id) {
+          setCurrentChildId(data.id)
+          localStorage.setItem('active_child_id', data.id)
+          setIsDirty(false)
+        }
+        return
+      }
+
+      if (!currentChildId) return
+
+      // 分步保存：每步只 upsert 对应字段，避免覆盖其它字段为空
+      const patch: any = { id: currentChildId, user_id: userId, updated_at: new Date().toISOString() }
+      if (step === 0) {
+        Object.assign(patch, {
+          name: basicData.name,
+          birthdate: basicData.birthdate || null,
+          birth_date: basicData.birthdate || null,
+          emoji: basicData.emoji,
+          languages: basicData.languages,
+          avatar_url: basicData.avatar_url || null,
+          blood_type: basicData.blood_type,
+          allergies: basicData.allergies_text.trim()
+            ? [basicData.allergies_text.trim()]
+            : ['无'],
+          passport_number: basicData.passport_number.trim() || null,
+          passport_expiry: basicData.passport_expiry || null,
+          nationality: basicData.nationality.trim() || null,
+        })
+        await supabase.from('children').upsert(patch, { onConflict: 'id' })
+      } else if (step === 1) {
+        Object.assign(patch, {
+          school: schoolData.school,
+          school_name: schoolData.school_name || schoolData.school,
+          grade: schoolData.grade,
+          school_start_time: schoolData.school_start_time || null,
+          school_end_time: schoolData.school_end_time || null,
+          transport_method: schoolData.transport_method,
+        })
+        await supabase.from('children').upsert(patch, { onConflict: 'id' })
+      } else if (step === 2) {
+        Object.assign(patch, {
+          usual_bedtime: healthData.usual_bedtime,
+          weekend_bedtime: healthData.weekend_bedtime,
+          medical_conditions: healthData.medical_conditions,
+          medications_current: healthData.medications_current,
+          preferred_hospitals: healthData.preferred_hospitals,
+        })
+        await supabase.from('children').upsert(patch, { onConflict: 'id' })
+      } else if (step === 3) {
+        await supabase.from('child_profiles').upsert({
+          child_id: currentChildId,
+          user_id: userId,
+          class_schedule: scheduleData.class_schedule,
+          activities: (scheduleData as any).activities || [],
+        }, { onConflict: 'child_id' })
+      }
+
+      setIsDirty(false)
+    } catch (e) {
+      console.warn('自动保存失败', e)
+    }
+  }, [
+    userId,
+    step,
+    isNew,
+    currentChildId,
+    basicData,
+    schoolData,
+    healthData,
+    scheduleData,
+  ])
+
+  const goNextStep = useCallback(async () => {
+    if (saving) return
+    await autoSaveCurrentStep()
+    setStep((s) => s + 1)
+  }, [autoSaveCurrentStep, saving])
+
   const handleSave = async () => {
     if (!basicData.name.trim()) { setSaveError('请填写孩子名字'); return }
     setSaving(true)
     setSaveError('')
 
     try {
-      const { data: { session } } = await supabase.auth.getSession()
-      const uid = session?.user?.id
+      const uid = userId
       if (!uid) { router.push('/'); return }
 
       const childPayload = {
@@ -193,15 +345,15 @@ function ChildEditContent() {
         preferred_hospitals: healthData.preferred_hospitals,
       }
 
-      let savedChildId = childId
+      let savedChildId = currentChildId
 
       if (isNew) {
   const { data, error } = await supabase.from('children').insert(childPayload).select().single()
   if (error) { setSaveError('新建失败: ' + error.message); setSaving(false); return }
   savedChildId = data?.id
 } else {
-  const { error } = await supabase.from('children').update(childPayload).eq('id', childId)
-        savedChildId = childId
+  const { error } = await supabase.from('children').update(childPayload).eq('id', currentChildId)
+        savedChildId = currentChildId
   if (error) { setSaveError('更新失败: ' + error.message); setSaving(false); return }
 }
 
@@ -222,6 +374,7 @@ function ChildEditContent() {
       }
 
       setSaved(true)
+      setIsDirty(false)
       setTimeout(() => router.push('/?refresh=1'), 1200)
 
     } catch (e) {
@@ -273,10 +426,10 @@ function ChildEditContent() {
         <motion.div style={{ ...GLASS_CARD, padding: '20px 16px', marginBottom: 16 }}>
           <AnimatePresence mode="wait">
             <motion.div key={step} initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} transition={{ duration: 0.25 }}>
-              {step === 0 && <StepBasic data={basicData} onChange={setBasicData} />}
-              {step === 1 && <StepSchool data={schoolData} onChange={setSchoolData} schools={schools} />}
-              {step === 2 && <StepHealth data={healthData} onChange={setHealthData} />}
-              {step === 3 && <StepSchedule data={scheduleData} onChange={setScheduleData} />}
+              {step === 0 && <StepBasic data={basicData} onChange={setBasicDataDirty} />}
+              {step === 1 && <StepSchool data={schoolData} onChange={setSchoolDataDirty} schools={schools} />}
+              {step === 2 && <StepHealth data={healthData} onChange={setHealthDataDirty} />}
+              {step === 3 && <StepSchedule data={scheduleData} onChange={setScheduleDataDirty} />}
             </motion.div>
           </AnimatePresence>
         </motion.div>
@@ -308,7 +461,7 @@ function ChildEditContent() {
                   上一步
                 </motion.button>
               )}
-              <motion.button whileTap={{ scale: 0.97 }} onClick={() => canProceed && setStep(step + 1)}
+              <motion.button whileTap={{ scale: 0.97 }} onClick={() => canProceed && void goNextStep()}
                 style={{ flex: 2, padding: '14px', borderRadius: 14, border: 'none', boxShadow: canProceed ? '0 4px 16px rgba(164,99,85,0.25)' : 'none', background: canProceed ? PAGE.accent : 'rgba(0,0,0,0.08)', color: canProceed ? '#fff' : PAGE.muted, fontSize: 14, fontWeight: 600, cursor: canProceed ? 'pointer' : 'default', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
                 下一步 <ArrowRight size={16} />
               </motion.button>
