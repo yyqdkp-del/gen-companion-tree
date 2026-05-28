@@ -123,7 +123,6 @@ function ProfileContent() {
           phone: data.phone || '',
           email: data.email || '',
         })
-        setIsPro(!!data.is_pro)
         setPassportData({
           passport_number: data.passport_number || '',
           passport_expiry: data.passport_expiry || '',

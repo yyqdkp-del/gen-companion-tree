@@ -1,10 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthUser } from '@/lib/auth/getAuthUser'
+import { isProWhitelistedEmail } from '@/lib/auth/proWhitelist'
 import { getServiceSupabase } from '@/lib/supabase/service'
 
 export async function GET(req: NextRequest) {
   const { user, error } = await getAuthUser(req)
   if (error || !user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  if (isProWhitelistedEmail(user.email)) {
+    return NextResponse.json({
+      is_pro: true,
+      plan: 'pro',
+      status: 'active',
+      current_period_end: null,
+      cancel_at_period_end: false,
+      whitelisted: true,
+    })
+  }
 
   const supabase = getServiceSupabase()
   const [{ data }, { data: profile }] = await Promise.all([

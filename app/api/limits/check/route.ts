@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthUser } from '@/lib/auth/getAuthUser'
+import { isProWhitelistedEmail } from '@/lib/auth/proWhitelist'
 import { getServiceSupabase } from '@/lib/supabase/service'
 
 const FREE_LIMITS = {
@@ -17,6 +18,11 @@ export async function GET(req: NextRequest) {
 
   const feature = (req.nextUrl.searchParams.get('feature') || 'hanzi_decode') as LimitFeature
   const today = new Date().toISOString().split('T')[0]
+
+  if (isProWhitelistedEmail(user.email)) {
+    return NextResponse.json({ allowed: true, is_pro: true, remaining: 999 })
+  }
+
   const supabase = getServiceSupabase()
 
   const [{ data: sub }, { data: profile }] = await Promise.all([
