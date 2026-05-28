@@ -22,6 +22,7 @@ export default function InstallPWA() {
     }
 
     const handler = (e: Event) => {
+      // 拦截系统默认横幅，改用右下角「添加到桌面」按钮；Chrome 可能打一行提示性 log，可忽略
       e.preventDefault();
       setDeferredPrompt(e as BeforeInstallPromptEvent);
     };

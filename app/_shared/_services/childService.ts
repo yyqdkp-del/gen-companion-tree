@@ -46,7 +46,8 @@ export async function fetchChildSchedule(childId: string, today: string) {
   const [profileRes, calRes, healthRes] = await Promise.all([
     supabase.from('child_profiles')
       .select('class_schedule, activities')
-      .eq('child_id', childId).single(),
+      .eq('child_id', childId)
+      .maybeSingle(),
     supabase.from('child_school_calendar')
       .select('*').eq('child_id', childId)
       .gte('date_start', today).lte('date_start', yearEnd)

@@ -171,7 +171,16 @@ function ProfileContent() {
       setConnectUserId(uid)
       const { data, error } = await supabase.from('user_google_tokens').select('service').eq('user_id', uid)
       if (error) {
-        console.warn('user_google_tokens:', error.message)
+        // 生产库若未跑 20260520000001 迁移，service 列不存在；降级为仅判断是否有 token 行
+        if (error.message.includes('service')) {
+          const legacy = await supabase.from('user_google_tokens').select('id').eq('user_id', uid)
+          if (!cancelled && !legacy.error) {
+            setGmailConnected((legacy.data?.length ?? 0) > 0)
+            setCalendarConnected(false)
+          }
+        } else {
+          console.warn('user_google_tokens:', error.message)
+        }
         return
       }
       if (cancelled) return
@@ -245,9 +254,26 @@ function ProfileContent() {
       }
 
       if (existingId) {
-        await supabase.from('family_profile').update(payload).eq('id', existingId)
+        const { error: updateErr } = await supabase
+          .from('family_profile')
+          .update(payload)
+          .eq('user_id', uid)
+        if (updateErr) {
+          setSaveError('保存失败: ' + updateErr.message)
+          setSaving(false)
+          return
+        }
       } else {
-        const { data } = await supabase.from('family_profile').insert(payload).select().single()
+        const { data, error: insertErr } = await supabase
+          .from('family_profile')
+          .insert(payload)
+          .select()
+          .single()
+        if (insertErr) {
+          setSaveError('保存失败: ' + insertErr.message)
+          setSaving(false)
+          return
+        }
         if (data) setExistingId(data.id)
       }
 
