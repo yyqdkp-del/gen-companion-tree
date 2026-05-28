@@ -1,7 +1,10 @@
+name: Supabase Migrations (prod)
+
 on:
   push:
     branches: [main]
   workflow_dispatch: {}
+
 jobs:
   migrate:
     runs-on: ubuntu-latest
@@ -13,11 +16,15 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
       - name: Setup Supabase CLI
         uses: supabase/setup-cli@v1
+
       - name: Link Supabase project
-        run: supabase link --project-ref "$SUPABASE_PROJECT_REF" --password "$SUPABASE_DB_PASSWORD"
-      - name: Apply pending migrations
-        run: supabase migration up --linked
-      - name: Show migration status
+        run: supabase link --project-ref "$SUPABASE_PROJECT_REF" --password "$SUPABASE_DB_PASSWORD" --yes
+
+      - name: Apply pending migrations (linked)
+        run: supabase migration up --linked --yes
+
+      - name: Show remote migration status (linked)
         run: supabase migration list --linked --password "$SUPABASE_DB_PASSWORD"
