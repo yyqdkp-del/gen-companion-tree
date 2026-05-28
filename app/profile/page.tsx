@@ -1,5 +1,5 @@
 'use client'
-import React, { useState, useEffect, Suspense } from 'react'
+import React, { useState, useEffect, useCallback, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -94,6 +94,8 @@ function ProfileContent() {
   const [calendarConnected, setCalendarConnected] = useState(false)
   const [oauthBanner, setOauthBanner] = useState<{ type: 'ok' | 'err'; text: string } | null>(null)
   const [isPro, setIsPro] = useState(false)
+  const [autoSaveHint, setAutoSaveHint] = useState('')
+  const [archiving, setArchiving] = useState(false)
 
   useEffect(() => {
     const loadSub = async () => {
@@ -112,7 +114,7 @@ function ProfileContent() {
       if (!session?.user?.id) return
 
       const { data } = await supabase.from('family_profile')
-        .select('*').eq('user_id', session.user.id).single()
+        .select('*').eq('user_id', session.user.id).maybeSingle()
 
       if (data) {
         setExistingId(data.id)
@@ -231,6 +233,130 @@ function ProfileContent() {
     }
   }
 
+  const getResolvedCity = useCallback(() => {
+    if (addressData.resident_city === 'other') {
+      return addressData.resident_city_custom?.trim() || null
+    }
+    return addressData.resident_city?.trim() || null
+  }, [addressData.resident_city, addressData.resident_city_custom])
+
+  const buildProfilePayload = useCallback((uid: string) => ({
+    user_id: uid,
+    ...memberData,
+    ...passportData,
+    ...addressData,
+    ...emergencyData,
+    resident_city: addressData.resident_city || null,
+    resident_city_custom:
+      addressData.resident_city === 'other'
+        ? (addressData.resident_city_custom?.trim() || null)
+        : null,
+    updated_at: new Date().toISOString(),
+  }), [memberData, passportData, addressData, emergencyData])
+
+  /** 写入 family_profile + family_places（分步自动保存与最终保存共用） */
+  const persistProfile = useCallback(async (uid: string): Promise<boolean> => {
+    const payload = buildProfilePayload(uid)
+    const resolvedCity = getResolvedCity()
+
+    const { data, error } = await supabase
+      .from('family_profile')
+      .upsert(payload, { onConflict: 'user_id' })
+      .select('id')
+      .single()
+
+    if (error) {
+      setSaveError('保存失败: ' + error.message)
+      return false
+    }
+    if (data?.id) setExistingId(data.id)
+
+    if (addressData.home_address_en?.trim()) {
+      const { data: existingPlace } = await supabase.from('family_places')
+        .select('id').eq('user_id', uid).eq('place_type', 'home').maybeSingle()
+      const placePayload = {
+        user_id: uid,
+        place_type: 'home',
+        name: '家',
+        address: addressData.home_address_en,
+        address_zh: addressData.home_address_zh,
+        city: resolvedCity,
+        is_primary: true,
+      }
+      if (existingPlace?.id) {
+        await supabase.from('family_places').update(placePayload).eq('id', existingPlace.id)
+      } else {
+        await supabase.from('family_places').insert(placePayload)
+      }
+    }
+
+    return true
+  }, [buildProfilePayload, getResolvedCity, addressData.home_address_en, addressData.home_address_zh])
+
+  const hasResidentCity = useCallback(
+    () => Boolean(getResolvedCity()),
+    [getResolvedCity],
+  )
+
+  /** 保存后按居住城市跑热点巡逻（分析归档到 hotspot_items） */
+  const runHotspotArchive = useCallback(async () => {
+    if (!hasResidentCity()) {
+      setOauthBanner({
+        type: 'err',
+        text: '档案已保存。请填写居住城市后，在首页热点里点「刷新热点」生成本地情报。',
+      })
+      return
+    }
+    setArchiving(true)
+    try {
+      const res = await fetchWithAuth('/api/base/patrol', {
+        method: 'POST',
+        body: JSON.stringify({}),
+        signal: AbortSignal.timeout(180_000),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data?.error || '热点分析失败')
+      if (data.skipped === 'no_resident_city') {
+        setOauthBanner({ type: 'err', text: '请填写居住城市后再生成本地热点' })
+      } else if ((data.saved ?? 0) > 0) {
+        setOauthBanner({ type: 'ok', text: `已归档 ${data.saved} 条本地热点到首页` })
+      } else if ((data.generated ?? 0) > 0) {
+        setOauthBanner({ type: 'ok', text: '热点已分析，今日同类情报已在列表中' })
+      } else {
+        setOauthBanner({ type: 'ok', text: '档案已归档，暂无新的高价值热点' })
+      }
+    } catch (e) {
+      if (!logOrAlertNetworkError(e)) {
+        setOauthBanner({ type: 'ok', text: '档案已保存，热点分析超时，请稍后在首页手动刷新' })
+      }
+    } finally {
+      setArchiving(false)
+    }
+  }, [hasResidentCity])
+
+  const autoSaveDraft = useCallback(async () => {
+    if (!memberData.member_name.trim()) return true
+    const { data: { session } } = await supabase.auth.getSession()
+    const uid = session?.user?.id
+    if (!uid) return false
+    setAutoSaveHint('保存中…')
+    const ok = await persistProfile(uid)
+    if (ok) {
+      setAutoSaveHint('已自动保存')
+      setTimeout(() => setAutoSaveHint(''), 2500)
+    }
+    return ok
+  }, [memberData.member_name, persistProfile])
+
+  const isLastStep = step === STEPS.length - 1
+  const canProceed = step === 0 ? !!memberData.member_name.trim() : true
+
+  const goNextStep = async () => {
+    if (!canProceed) return
+    await autoSaveDraft()
+    setStep(s => s + 1)
+  }
+
   const handleSave = async () => {
     setSaving(true)
     setSaveError('')
@@ -239,77 +365,24 @@ function ProfileContent() {
       const uid = session?.user?.id
       if (!uid) { router.push('/'); return }
 
-      const resolvedCity =
-        addressData.resident_city === 'other'
-          ? (addressData.resident_city_custom?.trim() || null)
-          : (addressData.resident_city || null)
-
-      const payload = {
-        user_id: uid,
-        ...memberData,
-        ...passportData,
-        ...addressData,
-        ...emergencyData,
-        updated_at: new Date().toISOString(),
-      }
-
-      if (existingId) {
-        const { error: updateErr } = await supabase
-          .from('family_profile')
-          .update(payload)
-          .eq('user_id', uid)
-        if (updateErr) {
-          setSaveError('保存失败: ' + updateErr.message)
-          setSaving(false)
-          return
-        }
-      } else {
-        const { data, error: insertErr } = await supabase
-          .from('family_profile')
-          .insert(payload)
-          .select()
-          .single()
-        if (insertErr) {
-          setSaveError('保存失败: ' + insertErr.message)
-          setSaving(false)
-          return
-        }
-        if (data) setExistingId(data.id)
-      }
-
-      // 同步地址到 family_places
-      if (addressData.home_address_en) {
-        const { data: existingPlace } = await supabase.from('family_places')
-          .select('id').eq('user_id', uid).eq('place_type', 'home').single()
-        const placePayload = {
-          user_id: uid, place_type: 'home', name: '家',
-          address: addressData.home_address_en,
-          address_zh: addressData.home_address_zh,
-          city: resolvedCity,
-          is_primary: true,
-        }
-        if (existingPlace) {
-          await supabase.from('family_places').update(placePayload).eq('id', existingPlace.id)
-        } else {
-          await supabase.from('family_places').insert(placePayload)
-        }
+      const ok = await persistProfile(uid)
+      if (!ok) {
+        setSaving(false)
+        return
       }
 
       setSaved(true)
-      // 编辑模式返回上一页，新建模式跳主页
+      await runHotspotArchive()
+
       setTimeout(() => {
         if (isEdit) router.back()
-        else router.push('/')
-      }, 1200)
-
+        else router.push('/?refresh=1')
+      }, 1500)
     } catch (e) {
       if (!logOrAlertNetworkError(e)) setSaveError('保存失败，请检查网络后重试')
     }
     setSaving(false)
   }
-
-  const isLastStep = step === STEPS.length - 1
-  const canProceed = step === 0 ? !!memberData.member_name.trim() : true
 
   return (
     <main style={{ minHeight: '100dvh', backgroundColor: '#fbf9f6', fontFamily: "'Noto Sans SC', 'PingFang SC', sans-serif", paddingBottom: NAV_HEIGHT_CSS }}>
@@ -462,6 +535,9 @@ function ProfileContent() {
           <div>
             <div style={{ fontSize: 18, fontWeight: 600, color: INK }}>{STEPS[step].label}</div>
             <div style={{ fontSize: 11, color: THEME.muted }}>步骤 {step + 1} / {STEPS.length}</div>
+            {autoSaveHint ? (
+              <div style={{ fontSize: 11, color: '#5c7a5e', marginTop: 4 }}>{autoSaveHint}</div>
+            ) : null}
           </div>
         </div>
 
@@ -536,7 +612,7 @@ function ProfileContent() {
                 style={{ flex: 1, padding: '14px', borderRadius: 16, border: '1px solid rgba(0,0,0,0.1)', background: 'transparent', fontSize: 14, color: THEME.muted, cursor: 'pointer' }}>
                 上一步
               </motion.button>
-              <motion.button whileTap={{ scale: 0.97 }} onClick={handleSave} disabled={saving || saved}
+              <motion.button whileTap={{ scale: 0.97 }} onClick={() => void handleSave()} disabled={saving || saved || archiving}
                 style={{
                   flex: 2, padding: '14px', borderRadius: 14, border: 'none',
                   background: saved ? '#22C55E' : ACCENT,
@@ -546,8 +622,8 @@ function ProfileContent() {
                   display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
                   transition: 'background 0.3s',
                 }}>
-                {saving ? <Loader size={16} /> : saved ? <Check size={16} /> : <Save size={16} />}
-                {saving ? '保存中…' : saved ? '已保存 🌿' : isEdit ? '保存修改' : '保存档案'}
+                {(saving || archiving) ? <Loader size={16} /> : saved ? <Check size={16} /> : <Save size={16} />}
+                {archiving ? '分析归档中…' : saving ? '保存中…' : saved ? '已保存 🌿' : isEdit ? '保存修改' : '保存并分析'}
               </motion.button>
             </>
           ) : (
@@ -558,7 +634,7 @@ function ProfileContent() {
                   上一步
                 </motion.button>
               )}
-              <motion.button whileTap={{ scale: 0.97 }} onClick={() => canProceed && setStep(step + 1)}
+              <motion.button whileTap={{ scale: 0.97 }} onClick={() => void goNextStep()}
                 style={{
                   flex: 2, padding: '14px', borderRadius: 16, border: 'none',
                   background: canProceed ? ACCENT : 'rgba(0,0,0,0.08)',
@@ -609,9 +685,9 @@ function ProfileContent() {
               {isEdit ? '放弃修改，返回' : '跳过，先去看看主页 →'}
             </span>
           ) : (
-            <span onClick={() => setStep(step + 1)}
+            <span onClick={() => void goNextStep()}
               style={{ fontSize: 12, color: THEME.muted, cursor: 'pointer', textDecoration: 'underline', opacity: 0.7 }}>
-              暂时跳过，稍后填写
+              暂时跳过（已填内容会自动保存）
             </span>
           )}
         </div>

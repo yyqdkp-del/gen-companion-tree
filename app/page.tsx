@@ -579,7 +579,7 @@ export default function BasePage() {
 `,
     }}>
       <Suspense fallback={null}>
-        <HomeRefreshFromQuery onRefresh={() => { void refreshKids() }} />
+        <HomeRefreshFromQuery onRefresh={() => { void refreshKids(); void ctxSync() }} />
       </Suspense>
       {showOnboarding && (
         <Onboarding onComplete={() => {
