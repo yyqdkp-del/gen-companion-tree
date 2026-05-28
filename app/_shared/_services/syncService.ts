@@ -52,9 +52,20 @@ export async function fetchAppData(uid: string, signal?: AbortSignal) {
     throw new DOMException('Aborted', 'AbortError')
   }
 
-  if (childRes.error) console.error('children fetch error:', childRes.error)
-  if (todoRes.error) console.error('todos fetch error:', todoRes.error)
-  if (hotspotRes.error) console.error('hotspots fetch error:', hotspotRes.error)
+  if (childRes.error) {
+    console.warn('children fetch error:', childRes.error)
+    // 孩子表失败不阻断待办/热点，避免整页卡在骨架屏
+    if (todoRes.error) console.warn('todos fetch error:', todoRes.error)
+    if (hotspotRes.error) console.warn('hotspots fetch error:', hotspotRes.error)
+    return {
+      kids: [],
+      todos: todoRes.data || [],
+      hotspots: hotspotRes.data || [],
+    }
+  }
+
+  if (todoRes.error) console.warn('todos fetch error:', todoRes.error)
+  if (hotspotRes.error) console.warn('hotspots fetch error:', hotspotRes.error)
 
   return {
     kids: childRes.data || [],

@@ -288,7 +288,7 @@ export default function BasePage() {
   const [keyboardOpen, setKeyboardOpen] = useState(false)
   const [showProfileBanner, setShowProfileBanner] = useState(false)
 
-  const { enrichedKids, refresh: refreshKids } = useChildData(userId, { deferMs: 1000 })
+  const { enrichedKids, refresh: refreshKids } = useChildData(userId, { deferMs: 0 })
   const [optimisticDoneIds, setOptimisticDoneIds] = useState<Set<string>>(() => new Set())
 
   const optimisticRemove = useCallback((id: string) => {
@@ -324,8 +324,18 @@ export default function BasePage() {
   const { groups: todoGroups } = todoEngine
   const hotspotEngine = useHotspotEngine(hotspots)
 
+  // sync 完成后先用基础 kids 展示头像/姓名，不必等 enrich
   useEffect(() => {
-    if (enrichedKids.length) {
+    if (kids.length > 0 && !activeKid) {
+      const storedId = localStorage.getItem('active_child_id')
+      const current = kids.find((k: any) => k.id === storedId) || kids[0]
+      setActiveKid(current)
+    }
+  }, [kids, activeKid, setActiveKid])
+
+  // enrich 完成后升级 activeKid（精力、紧急项等）
+  useEffect(() => {
+    if (enrichedKids.length > 0) {
       const storedId = localStorage.getItem('active_child_id')
       const current = enrichedKids.find((c: any) => c.id === storedId) || enrichedKids[0]
       setActiveKid(current)

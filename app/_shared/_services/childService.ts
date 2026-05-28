@@ -143,10 +143,17 @@ export async function saveDailyLog(
 export async function enrichChildren(
   uid: string,
   today: string,
+  existingKids?: any[],
 ): Promise<any[]> {
-  const { data: childData, error } = await supabase
-    .from('children').select('*').eq('user_id', uid)
-  if (error || !childData?.length) return []
+  let childData = existingKids?.length ? existingKids : null
+  if (!childData?.length) {
+    const { data, error } = await supabase
+      .from('children')
+      .select('*')
+      .eq('user_id', uid)
+    if (error || !data?.length) return []
+    childData = data
+  }
 
   const results = await Promise.allSettled(
     childData.map(async (c: any) => {
