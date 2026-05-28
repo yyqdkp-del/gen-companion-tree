@@ -417,6 +417,8 @@ async function runPatrolForUsers(userIds: string[], _patrolTime: string) {
       results.push({ userId: userId.slice(0, 8), error: e?.message })
     }
   }
+
+  return results
 }
 
 export async function POST(req: NextRequest) {
@@ -444,6 +446,23 @@ export async function POST(req: NextRequest) {
 
     if (!userIds.length) {
       return NextResponse.json({ ok: false, error: 'no users found' }, { status: 400 })
+    }
+
+    // 用户手动「刷新热点」：同步跑完再返回，否则前端 1s 后 sync 时 AI 尚未写入库
+    const isManualPatrol = Boolean(user && !authError)
+    if (isManualPatrol) {
+      const results = await runPatrolForUsers(userIds, patrolTime)
+      const first = results[0] as Record<string, unknown> | undefined
+      return NextResponse.json({
+        ok: true,
+        message: '巡逻完成',
+        patrol_time: patrolTime,
+        generated: (first?.generated as number | undefined) ?? 0,
+        saved: (first?.saved as number | undefined) ?? 0,
+        skipped: first?.skipped ?? null,
+        location: first?.location ?? null,
+        error: first?.error ?? null,
+      })
     }
 
     waitUntil(

@@ -421,19 +421,31 @@ export default function BasePage() {
       const res = await fetchWithAuth('/api/base/patrol', {
         method: 'POST',
         body: JSON.stringify({}),
-        signal: AbortSignal.timeout(30_000),
+        // 手动巡逻在服务端同步跑 Grok/Gemini/Claude，可能需 1–2 分钟
+        signal: AbortSignal.timeout(180_000),
       })
-      if (!res.ok) throw new Error('巡逻失败')
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data?.error || '巡逻失败')
+
+      await ctxSync()
+
+      if (data.skipped === 'no_resident_city') {
+        toast('请先在档案填写居住城市，才能生成本地热点', 'error')
+      } else if (data.error) {
+        toast(`巡逻失败：${data.error}`, 'error')
+      } else if ((data.saved ?? 0) > 0) {
+        toast(`已更新 ${data.saved} 条热点`, 'success')
+      } else if ((data.generated ?? 0) > 0) {
+        toast('今日同类热点已存在，未重复写入', 'success')
+      } else {
+        toast('暂无新的高价值热点，请稍后再试', 'success')
+      }
     } catch (e) {
       if ((e as Error).name !== 'AbortError') {
         if (!logOrAlertNetworkError(e)) toast('刷新失败，请重试', 'error')
       }
     } finally {
-      patrolTimerRef.current = setTimeout(() => {
-        ctxSync()
-        setPatrolling(false)
-        patrolTimerRef.current = null
-      }, 1000)
+      setPatrolling(false)
     }
   }
 
