@@ -38,7 +38,7 @@ export default function WeeklyReportSheet({ childId, childName, onClose }: Props
     setLoading(true)
     setError(null)
     try {
-      const limitRes = await fetchWithAuth('/api/stripe/status')
+      const limitRes = await fetchWithAuth('/api/pro/status')
       const limitData = await limitRes.json().catch(() => ({}))
       if (limitData.is_pro) {
         setIsProUser(true)

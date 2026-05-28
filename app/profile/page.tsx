@@ -100,7 +100,7 @@ function ProfileContent() {
   useEffect(() => {
     const loadSub = async () => {
       try {
-        const r = await fetchWithAuth('/api/stripe/status')
+        const r = await fetchWithAuth('/api/pro/status')
         const data = await r.json().catch(() => ({}))
         setIsPro(!!data?.is_pro)
       } catch { /* noop */ }

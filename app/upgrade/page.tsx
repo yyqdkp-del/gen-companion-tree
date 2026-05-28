@@ -294,7 +294,7 @@ export default function UpgradePage() {
         <div style={{ fontSize: 13, color: 'rgba(45,50,47,0.5)', fontFamily: 'sans-serif', marginBottom: 12 }}>
           免费版包含：
         </div>
-        {['每天3次汉字解码', '木棉树洞每天3条消息', '基础家庭档案', '热点巡逻'].map((f, i) => (
+        {['每天3次汉字解码', '木棉树洞AI陪伴', '基础家庭档案', '手动热点巡逻'].map((f, i) => (
           <div key={i} style={{
             fontSize: 13,
             color: 'rgba(45,50,47,0.5)',
