@@ -29,8 +29,8 @@ export const PADDLE_PLANS = {
     name: '根陪伴 Pro',
     price: 9.99,
     currency: 'USD',
-    priceId: process.env.PADDLE_PRO_PRICE_ID || 'pri_01ksh7y1var6m2e5tkt1bmtsn9',
-    productId: process.env.PADDLE_PRO_PRODUCT_ID || 'pro_01ksh7qf2dttmr0v44czfnjcsg',
+    priceId: process.env.PADDLE_PRO_PRICE_ID || 'pri_01kss5c225qmn8ztj87gc3jyaw',
+    productId: process.env.PADDLE_PRO_PRODUCT_ID || 'pro_01kss56b0va1hfk1ggbxxcay1e',
   },
 } as const
 
