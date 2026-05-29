@@ -1,25 +1,7 @@
 export const dynamic = 'force-dynamic'
 
 import { NextRequest, NextResponse } from 'next/server'
-import { createServerClient } from '@supabase/ssr'
-import { isAdminEmail } from '@/lib/admin/constants'
-
-async function getSessionUser(req: NextRequest) {
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '',
-    {
-      cookies: {
-        getAll() {
-          return req.cookies.getAll()
-        },
-        setAll() {},
-      },
-    },
-  )
-  const { data: { user } } = await supabase.auth.getUser()
-  return user
-}
+import { assertAdmin } from '@/lib/admin/assertAdmin'
 
 const ALLOWED_ENDPOINTS = new Set([
   '/api/cron/scheduler',
@@ -29,10 +11,8 @@ const ALLOWED_ENDPOINTS = new Set([
 ])
 
 export async function POST(req: NextRequest) {
-  const user = await getSessionUser(req)
-  if (!user || !isAdminEmail(user.email)) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-  }
+  const { error: forbidden } = await assertAdmin(req)
+  if (forbidden) return forbidden
 
   const body = await req.json().catch(() => ({}))
   const endpoint = typeof body.endpoint === 'string' ? body.endpoint : ''
