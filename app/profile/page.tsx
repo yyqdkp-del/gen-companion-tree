@@ -94,8 +94,28 @@ function ProfileContent() {
   const [calendarConnected, setCalendarConnected] = useState(false)
   const [oauthBanner, setOauthBanner] = useState<{ type: 'ok' | 'err'; text: string } | null>(null)
   const [isPro, setIsPro] = useState(false)
+  const [managingSubscription, setManagingSubscription] = useState(false)
   const [autoSaveHint, setAutoSaveHint] = useState('')
   const [archiving, setArchiving] = useState(false)
+
+  const handleManageSubscription = useCallback(async () => {
+    setManagingSubscription(true)
+    try {
+      const res = await fetchWithAuth('/api/paddle/portal', { method: 'POST' })
+      const data = await res.json().catch(() => ({}))
+      if (data.url) {
+        if (typeof data.url === 'string' && data.url.startsWith('/')) {
+          router.push(data.url)
+        } else {
+          window.open(data.url, '_blank', 'noopener,noreferrer')
+        }
+      }
+    } catch {
+      router.push('/upgrade')
+    } finally {
+      setManagingSubscription(false)
+    }
+  }, [router])
 
   useEffect(() => {
     const loadSub = async () => {
@@ -445,23 +465,25 @@ function ProfileContent() {
               </div>
             </div>
             {isPro ? (
-              <a
-                href="https://sandbox-buy.paddle.com/subscriptions"
-                target="_blank"
-                rel="noopener noreferrer"
+              <button
+                type="button"
+                onClick={() => void handleManageSubscription()}
+                disabled={managingSubscription}
                 style={{
                   flexShrink: 0,
                   fontSize: 13,
                   color: '#a46355',
-                  textDecoration: 'none',
+                  background: 'transparent',
                   padding: '6px 14px',
                   border: '1px solid rgba(164,99,85,0.3)',
                   borderRadius: 8,
                   fontFamily: 'sans-serif',
+                  cursor: managingSubscription ? 'wait' : 'pointer',
+                  opacity: managingSubscription ? 0.7 : 1,
                 }}
               >
-                管理订阅
-              </a>
+                {managingSubscription ? '打开中…' : '管理订阅'}
+              </button>
             ) : (
               <a
                 href="/upgrade"
