@@ -12,6 +12,7 @@ export default async function AdminDashboard() {
     { count: totalChildren },
     { count: todayPatrols },
     { data: recentPatrols },
+    { data: lastHotspot },
   ] = await Promise.all([
     supabase.from('family_profile').select('*', { count: 'exact', head: true }),
     supabase.from('family_profile').select('*', { count: 'exact', head: true }).eq('is_pro', true),
@@ -22,7 +23,24 @@ export default async function AdminDashboard() {
       .select('created_at, status, user_id, title')
       .order('created_at', { ascending: false })
       .limit(5),
+    supabase
+      .from('hotspot_items')
+      .select('created_at')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle(),
   ])
+
+  const lastPatrolTime = lastHotspot?.created_at
+  const hoursSincePatrol = lastPatrolTime
+    ? Math.floor((Date.now() - new Date(lastPatrolTime).getTime()) / 3600000)
+    : 999
+  const patrolHealth =
+    hoursSincePatrol < 2 ? '正常' : hoursSincePatrol < 6 ? '警告' : '异常'
+  const patrolHealthBg =
+    patrolHealth === '正常' ? '#e8f5ee' : patrolHealth === '警告' ? '#fef9ee' : '#fee'
+  const patrolHealthColor =
+    patrolHealth === '正常' ? '#2d7d5a' : patrolHealth === '警告' ? '#8c6b2e' : '#c0632e'
 
   const cards = [
     { label: '总用户', value: totalUsers || 0, color: '#a46355' },
@@ -37,7 +55,14 @@ export default async function AdminDashboard() {
         系统概览
       </h1>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 32 }}>
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(5, 1fr)',
+          gap: 16,
+          marginBottom: 32,
+        }}
+      >
         {cards.map((card) => (
           <div
             key={card.label}
@@ -56,6 +81,20 @@ export default async function AdminDashboard() {
             </div>
           </div>
         ))}
+        <div
+          style={{
+            background: patrolHealthBg,
+            borderRadius: 12,
+            padding: 20,
+            boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
+          }}
+        >
+          <div style={{ fontSize: 13, color: 'rgba(45,50,47,0.55)', marginBottom: 8 }}>热点巡逻</div>
+          <div style={{ fontSize: 20, fontWeight: 700, color: patrolHealthColor }}>{patrolHealth}</div>
+          <div style={{ fontSize: 12, marginTop: 4, opacity: 0.7, color: '#2d322f' }}>
+            {lastPatrolTime ? `${hoursSincePatrol} 小时前` : '从未巡逻'}
+          </div>
+        </div>
       </div>
 
       <div style={{ background: '#fff', borderRadius: 12, padding: 24, boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
