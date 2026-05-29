@@ -3,6 +3,12 @@ import { useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createBrowserClient } from '@supabase/ssr'
 import { saveSessionBundle } from '@/lib/auth/saveSessionBundle'
+import {
+  AUTH_NEXT_STORAGE_KEY,
+  consumeAuthNext,
+  markUpgradeWelcome,
+  sanitizeAuthNext,
+} from '@/lib/auth/authNextPath'
 
 const supabase = createBrowserClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || '',
@@ -16,7 +22,12 @@ function PWABridgeInner() {
   useEffect(() => {
     const init = async () => {
       const authCode = searchParams.get('auth_code')
-      const redirectTo = searchParams.get('redirect') || '/'
+      const hadStashed =
+        typeof window !== 'undefined' && !!sessionStorage.getItem(AUTH_NEXT_STORAGE_KEY)
+      const storedNext = consumeAuthNext()
+      const redirectTo = hadStashed
+        ? storedNext
+        : sanitizeAuthNext(searchParams.get('redirect'))
       const showInstall = searchParams.get('show_install') || '0'
 
       if (!authCode) { router.push('/auth'); return }
@@ -43,9 +54,12 @@ function PWABridgeInner() {
 
       await supabase.from('auth_temp_codes').delete().eq('code', authCode)
 
+      if (redirectTo === '/upgrade' || redirectTo.startsWith('/upgrade?')) {
+        markUpgradeWelcome()
+      }
       const url = new URL(redirectTo, window.location.origin)
       if (showInstall === '1') url.searchParams.set('show_install', '1')
-      router.push(url.toString())
+      window.location.href = url.toString()
     }
 
     init()

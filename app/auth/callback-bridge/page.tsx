@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { saveSessionBundle } from '@/lib/auth/saveSessionBundle'
+import { redirectAfterAuth } from '@/lib/auth/authNextPath'
 
 const supabase = createClient()
 
@@ -18,7 +19,7 @@ export default function AuthCallbackBridgePage() {
         if (session) {
           await saveSessionBundle(session)
           setMsg('跳转中…')
-          router.replace('/')
+          redirectAfterAuth()
           return
         }
         setMsg('未获取到会话')

@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { saveSessionBundle } from '@/lib/auth/saveSessionBundle'
+import { peekAuthNext, redirectAfterAuth, stashAuthNextFromUrl } from '@/lib/auth/authNextPath'
 import { motion, AnimatePresence } from 'framer-motion'
 
 const supabase = createClient(
@@ -20,22 +21,23 @@ export default function AuthPage() {
   const [done, setDone] = useState(false)
   const [consentPrivacy, setConsentPrivacy] = useState(false)
   const [consentAI, setConsentAI] = useState(false)
-  
+  const [returnPath, setReturnPath] = useState('/')
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user) {
-        fetch('/api/auth/check', { credentials: 'include' })
-          .then(r => r.json())
-          .then(data => {
-            if (data.authenticated) window.location.href = '/'
-          })
-          .catch(() => {})
-      }
-    })
     const params = new URLSearchParams(window.location.search)
+    setReturnPath(stashAuthNextFromUrl(params))
     if (params.get('error')) setError('登录失败，请重试')
     if (params.get('mode') === 'login') setMode('login')
+
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!session?.user) return
+      fetch('/api/auth/check', { credentials: 'include' })
+        .then(r => r.json())
+        .then(data => {
+          if (data.authenticated) redirectAfterAuth()
+        })
+        .catch(() => {})
+    })
   }, [])
 
   const saveChildData = async (userId: string) => {
@@ -130,13 +132,13 @@ export default function AuthPage() {
         const checkData = await checkRes.json()
 
         if (checkData.authenticated) {
-          window.location.href = '/'
+          redirectAfterAuth()
         } else {
           await new Promise(r => setTimeout(r, 500))
           const retryRes = await fetch('/api/auth/check', { credentials: 'include' })
           const retryData = await retryRes.json()
           if (retryData.authenticated) {
-            window.location.href = '/'
+            redirectAfterAuth()
           } else {
             setError('登录状态同步失败，请重试')
             setLoading(false)
@@ -185,7 +187,7 @@ export default function AuthPage() {
             请检查 <strong style={{ color: '#2d322f' }}>{email}</strong><br />
             点击邮件中的链接完成注册
           </div>
-          <button onClick={() => { window.location.href = '/' }} style={styles.btnPrimary}>
+          <button onClick={() => redirectAfterAuth(peekAuthNext())} style={styles.btnPrimary}>
             先去看看 →
           </button>
         </div>
@@ -212,6 +214,20 @@ export default function AuthPage() {
           <div style={{ fontSize: 13, color: '#6B8BAA', marginTop: 6 }}>
             {mode === 'register' ? '海外华人家庭的智能陪伴助手' : '继续你的家庭陪伴之旅'}
           </div>
+          {(returnPath === '/upgrade' || returnPath.startsWith('/upgrade?')) && (
+            <div style={{
+              marginTop: 14,
+              padding: '10px 14px',
+              borderRadius: 10,
+              background: 'rgba(164,99,85,0.08)',
+              border: '1px solid rgba(164,99,85,0.2)',
+              fontSize: 13,
+              color: '#a46355',
+              lineHeight: 1.6,
+            }}>
+              登录后将带你继续开通根陪伴 Pro
+            </div>
+          )}
         </div>
 
         {/* ── LINE按钮 ── */}

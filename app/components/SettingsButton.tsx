@@ -128,7 +128,7 @@ export default function SettingsButton() {
               <div style={{ padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: 8 }}>
 
                 {showLoginPrompt && (
-                  <motion.div whileTap={{ scale: 0.98 }} onClick={() => goTo('/auth')}
+                  <motion.div whileTap={{ scale: 0.98 }} onClick={() => goTo('/auth?next=/')}
                     style={{
                       ...menuItemStyle,
                       background: 'rgba(164,99,85,0.12)',

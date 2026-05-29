@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useApp } from '@/app/context/AppContext'
 import { toast } from '@/app/components/Toast'
 import { fetchWithAuth } from '@/lib/auth/fetchWithAuth'
+import { consumeUpgradeWelcome } from '@/lib/auth/authNextPath'
 import { PLANS } from '@/lib/stripe/plans'
 
 type PaddleCheckoutItem = { priceId: string; quantity: number }
@@ -38,6 +39,12 @@ export default function UpgradePage() {
   const [loading, setLoading] = useState(false)
   const [paddleReady, setPaddleReady] = useState(false)
   const initializedRef = useRef(false)
+
+  useEffect(() => {
+    if (consumeUpgradeWelcome()) {
+      toast('登录成功，点击下方开始免费试用', 'success')
+    }
+  }, [])
 
   useEffect(() => {
     if (!sessionReady) return
@@ -134,6 +141,41 @@ export default function UpgradePage() {
   }
 
   const plan = PLANS.pro
+
+  if (!sessionReady) {
+    return (
+      <main style={{
+        minHeight: '100dvh',
+        backgroundColor: '#fbf9f6',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 12,
+      }}>
+        <div style={{ fontSize: 40 }}>🌳</div>
+        <p style={{ fontSize: 14, color: 'rgba(45,50,47,0.5)', fontFamily: 'sans-serif' }}>
+          正在准备结账…
+        </p>
+      </main>
+    )
+  }
+
+  if (!userId) {
+    return (
+      <main style={{
+        minHeight: '100dvh',
+        backgroundColor: '#fbf9f6',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}>
+        <p style={{ fontSize: 14, color: 'rgba(45,50,47,0.5)', fontFamily: 'sans-serif' }}>
+          正在跳转登录…
+        </p>
+      </main>
+    )
+  }
 
   return (
     <main style={{
