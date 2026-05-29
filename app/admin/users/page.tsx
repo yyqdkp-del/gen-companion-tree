@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
 type AdminUser = {
@@ -14,6 +15,7 @@ type AdminUser = {
 }
 
 export default function AdminUsers() {
+  const router = useRouter()
   const [users, setUsers] = useState<AdminUser[]>([])
   const [loading, setLoading] = useState(true)
   const [togglingId, setTogglingId] = useState<string | null>(null)
@@ -30,15 +32,25 @@ export default function AdminUsers() {
         throw new Error(data.error || '加载失败')
       }
       setUsers(data.users || [])
+      router.refresh()
     } catch (e) {
       setError(e instanceof Error ? e.message : '加载失败')
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [router])
 
+  // 进入页面时拉取
   useEffect(() => {
     void loadUsers()
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- 仅挂载时拉取
+  }, [])
+
+  // 从详情页返回或切回标签页时重新拉取
+  useEffect(() => {
+    const handleFocus = () => void loadUsers()
+    window.addEventListener('focus', handleFocus)
+    return () => window.removeEventListener('focus', handleFocus)
   }, [loadUsers])
 
   const filtered = useMemo(() => {
