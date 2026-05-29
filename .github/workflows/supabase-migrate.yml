@@ -16,8 +16,8 @@ jobs:
       - name: Setup Supabase CLI
         uses: supabase/setup-cli@v1
       - name: Link Supabase project
-        run: supabase link --project-ref "$SUPABASE_PROJECT_REF" --password "$SUPABASE_DB_PASSWORD" --yes
+        run: supabase link --project-ref "$SUPABASE_PROJECT_REF" --password "$SUPABASE_DB_PASSWORD"
       - name: Apply pending migrations
-        run: supabase migration up --linked --yes
+        run: supabase migration up --linked
       - name: Show migration status
         run: supabase migration list --linked --password "$SUPABASE_DB_PASSWORD"
