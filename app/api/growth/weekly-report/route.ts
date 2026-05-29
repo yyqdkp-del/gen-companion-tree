@@ -64,7 +64,7 @@ async function fetchWeekHanzi(
     .eq('child_id', childId)
     .gte('learned_at', weekStart.toISOString())
     .lte('learned_at', weekEnd.toISOString())
-    .limit(20)
+    .limit(10)
 
   return (
     hanziSessions
@@ -72,6 +72,16 @@ async function fetchWeekHanzi(
       .map((s) => s.input_text)
       .filter(Boolean) as string[]
   ) || []
+}
+
+async function fetchActiveChildren(userId: string) {
+  const { data } = await supabase
+    .from('children')
+    .select('id, name, grade, birthdate')
+    .eq('user_id', userId)
+    .or('status.eq.active,status.is.null')
+    .order('created_at', { ascending: true })
+  return data || []
 }
 
 function childAgeLabel(child: { birthdate?: string | null; grade?: string | null }) {
@@ -88,10 +98,10 @@ function childAgeLabel(child: { birthdate?: string | null; grade?: string | null
   return ''
 }
 
-async function callClaudeLetter(prompt: string) {
+async function callClaudeLetter(prompt: string, maxTokens = 800) {
   const message = await anthropic.messages.create({
     model: 'claude-sonnet-4-20250514',
-    max_tokens: 800,
+    max_tokens: maxTokens,
     messages: [{ role: 'user', content: prompt }],
   })
   const text = message.content[0].type === 'text' ? message.content[0].text : ''
@@ -173,13 +183,9 @@ export async function POST(req: NextRequest) {
   const { weekStart, weekEnd, weekStartStr, weekEndStr } = getWeekBounds()
 
   if (family) {
-    const { data: children } = await supabase
-      .from('children')
-      .select('id, name, grade, birthdate')
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: true })
+    const children = await fetchActiveChildren(user.id)
 
-    if (!children?.length) {
+    if (!children.length) {
       return NextResponse.json({ error: '暂无孩子档案' }, { status: 404 })
     }
 
@@ -214,23 +220,18 @@ export async function POST(req: NextRequest) {
       })
     }
 
-    const familyPrompt = `请用妈妈的口吻给国内的爷爷奶奶写一封家庭周报信。
+    const familyPrompt = `请用妈妈的口吻给爷爷奶奶写一封家庭周报。
 
-本周各孩子学习情况：
-${childrenData.map((c) => `${c.name}（${c.grade || '—'}）：学了 ${c.hanzi.join('、') || '暂无记录'}`).join('\n')}
+${childrenData.map((c) =>
+  `${c.name}（${c.grade || '—'}）本周学了：${c.hanzi.length > 0 ? c.hanzi.join('、') : '暂无汉字记录'}`,
+).join('\n')}
 
-本周完成的家庭待办：
-${todoList.map((t) => `- ${t}`).join('\n') || '暂无'}
+本周家庭完成的事：
+${todoList.slice(0, 5).map((t) => `- ${t}`).join('\n') || '暂无'}
 
-要求：
-1. 温暖、亲切、口语化，像一条微信消息
-2. 分别提到每个孩子，各说一件具体小事或学习瞬间
-3. 若有家庭待办，自然带过一件
-4. 整体约200字
-5. 结尾简短表达思念，不煽情
-6. 不要标题，直接输出信件正文`
+要求：温暖亲切，分别提到每个孩子，200字左右，结尾表达思念。不要标题，直接输出信件正文。`
 
-    const letter = await callClaudeLetter(familyPrompt)
+    const letter = await callClaudeLetter(familyPrompt, 1000)
 
     const achievements: string[] = []
     childrenData.forEach((c) => {

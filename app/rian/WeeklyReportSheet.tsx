@@ -10,6 +10,7 @@ import { fetchWithAuth } from '@/lib/auth/fetchWithAuth'
 import { logOrAlertNetworkError } from '@/lib/errors/logOrAlertNetworkError'
 import { track } from '@/lib/analytics/track'
 import { toast } from '@/app/components/Toast'
+import { useApp } from '@/app/context/AppContext'
 
 type ReportContent = {
   letter?: string
@@ -23,17 +24,16 @@ type ReportContent = {
 type Props = {
   childId: string
   childName: string
-  multiChild?: boolean
   onClose: () => void
 }
 
 export default function WeeklyReportSheet({
   childId,
   childName,
-  multiChild = false,
   onClose,
 }: Props) {
   const router = useRouter()
+  const { kids } = useApp()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [content, setContent] = useState<ReportContent | null>(null)
@@ -42,7 +42,7 @@ export default function WeeklyReportSheet({
   const [isProUser, setIsProUser] = useState(false)
   const [reportMode, setReportMode] = useState<'child' | 'family'>('child')
 
-  const generate = useCallback(async (opts?: { family?: boolean }) => {
+  const handleGenerate = useCallback(async (opts?: { family?: boolean }) => {
     const family = opts?.family === true
     if (!family && !childId) {
       setError('请先选择孩子')
@@ -91,9 +91,9 @@ export default function WeeklyReportSheet({
   }, [childId])
 
   useEffect(() => {
-    if (childId) void generate({ family: false })
-    else if (multiChild) void generate({ family: true })
-  }, [childId, multiChild, generate])
+    if (childId) void handleGenerate({ family: false })
+    else if (kids.length > 1) void handleGenerate({ family: true })
+  }, [childId, kids.length, handleGenerate])
 
   const handleCopy = async () => {
     if (!shareUrl) return
@@ -198,6 +198,7 @@ export default function WeeklyReportSheet({
             alignItems: 'center',
             flexShrink: 0,
             gap: 8,
+            flexWrap: 'wrap',
           }}
         >
           <span
@@ -210,63 +211,58 @@ export default function WeeklyReportSheet({
           >
             {sheetTitle}
           </span>
-          <motion.button
-            type="button"
-            whileTap={{ scale: 0.86 }}
-            onClick={onClose}
-            style={{
-              cursor: 'pointer',
-              padding: 4,
-              border: 'none',
-              background: 'transparent',
-            }}
-          >
-            <X size={18} color={THEME.muted} />
-          </motion.button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            {kids.length > 1 && !loading && (
+              <button
+                type="button"
+                onClick={() => void handleGenerate({ family: true })}
+                style={{
+                  background: 'rgba(164,99,85,0.1)',
+                  color: '#a46355',
+                  border: '1px solid rgba(164,99,85,0.3)',
+                  borderRadius: 12,
+                  padding: '10px 20px',
+                  fontSize: 14,
+                  cursor: 'pointer',
+                  fontFamily: 'sans-serif',
+                }}
+              >
+                生成家庭周报
+              </button>
+            )}
+            <motion.button
+              type="button"
+              whileTap={{ scale: 0.86 }}
+              onClick={onClose}
+              style={{
+                cursor: 'pointer',
+                padding: 4,
+                border: 'none',
+                background: 'transparent',
+              }}
+            >
+              <X size={18} color={THEME.muted} />
+            </motion.button>
+          </div>
         </div>
 
-        {multiChild && !loading && (
-          <div
-            style={{
-              display: 'flex',
-              gap: 8,
-              padding: '8px 16px 0',
-              flexShrink: 0,
-            }}
-          >
+        {kids.length > 1 && !loading && reportMode === 'child' && (
+          <div style={{ padding: '0 16px 8px', flexShrink: 0 }}>
             <button
               type="button"
-              disabled={loading}
-              onClick={() => void generate({ family: false })}
+              onClick={() => void handleGenerate({ family: false })}
               style={{
-                flex: 1,
-                padding: '8px 10px',
+                background: 'rgba(92,122,94,0.08)',
+                color: '#5c7a5e',
+                border: '1px solid rgba(92,122,94,0.2)',
                 borderRadius: 12,
-                border: reportMode === 'child' ? '1px solid rgba(164,99,85,0.35)' : '1px solid rgba(45,50,47,0.1)',
-                background: reportMode === 'child' ? 'rgba(164,99,85,0.1)' : 'transparent',
-                color: reportMode === 'child' ? '#a46355' : THEME.muted,
-                fontSize: 12,
-                cursor: loading ? 'wait' : 'pointer',
+                padding: '8px 16px',
+                fontSize: 13,
+                cursor: 'pointer',
+                fontFamily: 'sans-serif',
               }}
             >
-              {childName}的周报
-            </button>
-            <button
-              type="button"
-              disabled={loading}
-              onClick={() => void generate({ family: true })}
-              style={{
-                flex: 1,
-                padding: '8px 10px',
-                borderRadius: 12,
-                border: reportMode === 'family' ? '1px solid rgba(164,99,85,0.35)' : '1px solid rgba(45,50,47,0.1)',
-                background: reportMode === 'family' ? 'rgba(164,99,85,0.1)' : 'transparent',
-                color: reportMode === 'family' ? '#a46355' : THEME.muted,
-                fontSize: 12,
-                cursor: loading ? 'wait' : 'pointer',
-              }}
-            >
-              家庭周报
+              重新生成{childName}的周报
             </button>
           </div>
         )}
@@ -303,7 +299,7 @@ export default function WeeklyReportSheet({
               <p style={{ fontSize: 13, color: '#7d3f37', marginBottom: 12 }}>{error}</p>
               <button
                 type="button"
-                onClick={() => void generate({ family: reportMode === 'family' })}
+                onClick={() => void handleGenerate({ family: reportMode === 'family' })}
                 style={{
                   padding: '8px 16px',
                   borderRadius: 20,

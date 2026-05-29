@@ -18,6 +18,7 @@ import { track } from '@/lib/analytics/track'
 import { SAFE_BOTTOM_INSET, STICKY_HEADER_PADDING_TOP } from '@/app/_shared/_constants/layout'
 import TourGuide, { type TourStep } from '@/app/components/TourGuide'
 import { toast } from '@/app/components/Toast'
+import { saveSession } from '@/app/_shared/_services/chineseService'
 
 const supabase = createClient()
 
@@ -265,7 +266,8 @@ export default function DecodePage() {
         if (uid) setUserId(uid)
       }
       if (uid) {
-        await supabase.from('chinese_sessions').insert({ user_id: uid, child_id: activeKid?.id || childInfo.id || null, input_text: query, input_type: activeTab, result: json, location_scene: locationScene, learned_at: new Date().toISOString() })
+        const activeKidId = activeKid?.id || childInfo.id || null
+        await saveSession(uid, activeKidId, query, activeTab, json, locationScene)
         await supabase.from('family_learning_dna').upsert({ user_id: uid, last_input_type: activeTab, last_learned_at: new Date().toISOString(), total_sessions: learnedItems.length + 1, preferred_scene: locationScene, updated_at: new Date().toISOString() }, { onConflict: 'user_id' })
         setLearnedItems(prev => [{ char: json.char, chengyu: json.chengyu, type: activeTab, mastery: null, learned_at: new Date().toISOString() }, ...prev])
       }

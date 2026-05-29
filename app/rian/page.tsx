@@ -84,32 +84,19 @@ const getChildGlow = (energy: number | null | undefined) =>
   energy == null ? 'rgba(255,255,255,0.45)' : getEnergyColor(energy)
 
 const { userId, kids: ctxKids, todos: ctxTodos, sync: ctxSync, activeKid, setActiveKid } = useApp()
-const [currentChild, setCurrentChild] = useState<Child | null>(null)
 
 useEffect(() => {
-  if (ctxKids.length === 0) {
-    setCurrentChild(null)
-    return
-  }
+  if (ctxKids.length === 0 || activeKid) return
   const storedId = typeof window !== 'undefined' ? localStorage.getItem('active_child_id') : null
-  const kid =
-    (activeKid && ctxKids.find((k: Child) => k.id === activeKid.id)) ||
-    (storedId ? ctxKids.find((k: Child) => k.id === storedId) : null) ||
-    ctxKids[0]
-  setCurrentChild(kid as Child)
-  if (!activeKid && kid) setActiveKid(kid)
+  const kid = (storedId ? ctxKids.find((k: Child) => k.id === storedId) : null) || ctxKids[0]
+  if (kid) setActiveKid(kid)
 }, [ctxKids, activeKid, setActiveKid])
 
-useEffect(() => {
-  if (activeKid?.id && activeKid.id !== currentChild?.id) {
-    const matched = ctxKids.find((k: Child) => k.id === activeKid.id)
-    if (matched) setCurrentChild(matched as Child)
+const handleSwitchChild = (nextKid: Child) => {
+  setActiveKid(nextKid)
+  if (typeof window !== 'undefined') {
+    localStorage.setItem('active_child_id', nextKid.id)
   }
-}, [activeKid, currentChild?.id, ctxKids])
-
-const handleSwitchChild = (kid: Child) => {
-  setCurrentChild(kid)
-  setActiveKid(kid)
 }
 
 const todosTyped = ctxTodos as TodoItem[]
@@ -151,7 +138,7 @@ const actionReminders = useMemo<Reminder[]>(() => {
 
   const children = ctxKids
   const loading = false
-  const childEnergy = currentChild?.energy != null ? currentChild.energy : null
+  const childEnergy = activeKid?.energy != null ? activeKid.energy : null
   const showChildEnergy = childEnergy != null
   
   const { markDone: markDoneAction, snooze: snoozeAction } = useTodoActions(actionReminders, ctxSync)
@@ -242,13 +229,13 @@ const actionReminders = useMemo<Reminder[]>(() => {
           transition={{ duration: 4, repeat: Infinity }}
           style={{ width: 64, height: 64, borderRadius: '50%', background: 'rgba(255,255,255,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid white', cursor: 'pointer', overflow: 'hidden' }}
         >
-          {currentChild?.avatar_url ? (
-            <img src={currentChild.avatar_url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          {activeKid?.avatar_url ? (
+            <img src={activeKid.avatar_url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
           ) : (
-            <span style={{ fontSize: 30 }}>{currentChild?.emoji || '🌱'}</span>
+            <span style={{ fontSize: 30 }}>{activeKid?.emoji || '🌱'}</span>
           )}
         </motion.div>
-        <p style={{ marginTop: 8, fontSize: 10, color: THEME.text, fontWeight: 'bold', letterSpacing: '0.2em', textAlign: 'center' }}>{currentChild?.name || ''}</p>
+        <p style={{ marginTop: 8, fontSize: 10, color: THEME.text, fontWeight: 'bold', letterSpacing: '0.2em', textAlign: 'center' }}>{activeKid?.name || ''}</p>
         <div style={{ width: 56, height: 3, background: 'rgba(255,255,255,0.3)', borderRadius: 2, margin: '3px auto', overflow: 'hidden' }}>
           {showChildEnergy ? (
             <motion.div animate={{ width: `${childEnergy}%`, backgroundColor: getEnergyColor(childEnergy) }} style={{ height: '100%' }} />
@@ -269,7 +256,7 @@ const actionReminders = useMemo<Reminder[]>(() => {
           >
             {children.map((c) => (
               <div key={c.id} onClick={() => { handleSwitchChild(c as Child); setShowFamilyMenu(false) }}
-                style={{ cursor: 'pointer', opacity: currentChild?.id === c.id ? 1 : 0.3, width: 36, height: 36, borderRadius: '50%', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,0.5)' }}>
+                style={{ cursor: 'pointer', opacity: activeKid?.id === c.id ? 1 : 0.3, width: 36, height: 36, borderRadius: '50%', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,0.5)' }}>
                 {c.avatar_url ? (
                   <img src={c.avatar_url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                 ) : (
@@ -313,7 +300,7 @@ const actionReminders = useMemo<Reminder[]>(() => {
           WebkitOverflowScrolling: 'touch',
         }}
       >
-        {currentChild && (
+        {activeKid && (
           <div style={{ padding: '0 16px', marginBottom: 12 }}>
             <div
               role="button"
@@ -481,11 +468,10 @@ const actionReminders = useMemo<Reminder[]>(() => {
 />
 
       <AnimatePresence>
-        {showWeeklyReport && (currentChild?.id || children.length > 1) && (
+        {showWeeklyReport && (activeKid?.id || children.length > 1) && (
           <WeeklyReportSheet
-            childId={currentChild?.id || ''}
-            childName={currentChild?.name || '宝宝'}
-            multiChild={children.length > 1}
+            childId={activeKid?.id || ''}
+            childName={activeKid?.name || '宝宝'}
             onClose={() => setShowWeeklyReport(false)}
           />
         )}
