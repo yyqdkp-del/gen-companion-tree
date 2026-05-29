@@ -770,6 +770,38 @@ function ProfileContent() {
 
 // ── 导出：包 Suspense 解决 useSearchParams 的 SSR 问题 ──
 export default function ProfilePage() {
+  const { userId, sessionReady } = useApp()
+
+  if (sessionReady && !userId) {
+    return (
+      <div style={{
+        minHeight: '100vh',
+        background: '#fbf9f6',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 16,
+      }}>
+        <div style={{ fontSize: 48 }}>🌳</div>
+        <div style={{ fontSize: 18, color: '#2d322f', fontFamily: "'Noto Serif SC', serif" }}>
+          请先登录
+        </div>
+        <a href="/auth" style={{
+          background: '#a46355',
+          color: '#fff',
+          padding: '12px 32px',
+          borderRadius: 12,
+          textDecoration: 'none',
+          fontSize: 15,
+          fontFamily: 'sans-serif',
+        }}>
+          登录 / 注册
+        </a>
+      </div>
+    )
+  }
+
   return (
     <Suspense>
       <ProfileContent />
