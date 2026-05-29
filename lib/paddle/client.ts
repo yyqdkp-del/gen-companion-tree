@@ -1,4 +1,5 @@
 import { Environment, Paddle, type PaddleOptions } from '@paddle/paddle-node-sdk'
+import { resolvePaddlePlanIds } from '@/lib/paddle/planIds'
 
 let _paddle: Paddle | null = null
 
@@ -23,15 +24,18 @@ export function getPaddle(): Paddle {
   return _paddle
 }
 
-/** 客户端也可安全引用（不含 SDK），仅暴露价格元数据与对应 Price ID */
+/** 展示用元数据（不含 Paddle ID，ID 见 getPaddlePlanIds） */
 export const PADDLE_PLANS = {
   pro: {
     name: '根陪伴 Pro',
     price: 9.99,
     currency: 'USD',
-    priceId: process.env.PADDLE_PRO_PRICE_ID || 'pri_01kss5c225qmn8ztj87gc3jyaw',
-    productId: process.env.PADDLE_PRO_PRODUCT_ID || 'pro_01kss56b0va1hfk1ggbxxcay1e',
   },
 } as const
 
 export type PaddlePlanKey = keyof typeof PADDLE_PLANS
+
+/** 每次请求时解析 env，纠正 price/product 填反 */
+export function getPaddlePlanIds() {
+  return resolvePaddlePlanIds()
+}

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthUser } from '@/lib/auth/getAuthUser'
-import { PADDLE_PLANS, type PaddlePlanKey } from '@/lib/paddle/client'
+import { PADDLE_PLANS, getPaddlePlanIds, type PaddlePlanKey } from '@/lib/paddle/client'
 
 export const dynamic = 'force-dynamic'
 
@@ -20,12 +20,12 @@ export async function POST(req: NextRequest) {
     // 无 body 时默认 pro
   }
 
-  const plan = PADDLE_PLANS[planKey]
+  const { priceId, productId } = getPaddlePlanIds()
   const baseUrl = (process.env.NEXT_PUBLIC_APP_URL || req.nextUrl.origin).replace(/\/$/, '')
 
   return NextResponse.json({
-    priceId: plan.priceId,
-    productId: plan.productId,
+    priceId,
+    productId,
     userId: user.id,
     email: user.email,
     plan: planKey,
