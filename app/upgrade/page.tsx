@@ -139,7 +139,7 @@ export default function UpgradePage() {
           升级根陪伴 Pro
         </div>
         <div style={{ fontSize: 15, color: 'rgba(45,50,47,0.6)', fontFamily: 'sans-serif', lineHeight: 1.7 }}>
-          解锁全部功能，让 AI 真正成为<br />你的家庭专属助手
+          解锁全部功能，让根真正成为<br />你的家庭专属助手
         </div>
       </div>
 
@@ -248,7 +248,7 @@ export default function UpgradePage() {
             fontFamily: 'sans-serif',
             textAlign: 'center',
           }}>
-            ✓ AI 随时在线 · 无需预约 · 孩子自己学
+            ✓ 根 随时陪伴 · 无需预约 · 孩子自己学
           </div>
         </div>
 
@@ -315,7 +315,7 @@ export default function UpgradePage() {
         <div style={{ fontSize: 13, color: 'rgba(45,50,47,0.5)', fontFamily: 'sans-serif', marginBottom: 12 }}>
           免费版包含：
         </div>
-        {['每天3次汉字解码', '木棉树洞AI陪伴', '基础家庭档案', '手动热点巡逻'].map((f, i) => (
+        {['每天3次汉字解码', '木棉树洞根陪伴', '基础家庭档案', '手动热点巡逻'].map((f, i) => (
           <div key={i} style={{
             fontSize: 13,
             color: 'rgba(45,50,47,0.5)',

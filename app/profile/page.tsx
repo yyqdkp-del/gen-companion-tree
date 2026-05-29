@@ -42,7 +42,7 @@ const PROFILE_TOUR: TourStep[] = [
   {
     id: 'profile',
     title: '填得越详细，根越懂你',
-    desc: '孩子的学校、签证类型、居住城市，这些信息让AI热点和提醒更精准。',
+    desc: '孩子的学校、签证类型、居住城市，这些信息让根热点和提醒更精准。',
     emoji: '📋',
     position: 'top',
     targetHint: '从基本信息开始填',

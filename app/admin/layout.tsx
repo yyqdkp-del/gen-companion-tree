@@ -9,7 +9,7 @@ const NAV = [
   { href: '/admin/hotspots', label: '🔥 热点审核' },
   { href: '/admin/subscriptions', label: '💳 订阅' },
   { href: '/admin/cron', label: '⚙️ 任务' },
-  { href: '/admin/ai', label: '🤖 AI监控' },
+  { href: '/admin/ai', label: '🤖 根监控' },
 ]
 
 function isNavActive(pathname: string, href: string) {

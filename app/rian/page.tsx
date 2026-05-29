@@ -49,7 +49,7 @@ const RIAN_TOUR: TourStep[] = [
   {
     id: 'todo',
     title: '说出来，根来整理',
-    desc: '点击底部相机或麦克风，说一件事、拍一张通知，AI自动变成待办和日历。',
+    desc: '点击底部相机或麦克风，说一件事、拍一张通知，自动变成待办和日历。',
     emoji: '✨',
     position: 'bottom',
     targetHint: '试试底部右侧相机按钮',
@@ -57,7 +57,7 @@ const RIAN_TOUR: TourStep[] = [
   {
     id: 'report',
     title: '每周成长周报',
-    desc: '点击「给爷爷奶奶的成长周报」，AI生成本周故事，一键发微信给国内家人。',
+    desc: '点击「给爷爷奶奶的成长周报」，自动生成本周故事，一键发微信给国内家人。',
     emoji: '💌',
     position: 'center',
   },

@@ -256,7 +256,7 @@ const HOME_TOUR: TourStep[] = [
   {
     id: 'hotspot',
     title: '根在帮你巡逻',
-    desc: '每天三次，AI自动扫描本地天气、学校通知、签证政策，只推送对你重要的信息。',
+    desc: '每天三次，自动扫描本地天气、学校通知、签证政策，只推送对你重要的信息。',
     emoji: '⚡',
     position: 'center',
   },

@@ -25,7 +25,7 @@ export default async function AdminAI() {
   return (
     <div>
       <h1 style={{ fontSize: 24, fontWeight: 600, marginBottom: 24, color: '#2d322f' }}>
-        AI 使用监控（过去24小时）
+        根 使用监控（过去24小时）
       </h1>
 
       <div
