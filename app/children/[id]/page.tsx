@@ -12,6 +12,8 @@ import { StepSchool }   from './steps/StepSchool'
 import { StepSchedule } from './steps/StepSchedule'
 import { StepHealth }   from './steps/StepHealth'
 import { logOrAlertNetworkError } from '@/lib/errors/logOrAlertNetworkError'
+import { fetchWithAuth } from '@/lib/auth/fetchWithAuth'
+import { toast } from '@/app/components/Toast'
 import { SAFE_BOTTOM_INSET } from '@/app/_shared/_constants/layout'
 
 const GLASS_CARD: React.CSSProperties = {
@@ -69,6 +71,7 @@ function ChildEditContent() {
   const [userId, setUserId] = useState<string | null>(null)
   const [currentChildId, setCurrentChildId] = useState<string | null>(paramChildId)
   const [isDirty, setIsDirty] = useState(false)
+  const [deleting, setDeleting] = useState(false)
 
   const [basicData, setBasicData] = useState({
     name: '', birthdate: '', emoji: '🌟', languages: [] as string[], avatar_url: '',
@@ -387,6 +390,35 @@ function ChildEditContent() {
 
   const isLastStep = step === STEPS.length - 1
   const canProceed = step === 0 ? !!basicData.name.trim() : true
+  const childId = currentChildId || paramChildId
+  const childName = basicData.name.trim() || '该孩子'
+
+  const handleDeleteChild = async () => {
+    if (!childId || isNew) return
+    if (!confirm(`确认删除 ${childName} 的档案？此操作不可恢复，所有相关数据将被删除。`)) return
+
+    setDeleting(true)
+    try {
+      const res = await fetchWithAuth(`/api/children/${childId}`, { method: 'DELETE' })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        throw new Error(typeof json.error === 'string' ? json.error : '删除失败')
+      }
+
+      if (typeof window !== 'undefined' && localStorage.getItem('active_child_id') === childId) {
+        localStorage.removeItem('active_child_id')
+        localStorage.removeItem('active_child')
+      }
+
+      toast('孩子档案已删除', 'success')
+      router.push('/')
+    } catch (e) {
+      toast('删除失败，请重试', 'error')
+      console.error(e)
+    } finally {
+      setDeleting(false)
+    }
+  }
 
   return (
     <main style={{ height: 'var(--vh, 100dvh)', overflow: 'hidden', display: 'flex', flexDirection: 'column', backgroundColor: PAGE.bg, fontFamily: "'Noto Sans SC', sans-serif" }}>
@@ -470,6 +502,27 @@ function ChildEditContent() {
             </>
           )}
         </div>
+
+        {!isNew && childId && (
+          <button
+            type="button"
+            onClick={() => void handleDeleteChild()}
+            disabled={deleting}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: 'rgba(45,50,47,0.3)',
+              fontSize: 13,
+              cursor: deleting ? 'default' : 'pointer',
+              padding: '20px 0',
+              fontFamily: 'sans-serif',
+              marginTop: 40,
+              width: '100%',
+            }}
+          >
+            {deleting ? '删除中...' : '删除孩子档案'}
+          </button>
+        )}
       </div>
     </main>
   )
