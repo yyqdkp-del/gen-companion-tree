@@ -278,6 +278,27 @@ export default function UpgradePage() {
               ? '加载支付组件中...'
               : `免费试用30天 → 之后 $${plan.price}/月`}
         </button>
+
+        {/* 备用直接结账按钮（手机测试 Paddle sandbox） */}
+        <a
+          href="https://sandbox-buy.paddle.com/checkout?items[0][priceId]=pri_01kss5c225qmn8ztj87gc3jyaw&items[0][quantity]=1"
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{
+            display: 'block',
+            textAlign: 'center',
+            marginTop: 12,
+            padding: '12px 24px',
+            background: 'rgba(164,99,85,0.1)',
+            color: '#a46355',
+            borderRadius: 12,
+            textDecoration: 'none',
+            fontSize: 14,
+            fontFamily: 'sans-serif',
+          }}
+        >
+          直接结账（测试）
+        </a>
       </div>
 
       {/* 免费版说明 */}
