@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { getAdminSupabase } from '@/lib/admin/supabase'
 
 export const dynamic = 'force-dynamic'
+export const revalidate = 0
 
 function formatDate(value: string | null | undefined) {
   if (!value) return '—'
