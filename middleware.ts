@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
+import { isAdminEmail } from '@/lib/admin/constants'
 
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl
@@ -15,6 +16,8 @@ export async function middleware(req: NextRequest) {
   ) {
     return NextResponse.next()
   }
+
+  const isAdminRoute = pathname.startsWith('/admin')
 
   let response = NextResponse.next({
     request: { headers: req.headers },
@@ -38,6 +41,15 @@ export async function middleware(req: NextRequest) {
   )
 
   const { data: { user } } = await supabase.auth.getUser()
+
+  if (isAdminRoute) {
+    if (!user || !isAdminEmail(user.email)) {
+      const url = new URL('/auth', req.url)
+      url.searchParams.set('next', pathname)
+      return NextResponse.redirect(url)
+    }
+    return response
+  }
 
   if (!user) {
     const url = new URL('/auth', req.url)
