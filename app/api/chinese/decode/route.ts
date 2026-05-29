@@ -100,10 +100,14 @@ export async function POST(req: NextRequest) {
   const {
     mode, char, sentence, keywords,
     child_name, child_grade, child_level,
+    child_id: bodyChildId,
     location_scene,
     // 修复四：接收地理围栏数据，不再写死清迈
     geofence,
   } = await req.json().catch(() => ({}))
+
+  const childId =
+    typeof bodyChildId === 'string' && bodyChildId.trim() ? bodyChildId.trim() : null
 
   // 修复四：优先用围栏城市，其次用 location_scene，最后降级
   const scene = geofence?.city
@@ -382,6 +386,7 @@ ${kw}
       try {
         await supabase.from('chinese_sessions').insert({
           user_id:        user.id,
+          child_id:       childId,
           input_text:     sentence,
           input_type:     'writing',
           result:         result,

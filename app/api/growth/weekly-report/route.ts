@@ -12,6 +12,154 @@ const supabase = createClient(
 )
 const anthropic = new Anthropic()
 
+function getWeekBounds(now = new Date()) {
+  const dayOfWeek = now.getDay()
+  const weekStart = new Date(now)
+  weekStart.setDate(now.getDate() - dayOfWeek)
+  weekStart.setHours(0, 0, 0, 0)
+  const weekEnd = new Date(weekStart)
+  weekEnd.setDate(weekStart.getDate() + 6)
+  weekEnd.setHours(23, 59, 59, 999)
+  return {
+    weekStart,
+    weekEnd,
+    weekStartStr: weekStart.toISOString().split('T')[0],
+    weekEndStr: weekEnd.toISOString().split('T')[0],
+  }
+}
+
+async function fetchWeekTodos(
+  userId: string,
+  weekStart: Date,
+  weekEnd: Date,
+  childId?: string,
+) {
+  let query = supabase
+    .from('todo_items')
+    .select('title, completed_at, priority, child_id')
+    .eq('user_id', userId)
+    .eq('status', 'done')
+    .gte('completed_at', weekStart.toISOString())
+    .lte('completed_at', weekEnd.toISOString())
+    .limit(20)
+
+  if (childId) {
+    query = query.or(`child_id.eq.${childId},child_id.is.null`)
+  }
+
+  const { data } = await query
+  return data || []
+}
+
+async function fetchWeekHanzi(
+  userId: string,
+  weekStart: Date,
+  weekEnd: Date,
+  childId: string,
+) {
+  const { data: hanziSessions } = await supabase
+    .from('chinese_sessions')
+    .select('input_text, input_type, result')
+    .eq('user_id', userId)
+    .eq('child_id', childId)
+    .gte('learned_at', weekStart.toISOString())
+    .lte('learned_at', weekEnd.toISOString())
+    .limit(20)
+
+  return (
+    hanziSessions
+      ?.filter((s) => s.input_type === 'hanzi')
+      .map((s) => s.input_text)
+      .filter(Boolean) as string[]
+  ) || []
+}
+
+function childAgeLabel(child: { birthdate?: string | null; grade?: string | null }) {
+  if (child.birthdate) {
+    const birth = new Date(child.birthdate as string)
+    if (!Number.isNaN(birth.getTime())) {
+      const age = Math.floor(
+        (Date.now() - birth.getTime()) / (365.25 * 24 * 60 * 60 * 1000),
+      )
+      if (age > 0 && age < 25) return String(age)
+    }
+  }
+  if (child.grade) return String(child.grade)
+  return ''
+}
+
+async function callClaudeLetter(prompt: string) {
+  const message = await anthropic.messages.create({
+    model: 'claude-sonnet-4-20250514',
+    max_tokens: 800,
+    messages: [{ role: 'user', content: prompt }],
+  })
+  const text = message.content[0].type === 'text' ? message.content[0].text : ''
+  return text.replace(/^["「]|["」]$/g, '').trim()
+}
+
+async function persistReport(
+  userId: string,
+  childId: string | null,
+  weekStartStr: string,
+  weekEndStr: string,
+  content: Record<string, unknown>,
+) {
+  const shareToken = crypto.randomBytes(16).toString('hex')
+  const tokenExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+
+  let existingQuery = supabase
+    .from('growth_reports')
+    .select('id')
+    .eq('user_id', userId)
+    .eq('week_start', weekStartStr)
+
+  existingQuery = childId
+    ? existingQuery.eq('child_id', childId)
+    : existingQuery.is('child_id', null)
+
+  const { data: existing } = await existingQuery.maybeSingle()
+
+  let reportId: string
+
+  if (existing) {
+    const { data: updated } = await supabase
+      .from('growth_reports')
+      .update({
+        content,
+        share_token: shareToken,
+        token_expires_at: tokenExpiresAt.toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', existing.id)
+      .select('id')
+      .single()
+    reportId = updated?.id || existing.id
+  } else {
+    const { data: created } = await supabase
+      .from('growth_reports')
+      .insert({
+        user_id: userId,
+        child_id: childId,
+        week_start: weekStartStr,
+        week_end: weekEndStr,
+        content,
+        share_token: shareToken,
+        token_expires_at: tokenExpiresAt.toISOString(),
+      })
+      .select('id')
+      .single()
+    reportId = created?.id || ''
+  }
+
+  const baseUrl = (
+    process.env.NEXT_PUBLIC_APP_URL || 'https://gen-companion-tree.vercel.app'
+  ).replace(/\/$/, '')
+  const shareUrl = `${baseUrl}/grandparent/${shareToken}`
+
+  return { reportId, shareUrl, shareToken, tokenExpiresAt }
+}
+
 export async function POST(req: NextRequest) {
   const { user, error } = await getAuthUser(req)
   if (error || !user) {
@@ -19,21 +167,118 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json().catch(() => ({}))
+  const family = body.family === true
   const child_id = typeof body.child_id === 'string' ? body.child_id : ''
+
+  const { weekStart, weekEnd, weekStartStr, weekEndStr } = getWeekBounds()
+
+  if (family) {
+    const { data: children } = await supabase
+      .from('children')
+      .select('id, name, grade, birthdate')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: true })
+
+    if (!children?.length) {
+      return NextResponse.json({ error: '暂无孩子档案' }, { status: 404 })
+    }
+
+    const todos = await fetchWeekTodos(user.id, weekStart, weekEnd)
+    const todoList = todos.map((t) => t.title).filter(Boolean) as string[]
+
+    const childrenData = await Promise.all(
+      children.map(async (child) => {
+        const hanzi = await fetchWeekHanzi(user.id, weekStart, weekEnd, child.id)
+        return {
+          id: child.id,
+          name: child.name as string,
+          grade: (child.grade as string) || childAgeLabel(child),
+          hanzi,
+        }
+      }),
+    )
+
+    const totalHanzi = childrenData.reduce((n, c) => n + c.hanzi.length, 0)
+    const hasRealData = totalHanzi > 0 || todoList.length > 0
+
+    if (!hasRealData) {
+      return NextResponse.json({
+        error: 'no_data',
+        message: '本周暂无学习记录，请先记录孩子的学习和生活',
+        week_summary: '本周暂无记录',
+        content: {
+          letter: '',
+          no_data: true,
+          family: true,
+        },
+      })
+    }
+
+    const familyPrompt = `请用妈妈的口吻给国内的爷爷奶奶写一封家庭周报信。
+
+本周各孩子学习情况：
+${childrenData.map((c) => `${c.name}（${c.grade || '—'}）：学了 ${c.hanzi.join('、') || '暂无记录'}`).join('\n')}
+
+本周完成的家庭待办：
+${todoList.map((t) => `- ${t}`).join('\n') || '暂无'}
+
+要求：
+1. 温暖、亲切、口语化，像一条微信消息
+2. 分别提到每个孩子，各说一件具体小事或学习瞬间
+3. 若有家庭待办，自然带过一件
+4. 整体约200字
+5. 结尾简短表达思念，不煽情
+6. 不要标题，直接输出信件正文`
+
+    const letter = await callClaudeLetter(familyPrompt)
+
+    const achievements: string[] = []
+    childrenData.forEach((c) => {
+      if (c.hanzi.length > 0) {
+        achievements.push(
+          `${c.name}学了 ${c.hanzi.length} 个汉字：${c.hanzi.slice(0, 5).join('、')}${c.hanzi.length > 5 ? ' 等' : ''}`,
+        )
+      }
+    })
+    todoList.slice(0, 4).forEach((title) => achievements.push(title))
+
+    const childNames = childrenData.map((c) => c.name).join('、')
+    const content: Record<string, unknown> = {
+      letter: letter || '',
+      achievements,
+      week_summary: `本周${childNames}共学了 ${totalHanzi} 个字，完成了 ${todoList.length} 件事`,
+      child_name: childNames,
+      family: true,
+      children: childrenData.map((c) => ({
+        id: c.id,
+        name: c.name,
+        hanzi_count: c.hanzi.length,
+        hanzi: c.hanzi,
+      })),
+    }
+
+    const { reportId, shareUrl, shareToken, tokenExpiresAt } = await persistReport(
+      user.id,
+      null,
+      weekStartStr,
+      weekEndStr,
+      content,
+    )
+
+    return NextResponse.json({
+      ok: true,
+      report_id: reportId,
+      content,
+      share_url: shareUrl,
+      share_token: shareToken,
+      expires_at: tokenExpiresAt.toISOString(),
+      family: true,
+    })
+  }
+
   if (!child_id) {
     return NextResponse.json({ error: '缺少 child_id' }, { status: 400 })
   }
-
-  const now = new Date()
-  const dayOfWeek = now.getDay()
-  const weekStart = new Date(now)
-  weekStart.setDate(now.getDate() - dayOfWeek)
-  weekStart.setHours(0, 0, 0, 0)
-  const weekEnd = new Date(weekStart)
-  weekEnd.setDate(weekStart.getDate() + 6)
-
-  const weekStartStr = weekStart.toISOString().split('T')[0]
-  const weekEndStr = weekEnd.toISOString().split('T')[0]
 
   const { data: child } = await supabase
     .from('children')
@@ -46,43 +291,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: '孩子不存在' }, { status: 404 })
   }
 
-  const { data: todos } = await supabase
-    .from('todo_items')
-    .select('title, completed_at, priority')
-    .eq('user_id', user.id)
-    .eq('status', 'done')
-    .gte('completed_at', weekStart.toISOString())
-    .lte('completed_at', weekEnd.toISOString())
-    .limit(20)
-
-  const { data: hanziSessions } = await supabase
-    .from('chinese_sessions')
-    .select('input_text, input_type, result')
-    .eq('user_id', user.id)
-    .gte('learned_at', weekStart.toISOString())
-    .lte('learned_at', weekEnd.toISOString())
-    .limit(10)
+  const todos = await fetchWeekTodos(user.id, weekStart, weekEnd, child_id)
+  const hanziList = await fetchWeekHanzi(user.id, weekStart, weekEnd, child_id)
+  const todoList = todos.map((t) => t.title).filter(Boolean) as string[]
+  const hasRealData = hanziList.length > 0 || todoList.length > 0
 
   const childName = child.name as string
-  let childAge = ''
-  if (child.birthdate) {
-    const birth = new Date(child.birthdate as string)
-    if (!Number.isNaN(birth.getTime())) {
-      const age = Math.floor(
-        (Date.now() - birth.getTime()) / (365.25 * 24 * 60 * 60 * 1000),
-      )
-      if (age > 0 && age < 25) childAge = String(age)
-    }
-  }
-  if (!childAge && child.grade) childAge = String(child.grade)
-
-  const hanziList =
-    hanziSessions
-      ?.filter((s) => s.input_type === 'hanzi')
-      .map((s) => s.input_text)
-      .filter(Boolean) as string[] || []
-  const todoList = todos?.map((t) => t.title).filter(Boolean) as string[] || []
-  const hasRealData = hanziList.length > 0 || todoList.length > 0
+  const childAge = childAgeLabel(child)
 
   if (!hasRealData) {
     return NextResponse.json({
@@ -92,6 +307,7 @@ export async function POST(req: NextRequest) {
       content: {
         letter: '',
         no_data: true,
+        child_name: childName,
       },
     })
   }
@@ -116,14 +332,7 @@ export async function POST(req: NextRequest) {
 
 请直接输出信件内容，不要任何标题或格式。`
 
-  const message = await anthropic.messages.create({
-    model: 'claude-sonnet-4-20250514',
-    max_tokens: 800,
-    messages: [{ role: 'user', content: prompt }],
-  })
-
-  const text = message.content[0].type === 'text' ? message.content[0].text : ''
-  const letter = text.replace(/^["「]|["」]$/g, '').trim()
+  const letter = await callClaudeLetter(prompt)
 
   const achievements: string[] = []
   if (hanziList.length > 0) {
@@ -143,55 +352,16 @@ export async function POST(req: NextRequest) {
         ? `${childName}这周学了 ${hanziList.length} 个字，完成了 ${todoList.length} 件事`
         : `${childName}本周的成长记录`,
     child_name: childName,
+    family: false,
   }
 
-  const shareToken = crypto.randomBytes(16).toString('hex')
-  const tokenExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
-
-  const { data: existing } = await supabase
-    .from('growth_reports')
-    .select('id')
-    .eq('user_id', user.id)
-    .eq('child_id', child_id)
-    .eq('week_start', weekStartStr)
-    .maybeSingle()
-
-  let reportId: string
-
-  if (existing) {
-    const { data: updated } = await supabase
-      .from('growth_reports')
-      .update({
-        content,
-        share_token: shareToken,
-        token_expires_at: tokenExpiresAt.toISOString(),
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', existing.id)
-      .select('id')
-      .single()
-    reportId = updated?.id || existing.id
-  } else {
-    const { data: created } = await supabase
-      .from('growth_reports')
-      .insert({
-        user_id: user.id,
-        child_id,
-        week_start: weekStartStr,
-        week_end: weekEndStr,
-        content,
-        share_token: shareToken,
-        token_expires_at: tokenExpiresAt.toISOString(),
-      })
-      .select('id')
-      .single()
-    reportId = created?.id || ''
-  }
-
-  const baseUrl = (
-    process.env.NEXT_PUBLIC_APP_URL || 'https://gen-companion-tree.vercel.app'
-  ).replace(/\/$/, '')
-  const shareUrl = `${baseUrl}/grandparent/${shareToken}`
+  const { reportId, shareUrl, shareToken, tokenExpiresAt } = await persistReport(
+    user.id,
+    child_id,
+    weekStartStr,
+    weekEndStr,
+    content,
+  )
 
   return NextResponse.json({
     ok: true,
@@ -200,5 +370,6 @@ export async function POST(req: NextRequest) {
     share_url: shareUrl,
     share_token: shareToken,
     expires_at: tokenExpiresAt.toISOString(),
+    family: false,
   })
 }

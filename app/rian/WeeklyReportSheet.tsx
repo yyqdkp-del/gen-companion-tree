@@ -17,15 +17,22 @@ type ReportContent = {
   week_summary?: string
   child_name?: string
   no_data?: boolean
+  family?: boolean
 }
 
 type Props = {
   childId: string
   childName: string
+  multiChild?: boolean
   onClose: () => void
 }
 
-export default function WeeklyReportSheet({ childId, childName, onClose }: Props) {
+export default function WeeklyReportSheet({
+  childId,
+  childName,
+  multiChild = false,
+  onClose,
+}: Props) {
   const router = useRouter()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -33,26 +40,35 @@ export default function WeeklyReportSheet({ childId, childName, onClose }: Props
   const [shareUrl, setShareUrl] = useState('')
   const [copied, setCopied] = useState(false)
   const [isProUser, setIsProUser] = useState(false)
+  const [reportMode, setReportMode] = useState<'child' | 'family'>('child')
 
-  const generate = useCallback(async () => {
+  const generate = useCallback(async (opts?: { family?: boolean }) => {
+    const family = opts?.family === true
+    if (!family && !childId) {
+      setError('请先选择孩子')
+      setLoading(false)
+      return
+    }
+
     setLoading(true)
     setError(null)
+    setReportMode(family ? 'family' : 'child')
+
     try {
       const limitRes = await fetchWithAuth('/api/pro/status')
       const limitData = await limitRes.json().catch(() => ({}))
-      if (limitData.is_pro) {
-        setIsProUser(true)
-      } else {
-        setIsProUser(false)
-      }
+      setIsProUser(!!limitData.is_pro)
+
       const res = await fetchWithAuth('/api/growth/weekly-report', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ child_id: childId }),
+        body: JSON.stringify(
+          family ? { family: true } : { child_id: childId },
+        ),
       })
       const data = await res.json()
       if (data.content?.no_data || data.error === 'no_data') {
-        setContent(data.content || { no_data: true })
+        setContent(data.content || { no_data: true, family })
         setShareUrl('')
         return
       }
@@ -65,7 +81,7 @@ export default function WeeklyReportSheet({ childId, childName, onClose }: Props
       void track({
         event_type: 'weekly_report_generated',
         page: '/rian',
-        meta: { child_id: childId },
+        meta: { child_id: family ? undefined : childId, family },
       })
     } catch (e) {
       if (!logOrAlertNetworkError(e)) setError('网络异常，请稍后再试')
@@ -75,8 +91,9 @@ export default function WeeklyReportSheet({ childId, childName, onClose }: Props
   }, [childId])
 
   useEffect(() => {
-    generate()
-  }, [generate])
+    if (childId) void generate({ family: false })
+    else if (multiChild) void generate({ family: true })
+  }, [childId, multiChild, generate])
 
   const handleCopy = async () => {
     if (!shareUrl) return
@@ -86,7 +103,7 @@ export default function WeeklyReportSheet({ childId, childName, onClose }: Props
       void track({
         event_type: 'weekly_report_shared',
         page: '/rian',
-        meta: { child_id: childId },
+        meta: { child_id: reportMode === 'family' ? undefined : childId, family: reportMode === 'family' },
       })
       setTimeout(() => setCopied(false), 2000)
     } catch {
@@ -102,14 +119,20 @@ export default function WeeklyReportSheet({ childId, childName, onClose }: Props
         void track({
           event_type: 'weekly_report_shared',
           page: '/rian',
-          meta: { child_id: childId },
+          meta: { child_id: reportMode === 'family' ? undefined : childId, family: reportMode === 'family' },
         })
         setTimeout(() => setCopied(false), 2000)
       } catch {
-        // keep report visible; user can long-press URL if shown elsewhere
+        // keep report visible
       }
     }
   }
+
+  const sheetTitle = reportMode === 'family' ? '家庭成长周报' : '成长周报'
+  const summaryFallback =
+    reportMode === 'family'
+      ? '本周家庭成长记录'
+      : `${childName}本周的成长记录`
 
   return (
     <motion.div
@@ -174,6 +197,7 @@ export default function WeeklyReportSheet({ childId, childName, onClose }: Props
             justifyContent: 'space-between',
             alignItems: 'center',
             flexShrink: 0,
+            gap: 8,
           }}
         >
           <span
@@ -184,7 +208,7 @@ export default function WeeklyReportSheet({ childId, childName, onClose }: Props
               fontFamily: 'serif',
             }}
           >
-            成长周报
+            {sheetTitle}
           </span>
           <motion.button
             type="button"
@@ -200,6 +224,52 @@ export default function WeeklyReportSheet({ childId, childName, onClose }: Props
             <X size={18} color={THEME.muted} />
           </motion.button>
         </div>
+
+        {multiChild && !loading && (
+          <div
+            style={{
+              display: 'flex',
+              gap: 8,
+              padding: '8px 16px 0',
+              flexShrink: 0,
+            }}
+          >
+            <button
+              type="button"
+              disabled={loading}
+              onClick={() => void generate({ family: false })}
+              style={{
+                flex: 1,
+                padding: '8px 10px',
+                borderRadius: 12,
+                border: reportMode === 'child' ? '1px solid rgba(164,99,85,0.35)' : '1px solid rgba(45,50,47,0.1)',
+                background: reportMode === 'child' ? 'rgba(164,99,85,0.1)' : 'transparent',
+                color: reportMode === 'child' ? '#a46355' : THEME.muted,
+                fontSize: 12,
+                cursor: loading ? 'wait' : 'pointer',
+              }}
+            >
+              {childName}的周报
+            </button>
+            <button
+              type="button"
+              disabled={loading}
+              onClick={() => void generate({ family: true })}
+              style={{
+                flex: 1,
+                padding: '8px 10px',
+                borderRadius: 12,
+                border: reportMode === 'family' ? '1px solid rgba(164,99,85,0.35)' : '1px solid rgba(45,50,47,0.1)',
+                background: reportMode === 'family' ? 'rgba(164,99,85,0.1)' : 'transparent',
+                color: reportMode === 'family' ? '#a46355' : THEME.muted,
+                fontSize: 12,
+                cursor: loading ? 'wait' : 'pointer',
+              }}
+            >
+              家庭周报
+            </button>
+          </div>
+        )}
 
         <div style={{
           flex: 1,
@@ -222,7 +292,9 @@ export default function WeeklyReportSheet({ childId, childName, onClose }: Props
                   margin: '0 auto 12px',
                 }}
               />
-              <div style={{ fontSize: 13 }}>根正在写本周成长故事…</div>
+              <div style={{ fontSize: 13 }}>
+                {reportMode === 'family' ? '根正在写家庭周报…' : '根正在写本周成长故事…'}
+              </div>
             </div>
           )}
 
@@ -231,7 +303,7 @@ export default function WeeklyReportSheet({ childId, childName, onClose }: Props
               <p style={{ fontSize: 13, color: '#7d3f37', marginBottom: 12 }}>{error}</p>
               <button
                 type="button"
-                onClick={generate}
+                onClick={() => void generate({ family: reportMode === 'family' })}
                 style={{
                   padding: '8px 16px',
                   borderRadius: 20,
@@ -261,7 +333,7 @@ export default function WeeklyReportSheet({ childId, childName, onClose }: Props
           {!loading && !error && content && !content.no_data && (
             <>
               <p style={{ fontSize: 12, color: THEME.muted, marginBottom: 10 }}>
-                {content.week_summary || `${childName}本周的成长记录`}
+                {content.week_summary || summaryFallback}
               </p>
               <div
                 style={{

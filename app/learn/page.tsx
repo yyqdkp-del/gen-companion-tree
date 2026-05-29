@@ -218,6 +218,7 @@ export default function DecodePage() {
           char: activeTab === 'hanzi' ? query : undefined,
           sentence: activeTab !== 'hanzi' ? query : undefined,
           child_name: childInfo.name, child_grade: childInfo.grade, child_level: childInfo.level,
+          child_id: activeKid?.id || childInfo.id || undefined,
           location_scene: locationScene, learned_chars: learnedChars,
           geofence: userLocation ? { city: userLocation.city, country: userLocation.country, country_code: userLocation.country_code } : null,
         }),
@@ -264,7 +265,7 @@ export default function DecodePage() {
         if (uid) setUserId(uid)
       }
       if (uid) {
-        await supabase.from('chinese_sessions').insert({ user_id: uid, child_id: childInfo.id || null, input_text: query, input_type: activeTab, result: json, location_scene: locationScene, learned_at: new Date().toISOString() })
+        await supabase.from('chinese_sessions').insert({ user_id: uid, child_id: activeKid?.id || childInfo.id || null, input_text: query, input_type: activeTab, result: json, location_scene: locationScene, learned_at: new Date().toISOString() })
         await supabase.from('family_learning_dna').upsert({ user_id: uid, last_input_type: activeTab, last_learned_at: new Date().toISOString(), total_sessions: learnedItems.length + 1, preferred_scene: locationScene, updated_at: new Date().toISOString() }, { onConflict: 'user_id' })
         setLearnedItems(prev => [{ char: json.char, chengyu: json.chengyu, type: activeTab, mastery: null, learned_at: new Date().toISOString() }, ...prev])
       }

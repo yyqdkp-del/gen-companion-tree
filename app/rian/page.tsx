@@ -65,7 +65,6 @@ const RIAN_TOUR: TourStep[] = [
 
 export default function RianPage() {
   const router = useRouter()
-  const [childIndex, setChildIndex] = useState(0)
   const [time, setTime] = useState(new Date())
   const [showBaseMenu, setShowBaseMenu] = useState(false)
   const [showFamilyMenu, setShowFamilyMenu] = useState(false)
@@ -84,7 +83,34 @@ const getEnergyColor = (v: number) => v > 70 ? '#8ca88d' : v > 40 ? '#b88e5e' : 
 const getChildGlow = (energy: number | null | undefined) =>
   energy == null ? 'rgba(255,255,255,0.45)' : getEnergyColor(energy)
 
-const { userId, kids: ctxKids, todos: ctxTodos, sync: ctxSync } = useApp()
+const { userId, kids: ctxKids, todos: ctxTodos, sync: ctxSync, activeKid, setActiveKid } = useApp()
+const [currentChild, setCurrentChild] = useState<Child | null>(null)
+
+useEffect(() => {
+  if (ctxKids.length === 0) {
+    setCurrentChild(null)
+    return
+  }
+  const storedId = typeof window !== 'undefined' ? localStorage.getItem('active_child_id') : null
+  const kid =
+    (activeKid && ctxKids.find((k: Child) => k.id === activeKid.id)) ||
+    (storedId ? ctxKids.find((k: Child) => k.id === storedId) : null) ||
+    ctxKids[0]
+  setCurrentChild(kid as Child)
+  if (!activeKid && kid) setActiveKid(kid)
+}, [ctxKids, activeKid, setActiveKid])
+
+useEffect(() => {
+  if (activeKid?.id && activeKid.id !== currentChild?.id) {
+    const matched = ctxKids.find((k: Child) => k.id === activeKid.id)
+    if (matched) setCurrentChild(matched as Child)
+  }
+}, [activeKid, currentChild?.id, ctxKids])
+
+const handleSwitchChild = (kid: Child) => {
+  setCurrentChild(kid)
+  setActiveKid(kid)
+}
 
 const todosTyped = ctxTodos as TodoItem[]
 const { groups } = useTodoEngine(todosTyped)
@@ -125,7 +151,6 @@ const actionReminders = useMemo<Reminder[]>(() => {
 
   const children = ctxKids
   const loading = false
-  const currentChild = children[childIndex]
   const childEnergy = currentChild?.energy != null ? currentChild.energy : null
   const showChildEnergy = childEnergy != null
   
@@ -242,9 +267,9 @@ const actionReminders = useMemo<Reminder[]>(() => {
           <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }}
             style={{ position: 'absolute', top: '17%', left: '5%', zIndex: 120, background: 'rgba(255,255,255,0.4)', backdropFilter: 'blur(30px)', borderRadius: 20, padding: 12, border: '1px solid rgba(255,255,255,0.5)', display: 'flex', gap: 12, alignItems: 'center' }}
           >
-            {children.map((c, i) => (
-              <div key={i} onClick={() => { setChildIndex(i); setShowFamilyMenu(false) }}
-                style={{ cursor: 'pointer', opacity: childIndex === i ? 1 : 0.3, width: 36, height: 36, borderRadius: '50%', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,0.5)' }}>
+            {children.map((c) => (
+              <div key={c.id} onClick={() => { handleSwitchChild(c as Child); setShowFamilyMenu(false) }}
+                style={{ cursor: 'pointer', opacity: currentChild?.id === c.id ? 1 : 0.3, width: 36, height: 36, borderRadius: '50%', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,0.5)' }}>
                 {c.avatar_url ? (
                   <img src={c.avatar_url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                 ) : (
@@ -456,10 +481,11 @@ const actionReminders = useMemo<Reminder[]>(() => {
 />
 
       <AnimatePresence>
-        {showWeeklyReport && currentChild?.id && (
+        {showWeeklyReport && (currentChild?.id || children.length > 1) && (
           <WeeklyReportSheet
-            childId={currentChild.id}
-            childName={currentChild.name || '宝宝'}
+            childId={currentChild?.id || ''}
+            childName={currentChild?.name || '宝宝'}
+            multiChild={children.length > 1}
             onClose={() => setShowWeeklyReport(false)}
           />
         )}
