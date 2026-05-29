@@ -49,7 +49,7 @@ type LightFlash = { id: string; x: number; y: number }
 
 export default function TreehousePage() {
   const router = useRouter()
-  const { kids: enrichedKids } = useApp()
+  const { kids: enrichedKids, userId } = useApp()
 
   // ── 密码验证（同一会话内免重复输入 PIN）──
   const [unlocked, setUnlocked] = useState(() => {
@@ -266,7 +266,14 @@ export default function TreehousePage() {
   const addMessage = (role: 'user' | 'assistant', content: string) => {
     const msg: Message = { id: crypto.randomUUID(), role, content, timestamp: Date.now() }
     setMessages(prev => { const u = [...prev, msg]; messagesRef.current = u; return u })
-    supabase.from('conversation_log').insert({ session_id: sessionId.current, role, content }).then(() => {})
+    if (userId) {
+      void supabase.from('conversation_log').insert({
+        user_id: userId,
+        session_id: sessionId.current,
+        role,
+        content,
+      })
+    }
 
     // 提到孩子时触发光点闪烁
     if (role === 'assistant' && (content.includes('William') || content.includes('Noah') || content.includes('孩子'))) {

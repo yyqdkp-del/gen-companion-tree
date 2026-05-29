@@ -240,12 +240,19 @@ function ProfileContent() {
     return addressData.resident_city?.trim() || null
   }, [addressData.resident_city, addressData.resident_city_custom])
 
+  const dateOrNull = (v: string) => (v?.trim() ? v.trim() : null)
+
   const buildProfilePayload = useCallback((uid: string) => ({
     user_id: uid,
     ...memberData,
     ...passportData,
     ...addressData,
     ...emergencyData,
+    // family_profile 中 DATE 列不能传 ""，否则 PostgreSQL 22007
+    passport_issue_date: dateOrNull(passportData.passport_issue_date),
+    passport_expiry: dateOrNull(passportData.passport_expiry),
+    insurance_expiry: dateOrNull(passportData.insurance_expiry),
+    visa_expiry: dateOrNull(passportData.visa_expiry),
     resident_city: addressData.resident_city || null,
     resident_city_custom:
       addressData.resident_city === 'other'

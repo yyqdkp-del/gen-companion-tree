@@ -51,6 +51,8 @@ function allergiesToText(val: unknown): string {
   return ''
 }
 
+const dateOrNull = (v: string) => (v?.trim() ? v.trim() : null)
+
 // ── 主组件 ──
 function ChildEditContent() {
   const router = useRouter()
@@ -200,8 +202,8 @@ function ChildEditContent() {
         const childPayload = {
           user_id: userId,
           name: basicData.name,
-          birthdate: basicData.birthdate || null,
-          birth_date: basicData.birthdate || null,
+          birthdate: dateOrNull(basicData.birthdate),
+          birth_date: dateOrNull(basicData.birthdate),
           emoji: basicData.emoji,
           languages: basicData.languages,
           avatar_url: basicData.avatar_url || null,
@@ -210,7 +212,7 @@ function ChildEditContent() {
             ? [basicData.allergies_text.trim()]
             : ['无'],
           passport_number: basicData.passport_number.trim() || null,
-          passport_expiry: basicData.passport_expiry || null,
+          passport_expiry: dateOrNull(basicData.passport_expiry),
           nationality: basicData.nationality.trim() || null,
           school: schoolData.school,
           school_name: schoolData.school_name || schoolData.school,
@@ -245,8 +247,8 @@ function ChildEditContent() {
       if (step === 0) {
         Object.assign(patch, {
           name: basicData.name,
-          birthdate: basicData.birthdate || null,
-          birth_date: basicData.birthdate || null,
+          birthdate: dateOrNull(basicData.birthdate),
+          birth_date: dateOrNull(basicData.birthdate),
           emoji: basicData.emoji,
           languages: basicData.languages,
           avatar_url: basicData.avatar_url || null,
@@ -255,7 +257,7 @@ function ChildEditContent() {
             ? [basicData.allergies_text.trim()]
             : ['无'],
           passport_number: basicData.passport_number.trim() || null,
-          passport_expiry: basicData.passport_expiry || null,
+          passport_expiry: dateOrNull(basicData.passport_expiry),
           nationality: basicData.nationality.trim() || null,
         })
         await supabase.from('children').upsert(patch, { onConflict: 'id' })
@@ -320,8 +322,8 @@ function ChildEditContent() {
       const childPayload = {
         user_id: uid,
         name: basicData.name,
-        birthdate: basicData.birthdate || null,
-        birth_date: basicData.birthdate || null,
+        birthdate: dateOrNull(basicData.birthdate),
+        birth_date: dateOrNull(basicData.birthdate),
         emoji: basicData.emoji,
         languages: basicData.languages,
         avatar_url: basicData.avatar_url || null,
@@ -330,7 +332,7 @@ function ChildEditContent() {
           ? [basicData.allergies_text.trim()]
           : ['无'],
         passport_number: basicData.passport_number.trim() || null,
-        passport_expiry: basicData.passport_expiry || null,
+        passport_expiry: dateOrNull(basicData.passport_expiry),
         nationality: basicData.nationality.trim() || null,
         school: schoolData.school,
         school_name: schoolData.school_name || schoolData.school,
