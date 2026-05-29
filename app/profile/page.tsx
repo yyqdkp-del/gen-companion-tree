@@ -425,51 +425,66 @@ function ProfileContent() {
 
       <div style={{ padding: '20px 20px 0', maxWidth: 640, margin: '0 auto' }}>
 
-        {!isPro && (
-          <button
-            type="button"
-            onClick={() => router.push('/upgrade')}
-            style={{
-              width: '100%',
-              padding: '14px 20px',
-              background: 'linear-gradient(135deg, #a46355 0%, #8a5247 100%)',
-              color: '#fff',
-              border: 'none',
-              borderRadius: 16,
-              fontSize: 15,
-              fontFamily: "'Noto Serif SC', serif",
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              marginBottom: 12,
-              boxShadow: '0 4px 16px rgba(164,99,85,0.3)',
-            }}
-          >
-            <span>🌳 升级 Pro 解锁全部功能</span>
-            <span style={{ fontSize: 13, opacity: 0.9 }}>$9.99/月 →</span>
-          </button>
-        )}
-
-        {isPro && (
-          <div style={{
-            width: '100%',
-            padding: '12px 20px',
-            background: 'rgba(92,122,94,0.08)',
-            border: '1px solid rgba(92,122,94,0.2)',
-            borderRadius: 14,
-            fontSize: 14,
-            color: '#5c7a5e',
-            fontFamily: 'sans-serif',
-            marginBottom: 12,
-            display: 'flex',
-            alignItems: 'center',
-            gap: 8,
+        {/* 订阅状态 */}
+        <div
+          style={{
+            background: '#fff',
+            borderRadius: 16,
+            padding: '20px 24px',
+            margin: '0 0 16px',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
           }}
-          >
-            ✓ Pro 会员已激活
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontSize: 15, fontWeight: 600, color: '#2d322f', marginBottom: 4 }}>
+                {isPro ? '✨ 根陪伴 Pro' : '免费版'}
+              </div>
+              <div style={{ fontSize: 13, color: 'rgba(45,50,47,0.5)' }}>
+                {isPro ? '已订阅，感谢支持' : '升级解锁全部功能'}
+              </div>
+            </div>
+            {isPro ? (
+              <a
+                href="https://sandbox-buy.paddle.com/subscriptions"
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{
+                  flexShrink: 0,
+                  fontSize: 13,
+                  color: '#a46355',
+                  textDecoration: 'none',
+                  padding: '6px 14px',
+                  border: '1px solid rgba(164,99,85,0.3)',
+                  borderRadius: 8,
+                  fontFamily: 'sans-serif',
+                }}
+              >
+                管理订阅
+              </a>
+            ) : (
+              <a
+                href="/upgrade"
+                onClick={(e) => {
+                  e.preventDefault()
+                  router.push('/upgrade')
+                }}
+                style={{
+                  flexShrink: 0,
+                  fontSize: 13,
+                  color: '#fff',
+                  textDecoration: 'none',
+                  padding: '6px 14px',
+                  background: '#a46355',
+                  borderRadius: 8,
+                  fontFamily: 'sans-serif',
+                }}
+              >
+                升级 Pro
+              </a>
+            )}
           </div>
-        )}
+        </div>
 
         {/* 快捷入口 - 在进度条之前 */}
         <div
