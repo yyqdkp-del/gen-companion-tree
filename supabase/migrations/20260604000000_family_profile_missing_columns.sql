@@ -1,0 +1,8 @@
+ALTER TABLE public.family_profile
+  ADD COLUMN IF NOT EXISTS resident_city TEXT,
+  ADD COLUMN IF NOT EXISTS member_name TEXT,
+  ADD COLUMN IF NOT EXISTS phone TEXT,
+  ADD COLUMN IF NOT EXISTS passport_number TEXT,
+  ADD COLUMN IF NOT EXISTS passport_expiry DATE,
+  ADD COLUMN IF NOT EXISTS visa_type TEXT,
+  ADD COLUMN IF NOT EXISTS visa_expiry DATE;
