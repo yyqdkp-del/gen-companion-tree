@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { useApp } from '@/app/context/AppContext'
+import { toast } from '@/app/components/Toast'
 import { fetchWithAuth } from '@/lib/auth/fetchWithAuth'
 import { PLANS } from '@/lib/stripe/plans'
 
@@ -32,9 +34,17 @@ const PADDLE_SCRIPT_SRC = 'https://cdn.paddle.com/paddle/v2/paddle.js'
 
 export default function UpgradePage() {
   const router = useRouter()
+  const { userId, sessionReady } = useApp()
   const [loading, setLoading] = useState(false)
   const [paddleReady, setPaddleReady] = useState(false)
   const initializedRef = useRef(false)
+
+  useEffect(() => {
+    if (!sessionReady) return
+    if (!userId) {
+      router.push('/auth?next=/upgrade')
+    }
+  }, [userId, sessionReady, router])
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -91,6 +101,16 @@ export default function UpgradePage() {
       })
       const data = await res.json()
       console.log('2. checkout API 返回:', data, 'status:', res.status)
+
+      if (!res.ok || !data.priceId) {
+        console.error('checkout API 失败:', data)
+        if (res.status === 401) {
+          router.push('/auth?next=/upgrade')
+          return
+        }
+        toast('结账初始化失败，请重试', 'error')
+        return
+      }
 
       if (!window.Paddle) {
         console.error('结账错误: Paddle SDK 未加载')
