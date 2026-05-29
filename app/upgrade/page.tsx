@@ -6,11 +6,14 @@ import { fetchWithAuth } from '@/lib/auth/fetchWithAuth'
 import { PLANS } from '@/lib/stripe/plans'
 
 type PaddleCheckoutItem = { priceId: string; quantity: number }
+type PaddleCheckoutEvent = { name?: string; data?: unknown }
+
 type PaddleCheckoutOptions = {
   items: PaddleCheckoutItem[]
   customer?: { email?: string }
   customData?: Record<string, string | undefined>
   settings?: { successUrl?: string }
+  eventCallback?: (event: PaddleCheckoutEvent) => void
 }
 
 type PaddleSDK = {
@@ -76,30 +79,35 @@ export default function UpgradePage() {
   }, [])
 
   const handleUpgrade = async () => {
-    if (!window.Paddle) {
-      alert('支付组件尚未加载完成，请稍候再试')
-      return
-    }
     setLoading(true)
     try {
+      console.log('1. 开始结账')
+      console.log('Paddle ready:', paddleReady)
+      console.log('Window.Paddle:', !!window.Paddle)
+
       const res = await fetchWithAuth('/api/paddle/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ plan: 'pro' }),
       })
-      if (!res.ok) {
-        console.error('paddle checkout config failed:', res.status)
+      const data = await res.json()
+      console.log('2. checkout API 返回:', data, 'status:', res.status)
+
+      if (!window.Paddle) {
+        console.error('结账错误: Paddle SDK 未加载')
         return
       }
-      const data = await res.json()
+
       window.Paddle.Checkout.open({
         items: [{ priceId: data.priceId, quantity: 1 }],
         customer: data.email ? { email: data.email } : undefined,
         customData: { user_id: data.userId },
         settings: { successUrl: data.successUrl },
+        eventCallback: (event) => {
+          console.log('Paddle event:', event)
+        },
       })
     } catch (e) {
-      console.error(e)
+      console.error('结账错误:', e)
     } finally {
       setLoading(false)
     }
