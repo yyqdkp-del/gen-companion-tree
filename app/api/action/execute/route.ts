@@ -341,6 +341,12 @@ function buildCalendarStartEnd(action: any): { startISO: string; endISO: string 
   return { startISO, endISO: endWall.replace(' ', 'T') }
 }
 
+const MAKE_DRAFT_ONLY_RESPONSE = {
+  ok: false,
+  message: '自动执行功能暂未开放，已为你生成草稿',
+  draft_only: true,
+}
+
 // ══ 执行具体动作（Gmail / Make.com）══
 async function performAction(action: any, userId: string) {
   const MAKE_WEBHOOK_URL = process.env.NEXT_PUBLIC_MAKE_WEBHOOK_URL || ''
@@ -360,7 +366,7 @@ async function performAction(action: any, userId: string) {
         }
         if (result.error?.includes('未授权')) {
           if (!MAKE_WEBHOOK_URL) {
-            return { ok: false, error: result.error || 'Gmail 未授权且无 Make Webhook 可降级' }
+            return MAKE_DRAFT_ONLY_RESPONSE
           }
           await fetch(MAKE_WEBHOOK_URL, {
             method: 'POST',
@@ -414,7 +420,7 @@ async function performAction(action: any, userId: string) {
         }
         if (result.error?.includes('未授权')) {
           if (!MAKE_WEBHOOK_URL) {
-            return { ok: false, error: result.error || '日历未授权且无 Make Webhook 可降级' }
+            return MAKE_DRAFT_ONLY_RESPONSE
           }
           await fetch(MAKE_WEBHOOK_URL, {
             method: 'POST',

@@ -102,9 +102,15 @@ async function enrichPackActions(
   return enrichActionsWithFormTemplates(actions, familyData, formTemplates, childName)
 }
 
+const MAKE_DRAFT_ONLY_RESPONSE = {
+  ok: false,
+  message: '自动执行功能暂未开放，已为你生成草稿',
+  draft_only: true,
+}
+
 // ══ 执行动作 Make.com ══
 async function executeAction(action: any, userId: string) {
-  if (!MAKE_WEBHOOK_URL) return { ok: false, error: 'No webhook' }
+  if (!MAKE_WEBHOOK_URL) return MAKE_DRAFT_ONLY_RESPONSE
   try {
     switch (action.type) {
       case 'email':
@@ -301,6 +307,10 @@ export async function POST(req: NextRequest) {
 
     // ── 直接执行动作（Make.com）──
     if (execute_action) {
+      const needsMake = execute_action.type === 'email' || execute_action.type === 'calendar'
+      if (needsMake && !MAKE_WEBHOOK_URL) {
+        return NextResponse.json(MAKE_DRAFT_ONLY_RESPONSE)
+      }
       return NextResponse.json(await executeAction(execute_action, userId))
     }
 

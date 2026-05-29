@@ -40,19 +40,63 @@ export default function AuthPage() {
 
   const saveChildData = async (userId: string) => {
     try {
-      const raw = localStorage.getItem('child_assessment')
+      const raw =
+        localStorage.getItem('onboarding_child') ||
+        localStorage.getItem('child_assessment')
       if (!raw) return
-      let data: { name?: string; grade?: string; school?: string } | null = null
+      let child: {
+        name?: string
+        grade?: string
+        school?: string
+        school_name?: string
+        emoji?: string
+      } | null = null
       try {
-        data = JSON.parse(raw)
+        child = JSON.parse(raw)
       } catch {
-        data = null
+        child = null
       }
-      if (!data?.name) return
-      const { name, grade, school } = data
-      await supabase.from('children').insert({ user_id: userId, name, grade, school_short: school })
+      if (!child?.name) return
+
+      const schoolName = child.school_name || child.school || ''
+      const { data, error } = await supabase
+        .from('children')
+        .insert({
+          user_id: userId,
+          name: child.name,
+          emoji: child.emoji || '👶🏻',
+          grade: child.grade || null,
+          school_name: schoolName || null,
+          school_short: schoolName || null,
+        })
+        .select('id')
+        .single()
+
+      if (error) {
+        console.warn('saveChildData children insert:', error.message)
+        return
+      }
+
+      if (data?.id) {
+        const { error: profileError } = await supabase.from('child_profiles').upsert(
+          {
+            child_id: data.id,
+            user_id: userId,
+            class_schedule: {},
+            activities: [],
+          },
+          { onConflict: 'child_id' },
+        )
+        if (profileError) {
+          console.warn('saveChildData child_profiles upsert:', profileError.message)
+        }
+      }
+
+      localStorage.removeItem('onboarding_child')
       localStorage.removeItem('child_assessment')
-    } catch {}
+    } catch (e) {
+      console.warn('saveChildData error:', e)
+    }
   }
 
   const handleSubmit = async () => {

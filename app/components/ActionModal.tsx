@@ -63,7 +63,7 @@ type ActionStatus = 'idle' | 'running' | 'done' | 'error'
 type TabKey = 'checklist' | 'carry' | 'draft'
 
 /** executeAction 返回值（含服务端 perform_action 的 skipped、eventLink） */
-type ExecuteClientResult = { message: string; skipped?: boolean; eventLink?: string }
+type ExecuteClientResult = { message: string; skipped?: boolean; draftOnly?: boolean; eventLink?: string }
 
 type ExecuteActionContext = { sourceType?: ActionSource; sourceId?: string }
 
@@ -345,7 +345,18 @@ async function executeAction(
           method: 'POST',
           body: JSON.stringify({ perform_action: action }),
         })
-        const json = await res.json().catch(() => ({})) as { skipped?: boolean; reason?: string }
+        const json = await res.json().catch(() => ({})) as {
+          skipped?: boolean
+          reason?: string
+          draft_only?: boolean
+          message?: string
+        }
+        if (json?.draft_only) {
+          return {
+            message: json.message || '已生成草稿，需手动执行',
+            draftOnly: true,
+          }
+        }
         if (json?.skipped) {
           return { message: typeof json.reason === 'string' ? json.reason : '未执行', skipped: true }
         }
@@ -370,6 +381,13 @@ async function executeAction(
           eventLink?: string
           message?: string
           fallback?: boolean
+          draft_only?: boolean
+        }
+        if (json?.draft_only) {
+          return {
+            message: json.message || '已生成草稿，需手动执行',
+            draftOnly: true,
+          }
         }
         if (json?.skipped) {
           return { message: typeof json.reason === 'string' ? json.reason : '未执行', skipped: true }
@@ -520,6 +538,11 @@ function ActionsArea({ actions, userId, primaryIndex, primaryReason, sourceId, s
     setStates(prev => { const n = [...prev]; n[i] = { status: 'running' }; return n })
     try {
       const result = await executeAction(action, userId, { sourceType, sourceId })
+      if (result.draftOnly) {
+        toast(result.message || '已生成草稿，需手动执行', 'info')
+        setStates(prev => { const n = [...prev]; n[i] = { status: 'idle' }; return n })
+        return
+      }
       if (result.skipped) {
         setStates(prev => { const n = [...prev]; n[i] = { status: 'idle' }; return n })
         return
