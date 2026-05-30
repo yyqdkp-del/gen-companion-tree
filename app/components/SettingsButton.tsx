@@ -110,7 +110,7 @@ export default function SettingsButton() {
               exit={{ opacity: 0, y: 20 }}
               transition={{ type: 'spring', damping: 25, stiffness: 300 }}
               style={{ position: 'fixed',
-                bottom: 'max(calc(env(safe-area-inset-bottom) + 80px), 90px)',
+                bottom: 'calc(56px + env(safe-area-inset-bottom, 0px) + 20px)',
                 right: 16, zIndex: 199, width: 220,
                 background: 'rgba(255,255,255,0.92)', backdropFilter: 'blur(40px)',
                 borderRadius: 20, boxShadow: '0 10px 40px rgba(0,0,0,0.12)',

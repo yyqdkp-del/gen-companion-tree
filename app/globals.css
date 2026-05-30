@@ -201,11 +201,11 @@ img {
 
 /* 全局安全区域适配 */
 .page-container {
-  padding-bottom: calc(80px + max(env(safe-area-inset-bottom), 20px));
+  padding-bottom: calc(56px + env(safe-area-inset-bottom, 0px) + 20px);
 }
 
 .page-container-dark {
-  padding-bottom: calc(80px + max(env(safe-area-inset-bottom), 20px));
+  padding-bottom: calc(56px + env(safe-area-inset-bottom, 0px) + 20px);
   background-color: #0a0d14;
 }
 

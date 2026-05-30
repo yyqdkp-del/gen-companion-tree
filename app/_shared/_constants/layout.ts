@@ -1,26 +1,34 @@
 // ─────────────────────────────────────────
-// 布局常量
-// 全项目统一引用，不在各处硬编码
+// 布局常量 — 4 Tab 底栏 + 右下角浮动输入
 // ─────────────────────────────────────────
 
-// 有底部导航的页面底部留白（80px 导航 + safe-area，至少 20px）
-export const PAGE_BOTTOM_PADDING = 'calc(80px + max(env(safe-area-inset-bottom), 20px))'
+export const TAB_BAR_HEIGHT_PX = 56
 
-// 底部导航栏总占用高度（胶囊 62px + safe-area + 外边距，略大于 PAGE_BOTTOM_PADDING）
-export const NAV_HEIGHT_CSS = `max(${PAGE_BOTTOM_PADDING}, 110px)`
+/** 仅底栏 */
+export const TAB_BAR_CSS = `calc(${TAB_BAR_HEIGHT_PX}px + env(safe-area-inset-bottom, 0px))`
 
-// 无底部导航页面（如 /learn）仅保留 Home 指示条区域
+/** 底栏 + 内容间距（无浮动话筒/相机） */
+export const PAGE_BOTTOM_TAB_ONLY = `calc(${TAB_BAR_HEIGHT_PX}px + env(safe-area-inset-bottom, 0px) + 20px)`
+
+/** 底栏 + 浮动按钮区（/ 与 /rian） */
+export const PAGE_BOTTOM_WITH_FLOAT = `calc(${TAB_BAR_HEIGHT_PX}px + env(safe-area-inset-bottom, 0px) + 88px)`
+
+/** 浮动话筒/相机距屏幕底 */
+export const FLOAT_INPUT_BOTTOM = `calc(${TAB_BAR_HEIGHT_PX}px + env(safe-area-inset-bottom, 0px) + 16px)`
+
+/** @deprecated 使用 PAGE_BOTTOM_TAB_ONLY */
+export const PAGE_BOTTOM_PADDING = PAGE_BOTTOM_TAB_ONLY
+
+/** @deprecated 使用 PAGE_BOTTOM_TAB_ONLY */
+export const NAV_HEIGHT_CSS = PAGE_BOTTOM_TAB_ONLY
+
 export const SAFE_BOTTOM_INSET = 'max(env(safe-area-inset-bottom), 20px)'
 
-// 顶部状态栏 / 刘海
 export const SAFE_AREA_TOP = 'max(env(safe-area-inset-top), 0px)'
 export const STICKY_HEADER_PADDING_TOP = 'calc(12px + env(safe-area-inset-top))'
 
-// 滚动页顶部留白（状态栏 + 内容间距）
 export const PAGE_TOP_PADDING = 'max(calc(env(safe-area-inset-top) + 44px), 56px)'
 
-// 弹窗底部 padding（确保内容不被导航栏遮挡）
-export const SHEET_BOTTOM_PADDING = 'max(calc(env(safe-area-inset-bottom) + 108px), 120px)'
+export const SHEET_BOTTOM_PADDING = `max(calc(env(safe-area-inset-bottom) + ${TAB_BAR_HEIGHT_PX}px + 52px), 120px)`
 
-// 浮动弹窗距底部距离（HotspotSheet/ChildSheet 类型）
-export const FLOAT_SHEET_BOTTOM = NAV_HEIGHT_CSS
+export const FLOAT_SHEET_BOTTOM = PAGE_BOTTOM_WITH_FLOAT

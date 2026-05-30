@@ -634,7 +634,7 @@ export default function TreehousePage() {
       <div style={{
         position: 'relative', zIndex: 10,
         padding: '12px 16px',
-        paddingBottom: 'calc(max(env(safe-area-inset-bottom), 20px) + 90px + var(--treehouse-kb, 0px))',
+        paddingBottom: 'calc(56px + env(safe-area-inset-bottom, 0px) + 12px + var(--treehouse-kb, 0px))',
         background: 'linear-gradient(to top, rgba(2,6,23,0.95) 0%, transparent 100%)',
         flexShrink: 0,
       }}>

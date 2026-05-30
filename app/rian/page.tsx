@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { X } from 'lucide-react'
 import nextDynamic from 'next/dynamic'
 import { THEME } from '@/app/_shared/_constants/theme'
-import { SAFE_AREA_TOP } from '@/app/_shared/_constants/layout'
+import { PAGE_BOTTOM_WITH_FLOAT, SAFE_AREA_TOP } from '@/app/_shared/_constants/layout'
 import { useTodoActions } from '@/app/_shared/_hooks/useTodoActions'
 import { useRecorder } from '@/app/_shared/_hooks/useRecorder'
 import { useUpload, UPLOAD_STATUS_TEXT } from '@/app/_shared/_hooks/useUpload'
@@ -294,7 +294,7 @@ const actionReminders = useMemo<Reminder[]>(() => {
           top: `calc(${SAFE_AREA_TOP} + 18vh)`,
           left: 0,
           right: 0,
-          bottom: 'calc(88px + env(safe-area-inset-bottom))',
+          bottom: PAGE_BOTTOM_WITH_FLOAT,
           overflowY: 'auto',
           zIndex: 25,
           WebkitOverflowScrolling: 'touch',

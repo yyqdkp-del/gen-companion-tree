@@ -1,10 +1,18 @@
 'use client'
+
 import dynamic from 'next/dynamic'
 import { useEffect } from 'react'
+import { usePathname } from 'next/navigation'
+import SettingsButton from '@/app/components/SettingsButton'
 
 const BottomInput = dynamic(() => import('@/app/components/BottomInput'), { ssr: false })
+const BottomNav = dynamic(() => import('@/app/components/BottomNav'), { ssr: false })
+
+const HIDE_CHROME = ['/auth', '/grandparent', '/admin', '/upgrade', '/privacy', '/terms', '/refund']
 
 export default function ClientComponents() {
+  const pathname = usePathname()
+
   useEffect(() => {
     const viewport = window.visualViewport
     if (!viewport) return
@@ -23,5 +31,24 @@ export default function ClientComponents() {
     }
   }, [])
 
-  return <BottomInput />
+  const showChrome = !HIDE_CHROME.some((p) => pathname.startsWith(p))
+
+  return (
+    <>
+      {showChrome && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 'max(10px, env(safe-area-inset-top, 10px))',
+            left: 12,
+            zIndex: 98,
+          }}
+        >
+          <SettingsButton />
+        </div>
+      )}
+      <BottomInput />
+      <BottomNav />
+    </>
+  )
 }

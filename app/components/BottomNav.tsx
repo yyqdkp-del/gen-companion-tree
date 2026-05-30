@@ -1,109 +1,169 @@
 'use client'
-import React, { useState } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
-import { Home as HomeIcon } from 'lucide-react'
-import { useRouter, usePathname } from 'next/navigation'
-import { useApp } from '@/app/context/AppContext'
-import SettingsButton from '@/app/components/SettingsButton'
 
-const PAGE_MAP: Record<string, string> = {
-  '/':          '基地',
-  '/rian':      '日安',
-  '/growth':    '根·中文',
-  '/treehouse': '日栖',
+import { usePathname, useRouter } from 'next/navigation'
+import { useApp } from '@/app/context/AppContext'
+
+const icons = {
+  home: (active: boolean) => (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path
+        d="M3 12L12 3L21 12V20C21 20.55 20.55 21 20 21H15V16H9V21H4C3.45 21 3 20.55 3 20V12Z"
+        stroke={active ? '#a46355' : 'rgba(45,50,47,0.35)'}
+        fill={active ? 'rgba(164,99,85,0.12)' : 'none'}
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  ),
+  calendar: (active: boolean) => (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <rect
+        x="3"
+        y="4"
+        width="18"
+        height="17"
+        rx="2"
+        stroke={active ? '#a46355' : 'rgba(45,50,47,0.35)'}
+        fill={active ? 'rgba(164,99,85,0.12)' : 'none'}
+        strokeWidth="1.5"
+      />
+      <line x1="8" y1="2" x2="8" y2="6" stroke={active ? '#a46355' : 'rgba(45,50,47,0.35)'} strokeWidth="1.5" strokeLinecap="round" />
+      <line x1="16" y1="2" x2="16" y2="6" stroke={active ? '#a46355' : 'rgba(45,50,47,0.35)'} strokeWidth="1.5" strokeLinecap="round" />
+      <line x1="7" y1="12" x2="17" y2="12" stroke={active ? '#a46355' : 'rgba(45,50,47,0.35)'} strokeWidth="1.5" strokeLinecap="round" />
+      <line x1="7" y1="16" x2="13" y2="16" stroke={active ? '#a46355' : 'rgba(45,50,47,0.35)'} strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  ),
+  book: (active: boolean) => (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path
+        d="M4 4C4 3.45 4.45 3 5 3H14L20 9V20C20 20.55 19.55 21 19 21H5C4.45 21 4 20.55 4 20V4Z"
+        stroke={active ? '#a46355' : 'rgba(45,50,47,0.35)'}
+        fill={active ? 'rgba(164,99,85,0.12)' : 'none'}
+        strokeWidth="1.5"
+        strokeLinejoin="round"
+      />
+      <path d="M14 3V9H20" stroke={active ? '#a46355' : 'rgba(45,50,47,0.35)'} strokeWidth="1.5" strokeLinejoin="round" />
+      <line x1="8" y1="13" x2="16" y2="13" stroke={active ? '#a46355' : 'rgba(45,50,47,0.35)'} strokeWidth="1.5" strokeLinecap="round" />
+      <line x1="8" y1="17" x2="13" y2="17" stroke={active ? '#a46355' : 'rgba(45,50,47,0.35)'} strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  ),
+  tree: (active: boolean) => (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path
+        d="M12 2L6 10H9L4 18H11V22H13V18H20L15 10H18L12 2Z"
+        stroke={active ? '#a46355' : 'rgba(45,50,47,0.35)'}
+        fill={active ? 'rgba(164,99,85,0.12)' : 'none'}
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  ),
 }
 
-const NAV_ITEMS = [
-  { label: '基地',   path: '/' },
-  { label: '日安',   path: '/rian' },
-  { label: '根·中文', path: '/growth' },
-  { label: '日栖',   path: '/treehouse' },
+const TABS = [
+  { path: '/', label: '根', iconKey: 'home' as const },
+  { path: '/rian', label: '根·安', iconKey: 'calendar' as const },
+  { path: '/growth', label: '根·字', iconKey: 'book' as const },
+  { path: '/treehouse', label: '根·栖', iconKey: 'tree' as const },
 ]
 
-const SHOW_PATHS = ['/', '/rian', '/growth', '/treehouse']
+const HIDE_ON = ['/auth', '/grandparent', '/admin', '/upgrade', '/privacy', '/terms', '/refund']
 
-type Props = {
-  leftSlot?: React.ReactNode   // 左侧按钮（话筒）
-  rightSlot?: React.ReactNode  // 右侧按钮（摄像头）
-}
-
-export default function BottomNav({ leftSlot, rightSlot }: Props) {
-  const router   = useRouter()
+export default function BottomNav() {
   const pathname = usePathname()
+  const router = useRouter()
   const { modalOpen } = useApp()
-  const [showMenu, setShowMenu] = useState(false)
 
-  const currentPage = PAGE_MAP[pathname]
-    || (pathname.startsWith('/growth') ? '根·中文' : '根·陪伴')
+  if (HIDE_ON.some((p) => pathname.startsWith(p))) return null
 
-  if (!SHOW_PATHS.includes(pathname)) return null
+  const isActive = (path: string) =>
+    path === '/' ? pathname === '/' : pathname.startsWith(path)
 
   return (
-    <footer style={{
-      position: 'fixed',
-      bottom: 'calc(max(env(safe-area-inset-bottom), 36px) + var(--keyboard-height, 0px))',
-      left: 0, right: 0, zIndex: 110,
-      display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '0 16px',
-      transition: 'bottom 0.15s ease-out, opacity 0.2s ease, transform 0.2s ease',
-      opacity: modalOpen ? 0 : 1,
-      transform: modalOpen ? 'translateY(100%)' : 'translateY(0)',
-      pointerEvents: modalOpen ? 'none' : 'auto',
-    }}>
-
-      {/* 页面切换菜单 */}
-      <AnimatePresence>
-        {showMenu && (
-          <motion.div
-            initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 10 }}
-            style={{ marginBottom: 12, display: 'flex', gap: 10 }}>
-            {NAV_ITEMS.map(item => (
-              <motion.button key={item.path} whileTap={{ scale: 0.95 }}
-                onClick={() => { router.push(item.path); setShowMenu(false) }}
-                style={{ padding: '8px 18px', borderRadius: 14,
-                  background: (pathname === item.path || (item.path === '/growth' && pathname.startsWith('/growth')))
-                    ? 'rgba(164, 99, 85, 0.08)' : 'rgba(251, 249, 246, 0.72)',
-                  border: '1px solid rgba(30, 41, 59, 0.06)', fontSize: 11, fontWeight: 700,
-                  color: (pathname === item.path || (item.path === '/growth' && pathname.startsWith('/growth'))) ? '#a46355' : 'rgba(30, 41, 59, 0.35)',
-                  backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)', cursor: 'pointer' }}>
-                {item.label}
-              </motion.button>
-            ))}
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* 底部胶囊 */}
-      <div style={{
-        width: '100%', maxWidth: 360, height: 62,
-        background: 'rgba(251, 249, 246, 0.88)',
+    <nav
+      aria-label="主导航"
+      style={{
+        position: 'fixed',
+        bottom: 'var(--keyboard-height, 0px)',
+        left: 0,
+        right: 0,
+        zIndex: 100,
+        background: 'rgba(251,249,246,0.94)',
         backdropFilter: 'blur(24px)',
         WebkitBackdropFilter: 'blur(24px)',
-        borderTop: '1px solid rgba(30, 41, 59, 0.06)',
-        borderRadius: 31,
-        display: 'flex', alignItems: 'center',
-        justifyContent: 'space-between', padding: '0 10px',
-      }}>
-        {/* 左侧插槽（话筒按钮） */}
-        {leftSlot ?? <div style={{ width: 52 }} />}
-
-        {/* 中间页面名 */}
-        <motion.button whileTap={{ scale: 0.95 }}
-          onClick={() => setShowMenu(!showMenu)}
-          style={{ display: 'flex', alignItems: 'center', gap: 7,
-            border: 'none', background: 'none', cursor: 'pointer' }}>
-          <HomeIcon size={19} color={showMenu ? '#a46355' : 'rgba(30, 41, 59, 0.35)'} />
-          <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: '0.3em',
-            color: showMenu ? '#a46355' : 'rgba(30, 41, 59, 0.35)' }}>
-            {currentPage}
-          </span>
-        </motion.button>
-
-        {/* 右侧插槽（摄像头按钮） */}
-        {rightSlot ?? <div style={{ width: 52 }} />}
-      </div>
-
-      <SettingsButton />
-    </footer>
+        borderTop: '0.5px solid rgba(45,50,47,0.08)',
+        paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+        display: 'flex',
+        justifyContent: 'space-around',
+        alignItems: 'stretch',
+        minHeight: 56,
+        transition: 'opacity 0.2s ease, transform 0.2s ease',
+        opacity: modalOpen ? 0 : 1,
+        transform: modalOpen ? 'translateY(100%)' : 'translateY(0)',
+        pointerEvents: modalOpen ? 'none' : 'auto',
+      }}
+    >
+      {TABS.map((tab) => {
+        const active = isActive(tab.path)
+        return (
+          <button
+            key={tab.path}
+            type="button"
+            aria-label={tab.label}
+            aria-current={active ? 'page' : undefined}
+            onClick={() => router.push(tab.path)}
+            style={{
+              flex: 1,
+              minHeight: 56,
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 2,
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              WebkitTapHighlightColor: 'transparent',
+              padding: '6px 0',
+              position: 'relative',
+            }}
+          >
+            {active && (
+              <div
+                style={{
+                  position: 'absolute',
+                  top: '50%',
+                  left: '50%',
+                  transform: 'translate(-50%, -50%)',
+                  width: 44,
+                  height: 36,
+                  borderRadius: 18,
+                  background: 'rgba(164,99,85,0.1)',
+                }}
+              />
+            )}
+            <div style={{ position: 'relative', zIndex: 1 }}>
+              {icons[tab.iconKey](active)}
+            </div>
+            <span
+              style={{
+                fontSize: 10,
+                fontFamily: "'Noto Serif SC', serif",
+                color: active ? '#a46355' : 'rgba(45,50,47,0.35)',
+                fontWeight: active ? 600 : 400,
+                letterSpacing: '0.05em',
+                position: 'relative',
+                zIndex: 1,
+                lineHeight: 1,
+              }}
+            >
+              {tab.label}
+            </span>
+          </button>
+        )
+      })}
+    </nav>
   )
 }

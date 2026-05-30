@@ -2,7 +2,7 @@
 
 import React, { Suspense, useCallback, useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { NAV_HEIGHT_CSS, PAGE_TOP_PADDING } from '@/app/_shared/_constants/layout'
+import { PAGE_BOTTOM_TAB_ONLY, PAGE_TOP_PADDING } from '@/app/_shared/_constants/layout'
 import SchoolContent from './components/SchoolContent'
 import AcademicContent from './components/AcademicContent'
 import HanziContent from './components/HanziContent'
@@ -37,7 +37,7 @@ function GrowthContent() {
   return (
     <main style={{
       minHeight: '100dvh',
-      padding: `${PAGE_TOP_PADDING} 0 ${NAV_HEIGHT_CSS}`,
+      padding: `${PAGE_TOP_PADDING} 0 ${PAGE_BOTTOM_TAB_ONLY}`,
       backgroundColor: '#fbf9f6',
       backgroundImage: `
         radial-gradient(at 80% 10%, rgba(228,237,228,0.35) 0px, transparent 50%),
