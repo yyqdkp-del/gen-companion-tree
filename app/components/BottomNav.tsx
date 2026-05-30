@@ -1,5 +1,7 @@
 'use client'
 
+import { useEffect } from 'react'
+import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useApp } from '@/app/context/AppContext'
 
@@ -76,6 +78,10 @@ export default function BottomNav() {
   const router = useRouter()
   const { modalOpen } = useApp()
 
+  useEffect(() => {
+    TABS.forEach((tab) => router.prefetch(tab.path))
+  }, [router])
+
   if (HIDE_ON.some((p) => pathname.startsWith(p))) return null
 
   const isActive = (path: string) =>
@@ -108,12 +114,13 @@ export default function BottomNav() {
       {TABS.map((tab) => {
         const active = isActive(tab.path)
         return (
-          <button
+          <Link
             key={tab.path}
-            type="button"
+            href={tab.path}
+            prefetch
+            scroll={false}
             aria-label={tab.label}
             aria-current={active ? 'page' : undefined}
-            onClick={() => router.push(tab.path)}
             style={{
               flex: 1,
               minHeight: 56,
@@ -128,6 +135,8 @@ export default function BottomNav() {
               WebkitTapHighlightColor: 'transparent',
               padding: '6px 0',
               position: 'relative',
+              textDecoration: 'none',
+              color: 'inherit',
             }}
           >
             {active && (
@@ -161,7 +170,7 @@ export default function BottomNav() {
             >
               {tab.label}
             </span>
-          </button>
+          </Link>
         )
       })}
     </nav>

@@ -11,7 +11,6 @@ import { useRecorder } from '@/app/_shared/_hooks/useRecorder'
 import { useUpload, UPLOAD_STATUS_TEXT } from '@/app/_shared/_hooks/useUpload'
 const TodoDetailModal = nextDynamic(() => import('./TodoDetailModal'), { ssr: false })
 const WeeklyReportSheet = nextDynamic(() => import('./WeeklyReportSheet'), { ssr: false })
-export const dynamic = 'force-dynamic'
 import { useApp } from '@/app/context/AppContext'
 import { logOrAlertNetworkError } from '@/lib/errors/logOrAlertNetworkError'
 import { fetchWithAuth } from '@/lib/auth/fetchWithAuth'

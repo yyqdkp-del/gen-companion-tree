@@ -7,8 +7,6 @@ import SchoolContent from './components/SchoolContent'
 import AcademicContent from './components/AcademicContent'
 import HanziContent from './components/HanziContent'
 
-export const dynamic = 'force-dynamic'
-
 const TABS = ['学校', '学业', '汉字'] as const
 type Tab = typeof TABS[number]
 
@@ -115,7 +113,11 @@ function GrowthContent() {
 export default function GrowthPage() {
   return (
     <Suspense fallback={
-      <main style={{ minHeight: '100dvh', background: '#fbf9f6' }} />
+      <main style={{
+        minHeight: '100dvh',
+        backgroundColor: '#fbf9f6',
+        padding: `${PAGE_TOP_PADDING} 20px ${PAGE_BOTTOM_TAB_ONLY}`,
+      }} />
     }>
       <GrowthContent />
     </Suspense>

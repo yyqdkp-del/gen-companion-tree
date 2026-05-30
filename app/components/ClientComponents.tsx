@@ -1,12 +1,10 @@
 'use client'
 
-import dynamic from 'next/dynamic'
 import { useEffect } from 'react'
 import { usePathname } from 'next/navigation'
 import SettingsButton from '@/app/components/SettingsButton'
-
-const BottomInput = dynamic(() => import('@/app/components/BottomInput'), { ssr: false })
-const BottomNav = dynamic(() => import('@/app/components/BottomNav'), { ssr: false })
+import BottomInput from '@/app/components/BottomInput'
+import BottomNav from '@/app/components/BottomNav'
 
 const HIDE_CHROME = ['/auth', '/grandparent', '/admin', '/upgrade', '/privacy', '/terms', '/refund']
 

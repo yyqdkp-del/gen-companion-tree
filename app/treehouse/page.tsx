@@ -8,8 +8,6 @@ import { logOrAlertNetworkError } from '@/lib/errors/logOrAlertNetworkError'
 import { useApp } from '@/app/context/AppContext'
 import { motion, AnimatePresence } from 'framer-motion'
 
-export const dynamic = 'force-dynamic'
-
 const supabase = createClient(
 )
 
