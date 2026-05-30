@@ -35,7 +35,7 @@ const PADDLE_SCRIPT_SRC = 'https://cdn.paddle.com/paddle/v2/paddle.js'
 
 export default function UpgradePage() {
   const router = useRouter()
-  const { userId, sessionReady } = useApp()
+  const { userId, sessionReady, loading: appLoading } = useApp()
   const [loading, setLoading] = useState(false)
   const [paddleReady, setPaddleReady] = useState(false)
   const initializedRef = useRef(false)
@@ -112,7 +112,7 @@ export default function UpgradePage() {
       if (!res.ok || !data.priceId) {
         console.error('checkout API 失败:', data)
         if (res.status === 401) {
-          router.push('/auth?next=/upgrade')
+          router.replace('/auth?next=/upgrade')
           return
         }
         toast('结账初始化失败，请重试', 'error')
@@ -142,7 +142,7 @@ export default function UpgradePage() {
 
   const plan = PLANS.pro
 
-  if (!sessionReady) {
+  if (!sessionReady || appLoading) {
     return (
       <main style={{
         minHeight: '100dvh',

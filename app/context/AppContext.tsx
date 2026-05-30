@@ -227,9 +227,10 @@ const setActiveKid = useCallback((kid: any) => {
 
         setLoading(false)
         setTimeout(() => {
-          if (!userIdRef.current && !window.location.pathname.includes('/auth')) {
-            router.push('/auth')
-          }
+          if (userIdRef.current) return
+          const path = window.location.pathname
+          if (path.startsWith('/auth') || path.startsWith('/upgrade')) return
+          router.replace('/auth')
         }, 3000)
       } finally {
         setSessionReady(true)

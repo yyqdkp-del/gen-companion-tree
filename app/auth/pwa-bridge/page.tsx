@@ -6,7 +6,7 @@ import { saveSessionBundle } from '@/lib/auth/saveSessionBundle'
 import {
   AUTH_NEXT_STORAGE_KEY,
   consumeAuthNext,
-  markUpgradeWelcome,
+  navigateAfterAuth,
   sanitizeAuthNext,
 } from '@/lib/auth/authNextPath'
 
@@ -54,12 +54,9 @@ function PWABridgeInner() {
 
       await supabase.from('auth_temp_codes').delete().eq('code', authCode)
 
-      if (redirectTo === '/upgrade' || redirectTo.startsWith('/upgrade?')) {
-        markUpgradeWelcome()
-      }
       const url = new URL(redirectTo, window.location.origin)
       if (showInstall === '1') url.searchParams.set('show_install', '1')
-      window.location.href = url.toString()
+      navigateAfterAuth(router, `${url.pathname}${url.search}`)
     }
 
     init()

@@ -1,9 +1,11 @@
 import { createClient } from '@/lib/supabase/client'
+import { clearAuthNextStash } from '@/lib/auth/authNextPath'
 import { fetchWithAuth } from '@/lib/auth/fetchWithAuth'
 
 /** 注销：清本地业务数据与 auth 缓存 → 清服务端 Push 订阅 → signOut → 跳转登录页 */
 export async function signOutWithPushCleanup() {
   if (typeof window !== 'undefined') {
+    clearAuthNextStash()
     localStorage.removeItem('app_user_id')
     localStorage.removeItem('active_child_id')
     localStorage.removeItem('active_child')
@@ -28,5 +30,5 @@ export async function signOutWithPushCleanup() {
   }
   const supabase = createClient()
   await supabase.auth.signOut()
-  if (typeof window !== 'undefined') window.location.href = '/auth'
+  if (typeof window !== 'undefined') window.location.replace('/auth')
 }

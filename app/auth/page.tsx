@@ -1,9 +1,15 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { saveSessionBundle } from '@/lib/auth/saveSessionBundle'
-import { peekAuthNext, redirectAfterAuth, stashAuthNextFromUrl } from '@/lib/auth/authNextPath'
+import {
+  navigateAfterAuth,
+  peekAuthNext,
+  sanitizeAuthNext,
+  stashAuthNextFromUrl,
+} from '@/lib/auth/authNextPath'
 import { motion, AnimatePresence } from 'framer-motion'
 
 const supabase = createClient(
@@ -12,6 +18,7 @@ const supabase = createClient(
 const LINE_CLIENT_ID = process.env.NEXT_PUBLIC_LINE_CLIENT_ID || '2009745649'
 
 export default function AuthPage() {
+  const router = useRouter()
   const [mode, setMode] = useState<'register' | 'login'>('register')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -34,11 +41,17 @@ export default function AuthPage() {
       fetch('/api/auth/check', { credentials: 'include' })
         .then(r => r.json())
         .then(data => {
-          if (data.authenticated) redirectAfterAuth()
+          if (!data.authenticated) return
+          const explicitNext = params.get('next')
+          if (explicitNext) {
+            navigateAfterAuth(router, sanitizeAuthNext(explicitNext))
+          } else {
+            router.replace('/')
+          }
         })
         .catch(() => {})
     })
-  }, [])
+  }, [router])
 
   const saveChildData = async (userId: string) => {
     try {
@@ -132,13 +145,13 @@ export default function AuthPage() {
         const checkData = await checkRes.json()
 
         if (checkData.authenticated) {
-          redirectAfterAuth()
+          navigateAfterAuth(router)
         } else {
           await new Promise(r => setTimeout(r, 500))
           const retryRes = await fetch('/api/auth/check', { credentials: 'include' })
           const retryData = await retryRes.json()
           if (retryData.authenticated) {
-            redirectAfterAuth()
+            navigateAfterAuth(router)
           } else {
             setError('登录状态同步失败，请重试')
             setLoading(false)
@@ -187,7 +200,7 @@ export default function AuthPage() {
             请检查 <strong style={{ color: '#2d322f' }}>{email}</strong><br />
             点击邮件中的链接完成注册
           </div>
-          <button onClick={() => redirectAfterAuth(peekAuthNext())} style={styles.btnPrimary}>
+          <button onClick={() => navigateAfterAuth(router, peekAuthNext())} style={styles.btnPrimary}>
             先去看看 →
           </button>
         </div>

@@ -50,6 +50,12 @@ export function consumeAuthNext(): string {
   return dest
 }
 
+export function clearAuthNextStash(): void {
+  if (typeof window === 'undefined') return
+  sessionStorage.removeItem(AUTH_NEXT_STORAGE_KEY)
+  sessionStorage.removeItem(UPGRADE_WELCOME_FLAG)
+}
+
 export function markUpgradeWelcome(): void {
   if (typeof window === 'undefined') return
   sessionStorage.setItem(UPGRADE_WELCOME_FLAG, '1')
@@ -62,11 +68,24 @@ export function consumeUpgradeWelcome(): boolean {
   return v === '1'
 }
 
-/** 登录完成后整页跳转，确保 App 上下文与 Supabase session 同步 */
-export function redirectAfterAuth(destination?: string): void {
-  const dest = sanitizeAuthNext(destination ?? consumeAuthNext())
+function applyUpgradeWelcomeFlag(dest: string) {
   if (dest === '/upgrade' || dest.startsWith('/upgrade?')) {
     markUpgradeWelcome()
   }
-  window.location.href = dest
+}
+
+type AuthRouter = { replace: (href: string) => void }
+
+/** 登录后站内跳转（不整页刷新，避免 session 与 AppContext 竞态） */
+export function navigateAfterAuth(router: AuthRouter, destination?: string) {
+  const dest = sanitizeAuthNext(destination ?? consumeAuthNext())
+  applyUpgradeWelcomeFlag(dest)
+  router.replace(dest)
+}
+
+/** OAuth 等需整页刷新时用 replace，减少历史栈来回跳 */
+export function redirectAfterAuth(destination?: string) {
+  const dest = sanitizeAuthNext(destination ?? consumeAuthNext())
+  applyUpgradeWelcomeFlag(dest)
+  window.location.replace(dest)
 }

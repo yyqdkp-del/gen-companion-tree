@@ -28,7 +28,10 @@ export async function fetchWithAuth(url: string, options: RequestInit = {}) {
     if (error) {
       if (typeof window !== 'undefined') {
         alert('登录已过期，请重新登录')
-        window.location.href = '/auth'
+        const next = encodeURIComponent(
+          `${window.location.pathname}${window.location.search}`,
+        )
+        window.location.replace(`/auth?next=${next}`)
       }
       return res
     }
