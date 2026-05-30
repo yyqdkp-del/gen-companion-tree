@@ -11,18 +11,16 @@ const PAGE_MAP: Record<string, string> = {
   '/rian':      '日安',
   '/growth':    '根·中文',
   '/treehouse': '日栖',
-  '/school':    '学校',
 }
 
 const NAV_ITEMS = [
   { label: '基地',   path: '/' },
   { label: '日安',   path: '/rian' },
   { label: '根·中文', path: '/growth' },
-  { label: '学校',   path: '/school' },
   { label: '日栖',   path: '/treehouse' },
 ]
 
-const SHOW_PATHS = ['/', '/rian', '/growth', '/treehouse', '/school']
+const SHOW_PATHS = ['/', '/rian', '/growth', '/treehouse']
 
 type Props = {
   leftSlot?: React.ReactNode   // 左侧按钮（话筒）
@@ -35,7 +33,8 @@ export default function BottomNav({ leftSlot, rightSlot }: Props) {
   const { modalOpen } = useApp()
   const [showMenu, setShowMenu] = useState(false)
 
-  const currentPage = PAGE_MAP[pathname] || '根·陪伴'
+  const currentPage = PAGE_MAP[pathname]
+    || (pathname.startsWith('/growth') ? '根·中文' : '根·陪伴')
 
   if (!SHOW_PATHS.includes(pathname)) return null
 
@@ -62,10 +61,10 @@ export default function BottomNav({ leftSlot, rightSlot }: Props) {
               <motion.button key={item.path} whileTap={{ scale: 0.95 }}
                 onClick={() => { router.push(item.path); setShowMenu(false) }}
                 style={{ padding: '8px 18px', borderRadius: 14,
-                  background: pathname === item.path
+                  background: (pathname === item.path || (item.path === '/growth' && pathname.startsWith('/growth')))
                     ? 'rgba(164, 99, 85, 0.08)' : 'rgba(251, 249, 246, 0.72)',
                   border: '1px solid rgba(30, 41, 59, 0.06)', fontSize: 11, fontWeight: 700,
-                  color: pathname === item.path ? '#a46355' : 'rgba(30, 41, 59, 0.35)',
+                  color: (pathname === item.path || (item.path === '/growth' && pathname.startsWith('/growth'))) ? '#a46355' : 'rgba(30, 41, 59, 0.35)',
                   backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)', cursor: 'pointer' }}>
                 {item.label}
               </motion.button>

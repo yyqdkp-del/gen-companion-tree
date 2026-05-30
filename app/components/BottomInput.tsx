@@ -15,7 +15,7 @@ import { logOrAlertNetworkError } from '@/lib/errors/logOrAlertNetworkError'
 import { toast } from '@/app/components/Toast'
 import BottomNav from './BottomNav'
 
-const SHOW_PATHS = ['/', '/rian', '/growth', '/treehouse', '/travel', '/vehicles', '/school']
+const SHOW_PATHS = ['/', '/rian', '/growth', '/treehouse', '/travel', '/vehicles']
 
 export default function BottomInput() {
   const pathname  = usePathname()

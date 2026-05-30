@@ -1,177 +1,123 @@
 'use client'
-import React, { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
-import { motion } from 'framer-motion'
-import { useApp } from '@/app/context/AppContext'
-import { PAGE_BOTTOM_PADDING } from '@/app/_shared/_constants/layout'
-import nextDynamic from 'next/dynamic'
+
+import React, { Suspense, useCallback, useEffect, useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { NAV_HEIGHT_CSS, PAGE_TOP_PADDING } from '@/app/_shared/_constants/layout'
+import SchoolContent from './components/SchoolContent'
+import AcademicContent from './components/AcademicContent'
+import HanziContent from './components/HanziContent'
 
 export const dynamic = 'force-dynamic'
 
-const ChildAvatar = nextDynamic(() => import('@/app/components/ChildAvatar'), { ssr: false })
-function FallingLeaves() {
-  const leaves = [
-    { id: 0, sx: 28, dur: 12, d: 0,   size: 13, r: 20  },
-    { id: 1, sx: 58, dur: 15, d: 3.5, size: 10, r: -38 },
-    { id: 2, sx: 42, dur: 10, d: 7,   size: 12, r: 42  },
-    { id: 3, sx: 72, dur: 14, d: 1.8, size: 9,  r: -22 },
-    { id: 4, sx: 18, dur: 13, d: 9,   size: 11, r: 55  },
-    { id: 5, sx: 82, dur: 11, d: 5,   size: 8,  r: -30 },
-  ]
-  return (
-    <div style={{ position: 'fixed', inset: 0, pointerEvents: 'none', overflow: 'hidden', zIndex: 35 }}>
-      {leaves.map(l => (
-        <motion.div key={l.id}
-          initial={{ y: '-4vh', x: `${l.sx}vw`, opacity: 0.55, rotate: l.r }}
-          animate={{
-            y: '108vh',
-            x: [`${l.sx}vw`, `${l.sx + 7}vw`, `${l.sx + 2}vw`, `${l.sx + 10}vw`],
-            opacity: [0.55, 0.42, 0.28, 0],
-            rotate: [l.r, l.r + 80, l.r + 160, l.r + 240],
-          }}
-          transition={{ duration: l.dur, delay: l.d, repeat: Infinity, ease: 'linear' }}
-          style={{ position: 'absolute', fontSize: `${l.size}px` }}
-        >🍃</motion.div>
-      ))}
-    </div>
-  )
+const TABS = ['学校', '学业', '汉字'] as const
+type Tab = typeof TABS[number]
+
+function parseTab(raw: string | null): Tab {
+  if (raw === '学校' || raw === '学业' || raw === '汉字') return raw
+  if (raw === 'school') return '学校'
+  if (raw === 'academic') return '学业'
+  if (raw === 'hanzi' || raw === 'learn') return '汉字'
+  return '学校'
 }
 
-function gradientForHour(hour: number): string {
-  if (hour >= 6 && hour < 12) return 'linear-gradient(135deg, #faf0e6 0%, #f0e0d0 100%)'
-  if (hour >= 12 && hour < 18) return 'linear-gradient(135deg, #e8f4e8 0%, #d8e8d8 100%)'
-  if (hour >= 18 && hour < 22) return 'linear-gradient(135deg, #f0e8f4 0%, #e0d8e8 100%)'
-  return 'linear-gradient(135deg, #2d322f 0%, #1a1f1c 100%)'
-}
-
-export default function GrowthPage() {
+function GrowthContent() {
   const router = useRouter()
-  const { activeKid } = useApp()
-  const [bgGradient, setBgGradient] = useState('')
+  const searchParams = useSearchParams()
+  const [activeTab, setActiveTab] = useState<Tab>(() => parseTab(searchParams.get('tab')))
 
   useEffect(() => {
-    setBgGradient(gradientForHour(new Date().getHours()))
-  }, [])
+    setActiveTab(parseTab(searchParams.get('tab')))
+  }, [searchParams])
+
+  const selectTab = useCallback((tab: Tab) => {
+    setActiveTab(tab)
+    router.replace(`/growth?tab=${encodeURIComponent(tab)}`, { scroll: false })
+  }, [router])
 
   return (
     <main style={{
-      position: 'fixed', inset: 0,
-      width: '100dvw', height: '100dvh',
-      overflow: 'hidden',
+      minHeight: '100dvh',
+      padding: `${PAGE_TOP_PADDING} 0 ${NAV_HEIGHT_CSS}`,
       backgroundColor: '#fbf9f6',
+      backgroundImage: `
+        radial-gradient(at 80% 10%, rgba(228,237,228,0.35) 0px, transparent 50%),
+        radial-gradient(at 15% 85%, rgba(245,214,209,0.25) 0px, transparent 50%)
+      `,
       fontFamily: "'Noto Serif SC', Georgia, serif",
-      display: 'flex',
-      flexDirection: 'column',
+      color: '#2d322f',
     }}>
       <div style={{
-        position: 'absolute', inset: 0,
-        background: bgGradient || gradientForHour(new Date().getHours()),
-        willChange: 'auto',
-      }} />
-
-      <ChildAvatar />
-
-      <div style={{
-        position: 'relative',
-        zIndex: 50,
-        flex: 1,
-        display: 'flex',
-        flexDirection: 'column',
-        justifyContent: 'center',
-        alignItems: 'center',
-        padding: `0 16px ${PAGE_BOTTOM_PADDING}`,
-        gap: 20,
-        minHeight: 0,
+        position: 'sticky',
+        top: 0,
+        zIndex: 40,
+        background: 'rgba(251,249,246,0.92)',
+        backdropFilter: 'blur(16px)',
+        WebkitBackdropFilter: 'blur(16px)',
+        paddingTop: 'max(env(safe-area-inset-top, 0px), 0px)',
       }}>
-        <motion.button
-          initial={{ opacity: 0, y: -10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 1.0 }}
-          whileHover={{ scale: 1.06 }}
-          whileTap={{ scale: 0.93 }}
-          onClick={() => router.push('/growth/academic')}
-          style={{
-            background: 'rgba(255,255,255,0.8)',
-            border: '1px solid rgba(255,255,255,0.6)',
-            borderRadius: 18,
-            backdropFilter: 'blur(10px)',
-            boxShadow: '0 4px 20px rgba(45,50,47,0.05)',
-            cursor: 'pointer',
-            width: 'min(280px, 75vw)',
-            padding: '14px 18px',
-            display: 'flex', alignItems: 'center', gap: 14,
-          }}
-        >
+        <div style={{ padding: '12px 20px 0' }}>
           <div style={{
-            width: 44, height: 44, borderRadius: 22,
-            background: 'rgba(164,99,85,0.12)',
-            border: '1px solid rgba(164,99,85,0.25)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 24, flexShrink: 0,
-          }}>🏆</div>
-          <div style={{ flex: 1, textAlign: 'left' }}>
-            <div style={{
-              fontSize: 15, fontWeight: 700, color: '#2d322f',
-              letterSpacing: '0.08em',
-              lineHeight: 1.3,
-            }}>
-              {activeKid ? `${activeKid.name}的学业` : '学业成长'}
-            </div>
-            <div style={{ fontSize: 11, color: 'rgba(45,50,47,0.5)', marginTop: 3, letterSpacing: '0.06em' }}>
-              升学规划 · 成长档案
-            </div>
-          </div>
-          <div style={{ fontSize: 18, color: 'rgba(45,50,47,0.35)', flexShrink: 0 }}>›</div>
-        </motion.button>
+            fontSize: 9,
+            letterSpacing: 4,
+            color: '#a46355',
+            textTransform: 'uppercase',
+            marginBottom: 4,
+            fontFamily: "'Montserrat', sans-serif",
+          }}>根·中文</div>
+          <h1 style={{
+            margin: '0 0 12px',
+            fontSize: 22,
+            fontWeight: 500,
+            letterSpacing: '0.06em',
+          }}>学校 · 学业 · 汉字</h1>
+        </div>
 
-        <motion.button
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 1.2 }}
-          whileHover={{ scale: 1.06 }}
-          whileTap={{ scale: 0.93 }}
-          onClick={() => router.push('/learn')}
-          style={{
-            background: 'rgba(255,255,255,0.8)',
-            border: '1px solid rgba(255,255,255,0.6)',
-            borderRadius: 18,
-            backdropFilter: 'blur(10px)',
-            boxShadow: '0 4px 20px rgba(45,50,47,0.05)',
-            cursor: 'pointer',
-            width: 'min(280px, 75vw)',
-            padding: '14px 18px',
-            display: 'flex', alignItems: 'center', gap: 14,
-          }}
-        >
-          <div style={{
-            width: 44, height: 44, borderRadius: 22,
-            background: 'rgba(164,99,85,0.12)',
-            border: '1px solid rgba(164,99,85,0.25)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 24, flexShrink: 0,
-          }}>📖</div>
-          <div style={{ flex: 1, textAlign: 'left' }}>
-            <div style={{
-              fontSize: 15, fontWeight: 700, color: '#2d322f',
-              letterSpacing: '0.08em',
-              lineHeight: 1.3,
-            }}>
-              根·中文
-            </div>
-            <div style={{ fontSize: 11, color: 'rgba(45,50,47,0.5)', marginTop: 3, letterSpacing: '0.06em' }}>
-              字理解码 · 成语 · 文化句
-            </div>
-          </div>
-          <div style={{ fontSize: 18, color: 'rgba(45,50,47,0.35)', flexShrink: 0 }}>›</div>
-        </motion.button>
+        <div style={{
+          display: 'flex',
+          gap: 0,
+          padding: '0 20px',
+          marginBottom: 0,
+          borderBottom: '1px solid rgba(45,50,47,0.08)',
+        }}>
+          {TABS.map((tab) => (
+            <button
+              key={tab}
+              type="button"
+              onClick={() => selectTab(tab)}
+              style={{
+                flex: 1,
+                padding: '12px 0',
+                background: 'none',
+                border: 'none',
+                borderBottom: activeTab === tab ? '2px solid #a46355' : '2px solid transparent',
+                color: activeTab === tab ? '#a46355' : 'rgba(45,50,47,0.4)',
+                fontSize: 15,
+                fontFamily: "'Noto Serif SC', serif",
+                fontWeight: activeTab === tab ? 600 : 400,
+                cursor: 'pointer',
+              }}
+            >
+              {tab}
+            </button>
+          ))}
+        </div>
       </div>
 
-      <FallingLeaves />
-
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;500;700&display=swap');
-        * { -webkit-tap-highlight-color: transparent; box-sizing: border-box; }
-      `}</style>
+      <div style={{ padding: '20px 20px 32px' }}>
+        {activeTab === '学校' && <SchoolContent />}
+        {activeTab === '学业' && <AcademicContent />}
+        {activeTab === '汉字' && <HanziContent />}
+      </div>
     </main>
+  )
+}
+
+export default function GrowthPage() {
+  return (
+    <Suspense fallback={
+      <main style={{ minHeight: '100dvh', background: '#fbf9f6' }} />
+    }>
+      <GrowthContent />
+    </Suspense>
   )
 }
