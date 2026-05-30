@@ -11,7 +11,6 @@ import {
   ShoppingCart, Plane, Pill, Building2, BookOpen,
   Mic, Camera, Phone, Send, Upload,
 } from 'lucide-react'
-export const dynamic = 'force-dynamic'
 import TodoDetailModal from '@/app/rian/TodoDetailModal'
 import ChildSheet from '@/app/rian/ChildSheet'
 import HotspotSheet from '@/app/rian/HotspotSheet'
