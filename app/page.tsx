@@ -302,7 +302,10 @@ export default function BasePage() {
   const [keyboardOpen, setKeyboardOpen] = useState(false)
   const [showProfileBanner, setShowProfileBanner] = useState(false)
 
-  const { enrichedKids, refresh: refreshKids } = useChildData(userId, { deferMs: 0 })
+  const { enrichedKids, refresh: refreshKids, ensureEnriched } = useChildData(userId, {
+    deferMs: 0,
+    activeChildId: activeKid?.id ?? null,
+  })
   const [optimisticDoneIds, setOptimisticDoneIds] = useState<Set<string>>(() => new Set())
 
   const optimisticRemove = useCallback((id: string) => {
@@ -349,12 +352,16 @@ export default function BasePage() {
 
   // enrich 完成后升级 activeKid（精力、紧急项等）
   useEffect(() => {
-    if (enrichedKids.length > 0) {
-      const storedId = localStorage.getItem('active_child_id')
-      const current = enrichedKids.find((c: any) => c.id === storedId) || enrichedKids[0]
-      setActiveKid(current)
-    }
-  }, [enrichedKids, setActiveKid])
+    if (!activeKid?.id || !enrichedKids.length) return
+    const match = enrichedKids.find((c: any) => c.id === activeKid.id)
+    if (match?._enriched) setActiveKid(match)
+  }, [enrichedKids, activeKid?.id, setActiveKid])
+
+  const handleSwitchKid = useCallback(async (kid: any) => {
+    setActiveKid(kid)
+    const full = await ensureEnriched(kid.id)
+    if (full) setActiveKid(full)
+  }, [setActiveKid, ensureEnriched])
 
   useEffect(() => {
     const skipped = localStorage.getItem('onboarding_skipped')
@@ -669,7 +676,7 @@ export default function BasePage() {
         kids={kids}
         enrichedKids={enrichedKids}
         activeKid={activeKid}
-        onSwitch={setActiveKid}
+        onSwitch={handleSwitchKid}
       />
 
       <header style={{ position: 'fixed',
@@ -736,14 +743,14 @@ export default function BasePage() {
           <ChildSheet key="child"
             childList={enrichedKids.length ? enrichedKids : kids}
             sel={activeKid}
-            onSel={(c: any) => setActiveKid(c)}
+            onSel={(c: any) => { void handleSwitchKid(c) }}
             onClose={() => closeModal()}
             onAdd={() => openModal('addChild')}
             userId={userId}
             onStatusSaved={async () => {
-              const list = await refreshKids()
               const id = activeKid?.id || localStorage.getItem('active_child_id')
-              const next = list.find((c: any) => c.id === id) || list[0]
+              if (!id) return
+              const next = await ensureEnriched(id, true)
               if (next) setActiveKid(next)
             }} />
         )}

@@ -65,17 +65,18 @@ export default function ChildrenPage() {
       .eq('user_id', session.user.id)
       .order('created_at')
 
-    // 读取每个孩子的中文水平（从 assessments 表）
+    // 列表页：串行加载测评等级，避免 N 个孩子并行打 assessments
     if (data) {
-      const enriched = await Promise.all(data.map(async (child) => {
+      const enriched: (Child & { chinese_level?: string })[] = []
+      for (const child of data) {
         const { data: assessment } = await supabase
-  .from('assessments')
-  .select('report')
-  .eq('user_id', session.user.id)
-  .eq('child_name', child.name)
-  .order('created_at', { ascending: false })
-  .limit(1)
-  .maybeSingle()
+          .from('assessments')
+          .select('report')
+          .eq('user_id', session.user.id)
+          .eq('child_name', child.name)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle()
 
         let chinese_level = ''
         if (assessment?.report) {
@@ -83,10 +84,10 @@ export default function ChildrenPage() {
             const r = typeof assessment.report === 'string'
               ? JSON.parse(assessment.report) : assessment.report
             chinese_level = r?.level || ''
-          } catch {}
+          } catch { /* ignore */ }
         }
-        return { ...child, chinese_level }
-      }))
+        enriched.push({ ...child, chinese_level })
+      }
       setChildren(enriched)
     }
     setLoading(false)
