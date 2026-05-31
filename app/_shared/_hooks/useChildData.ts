@@ -1,5 +1,6 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
-import { enrichChildren, enrichOneChild, toMinimalEnrichedChild } from '../_services/childService'
+import { useState, useEffect, useCallback, useMemo } from 'react'
+import useSWR, { useSWRConfig } from 'swr'
+import { enrichOneChild, toMinimalEnrichedChild } from '../_services/childService'
 import { useLocalTodayStr } from '@/lib/date/useLocalTodayStr'
 import { useApp } from '@/app/context/AppContext'
 
@@ -10,67 +11,96 @@ type Options = {
   activeChildId?: string | null
 }
 
+function buildEnrichedList(
+  kids: any[],
+  activeEnriched: any | undefined,
+  enrichedById: Record<string, any>,
+): any[] {
+  return kids.map((k: any) => {
+    if (activeEnriched && k.id === activeEnriched.id) return activeEnriched
+    const cached = enrichedById[k.id]
+    if (cached?._enriched) return cached
+    return toMinimalEnrichedChild(k)
+  })
+}
+
 export function useChildData(userId: string | null, options?: Options) {
   const { kids } = useApp()
-  const [enrichedKids, setEnrichedKids] = useState<any[]>([])
-  const cacheRef = useRef<Record<string, any>>({})
-  const enrichBusyRef = useRef<string | null>(null)
+  const { mutate: globalMutate } = useSWRConfig()
+  const [enrichedById, setEnrichedById] = useState<Record<string, any>>({})
   const today = useLocalTodayStr()
-  const deferMs = options?.deferMs ?? 0
   const activeChildId = options?.activeChildId ?? null
+  const enrichTargetId = activeChildId ?? (kids.length === 1 ? kids[0]?.id ?? null : null)
 
-  const mergeList = useCallback((list: any[]) => {
-    setEnrichedKids(list)
-    list.forEach((c: any) => { cacheRef.current[c.id] = c })
-    return list
+  const mergeEnriched = useCallback((full: any) => {
+    setEnrichedById((prev) => ({ ...prev, [full.id]: full }))
   }, [])
+
+  const { data: activeEnriched } = useSWR(
+    userId && enrichTargetId ? (['child-enriched', userId, enrichTargetId, today] as const) : null,
+    async () => {
+      const base = kids.find((k: any) => k.id === enrichTargetId)
+      if (!base) throw new Error('Child not found')
+      return enrichOneChild(base, userId!, today)
+    },
+    {
+      dedupingInterval: 60000,
+      revalidateOnFocus: false,
+      onSuccess: mergeEnriched,
+    },
+  )
+
+  useEffect(() => {
+    if (!userId) setEnrichedById({})
+  }, [userId])
+
+  const enrichedKids = useMemo(
+    () => (userId && kids.length ? buildEnrichedList(kids, activeEnriched, enrichedById) : []),
+    [userId, kids, activeEnriched, enrichedById],
+  )
+
+  const fetchEnriched = useCallback(async (childId: string) => {
+    const base = kids.find((k: any) => k.id === childId)
+    if (!base || !userId) return null
+    return enrichOneChild(base, userId, today)
+  }, [kids, userId, today])
 
   const refresh = useCallback(async (forChildId?: string | null): Promise<any[]> => {
     if (!userId) return []
-    const targetId = forChildId ?? activeChildId
-    const enriched = await enrichChildren(userId, today, kids.length > 0 ? kids : undefined, {
-      activeChildId: targetId,
-    })
-    return mergeList(enriched)
-  }, [userId, today, kids, activeChildId, mergeList])
+    const targetId = forChildId ?? enrichTargetId
+    if (!targetId) return buildEnrichedList(kids, activeEnriched, enrichedById)
 
-  /** 切换孩子时按需加载详细数据（已 enrich 则跳过） */
+    const full = await globalMutate(
+      ['child-enriched', userId, targetId, today],
+      () => fetchEnriched(targetId),
+      { revalidate: true },
+    )
+
+    const mergedById = full
+      ? { ...enrichedById, [targetId]: full }
+      : enrichedById
+
+    return buildEnrichedList(kids, targetId === enrichTargetId ? (full ?? activeEnriched) : activeEnriched, mergedById)
+  }, [userId, enrichTargetId, kids, activeEnriched, enrichedById, globalMutate, fetchEnriched])
+
   const ensureEnriched = useCallback(async (childId: string, force = false): Promise<any | null> => {
     if (!userId || !childId) return null
-    if (!force && cacheRef.current[childId]?._enriched) {
-      return cacheRef.current[childId]
-    }
-    if (enrichBusyRef.current === childId) {
-      return cacheRef.current[childId] ?? null
-    }
-
     const base = kids.find((k: any) => k.id === childId)
     if (!base) return null
 
-    enrichBusyRef.current = childId
-    try {
-      const full = await enrichOneChild(base, userId, today)
-      cacheRef.current[childId] = full
-      setEnrichedKids((prev) => {
-        const next = prev.length
-          ? prev.map((c) => (c.id === childId ? full : c))
-          : kids.map((k: any) => (k.id === childId ? full : toMinimalEnrichedChild(k)))
-        return next
-      })
-      return full
-    } finally {
-      if (enrichBusyRef.current === childId) enrichBusyRef.current = null
+    if (!force) {
+      if (activeEnriched?.id === childId && activeEnriched._enriched) return activeEnriched
+      const cached = enrichedById[childId]
+      if (cached?._enriched) return cached
     }
-  }, [userId, today, kids])
 
-  useEffect(() => {
-    if (!userId) {
-      setEnrichedKids([])
-      return
-    }
-    const timer = setTimeout(() => { void refresh() }, deferMs)
-    return () => clearTimeout(timer)
-  }, [userId, deferMs, refresh, kids.length, activeChildId])
+    const full = await globalMutate(
+      ['child-enriched', userId, childId, today],
+      () => fetchEnriched(childId),
+      { revalidate: true },
+    )
+    return full ?? null
+  }, [userId, today, kids, activeEnriched, enrichedById, globalMutate, fetchEnriched])
 
   return { enrichedKids, refresh, ensureEnriched }
 }
