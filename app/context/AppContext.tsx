@@ -2,6 +2,7 @@
 import { createClient } from '@/lib/supabase/client'
 const supabase = createClient()
 import { createContext, useContext, useState, useEffect, useRef, useCallback, useMemo, ReactNode } from 'react'
+import useSWR, { useSWRConfig } from 'swr'
 import { fetchAppData, readAppCoreCache, writeAppCoreCache } from '@/app/_shared/_services/syncService'
 import { useSpeech } from '@/app/_shared/_hooks/useSpeech'
 import { useRouter } from 'next/navigation'
@@ -13,6 +14,12 @@ import { phIdentify } from '@/lib/analytics/posthog'
 
 async function subscribePush(session: Session) {
   await subscribePushIfPermitted(session)
+}
+
+type AppCoreData = {
+  kids: any[]
+  todos: any[]
+  hotspots: any[]
 }
 
 type AppContextType = {
@@ -45,15 +52,10 @@ const AppContext = createContext<AppContextType | null>(null)
 
 export function AppProvider({ children }: { children: ReactNode }) {
   const router = useRouter()
+  const { mutate: globalMutate } = useSWRConfig()
   const [userId, setUserId] = useState('')
   const userIdRef = useRef('')
-  const syncDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const syncAbortRef = useRef<AbortController | null>(null)
-  const syncGenRef = useRef(0)
-  const [kids, setKids] = useState<any[]>([])
-  const [todos, setTodos] = useState<any[]>([])
-  const [hotspots, setHotspots] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
+  const [tempTodos, setTempTodos] = useState<any[]>([])
   const [processStatus, setProcessStatus] = useState<{
     status: 'processing' | 'done' | 'failed' | null
     message: string
@@ -61,22 +63,59 @@ export function AppProvider({ children }: { children: ReactNode }) {
   } | null>(null)
 
   const [activeKid, setActiveKidState] = useState<any | null>(null)
-const [modalOpen, setModalOpen] = useState(false)
-const [sessionReady, setSessionReady] = useState(false)
-const [showOnboarding, setShowOnboarding] = useState(false)
-const { speak, stop, enabled: speechEnabled, toggle: toggleSpeech } = useSpeech()
-const setActiveKid = useCallback((kid: any) => {
-  setActiveKidState(kid)
-  if (kid && typeof window !== 'undefined') {
-    localStorage.setItem('active_child_id', kid.id)
-    localStorage.setItem('active_child', JSON.stringify({
-      id: kid.id, name: kid.name, grade: kid.grade,
-      level: kid.chinese_level || kid.level || 'R2',
-      emoji: kid.emoji || '👶🏻',
-      school: kid.school_name || kid.school || '',
-    }))
-  }
-}, [])
+  const [modalOpen, setModalOpen] = useState(false)
+  const [sessionReady, setSessionReady] = useState(false)
+  const [showOnboarding, setShowOnboarding] = useState(false)
+  const { speak, stop, enabled: speechEnabled, toggle: toggleSpeech } = useSpeech()
+
+  const fallbackData = useMemo((): AppCoreData | undefined => {
+    if (!userId) return undefined
+    const cached = readAppCoreCache(userId)
+    if (!cached) return undefined
+    return {
+      kids: cached.kids as any[],
+      todos: cached.todos as any[],
+      hotspots: cached.hotspots as any[],
+    }
+  }, [userId])
+
+  const { data, isLoading } = useSWR<AppCoreData>(
+    userId ? (['app-core', userId] as const) : null,
+    () => fetchAppData(userId),
+    {
+      dedupingInterval: 30000,
+      revalidateOnFocus: true,
+      fallbackData,
+      onSuccess: (coreData) => {
+        if (!userId) return
+        writeAppCoreCache(userId, coreData)
+        phIdentify(userId, { has_children: coreData.kids.length > 0 })
+      },
+      onError: (e) => logOrAlertNetworkError(e),
+    },
+  )
+
+  const kids = data?.kids ?? []
+  const hotspots = data?.hotspots ?? []
+  const todos = useMemo(
+    () => [...tempTodos, ...(data?.todos ?? [])],
+    [tempTodos, data?.todos],
+  )
+  const loading = userId ? isLoading : !sessionReady
+
+  const setActiveKid = useCallback((kid: any) => {
+    setActiveKidState(kid)
+    if (kid && typeof window !== 'undefined') {
+      localStorage.setItem('active_child_id', kid.id)
+      localStorage.setItem('active_child', JSON.stringify({
+        id: kid.id, name: kid.name, grade: kid.grade,
+        level: kid.chinese_level || kid.level || 'R2',
+        emoji: kid.emoji || '👶🏻',
+        school: kid.school_name || kid.school || '',
+      }))
+    }
+  }, [])
+
   const setUserIdSafe = useCallback((id: string) => {
     userIdRef.current = id
     setUserId(id)
@@ -108,86 +147,28 @@ const setActiveKid = useCallback((kid: any) => {
       _isTemp: true,
       created_at: new Date().toISOString(),
     }
-    setTodos(prev => [tempTodo, ...prev])
+    setTempTodos(prev => [tempTodo, ...prev])
     return tempId
   }, [])
 
   const removeTempTodo = useCallback((id: string) => {
-    setTodos(prev => prev.filter(t => t.id !== id))
+    setTempTodos(prev => prev.filter(t => t.id !== id))
   }, [])
 
-  const applyCoreData = useCallback((uid: string, kids: any[], todos: any[], hotspots: any[]) => {
-    setKids(kids)
-    setTodos(todos)
-    setHotspots(hotspots)
-    writeAppCoreCache(uid, { kids, todos, hotspots })
-    phIdentify(uid, { has_children: kids.length > 0 })
-  }, [])
-
-  const hydrateFromCache = useCallback((uid: string) => {
-    const cached = readAppCoreCache(uid)
-    if (!cached) return false
-    setKids(cached.kids as any[])
-    setTodos(cached.todos as any[])
-    setHotspots(cached.hotspots as any[])
-    setLoading(false)
-    return true
-  }, [])
-
-  const sync = useCallback(async (forceUid?: string, options?: { background?: boolean }) => {
+  const sync = useCallback(async (forceUid?: string) => {
     const uid = forceUid || userIdRef.current || (typeof window !== 'undefined' ? localStorage.getItem('app_user_id') : '') || ''
-    if (!uid) {
-      setLoading(false)
-      return
-    }
-
-    if (!options?.background) {
-      const hadCache = hydrateFromCache(uid)
-      if (!hadCache) setLoading(true)
-    }
-
-    syncAbortRef.current?.abort()
-    const controller = new AbortController()
-    syncAbortRef.current = controller
-    const gen = ++syncGenRef.current
-
-    try {
-      const { kids, todos, hotspots } = await fetchAppData(uid, controller.signal)
-      if (controller.signal.aborted) return
-      if (gen !== syncGenRef.current) return
-      applyCoreData(uid, kids, todos, hotspots)
-    } catch (e: unknown) {
-      if (controller.signal.aborted) return
-      const name = e instanceof Error ? e.name : ''
-      if (name === 'AbortError' || (e instanceof DOMException && e.name === 'AbortError')) return
-      logOrAlertNetworkError(e)
-    } finally {
-      if (gen === syncGenRef.current) setLoading(false)
-    }
-  }, [applyCoreData, hydrateFromCache])
-
-  const debouncedSync = useCallback(() => {
-    if (syncDebounceRef.current) clearTimeout(syncDebounceRef.current)
-    syncDebounceRef.current = setTimeout(() => {
-      syncDebounceRef.current = null
-      void sync()
-    }, 800)
-  }, [sync])
+    if (!uid) return
+    await globalMutate(['app-core', uid])
+  }, [globalMutate])
 
   const signOut = useCallback(async () => {
     await signOutWithPushCleanup()
   }, [])
 
-  useEffect(() => () => {
-    if (syncDebounceRef.current) clearTimeout(syncDebounceRef.current)
-  }, [])
-
   useEffect(() => {
     const bootLoggedIn = (uid: string, session: Session) => {
       setUserIdSafe(uid)
-      const hadCache = hydrateFromCache(uid)
       setSessionReady(true)
-      void sync(uid, { background: hadCache })
       void subscribePush(session)
     }
 
@@ -225,7 +206,6 @@ const setActiveKid = useCallback((kid: any) => {
           return
         }
 
-        setLoading(false)
         setTimeout(() => {
           if (userIdRef.current) return
           const path = window.location.pathname
@@ -254,68 +234,71 @@ const setActiveKid = useCallback((kid: any) => {
 
   useEffect(() => {
     if (!userId) return
+    const revalidate = () => { void globalMutate(['app-core', userId]) }
     const channel = supabase.channel('app_realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'todo_items' }, () => debouncedSync())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'hotspot_items' }, () => debouncedSync())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'children' }, () => debouncedSync())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'todo_items' }, revalidate)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'hotspot_items' }, revalidate)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'children' }, revalidate)
       .subscribe()
     return () => { supabase.removeChannel(channel) }
-  }, [userId, debouncedSync])
+  }, [userId, globalMutate])
+
   useEffect(() => {
     if (!userId) return
     const handleVisibility = () => {
-      if (document.visibilityState === 'visible') void sync(userId)
+      if (document.visibilityState === 'visible') void globalMutate(['app-core', userId])
     }
     document.addEventListener('visibilitychange', handleVisibility)
     return () => document.removeEventListener('visibilitychange', handleVisibility)
-  }, [userId, sync])
+  }, [userId, globalMutate])
+
   useEffect(() => {
-  if (!userId) return
+    if (!userId) return
 
-  const channel = supabase
-    .channel('process_status')
-    .on('postgres_changes', {
-      event: 'UPDATE',
-      schema: 'public',
-      table: 'raw_inputs',
-      filter: `user_id=eq.${userId}`,
-    }, (payload) => {
-      const { status, extracted_events } = payload.new
+    const channel = supabase
+      .channel('process_status')
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'raw_inputs',
+        filter: `user_id=eq.${userId}`,
+      }, (payload) => {
+        const { status, extracted_events } = payload.new
 
-      if (status === 'processing') {
-        setProcessStatus({ status: 'processing', message: '根正在整理中...' })
-      }
+        if (status === 'processing') {
+          setProcessStatus({ status: 'processing', message: '根正在整理中...' })
+        }
 
-      if (status === 'done') {
-        const tools = extracted_events || []
-        const todoCount = tools.filter((t: any) => t.tool === 'add_todo').length
-        const scheduleCount = tools.filter((t: any) => t.tool === 'add_schedule').length
-        const healthCount = tools.filter((t: any) => t.tool === 'add_health').length
+        if (status === 'done') {
+          const tools = extracted_events || []
+          const todoCount = tools.filter((t: any) => t.tool === 'add_todo').length
+          const scheduleCount = tools.filter((t: any) => t.tool === 'add_schedule').length
+          const healthCount = tools.filter((t: any) => t.tool === 'add_health').length
 
-        const parts = []
-        if (todoCount > 0) parts.push(`${todoCount}件待办`)
-        if (scheduleCount > 0) parts.push(`${scheduleCount}个日程`)
-        if (healthCount > 0) parts.push(`${healthCount}条健康记录`)
+          const parts = []
+          if (todoCount > 0) parts.push(`${todoCount}件待办`)
+          if (scheduleCount > 0) parts.push(`${scheduleCount}个日程`)
+          if (healthCount > 0) parts.push(`${healthCount}条健康记录`)
 
-        setProcessStatus({
-          status: 'done',
-          message: parts.length > 0 ? `整理完成 · 发现${parts.join('、')}` : '整理完成 ✓',
-          tools,
-        })
+          setProcessStatus({
+            status: 'done',
+            message: parts.length > 0 ? `整理完成 · 发现${parts.join('、')}` : '整理完成 ✓',
+            tools,
+          })
 
-        sync(userId)
-        setTimeout(() => setProcessStatus(null), 4000)
-      }
+          void globalMutate(['app-core', userId])
+          setTimeout(() => setProcessStatus(null), 4000)
+        }
 
-      if (status === 'failed') {
-        setProcessStatus({ status: 'failed', message: '整理失败，根会重试' })
-        setTimeout(() => setProcessStatus(null), 3000)
-      }
-    })
-    .subscribe()
+        if (status === 'failed') {
+          setProcessStatus({ status: 'failed', message: '整理失败，根会重试' })
+          setTimeout(() => setProcessStatus(null), 3000)
+        }
+      })
+      .subscribe()
 
-  return () => { supabase.removeChannel(channel) }
-}, [userId, sync])
+    return () => { supabase.removeChannel(channel) }
+  }, [userId, globalMutate])
 
   const value = useMemo<AppContextType>(
     () => ({
