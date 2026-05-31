@@ -289,7 +289,8 @@ export default function BasePage() {
   const { userId, kids, todos, hotspots, loading, sessionReady, sync: ctxSync,
     processStatus, setProcessStatus, activeKid, setActiveKid,
     modalOpen, setModalOpen, showOnboarding, setShowOnboarding } = useApp()
-  const [time, setTime] = useState(new Date())
+  const [clockTime, setClockTime] = useState('')
+  const [dateLabel, setDateLabel] = useState('')
   const [modal, setModal] = useState<'child' | 'todo' | 'hotspot' | 'addChild' | 'oneTap' | 'input' | null>(null)
 
   const openModal = (m: typeof modal) => { setModal(m); setModalOpen(true) }
@@ -297,6 +298,9 @@ export default function BasePage() {
   const [oneTapTodo, setOneTapTodo] = useState<TodoItem | null>(null)
   const [patrolling, setPatrolling] = useState(false)
   const patrolTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const lastMinuteOfDayRef = useRef<number | null>(null)
+  const lastHourRef = useRef<number | null>(null)
+  const lastDateLabelRef = useRef('')
   const [mounted, setMounted] = useState(false)
   const [greeting, setGreeting] = useState<Greeting | null>(null)
   const [keyboardOpen, setKeyboardOpen] = useState(false)
@@ -371,13 +375,30 @@ export default function BasePage() {
 
   useEffect(() => {
     setMounted(true)
-    const updateClock = () => {
+    const tick = () => {
       const now = new Date()
-      setTime(now)
-      setGreeting(getGreetingForHour(now.getHours()))
+      const hour = now.getHours()
+      const minute = now.getMinutes()
+      const minuteOfDay = hour * 60 + minute
+
+      if (lastMinuteOfDayRef.current !== minuteOfDay) {
+        lastMinuteOfDayRef.current = minuteOfDay
+        setClockTime(`${hour}:${String(minute).padStart(2, '0')}`)
+
+        const nextDateLabel = `${now.getMonth() + 1}.${now.getDate()}`
+        if (lastDateLabelRef.current !== nextDateLabel) {
+          lastDateLabelRef.current = nextDateLabel
+          setDateLabel(nextDateLabel)
+        }
+      }
+
+      if (lastHourRef.current !== hour) {
+        lastHourRef.current = hour
+        setGreeting(getGreetingForHour(hour))
+      }
     }
-    updateClock()
-    const ticker = setInterval(updateClock, 1000)
+    tick()
+    const ticker = setInterval(tick, 1000)
     return () => clearInterval(ticker)
   }, [])
 
@@ -684,13 +705,11 @@ export default function BasePage() {
         right: '6%', zIndex: 50, textAlign: 'right' }}>
         <h1 style={{ fontSize: 'clamp(48px, 15vw, 76px)', fontWeight: 100,
           color: THEME.text, opacity: 0.9, lineHeight: 1, margin: 0 }}>
-          {mounted
-            ? `${time.getHours()}:${time.getMinutes() < 10 ? `0${time.getMinutes()}` : time.getMinutes()}`
-            : '--:--'}
+          {mounted ? clockTime || '--:--' : '--:--'}
         </h1>
         <p style={{ fontSize: 10, color: THEME.text, opacity: 0.35,
           letterSpacing: '0.25em', marginTop: 3 }}>
-          {mounted ? `${time.getMonth() + 1}.${time.getDate()}` : ''}
+          {mounted ? dateLabel : ''}
         </p>
       </header>
 

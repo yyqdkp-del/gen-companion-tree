@@ -11,6 +11,9 @@ export function initPostHog() {
     capture_pageleave: true,
     persistence: 'localStorage',
     autocapture: false,
+    session_recording: {
+      sample_rate: 0.1,
+    },
   })
 }
 
