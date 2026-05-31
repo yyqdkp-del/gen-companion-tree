@@ -12,6 +12,51 @@ function normalizePatrolSourceUrl(item: Record<string, unknown>): string {
   return isValidHotspotUrl(raw) ? raw : ''
 }
 
+function buildRecencyBlock(todayYmd: string): string {
+  return `
+当前日期（用户本地）：${todayYmd}
+硬性规则：只使用 ${todayYmd} 往前 7 个日历日内发生或官方发布的信息。
+若搜索结果仅有 2025 年或更早日期、且与当前周无关，必须丢弃，不得写入热点。
+标题或 summary 必须包含事件日期（如「${todayYmd}」）。
+`.trim()
+}
+
+const HOTSPOT_YEAR_RE = /20(\d{2})/g
+const POLICY_RECENCY_WHITELIST = ['签证', '政策', '法规']
+
+/** saveHotspots 前：丢弃 title/summary 中出现早于当前年的年份（政策类白名单除外） */
+function filterHotspotsByRecency(items: any[], todayYmd: string): any[] {
+  const currentYear = parseInt(todayYmd.slice(0, 4), 10)
+  let dropped = 0
+
+  const filtered = items.filter((item) => {
+    const text = `${String(item.title || '')}${String(item.summary || '')}`
+    if (POLICY_RECENCY_WHITELIST.some((kw) => text.includes(kw))) return true
+
+    const years: number[] = []
+    HOTSPOT_YEAR_RE.lastIndex = 0
+    let m: RegExpExecArray | null
+    while ((m = HOTSPOT_YEAR_RE.exec(text)) !== null) {
+      years.push(2000 + parseInt(m[1], 10))
+    }
+    if (!years.length) return true
+
+    if (years.some((y) => y < currentYear)) {
+      dropped++
+      return false
+    }
+    return true
+  })
+
+  if (dropped > 0) {
+    console.log(
+      `patrol: 因旧年份过滤丢弃 ${dropped} 条热点（当前年 ${currentYear}，原因：title/summary 含早于 ${currentYear} 的年份）`,
+    )
+  }
+
+  return filtered
+}
+
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || '',
   process.env.SUPABASE_SERVICE_ROLE_KEY || ''
@@ -77,7 +122,12 @@ async function fetchFamilyContextForHotspots(userId: string, locationCityFallbac
 }
 
 // ── Grok 实时快数据 ──
-async function callGrok(snapshot: any, location: string, patrolPrompt?: string): Promise<string> {
+async function callGrok(
+  snapshot: any,
+  location: string,
+  recencyBlock: string,
+  patrolPrompt?: string,
+): Promise<string> {
   const child = snapshot.children?.[0]
   const topInterests = snapshot.interests?.map((i: any) => i.topic).slice(0, 5).join('、') || ''
   const frequentPlaces = snapshot.places
@@ -106,7 +156,9 @@ async function callGrok(snapshot: any, location: string, patrolPrompt?: string):
           },
           {
             role: 'user',
-            content: `现在是${location} ${timeCtx}，搜索以下内容并返回真实数据：
+            content: `${recencyBlock}
+
+现在是${location} ${timeCtx}，搜索以下内容并返回真实数据：
 1. ${location}今日天气+明日预报（含降雨概率和AQI）
 2. ${location}过去6小时突发事件（封路/火灾/示威/事故）
 3. 当地主要货币兑人民币今日汇率+近7日走势
@@ -128,7 +180,12 @@ ${topInterests ? `6. 关注话题最新动态：${topInterests}` : ''}
 }
 
 // ── Gemini 深度本地化 ──
-async function callGemini(snapshot: any, location: string, officialSites: string[] = []): Promise<string> {
+async function callGemini(
+  snapshot: any,
+  location: string,
+  recencyBlock: string,
+  officialSites: string[] = [],
+): Promise<string> {
   const child = snapshot.children?.[0]
   const sitesText = officialSites.length
     ? `\n参考官方网站：${officialSites.join('、')}`
@@ -143,7 +200,9 @@ async function callGemini(snapshot: any, location: string, officialSites: string
         body: JSON.stringify({
           contents: [{
             parts: [{
-              text: `用Google Search搜索${location}本地信息：\n1. ${location}本地官方媒体今日停水停电行政通知\n2. 当地移民局官网近期签证政策变化\n3. ${location}近30天新开亲子餐厅或活动场所（Google Maps 4星以上）\n4. ${location}登革热/流感等健康疾病官方最新数据\n5. ${child?.school_name || location + '国际学校'}官方近期公告\n6. 当地政府官网近期影响外籍家庭的政策${sitesText}\n每条必须注明来源网址和可信度（官方/社交/用户），用中文输出。无真实信息不输出。`
+              text: `${recencyBlock}
+
+用Google Search搜索${location}本地信息：\n1. ${location}本地官方媒体今日停水停电行政通知\n2. 当地移民局官网近期签证政策变化\n3. ${location}近30天新开亲子餐厅或活动场所（Google Maps 4星以上）\n4. ${location}登革热/流感等健康疾病官方最新数据\n5. ${child?.school_name || location + '国际学校'}官方近期公告\n6. 当地政府官网近期影响外籍家庭的政策${sitesText}\n每条必须注明来源网址和可信度（官方/社交/用户），用中文输出。无真实信息不输出。`
             }]
           }],
           tools: [{ google_search: {} }],
@@ -159,8 +218,10 @@ async function callGemini(snapshot: any, location: string, officialSites: string
   }
 }
 
-function buildPatrolSystem(familyContext: string): string {
-  return `你是海外华人家庭的私人安全秘书，专门过滤对妈妈真正重要的信息。
+function buildPatrolSystem(familyContext: string, recencyBlock: string): string {
+  return `${recencyBlock}
+
+你是海外华人家庭的私人安全秘书，专门过滤对妈妈真正重要的信息。
 
 ## 必须推送（高价值）
 1. 签证/居留政策突变（ED签、MM2H、PR等）
@@ -210,9 +271,10 @@ async function callClaude(
   snapshot: any,
   location: string,
   familyContext: string,
+  recencyBlock: string,
 ): Promise<any[]> {
   const children = snapshot.children?.map((c: any) => `${c.name}(${c.school_name})`).join('、') || '孩子'
-  const patrolSystem = buildPatrolSystem(familyContext)
+  const patrolSystem = buildPatrolSystem(familyContext, recencyBlock)
 
   try {
     const res = await fetch('https://api.anthropic.com/v1/messages', {
@@ -385,17 +447,19 @@ async function runPatrolForUsers(userIds: string[], _patrolTime: string) {
         ? getTodayStrInTimeZone(userLocation.timezone)
         : getTodayStrInTimeZone('UTC')
       const patrolPrompt = userLocation?.local_config.patrol_prompt || ''
+      const recencyBlock = buildRecencyBlock(todayYmd)
 
       await archiveOldHotspots(userId)
       const snapshot = await getFamilySnapshot(userId)
 
       const [grokData, geminiData, familyContext] = await Promise.all([
-        callGrok(snapshot, location, patrolPrompt),
-        callGemini(snapshot, location, userLocation?.local_config.official_sites || []),
+        callGrok(snapshot, location, recencyBlock, patrolPrompt),
+        callGemini(snapshot, location, recencyBlock, userLocation?.local_config.official_sites || []),
         fetchFamilyContextForHotspots(userId, profileCity || userLocation?.city || ''),
       ])
 
-      const hotspots = await callClaude(grokData, geminiData, snapshot, location, familyContext)
+      const rawHotspots = await callClaude(grokData, geminiData, snapshot, location, familyContext, recencyBlock)
+      const hotspots = filterHotspotsByRecency(rawHotspots, todayYmd)
       const saved = await saveHotspots(hotspots, userId, todayYmd)
       if (!saved.ok) {
         console.error('hotspots not saved for user:', userId)
@@ -409,7 +473,7 @@ async function runPatrolForUsers(userIds: string[], _patrolTime: string) {
       results.push({
         userId: userId.slice(0, 8),
         location,
-        generated: hotspots.length,
+        generated: rawHotspots.length,
         saved: saved.count,
       })
     } catch (e: any) {

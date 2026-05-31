@@ -49,7 +49,12 @@ function StepSchool({ data, onChange, schools }: { data: any; onChange: (d: any)
       </div>
 
       {data.school_id === 'other' && (
-        <Field label="学校名称" value={data.school || ''} onChange={v => onChange({ ...data, school: v })} placeholder="输入学校全名" />
+        <Field
+          label="学校名称"
+          value={data.school || data.school_name || ''}
+          onChange={v => onChange({ ...data, school: v, school_name: v })}
+          placeholder="输入学校全名"
+        />
       )}
 
       <SelectField label="年级" value={data.grade || ''} onChange={v => onChange({ ...data, grade: v })}

@@ -1,5 +1,5 @@
 'use client'
-import React, { useState, useEffect, useCallback, Suspense } from 'react'
+import React, { useState, useEffect, useCallback, Suspense, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -96,7 +96,27 @@ function ProfileContent() {
   const [isPro, setIsPro] = useState(false)
   const [managingSubscription, setManagingSubscription] = useState(false)
   const [autoSaveHint, setAutoSaveHint] = useState('')
+  const [isDirty, setIsDirty] = useState(false)
+  const [profileHydrated, setProfileHydrated] = useState(false)
+  const autoSaveBusyRef = useRef(false)
   const [archiving, setArchiving] = useState(false)
+
+  const setMemberDataDirty = useCallback((next: typeof memberData | ((prev: typeof memberData) => typeof memberData)) => {
+    setIsDirty(true)
+    setMemberData(next)
+  }, [])
+  const setPassportDataDirty = useCallback((next: typeof passportData | ((prev: typeof passportData) => typeof passportData)) => {
+    setIsDirty(true)
+    setPassportData(next)
+  }, [])
+  const setAddressDataDirty = useCallback((next: typeof addressData | ((prev: typeof addressData) => typeof addressData)) => {
+    setIsDirty(true)
+    setAddressData(next)
+  }, [])
+  const setEmergencyDataDirty = useCallback((next: typeof emergencyData | ((prev: typeof emergencyData) => typeof emergencyData)) => {
+    setIsDirty(true)
+    setEmergencyData(next)
+  }, [])
 
   const handleManageSubscription = useCallback(async () => {
     setManagingSubscription(true)
@@ -180,8 +200,9 @@ function ProfileContent() {
           chronic_conditions: data.chronic_conditions || '',
         })
       }
+      setProfileHydrated(true)
     }
-    load()
+    void load()
   }, [])
 
   useEffect(() => {
@@ -361,22 +382,58 @@ function ProfileContent() {
     }
   }, [hasResidentCity])
 
-  const autoSaveDraft = useCallback(async () => {
-    if (!memberData.member_name.trim()) return true
+  const autoSaveDraft = useCallback(async (): Promise<boolean> => {
+    if (!memberData.member_name.trim()) return false
     const { data: { session } } = await supabase.auth.getSession()
     const uid = session?.user?.id
     if (!uid) return false
     setAutoSaveHint('保存中…')
     const ok = await persistProfile(uid)
     if (ok) {
+      setIsDirty(false)
       setAutoSaveHint('已自动保存')
       setTimeout(() => setAutoSaveHint(''), 2500)
+    } else {
+      setAutoSaveHint('')
     }
     return ok
   }, [memberData.member_name, persistProfile])
 
   const isLastStep = step === STEPS.length - 1
   const canProceed = step === 0 ? !!memberData.member_name.trim() : true
+
+  const changeStep = useCallback(async (next: number) => {
+    if (next === step) return
+    if (isDirty && memberData.member_name.trim()) {
+      await autoSaveDraft()
+    }
+    setStep(next)
+  }, [step, isDirty, memberData.member_name, autoSaveDraft])
+
+  const leavePage = useCallback(async () => {
+    if (isDirty && memberData.member_name.trim()) await autoSaveDraft()
+    router.back()
+  }, [isDirty, memberData.member_name, autoSaveDraft, router])
+
+  useEffect(() => {
+    if (!profileHydrated || !isDirty || !memberData.member_name.trim()) return
+    const timer = window.setTimeout(() => {
+      if (autoSaveBusyRef.current) return
+      autoSaveBusyRef.current = true
+      void autoSaveDraft().finally(() => {
+        autoSaveBusyRef.current = false
+      })
+    }, 800)
+    return () => window.clearTimeout(timer)
+  }, [
+    profileHydrated,
+    isDirty,
+    memberData,
+    passportData,
+    addressData,
+    emergencyData,
+    autoSaveDraft,
+  ])
 
   const goNextStep = async () => {
     if (!canProceed) return
@@ -429,7 +486,7 @@ function ProfileContent() {
         borderBottom: '1px solid rgba(255,255,255,0.3)',
       }}>
         <motion.button whileTap={{ scale: 0.9 }}
-          onClick={() => step > 0 ? setStep(step - 1) : router.back()}
+          onClick={() => void (step > 0 ? changeStep(step - 1) : leavePage())}
           style={{ background: 'none', border: 'none', cursor: 'pointer', color: INK }}>
           <ArrowLeft size={20} />
         </motion.button>
@@ -437,7 +494,7 @@ function ProfileContent() {
         <span style={{ fontSize: 16, fontWeight: 700, color: INK }}>
           {isEdit ? '编辑个人资料' : '建立家庭档案'}
         </span>
-        <span onClick={() => router.back()}
+        <span onClick={() => void leavePage()}
           style={{ fontSize: 13, color: THEME.muted, cursor: 'pointer', textDecoration: 'underline' }}>
           {isEdit ? '取消' : '跳过'}
         </span>
@@ -556,7 +613,7 @@ function ProfileContent() {
         {/* 进度条 */}
         <div style={{ display: 'flex', gap: 6, marginBottom: 28 }}>
           {STEPS.map((s, i) => (
-            <div key={i} onClick={() => i < step && setStep(i)}
+            <div key={i} onClick={() => { if (i < step) void changeStep(i) }}
               style={{
                 flex: 1, height: 3, borderRadius: 2,
                 background: i <= step ? ACCENT : 'rgba(164,99,85,0.12)',
@@ -595,10 +652,10 @@ function ProfileContent() {
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -20 }}
               transition={{ duration: 0.25 }}>
-              {step === 0 && <StepMember data={memberData} onChange={setMemberData} />}
-              {step === 1 && <StepPassport data={passportData} onChange={setPassportData} />}
-              {step === 2 && <StepAddress data={addressData} onChange={setAddressData} />}
-              {step === 3 && <StepEmergency data={emergencyData} onChange={setEmergencyData} />}
+              {step === 0 && <StepMember data={memberData} onChange={setMemberDataDirty} />}
+              {step === 1 && <StepPassport data={passportData} onChange={setPassportDataDirty} />}
+              {step === 2 && <StepAddress data={addressData} onChange={setAddressDataDirty} />}
+              {step === 3 && <StepEmergency data={emergencyData} onChange={setEmergencyDataDirty} />}
             </motion.div>
           </AnimatePresence>
         </div>
@@ -654,7 +711,7 @@ function ProfileContent() {
         <div style={{ display: 'flex', gap: 10, paddingBottom: `max(calc(env(safe-area-inset-bottom) + 20px), 24px)` }}>
           {isLastStep ? (
             <>
-              <motion.button whileTap={{ scale: 0.97 }} onClick={() => setStep(step - 1)}
+              <motion.button whileTap={{ scale: 0.97 }} onClick={() => void changeStep(step - 1)}
                 style={{ flex: 1, padding: '14px', borderRadius: 16, border: '1px solid rgba(0,0,0,0.1)', background: 'transparent', fontSize: 14, color: THEME.muted, cursor: 'pointer' }}>
                 上一步
               </motion.button>
@@ -698,7 +755,7 @@ function ProfileContent() {
           ) : (
             <>
               {step > 0 && (
-                <motion.button whileTap={{ scale: 0.97 }} onClick={() => setStep(step - 1)}
+                <motion.button whileTap={{ scale: 0.97 }} onClick={() => void changeStep(step - 1)}
                   style={{ flex: 1, padding: '14px', borderRadius: 16, border: '1px solid rgba(0,0,0,0.1)', background: 'transparent', fontSize: 14, color: THEME.muted, cursor: 'pointer' }}>
                   上一步
                 </motion.button>
@@ -749,7 +806,7 @@ function ProfileContent() {
             注销账号
           </button>
           {isLastStep ? (
-            <span onClick={() => router.back()}
+            <span onClick={() => void leavePage()}
               style={{ fontSize: 12, color: THEME.muted, cursor: 'pointer', textDecoration: 'underline', opacity: 0.7 }}>
               {isEdit ? '放弃修改，返回' : '跳过，先去看看主页 →'}
             </span>

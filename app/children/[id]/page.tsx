@@ -1,5 +1,5 @@
 'use client'
-import React, { useState, useEffect, Suspense, useCallback } from 'react'
+import React, { useState, useEffect, Suspense, useCallback, useRef } from 'react'
 import { useRouter, useParams, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -9,6 +9,7 @@ const supabase = createClient()
 
 import { StepBasic }    from './steps/StepBasic'
 import { StepSchool }   from './steps/StepSchool'
+import { resolveSchoolId } from './resolveSchoolId'
 import { StepSchedule } from './steps/StepSchedule'
 import { StepHealth }   from './steps/StepHealth'
 import { logOrAlertNetworkError } from '@/lib/errors/logOrAlertNetworkError'
@@ -71,6 +72,12 @@ function ChildEditContent() {
   const [userId, setUserId] = useState<string | null>(null)
   const [currentChildId, setCurrentChildId] = useState<string | null>(paramChildId)
   const [isDirty, setIsDirty] = useState(false)
+  const [autoSaveHint, setAutoSaveHint] = useState('')
+  const [schoolSyncHint, setSchoolSyncHint] = useState(false)
+  const [childHydrated, setChildHydrated] = useState(isNew)
+  const autoSaveBusyRef = useRef(false)
+  const schoolSyncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const lastSchoolSyncKeyRef = useRef('')
   const [deleting, setDeleting] = useState(false)
 
   const [basicData, setBasicData] = useState({
@@ -110,6 +117,34 @@ function ChildEditContent() {
   const setScheduleDataDirty = useCallback((next: any) => {
     setIsDirty(true)
     setScheduleData(next)
+  }, [])
+
+  const triggerSchoolCalendarSync = useCallback((childId: string, uid: string) => {
+    const school_name = (schoolData.school_name || schoolData.school || '').trim()
+    if (!school_name) return
+    const syncKey = `${childId}:${school_name}`
+    if (lastSchoolSyncKeyRef.current === syncKey) return
+    lastSchoolSyncKeyRef.current = syncKey
+
+    setSchoolSyncHint(true)
+    if (schoolSyncTimerRef.current) clearTimeout(schoolSyncTimerRef.current)
+    schoolSyncTimerRef.current = setTimeout(() => setSchoolSyncHint(false), 3000)
+
+    void fetchWithAuth('/api/children/sync-school-calendar', {
+      method: 'POST',
+      body: JSON.stringify({
+        child_id: childId,
+        user_id: uid,
+        school_name,
+        grade: schoolData.grade || '',
+      }),
+    })
+  }, [schoolData.school_name, schoolData.school, schoolData.grade])
+
+  useEffect(() => {
+    return () => {
+      if (schoolSyncTimerRef.current) clearTimeout(schoolSyncTimerRef.current)
+    }
   }, [])
 
   useEffect(() => {
@@ -154,8 +189,21 @@ function ChildEditContent() {
   }
 
   const loadChild = async () => {
-    const { data: child } = await supabase.from('children').select('*').eq('id', paramChildId).single()
-    if (!child) return
+    const [{ data: child }, { data: schoolList }] = await Promise.all([
+      supabase.from('children').select('*').eq('id', paramChildId).single(),
+      supabase.from('schools').select('id, name_full, name_short').order('name_full'),
+    ])
+    if (!child) {
+      setChildHydrated(true)
+      return
+    }
+    const schoolRows = schoolList ?? []
+    if (schoolRows.length) setSchools(schoolRows)
+    const schoolId = resolveSchoolId(
+      schoolRows,
+      child.school || '',
+      child.school_name || '',
+    )
 
     setBasicData({
       name: child.name || '',
@@ -170,9 +218,9 @@ function ChildEditContent() {
       nationality: child.nationality || '',
     })
     setSchoolData({
-      school_id: '',
-      school: child.school || '',
-      school_name: child.school_name || '',
+      school_id: schoolId,
+      school: child.school || child.school_name || '',
+      school_name: child.school_name || child.school || '',
       grade: child.grade || '',
       school_start_time: child.school_start_time || '',
       school_end_time: child.school_end_time || '',
@@ -193,11 +241,12 @@ function ChildEditContent() {
         activities: profile.activities || [],
       })
     }
+    setChildHydrated(true)
   }
 
-  const autoSaveCurrentStep = useCallback(async () => {
-    if (!userId) return
-    if (step === 0 && !basicData.name.trim()) return
+  const autoSaveCurrentStep = useCallback(async (): Promise<boolean> => {
+    if (!userId) return false
+    if (step === 0 && !basicData.name.trim()) return false
 
     try {
       // 新建孩子：第一次保存时先创建 children 拿到 id
@@ -240,13 +289,13 @@ function ChildEditContent() {
           localStorage.setItem('active_child_id', data.id)
           setIsDirty(false)
         }
-        return
+        return true
       }
 
-      if (!currentChildId) return
+      if (!currentChildId) return false
 
       // 分步保存：每步只 upsert 对应字段，避免覆盖其它字段为空
-      const patch: any = { id: currentChildId, user_id: userId, updated_at: new Date().toISOString() }
+      const patch: Record<string, unknown> = { id: currentChildId, user_id: userId, updated_at: new Date().toISOString() }
       if (step === 0) {
         Object.assign(patch, {
           name: basicData.name,
@@ -263,7 +312,8 @@ function ChildEditContent() {
           passport_expiry: dateOrNull(basicData.passport_expiry),
           nationality: basicData.nationality.trim() || null,
         })
-        await supabase.from('children').upsert(patch, { onConflict: 'id' })
+        const { error } = await supabase.from('children').upsert(patch, { onConflict: 'id' })
+        if (error) throw error
       } else if (step === 1) {
         Object.assign(patch, {
           school: schoolData.school,
@@ -273,7 +323,9 @@ function ChildEditContent() {
           school_end_time: schoolData.school_end_time || null,
           transport_method: schoolData.transport_method,
         })
-        await supabase.from('children').upsert(patch, { onConflict: 'id' })
+        const { error } = await supabase.from('children').upsert(patch, { onConflict: 'id' })
+        if (error) throw error
+        triggerSchoolCalendarSync(currentChildId, userId)
       } else if (step === 2) {
         Object.assign(patch, {
           usual_bedtime: healthData.usual_bedtime,
@@ -282,19 +334,26 @@ function ChildEditContent() {
           medications_current: healthData.medications_current,
           preferred_hospitals: healthData.preferred_hospitals,
         })
-        await supabase.from('children').upsert(patch, { onConflict: 'id' })
+        const { error } = await supabase.from('children').upsert(patch, { onConflict: 'id' })
+        if (error) throw error
       } else if (step === 3) {
-        await supabase.from('child_profiles').upsert({
+        const { error } = await supabase.from('child_profiles').upsert({
           child_id: currentChildId,
           user_id: userId,
           class_schedule: scheduleData.class_schedule,
           activities: (scheduleData as any).activities || [],
         }, { onConflict: 'child_id' })
+        if (error) throw error
       }
 
       setIsDirty(false)
+      return true
     } catch (e) {
       console.warn('自动保存失败', e)
+      if (!logOrAlertNetworkError(e)) {
+        toast('自动保存失败，请检查网络', 'error')
+      }
+      return false
     }
   }, [
     userId,
@@ -305,6 +364,7 @@ function ChildEditContent() {
     schoolData,
     healthData,
     scheduleData,
+    triggerSchoolCalendarSync,
   ])
 
   const goNextStep = useCallback(async () => {
@@ -312,6 +372,52 @@ function ChildEditContent() {
     await autoSaveCurrentStep()
     setStep((s) => s + 1)
   }, [autoSaveCurrentStep, saving])
+
+  const changeStep = useCallback(async (next: number) => {
+    if (next === step) return
+    if (isDirty) {
+      setAutoSaveHint('保存中…')
+      await autoSaveCurrentStep()
+      setAutoSaveHint('')
+    }
+    setStep(next)
+  }, [step, isDirty, autoSaveCurrentStep])
+
+  const leavePage = useCallback(async () => {
+    if (isDirty) await autoSaveCurrentStep()
+    router.back()
+  }, [isDirty, autoSaveCurrentStep, router])
+
+  useEffect(() => {
+    if (!childHydrated || !isDirty || !userId) return
+    if (step === 0 && !basicData.name.trim()) return
+    const timer = window.setTimeout(() => {
+      if (autoSaveBusyRef.current) return
+      autoSaveBusyRef.current = true
+      setAutoSaveHint('保存中…')
+      void autoSaveCurrentStep().then((ok) => {
+        if (ok) {
+          setAutoSaveHint('已自动保存')
+          window.setTimeout(() => setAutoSaveHint(''), 2500)
+        } else {
+          setAutoSaveHint('')
+        }
+      }).finally(() => {
+        autoSaveBusyRef.current = false
+      })
+    }, 800)
+    return () => window.clearTimeout(timer)
+  }, [
+    childHydrated,
+    isDirty,
+    userId,
+    step,
+    autoSaveCurrentStep,
+    basicData,
+    schoolData,
+    healthData,
+    scheduleData,
+  ])
 
   const handleSave = async () => {
     if (!basicData.name.trim()) { setSaveError('请填写孩子名字'); return }
@@ -380,6 +486,9 @@ function ChildEditContent() {
 
       setSaved(true)
       setIsDirty(false)
+      if (savedChildId && uid) {
+        triggerSchoolCalendarSync(savedChildId, uid)
+      }
       setTimeout(() => router.push('/?refresh=1'), 1200)
 
     } catch (e) {
@@ -425,14 +534,14 @@ function ChildEditContent() {
 
       <div style={{ position: 'sticky', top: 0, zIndex: 50, ...GLASS_CARD, borderRadius: 0, borderLeft: 'none', borderRight: 'none', borderTop: 'none', padding: 'calc(14px + env(safe-area-inset-top)) 16px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <motion.button whileTap={{ scale: 0.9 }}
-          onClick={() => step > 0 ? setStep(step - 1) : router.back()}
+          onClick={() => void (step > 0 ? changeStep(step - 1) : leavePage())}
           style={{ background: 'none', border: 'none', cursor: 'pointer', color: PAGE.ink, padding: '4px' }}>
           <ArrowLeft size={20} />
         </motion.button>
         <span style={{ fontSize: 15, fontWeight: 700, color: PAGE.ink, fontFamily: "'Noto Serif SC', serif" }}>
           {isNew ? '添加孩子' : '编辑孩子资料'}
         </span>
-        <span onClick={() => router.back()} style={{ fontSize: 13, color: PAGE.muted, cursor: 'pointer' }}>
+        <span onClick={() => void leavePage()} style={{ fontSize: 13, color: PAGE.muted, cursor: 'pointer' }}>
           取消
         </span>
       </div>
@@ -441,7 +550,7 @@ function ChildEditContent() {
 
         <div style={{ display: 'flex', gap: 6, marginBottom: 20 }}>
           {STEPS.map((s, i) => (
-            <div key={s.id} onClick={() => i < step && setStep(i)}
+            <div key={s.id} onClick={() => { if (i < step) void changeStep(i) }}
               style={{ flex: 1, height: 3, borderRadius: 2, background: i <= step ? PAGE.accent : 'rgba(164,99,85,0.12)', cursor: i < step ? 'pointer' : 'default', transition: 'background 0.3s' }} />
           ))}
         </div>
@@ -449,6 +558,9 @@ function ChildEditContent() {
         <div style={{ fontSize: 17, fontWeight: 600, color: PAGE.ink, marginBottom: 2 }}>{STEPS[step].title}</div>
         <div style={{ fontSize: 11, color: PAGE.muted, marginBottom: 16 }}>
           {STEPS[step].desc} · 步骤 {step + 1} / {STEPS.length}
+          {autoSaveHint ? (
+            <span style={{ display: 'block', color: '#5c7a5e', marginTop: 4 }}>{autoSaveHint}</span>
+          ) : null}
         </div>
 
         {isFromQuick && step === 0 && (
@@ -477,7 +589,7 @@ function ChildEditContent() {
         <div style={{ display: 'flex', gap: 10, paddingBottom: `calc(${SAFE_BOTTOM_INSET} + 20px)` }}>
           {isLastStep ? (
             <>
-              <motion.button whileTap={{ scale: 0.97 }} onClick={() => setStep(step - 1)}
+              <motion.button whileTap={{ scale: 0.97 }} onClick={() => void changeStep(step - 1)}
                 style={{ flex: 1, padding: '14px', borderRadius: 16, border: '1px solid rgba(0,0,0,0.1)', background: 'transparent', fontSize: 14, color: PAGE.muted, cursor: 'pointer' }}>
                 上一步
               </motion.button>
@@ -490,7 +602,7 @@ function ChildEditContent() {
           ) : (
             <>
               {step > 0 && (
-                <motion.button whileTap={{ scale: 0.97 }} onClick={() => setStep(step - 1)}
+                <motion.button whileTap={{ scale: 0.97 }} onClick={() => void changeStep(step - 1)}
                   style={{ flex: 1, padding: '14px', borderRadius: 16, border: '1px solid rgba(0,0,0,0.1)', background: 'transparent', fontSize: 14, color: PAGE.muted, cursor: 'pointer' }}>
                   上一步
                 </motion.button>
@@ -502,6 +614,12 @@ function ChildEditContent() {
             </>
           )}
         </div>
+
+        {(schoolData.school_name || schoolData.school) && schoolSyncHint && (
+          <div style={{ fontSize: 11, color: '#5c7a5e', textAlign: 'center', marginTop: -4, marginBottom: 12 }}>
+            学校日历同步中…
+          </div>
+        )}
 
         {!isNew && childId && (
           <button
