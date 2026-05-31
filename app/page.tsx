@@ -358,8 +358,15 @@ export default function BasePage() {
   useEffect(() => {
     if (!activeKid?.id || !enrichedKids.length) return
     const match = enrichedKids.find((c: any) => c.id === activeKid.id)
-    if (match?._enriched) setActiveKid(match)
-  }, [enrichedKids, activeKid?.id, setActiveKid])
+    if (!match?._enriched) return
+    // 关键字段没变化就不更新，避免触发 Context 重渲染
+    if (
+      match.id === activeKid.id &&
+      match.updated_at === activeKid.updated_at &&
+      match._enriched === activeKid._enriched
+    ) return
+    setActiveKid(match)
+  }, [enrichedKids, activeKid?.id, activeKid?.updated_at, activeKid?._enriched, setActiveKid])
 
   const handleSwitchKid = useCallback(async (kid: any) => {
     setActiveKid(kid)
