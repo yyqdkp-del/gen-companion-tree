@@ -56,6 +56,16 @@ function allergiesToText(val: unknown): string {
 
 const dateOrNull = (v: string) => (v?.trim() ? v.trim() : null)
 
+function logChildrenDbError(
+  op: string,
+  error: { message?: string; details?: string; hint?: string; code?: string } | null,
+  payload?: Record<string, unknown>,
+) {
+  console.error(`children ${op} error:`, error)
+  console.error(`children ${op} error (full):`, JSON.stringify(error, null, 2))
+  if (payload) console.error(`children ${op} payload:`, payload)
+}
+
 // ── 主组件 ──
 function ChildEditContent() {
   const router = useRouter()
@@ -246,14 +256,19 @@ function ChildEditContent() {
 
   const autoSaveCurrentStep = useCallback(async (): Promise<boolean> => {
     if (!userId) return false
-    if (step === 0 && !basicData.name.trim()) return false
+
+    const trimmedName = basicData.name.trim()
 
     try {
       // 新建孩子：第一次保存时先创建 children 拿到 id
       if (isNew && !currentChildId) {
+        if (!trimmedName) {
+          console.error('children insert skipped: name is empty')
+          return false
+        }
         const childPayload = {
           user_id: userId,
-          name: basicData.name,
+          name: trimmedName,
           birthdate: dateOrNull(basicData.birthdate),
           birth_date: dateOrNull(basicData.birthdate),
           emoji: basicData.emoji,
@@ -283,7 +298,10 @@ function ChildEditContent() {
           .insert(childPayload)
           .select('id')
           .single()
-        if (error) throw error
+        if (error) {
+          logChildrenDbError('insert', error, childPayload)
+          throw error
+        }
         if (data?.id) {
           setCurrentChildId(data.id)
           localStorage.setItem('active_child_id', data.id)
@@ -294,11 +312,16 @@ function ChildEditContent() {
 
       if (!currentChildId) return false
 
-      // 分步保存：每步只 upsert 对应字段，避免覆盖其它字段为空
-      const patch: Record<string, unknown> = { id: currentChildId, user_id: userId, updated_at: new Date().toISOString() }
+      const updatedAt = new Date().toISOString()
+
+      // 分步保存：已有记录用 update，避免 upsert 缺 name 触发 NOT NULL 400
       if (step === 0) {
-        Object.assign(patch, {
-          name: basicData.name,
+        if (!trimmedName) {
+          console.error('children update skipped: name is empty')
+          return false
+        }
+        const updatePayload = {
+          name: trimmedName,
           birthdate: dateOrNull(basicData.birthdate),
           birth_date: dateOrNull(basicData.birthdate),
           emoji: basicData.emoji,
@@ -311,39 +334,70 @@ function ChildEditContent() {
           passport_number: basicData.passport_number.trim() || null,
           passport_expiry: dateOrNull(basicData.passport_expiry),
           nationality: basicData.nationality.trim() || null,
-        })
-        const { error } = await supabase.from('children').upsert(patch, { onConflict: 'id' })
-        if (error) throw error
+          updated_at: updatedAt,
+        }
+        const { error } = await supabase
+          .from('children')
+          .update(updatePayload)
+          .eq('id', currentChildId)
+          .eq('user_id', userId)
+        if (error) {
+          logChildrenDbError('update (step 0)', error, updatePayload)
+          throw error
+        }
       } else if (step === 1) {
-        Object.assign(patch, {
+        const updatePayload = {
           school: schoolData.school,
           school_name: schoolData.school_name || schoolData.school,
           grade: schoolData.grade,
           school_start_time: schoolData.school_start_time || null,
           school_end_time: schoolData.school_end_time || null,
           transport_method: schoolData.transport_method,
-        })
-        const { error } = await supabase.from('children').upsert(patch, { onConflict: 'id' })
-        if (error) throw error
+          updated_at: updatedAt,
+        }
+        const { error } = await supabase
+          .from('children')
+          .update(updatePayload)
+          .eq('id', currentChildId)
+          .eq('user_id', userId)
+        if (error) {
+          logChildrenDbError('update (step 1)', error, updatePayload)
+          throw error
+        }
         triggerSchoolCalendarSync(currentChildId, userId)
       } else if (step === 2) {
-        Object.assign(patch, {
+        const updatePayload = {
           usual_bedtime: healthData.usual_bedtime,
           weekend_bedtime: healthData.weekend_bedtime,
           medical_conditions: healthData.medical_conditions,
           medications_current: healthData.medications_current,
           preferred_hospitals: healthData.preferred_hospitals,
-        })
-        const { error } = await supabase.from('children').upsert(patch, { onConflict: 'id' })
-        if (error) throw error
+          updated_at: updatedAt,
+        }
+        const { error } = await supabase
+          .from('children')
+          .update(updatePayload)
+          .eq('id', currentChildId)
+          .eq('user_id', userId)
+        if (error) {
+          logChildrenDbError('update (step 2)', error, updatePayload)
+          throw error
+        }
       } else if (step === 3) {
-        const { error } = await supabase.from('child_profiles').upsert({
+        const profilePayload = {
           child_id: currentChildId,
           user_id: userId,
           class_schedule: scheduleData.class_schedule,
           activities: (scheduleData as any).activities || [],
-        }, { onConflict: 'child_id' })
-        if (error) throw error
+        }
+        const { error } = await supabase.from('child_profiles').upsert(
+          profilePayload,
+          { onConflict: 'child_id' },
+        )
+        if (error) {
+          logChildrenDbError('child_profiles upsert (step 3)', error, profilePayload)
+          throw error
+        }
       }
 
       setIsDirty(false)
