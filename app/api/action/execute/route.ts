@@ -529,6 +529,33 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ ok: false, error: 'Todo not found' }, { status: 404 })
       }
 
+      // 读 todo_items 预生成缓存
+      const pack = todo.ai_action_data?.execution_pack
+      const preparedAt = todo.ai_action_data?.prepared_at
+
+      if (pack && preparedAt) {
+        const ageHours = (Date.now() - new Date(preparedAt).getTime()) / 3600000
+        if (ageHours < 6) {
+          // 命中缓存，补写 action_queue 后直接返回
+          const actionQueueId = await upsertActionQueue(
+            userId,
+            resolvedSourceType,
+            resolvedSourceId,
+            todo.title,
+            todo.category || 'other',
+            todo.priority === 'red' ? 3 : todo.priority === 'orange' ? 2 : 1,
+            pack,
+          )
+
+          return NextResponse.json({
+            ok: true,
+            execution_pack: pack,
+            action_queue_id: actionQueueId,
+            cached: true,
+          })
+        }
+      }
+
       title = todo.title
       category = todo.category || 'other'
       urgencyLevel = todo.priority === 'red' ? 3 : todo.priority === 'orange' ? 2 : 1

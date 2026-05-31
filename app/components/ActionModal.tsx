@@ -31,6 +31,8 @@ export type ActionModalProps = {
   // 额外数据（孩子日程用）
   event_data?: any
   child_name?: string
+  /** 待办预生成数据（有 execution_pack 时可即时展示） */
+  ai_action_data?: any
   // 用户
   userId: string
   // 回调
@@ -74,6 +76,15 @@ function resolveOpenUrl(url: string): string {
   if (typeof window === 'undefined') return u
   const path = u.startsWith('/') ? u : `/${u}`
   return `${window.location.origin}${path}`
+}
+
+function getFreshExecutionPack(aiActionData?: any): ExecutionPack | null {
+  const pack = aiActionData?.execution_pack
+  const preparedAt = aiActionData?.prepared_at
+  if (!pack || !preparedAt) return null
+  const ageHours = (Date.now() - new Date(preparedAt).getTime()) / 3600000
+  if (ageHours >= 6) return null
+  return pack as ExecutionPack
 }
 
 // ── 语音播报（联动设置）──
@@ -672,7 +683,7 @@ function ActionsArea({ actions, userId, primaryIndex, primaryReason, sourceId, s
 // ══ 主组件 ══
 export default function ActionModal({
   source_type, source_id, title, category, urgency_level,
-  due_date, event_data, child_name, userId,
+  due_date, event_data, child_name, ai_action_data, userId,
   onClose, onDone, onSnooze, onSync,
 }: ActionModalProps) {
   const { sessionReady } = useApp()
@@ -684,17 +695,24 @@ export default function ActionModal({
   useEffect(() => {
     if (!source_id) return
     setActiveTab(null)
-    setPack(null)
+
+    const cachedPack = source_type === 'todo' ? getFreshExecutionPack(ai_action_data) : null
+    if (cachedPack) {
+      setPack(cachedPack)
+      setLoading(false)
+    } else {
+      setPack(null)
+    }
 
     if (!sessionReady) {
-      setLoading(true)
+      if (!cachedPack) setLoading(true)
       return
     }
 
-    setLoading(true)
+    if (!cachedPack) setLoading(true)
 
     let cancelled = false
-    ;(async () => {
+    void (async () => {
       const headers = await getJsonAuthHeaders()
       if (!headers.Authorization) {
         if (!cancelled) {
@@ -728,7 +746,7 @@ export default function ActionModal({
     })()
 
     return () => { cancelled = true }
-  }, [source_id, source_type, sessionReady])
+  }, [source_id, source_type, sessionReady, ai_action_data, event_data, child_name, onSync])
 
   const savePack = async (newPack: ExecutionPack) => {
     setPack(newPack)

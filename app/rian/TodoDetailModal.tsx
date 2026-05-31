@@ -21,6 +21,7 @@ export default function TodoDetailModal({ reminder, userId, onClose, onDone, onS
       category={reminder.category}
       urgency_level={reminder.urgency_level as 1 | 2 | 3}
       due_date={reminder.due_date}
+      ai_action_data={reminder.ai_action_data}
       userId={userId}
       onClose={onClose}
       onDone={onDone}
