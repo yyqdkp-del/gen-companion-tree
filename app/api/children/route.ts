@@ -36,9 +36,10 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json().catch(() => ({}))
-  const name = typeof body.name === 'string' ? body.name.trim() : ''
+  const rawName = body.name ?? body.child_name
+  const name = typeof rawName === 'string' ? rawName.trim() : ''
   if (!name) {
-    return NextResponse.json({ ok: false, error: 'Missing child name' }, { status: 400 })
+    return NextResponse.json({ error: '孩子姓名不能为空' }, { status: 400 })
   }
 
   const supabase = createClient(

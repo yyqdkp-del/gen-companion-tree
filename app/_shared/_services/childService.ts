@@ -336,8 +336,14 @@ export async function addChild(
   uid: string,
   d: { name: string; emoji: string; school_name?: string; grade?: string; avatar_url?: string | null },
 ): Promise<string | null> {
+  const trimmedName = d.name?.trim()
+  if (!trimmedName) {
+    console.error('addChild: name is empty')
+    return null
+  }
+
   const { data } = await supabase.from('children').insert({
-    user_id: uid, name: d.name, emoji: d.emoji || '👶🏻',
+    user_id: uid, name: trimmedName, emoji: d.emoji || '👶🏻',
     avatar_url: d.avatar_url || null,
     energy: null, status: 'active',
     school_name: d.school_name, grade: d.grade,

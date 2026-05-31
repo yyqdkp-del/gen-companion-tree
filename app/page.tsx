@@ -68,6 +68,7 @@ function dropState(type: string, data: any) {
 
 function AddChildSheet({ onClose, onSave }: { onClose: () => void; onSave: (d: any) => Promise<void> }) {
   const [name, setName] = useState('')
+  const [nameError, setNameError] = useState('')
   const [emoji, setEmoji] = useState('👶🏻')
   const [school, setSchool] = useState('')
   const [grade, setGrade] = useState('')
@@ -147,22 +148,36 @@ function AddChildSheet({ onClose, onSave }: { onClose: () => void; onSave: (d: a
             </div>
           </div>
           {[
-            { label: '孩子名字 *', val: name, set: setName, ph: '英文名或中文名' },
+            { label: '孩子名字 *', val: name, set: setName, ph: '英文名或中文名', isName: true },
             { label: '学校名称',   val: school, set: setSchool, ph: 'Lanna International School' },
             { label: '年级班级',   val: grade,  set: setGrade,  ph: 'Grade 2 / 小学二年级' },
           ].map(f => (
             <div key={f.label} style={{ marginBottom: 14 }}>
               <div style={{ fontSize: 12, color: THEME.muted, marginBottom: 6, fontWeight: 600 }}>{f.label}</div>
-              <input value={f.val} onChange={e => f.set(e.target.value)} placeholder={f.ph}
+              <input value={f.val} onChange={e => {
+                f.set(e.target.value)
+                if (f.isName && nameError) setNameError('')
+              }} placeholder={f.ph}
                 style={{ width: '100%', padding: '12px 14px', borderRadius: 12,
-                  border: '1px solid rgba(0,0,0,0.1)', background: 'rgba(255,255,255,0.55)',
+                  border: `1px solid ${f.isName && nameError ? 'rgba(164,99,85,0.5)' : 'rgba(0,0,0,0.1)'}`,
+                  background: 'rgba(255,255,255,0.55)',
                   fontSize: 14, color: THEME.text, outline: 'none', boxSizing: 'border-box' }} />
+              {f.isName && nameError ? (
+                <div style={{ fontSize: 12, color: '#a46355', marginTop: 6 }}>{nameError}</div>
+              ) : null}
             </div>
           ))}
-          <motion.button whileTap={{ scale: 0.97 }} disabled={!name.trim() || saving}
+          <motion.button whileTap={{ scale: 0.97 }} disabled={saving}
             onClick={async () => {
+              const trimmedName = name.trim()
+              if (!trimmedName) {
+                setNameError('请输入孩子姓名')
+                toast('请输入孩子姓名', 'error')
+                return
+              }
+              setNameError('')
               setSaving(true)
-              await onSave({ name: name.trim(), emoji, school_name: school, grade, avatar_url: avatarUrl })
+              await onSave({ name: trimmedName, emoji, school_name: school, grade, avatar_url: avatarUrl })
               setSaving(false)
               onClose()
             }}
