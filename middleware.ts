@@ -51,7 +51,12 @@ export async function middleware(req: NextRequest) {
     return response
   }
 
-  if (!user) {
+  const protectedPrefixes = ['/profile', '/children', '/vehicles', '/travel']
+  const needsAuth = protectedPrefixes.some(
+    (p) => pathname === p || pathname.startsWith(`${p}/`),
+  )
+
+  if (needsAuth && !user) {
     const url = new URL('/auth', req.url)
     url.searchParams.set('next', pathname)
     return NextResponse.redirect(url)

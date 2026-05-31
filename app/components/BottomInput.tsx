@@ -3,7 +3,7 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Mic, Camera, Send, Square, Loader, Upload } from 'lucide-react'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { useApp } from '@/app/context/AppContext'
 import { useRecorder } from '@/app/_shared/_hooks/useRecorder'
 import { useUpload, UPLOAD_STATUS_TEXT } from '@/app/_shared/_hooks/useUpload'
@@ -14,7 +14,7 @@ import { fetchWithAuth } from '@/lib/auth/fetchWithAuth'
 import { createClient } from '@/lib/supabase/client'
 import { subscribePushIfPermitted } from '@/lib/push/subscribePushClient'
 import { logOrAlertNetworkError } from '@/lib/errors/logOrAlertNetworkError'
-import { toast } from '@/app/components/Toast'
+import { toast, toastRegisterPrompt } from '@/app/components/Toast'
 
 const SHOW_ON = ['/', '/rian']
 
@@ -36,7 +36,17 @@ const FLOAT_BTN: React.CSSProperties = {
 
 export default function BottomInput() {
   const pathname = usePathname()
+  const router = useRouter()
   const { userId, sync: ctxSync, addTempTodo, removeTempTodo, speak, sessionReady } = useApp()
+
+  const requireRianLogin = useCallback(() => {
+    if (pathname !== '/rian' || userId) return false
+    toastRegisterPrompt(
+      () => router.push('/auth?next=/rian'),
+      '登录后可保存待办和日程',
+    )
+    return true
+  }, [pathname, userId, router])
 
   const [inputMode, setInputMode] = useState<'none' | 'audio_text' | 'vision_file'>('none')
   const [inputText, setInputText] = useState('')
@@ -70,6 +80,7 @@ export default function BottomInput() {
 
   const sendCommand = async () => {
     if (!inputText.trim() || sending) return
+    if (requireRianLogin()) return
     if (!sessionReady) return
     setSending(true)
     const content = inputText.trim()
@@ -126,6 +137,7 @@ export default function BottomInput() {
   }
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (requireRianLogin()) return
     const file = e.target.files?.[0]
     if (!file) return
     if (!sessionReady) return
@@ -378,7 +390,10 @@ export default function BottomInput() {
           aria-label="拍照或上传"
           whileTap={{ scale: 0.92 }}
           disabled={!sessionReady}
-          onClick={() => sessionReady && setInputMode(inputMode === 'vision_file' ? 'none' : 'vision_file')}
+          onClick={() => {
+            if (requireRianLogin()) return
+            if (sessionReady) setInputMode(inputMode === 'vision_file' ? 'none' : 'vision_file')
+          }}
           style={{
             ...FLOAT_BTN,
             border: inputMode === 'vision_file' ? '1.5px solid rgba(164,99,85,0.4)' : FLOAT_BTN.border,
@@ -393,7 +408,10 @@ export default function BottomInput() {
           aria-label="语音与文字"
           whileTap={{ scale: 0.92 }}
           disabled={!sessionReady}
-          onClick={() => sessionReady && setInputMode(inputMode === 'audio_text' ? 'none' : 'audio_text')}
+          onClick={() => {
+            if (requireRianLogin()) return
+            if (sessionReady) setInputMode(inputMode === 'audio_text' ? 'none' : 'audio_text')
+          }}
           style={{
             ...FLOAT_BTN,
             border: inputMode === 'audio_text' ? '1.5px solid rgba(164,99,85,0.4)' : FLOAT_BTN.border,

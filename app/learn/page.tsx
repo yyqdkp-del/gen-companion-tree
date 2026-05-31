@@ -17,7 +17,7 @@ import TabBar, { type TabType } from './components/TabBar'
 import { track } from '@/lib/analytics/track'
 import { SAFE_BOTTOM_INSET, STICKY_HEADER_PADDING_TOP } from '@/app/_shared/_constants/layout'
 import TourGuide, { type TourStep } from '@/app/components/TourGuide'
-import { toast } from '@/app/components/Toast'
+import { toast, toastRegisterPrompt } from '@/app/components/Toast'
 import { saveSession } from '@/app/_shared/_services/chineseService'
 
 const supabase = createClient()
@@ -57,7 +57,7 @@ const LEARN_TOUR: TourStep[] = [
 // ══ 主页面 ══
 export default function DecodePage() {
   const router = useRouter()
-  const { activeKid } = useApp()
+  const { activeKid, userId: ctxUserId } = useApp()
   const [activeTab, setActiveTab] = useState<TabType>('hanzi')
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
@@ -176,6 +176,14 @@ export default function DecodePage() {
   const generate = async (overrideInput?: string) => {
     const query = (overrideInput || input).trim()
     if (!query) return
+
+    if (!ctxUserId) {
+      toastRegisterPrompt(
+        () => router.push('/auth?next=/learn'),
+        '登录后每天3次免费解码',
+      )
+      return
+    }
 
     if (activeTab === 'hanzi' && !HAN_RE.test(query)) {
       setError('请输入汉字')

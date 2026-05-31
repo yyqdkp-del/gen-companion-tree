@@ -29,7 +29,7 @@ import { getJsonAuthHeaders } from '@/lib/auth/clientAuthHeaders'
 import { fetchWithAuth } from '@/lib/auth/fetchWithAuth'
 import { logOrAlertNetworkError } from '@/lib/errors/logOrAlertNetworkError'
 import { handleLimitReached } from '@/lib/limits/client'
-import { toast } from '@/app/components/Toast'
+import { toast, toastRegisterPrompt } from '@/app/components/Toast'
 import TourGuide, { type TourStep } from '@/app/components/TourGuide'
 import { sanitizeFileName } from '@/lib/storage/sanitizeFileName'
 import { useRouter } from 'next/navigation'
@@ -443,7 +443,19 @@ export default function BasePage() {
     closeModal()
   }
 
+  const promptRegister = useCallback(
+    (message: string) => {
+      toastRegisterPrompt(() => router.push('/auth?next=/'), message)
+    },
+    [router],
+  )
+
   const handleAddChild = async (d: any) => {
+    if (!userId) {
+      promptRegister('登录后可添加孩子档案，现在注册体验')
+      closeModal()
+      return
+    }
     const res = await fetchWithAuth('/api/children', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -472,6 +484,10 @@ export default function BasePage() {
   }
 
   const handlePatrol = async () => {
+    if (!userId) {
+      promptRegister('登录后每天自动巡逻，现在注册体验')
+      return
+    }
     if (patrolling) return
     if (patrolTimerRef.current) {
       clearTimeout(patrolTimerRef.current)
@@ -786,7 +802,13 @@ export default function BasePage() {
             sel={activeKid}
             onSel={(c: any) => { void handleSwitchKid(c) }}
             onClose={() => closeModal()}
-            onAdd={() => openModal('addChild')}
+            onAdd={() => {
+              if (!userId) {
+                promptRegister('登录后可添加孩子档案，现在注册体验')
+                return
+              }
+              openModal('addChild')
+            }}
             userId={userId}
             onStatusSaved={async () => {
               const id = activeKid?.id || localStorage.getItem('active_child_id')

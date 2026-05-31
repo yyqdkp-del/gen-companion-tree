@@ -5,7 +5,6 @@ import { createContext, useContext, useState, useEffect, useRef, useCallback, us
 import useSWR, { useSWRConfig } from 'swr'
 import { fetchAppData, readAppCoreCache, writeAppCoreCache } from '@/app/_shared/_services/syncService'
 import { useSpeech } from '@/app/_shared/_hooks/useSpeech'
-import { useRouter } from 'next/navigation'
 import type { Session } from '@supabase/supabase-js'
 import { subscribePushIfPermitted } from '@/lib/push/subscribePushClient'
 import { signOutWithPushCleanup } from '@/lib/auth/signOutClient'
@@ -51,7 +50,6 @@ type AppContextType = {
 const AppContext = createContext<AppContextType | null>(null)
 
 export function AppProvider({ children }: { children: ReactNode }) {
-  const router = useRouter()
   const { mutate: globalMutate } = useSWRConfig()
   const [userId, setUserId] = useState('')
   const userIdRef = useRef('')
@@ -206,12 +204,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
           return
         }
 
-        setTimeout(() => {
-          if (userIdRef.current) return
-          const path = window.location.pathname
-          if (path.startsWith('/auth') || path.startsWith('/upgrade')) return
-          router.replace('/auth')
-        }, 3000)
       } finally {
         setSessionReady(true)
       }

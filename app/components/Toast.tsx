@@ -5,9 +5,11 @@ type ToastType = 'error' | 'success' | 'info'
 
 type SimpleToast = { id: number; kind: 'simple'; msg: string; type: ToastType }
 type LimitToast = { id: number; kind: 'limit'; msg: string; onUpgrade?: () => void }
+type AuthPromptToast = { id: number; kind: 'auth'; msg: string; onRegister?: () => void }
 
 let toastFn: ((msg: string, type?: ToastType) => void) | null = null
 let limitToastFn: ((opts: { message?: string; onUpgrade?: () => void }) => void) | null = null
+let registerPromptFn: ((opts: { message?: string; onRegister?: () => void }) => void) | null = null
 
 export function toast(msg: string, type: ToastType = 'info') {
   toastFn?.(msg, type)
@@ -17,8 +19,15 @@ export function toastLimitReached(onUpgrade?: () => void, message = '今日次�
   limitToastFn?.({ message, onUpgrade })
 }
 
+export function toastRegisterPrompt(
+  onRegister?: () => void,
+  message = '登录后可使用完整功能',
+) {
+  registerPromptFn?.({ message, onRegister })
+}
+
 export default function Toast() {
-  const [toasts, setToasts] = useState<Array<SimpleToast | LimitToast>>([])
+  const [toasts, setToasts] = useState<Array<SimpleToast | LimitToast | AuthPromptToast>>([])
 
   useEffect(() => {
     toastFn = (msg, ty = 'info') => {
@@ -31,9 +40,15 @@ export default function Toast() {
       setToasts(prev => [...prev, { id, kind: 'limit', msg: message || '今日次数已用完', onUpgrade }])
       setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 6000)
     }
+    registerPromptFn = ({ message, onRegister }) => {
+      const id = Date.now()
+      setToasts(prev => [...prev, { id, kind: 'auth', msg: message || '登录后可使用完整功能', onRegister }])
+      setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 6000)
+    }
     return () => {
       toastFn = null
       limitToastFn = null
+      registerPromptFn = null
     }
   }, [])
 
@@ -53,7 +68,7 @@ export default function Toast() {
       alignItems: 'center',
     }}>
       {toasts.map(t => (
-        t.kind === 'limit' ? (
+        t.kind === 'limit' || t.kind === 'auth' ? (
           <div key={t.id} style={{
             padding: '12px 16px',
             borderRadius: 16,
@@ -70,7 +85,8 @@ export default function Toast() {
             <button
               type="button"
               onClick={() => {
-                t.onUpgrade?.()
+                if (t.kind === 'limit') t.onUpgrade?.()
+                else t.onRegister?.()
                 setToasts(prev => prev.filter(x => x.id !== t.id))
               }}
               style={{
@@ -85,7 +101,7 @@ export default function Toast() {
                 fontFamily: 'sans-serif',
               }}
             >
-              升级 Pro
+              {t.kind === 'limit' ? '升级 Pro' : '去注册'}
             </button>
           </div>
         ) : (

@@ -454,6 +454,21 @@ export default function TreehousePage() {
       }}
     >
 
+      {!userId && (
+        <p style={{
+          position: 'relative',
+          zIndex: 20,
+          margin: 0,
+          padding: 'max(env(safe-area-inset-top), 8px) 16px 6px',
+          textAlign: 'center',
+          fontSize: 11,
+          color: THEME.textDim,
+          letterSpacing: '0.06em',
+        }}>
+          登录后可保存对话记录
+        </p>
+      )}
+
       {/* ── 呼吸背景光晕 ── */}
       <motion.div
         animate={{
