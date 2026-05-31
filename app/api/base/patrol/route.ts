@@ -4,6 +4,7 @@ import { createClient } from '@supabase/supabase-js'
 import { waitUntil } from '@vercel/functions'
 import { getUserLocation } from '@/lib/geofence'
 import { getAuthUser } from '@/lib/auth/getAuthUser'
+import { checkLimit, recordUsage } from '@/lib/limits/usage'
 import { getTodayStrInTimeZone } from '@/lib/date/localDate'
 import { isValidHotspotUrl } from '@/lib/hotspot/url'
 
@@ -515,7 +516,15 @@ export async function POST(req: NextRequest) {
     // 用户手动「刷新热点」：同步跑完再返回，否则前端 1s 后 sync 时 AI 尚未写入库
     const isManualPatrol = Boolean(user && !authError)
     if (isManualPatrol) {
+      const limit = await checkLimit(user!.id, 'patrol', user!.email)
+      if (!limit.allowed) {
+        return NextResponse.json(
+          { error: 'limit_reached', feature: 'patrol' },
+          { status: 429 },
+        )
+      }
       const results = await runPatrolForUsers(userIds, patrolTime)
+      await recordUsage(user!.id, 'patrol')
       const first = results[0] as Record<string, unknown> | undefined
       return NextResponse.json({
         ok: true,

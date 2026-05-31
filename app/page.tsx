@@ -25,10 +25,10 @@ import { useTodoActions } from '@/app/_shared/_hooks/useTodoActions'
 import { useTodoEngine } from '@/app/_shared/_hooks/useTodoEngine'
 import { useHotspotEngine } from '@/app/_shared/_hooks/useHotspotEngine'
 import { track } from '@/lib/analytics/track'
-import { addChild } from '@/app/_shared/_services/childService'
 import { getJsonAuthHeaders } from '@/lib/auth/clientAuthHeaders'
 import { fetchWithAuth } from '@/lib/auth/fetchWithAuth'
 import { logOrAlertNetworkError } from '@/lib/errors/logOrAlertNetworkError'
+import { handleLimitReached } from '@/lib/limits/client'
 import { toast } from '@/app/components/Toast'
 import TourGuide, { type TourStep } from '@/app/components/TourGuide'
 import { sanitizeFileName } from '@/lib/storage/sanitizeFileName'
@@ -444,13 +444,25 @@ export default function BasePage() {
   }
 
   const handleAddChild = async (d: any) => {
-    const { data: { session } } = await supabase.auth.getSession()
-    const uid = session?.user?.id
-    if (!uid) return
-    const newId = await addChild(uid, d)
+    const res = await fetchWithAuth('/api/children', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: d.name,
+        emoji: d.emoji,
+        grade: d.grade,
+        school_name: d.school_name || d.school,
+      }),
+    })
+    const data = await res.json().catch(() => ({}))
+    if (handleLimitReached(data, () => router.push('/upgrade'))) return
+    if (!res.ok || !data.child_id) {
+      toast(data.message || data.error || '添加孩子失败', 'error')
+      return
+    }
     await ctxSync()
     closeModal()
-    if (newId) window.location.href = `/children/${newId}?from=quick`
+    window.location.href = `/children/${data.child_id}?from=quick`
   }
 
   const handleRead = async (id: string) => {
@@ -474,7 +486,10 @@ export default function BasePage() {
         signal: AbortSignal.timeout(180_000),
       })
       const data = await res.json().catch(() => ({}))
-      if (!res.ok) throw new Error(data?.error || '巡逻失败')
+      if (!res.ok) {
+        if (handleLimitReached(data, () => router.push('/upgrade'))) return
+        throw new Error(data?.error || '巡逻失败')
+      }
 
       await ctxSync()
 

@@ -3,12 +3,21 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getAuthUser } from '@/lib/auth/getAuthUser'
 import { createClient } from '@supabase/supabase-js'
 import { fetchResidentCity, naturalImageryHint } from '@/lib/family/resolveResidentCity'
+import { checkLimit, recordUsage } from '@/lib/limits/usage'
 
 export async function POST(req: NextRequest) {
   try {
     const { user, error: authError } = await getAuthUser(req)
     if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const limit = await checkLimit(user.id, 'treehouse_message', user.email)
+    if (!limit.allowed) {
+      return NextResponse.json(
+        { error: 'limit_reached', feature: 'treehouse_message' },
+        { status: 429 },
+      )
     }
 
     const { messages, contextData } = await req.json()
@@ -36,6 +45,10 @@ export async function POST(req: NextRequest) {
     })
 
     const data = await response.json()
+    if (!response.ok) {
+      return NextResponse.json(data, { status: response.status })
+    }
+    await recordUsage(user.id, 'treehouse_message')
     return NextResponse.json(data)
   } catch (e: any) {
     console.error('chat error:', e)

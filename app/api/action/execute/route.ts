@@ -4,6 +4,7 @@ export const maxDuration = 60
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { getAuthUser } from '@/lib/auth/getAuthUser'
+import { checkLimit, recordUsage } from '@/lib/limits/usage'
 import { fetchFormTemplates, enrichActionsWithFormTemplates } from '@/lib/action/enrichPDF'
 import { familyServicePromptLabel, resolveResidentCityFromFamilyData } from '@/lib/family/resolveResidentCity'
 const supabase = createClient(
@@ -556,6 +557,14 @@ export async function POST(req: NextRequest) {
         }
       }
 
+      const oneTapLimit = await checkLimit(userId, 'one_tap', user.email)
+      if (!oneTapLimit.allowed) {
+        return NextResponse.json(
+          { error: 'limit_reached', feature: 'one_tap' },
+          { status: 429 },
+        )
+      }
+
       title = todo.title
       category = todo.category || 'other'
       urgencyLevel = todo.priority === 'red' ? 3 : todo.priority === 'orange' ? 2 : 1
@@ -601,6 +610,14 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ ok: false, error: 'Event not found' }, { status: 404 })
       }
 
+      const scheduleLimit = await checkLimit(userId, 'one_tap', user.email)
+      if (!scheduleLimit.allowed) {
+        return NextResponse.json(
+          { error: 'limit_reached', feature: 'one_tap' },
+          { status: 429 },
+        )
+      }
+
       title = event.title
       category = event.event_type || 'activity'
       urgencyLevel = event.requires_payment ? 2 : 1
@@ -644,6 +661,14 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ ok: false, error: 'Hotspot not found' }, { status: 404 })
       }
 
+      const hotspotLimit = await checkLimit(userId, 'one_tap', user.email)
+      if (!hotspotLimit.allowed) {
+        return NextResponse.json(
+          { error: 'limit_reached', feature: 'one_tap' },
+          { status: 429 },
+        )
+      }
+
       title = hotspot.title
       category = hotspot.category || 'lifestyle'
       urgencyLevel = hotspot.urgency === 'urgent' ? 3 : hotspot.urgency === 'important' ? 2 : 1
@@ -668,6 +693,8 @@ export async function POST(req: NextRequest) {
       urgencyLevel,
       executionPack
     )
+
+    await recordUsage(userId, 'one_tap')
 
     return NextResponse.json({
       ok: true,

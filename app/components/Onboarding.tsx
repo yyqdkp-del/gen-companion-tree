@@ -5,12 +5,16 @@ import type { CSSProperties } from 'react'
 import { useApp } from '@/app/context/AppContext'
 import { fetchWithAuth } from '@/lib/auth/fetchWithAuth'
 import { track } from '@/lib/analytics/track'
+import { useRouter } from 'next/navigation'
+import { handleLimitReached } from '@/lib/limits/client'
+import { toast } from '@/app/components/Toast'
 
 interface OnboardingProps {
   onComplete: () => void
 }
 
 export default function Onboarding({ onComplete }: OnboardingProps) {
+  const router = useRouter()
   const [step, setStep] = useState(1)
   const [childName, setChildName] = useState('')
   const [childAge, setChildAge] = useState('')
@@ -27,8 +31,9 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
     if (!childName) return
     setLoading(true)
     try {
-      await fetchWithAuth('/api/children', {
+      const res = await fetchWithAuth('/api/children', {
         method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: childName,
           emoji: childEmoji,
@@ -36,6 +41,12 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
           school_name: schoolName || undefined,
         }),
       })
+      const data = await res.json().catch(() => ({}))
+      if (handleLimitReached(data, () => router.push('/upgrade'))) return
+      if (!res.ok) {
+        toast(data.message || '添加孩子失败', 'error')
+        return
+      }
       await sync()
     } catch (e) {
       console.error(e)

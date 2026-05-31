@@ -1,14 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthUser } from '@/lib/auth/getAuthUser'
-import { isProWhitelistedEmail } from '@/lib/auth/proWhitelist'
-import { getServiceSupabase } from '@/lib/supabase/service'
-
-const FREE_LIMITS = {
-  hanzi_decode: 3,
-  weekly_report_share: 0,
-} as const
-
-type LimitFeature = keyof typeof FREE_LIMITS
+import {
+  FREE_LIMITS,
+  checkLimit,
+  recordUsage,
+  type LimitFeature,
+} from '@/lib/limits/usage'
 
 export async function GET(req: NextRequest) {
   const { user, error } = await getAuthUser(req)
@@ -17,53 +14,21 @@ export async function GET(req: NextRequest) {
   }
 
   const feature = (req.nextUrl.searchParams.get('feature') || 'hanzi_decode') as LimitFeature
-  const today = new Date().toISOString().split('T')[0]
+  const result = await checkLimit(user.id, feature, user.email)
 
-  if (isProWhitelistedEmail(user.email)) {
+  if (result.is_pro) {
     return NextResponse.json({ allowed: true, is_pro: true, remaining: 999 })
   }
-
-  const supabase = getServiceSupabase()
-
-  const [{ data: sub }, { data: profile }] = await Promise.all([
-    supabase
-      .from('subscriptions')
-      .select('status, plan')
-      .eq('user_id', user.id)
-      .maybeSingle(),
-    supabase
-      .from('family_profile')
-      .select('is_pro')
-      .eq('user_id', user.id)
-      .maybeSingle(),
-  ])
-
-  const isPro =
-    (sub?.plan === 'pro' &&
-      (sub?.status === 'active' || sub?.status === 'trialing')) ||
-    profile?.is_pro === true
-
-  if (isPro) {
-    return NextResponse.json({ allowed: true, is_pro: true, remaining: 999 })
-  }
-
-  const { count } = await supabase
-    .from('analytics_events')
-    .select('*', { count: 'exact', head: true })
-    .eq('user_id', user.id)
-    .eq('event_type', `${feature}_used`)
-    .gte('created_at', today)
 
   const limit = FREE_LIMITS[feature] ?? 3
-  const used = count || 0
-  const remaining = Math.max(0, limit - used)
+  const used = limit - result.remaining
 
   return NextResponse.json({
-    allowed: remaining > 0,
+    allowed: result.allowed,
     is_pro: false,
     used,
     limit,
-    remaining,
+    remaining: result.remaining,
   })
 }
 
@@ -81,13 +46,6 @@ export async function POST(req: NextRequest) {
     // default feature
   }
 
-  const supabase = getServiceSupabase()
-  await supabase.from('analytics_events').insert({
-    user_id: user.id,
-    event_type: `${feature}_used`,
-    page: '/api/limits',
-    session_id: 'limit_check',
-  })
-
+  await recordUsage(user.id, feature)
   return NextResponse.json({ ok: true })
 }

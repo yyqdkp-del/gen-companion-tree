@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { fetchWithAuth } from '@/lib/auth/fetchWithAuth'
 import { logOrAlertNetworkError } from '@/lib/errors/logOrAlertNetworkError'
+import { handleLimitReached } from '@/lib/limits/client'
 import { useApp } from '@/app/context/AppContext'
 import { motion, AnimatePresence } from 'framer-motion'
 
@@ -313,9 +314,14 @@ export default function TreehousePage() {
         }),
       })
 
-      if (!response.ok) throw new Error('请求失败')
-
-      const data = await response.json()
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok) {
+        if (handleLimitReached(data, () => router.push('/upgrade'))) {
+          setThinking(false)
+          return
+        }
+        throw new Error('请求失败')
+      }
       const reply = data.content?.[0]?.text || '我在。'
       const delay = 600 + Math.random() * 800
       if (sendTimerRef.current) clearTimeout(sendTimerRef.current)

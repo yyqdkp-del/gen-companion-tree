@@ -4,6 +4,8 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { getJsonAuthHeaders } from '@/lib/auth/clientAuthHeaders'
 import { fetchWithAuth } from '@/lib/auth/fetchWithAuth'
 import { logOrAlertNetworkError } from '@/lib/errors/logOrAlertNetworkError'
+import { handleLimitReached } from '@/lib/limits/client'
+import { useRouter } from 'next/navigation'
 import { toast } from '@/app/components/Toast'
 import { useApp } from '@/app/context/AppContext'
 import {
@@ -686,6 +688,7 @@ export default function ActionModal({
   due_date, event_data, child_name, ai_action_data, userId,
   onClose, onDone, onSnooze, onSync,
 }: ActionModalProps) {
+  const router = useRouter()
   const { sessionReady } = useApp()
   const [pack, setPack] = useState<ExecutionPack | null>(null)
   const [loading, setLoading] = useState(false)
@@ -734,6 +737,7 @@ export default function ActionModal({
         })
         const data = await res.json()
         if (cancelled) return
+        if (handleLimitReached(data, () => router.push('/upgrade'))) return
         if (data.ok && data.execution_pack) {
           setPack(data.execution_pack)
           onSync?.()
@@ -746,7 +750,7 @@ export default function ActionModal({
     })()
 
     return () => { cancelled = true }
-  }, [source_id, source_type, sessionReady, ai_action_data, event_data, child_name, onSync])
+  }, [source_id, source_type, sessionReady, ai_action_data, event_data, child_name, onSync, router])
 
   const savePack = async (newPack: ExecutionPack) => {
     setPack(newPack)

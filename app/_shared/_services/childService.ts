@@ -376,6 +376,13 @@ export async function addChild(
     return null
   }
 
+  const { assertCanAddChild } = await import('@/lib/limits/usage')
+  const quota = await assertCanAddChild(uid)
+  if (!quota.ok) {
+    console.warn('addChild: limit reached', quota.message)
+    return null
+  }
+
   const { data } = await supabase.from('children').insert({
     user_id: uid, name: trimmedName, emoji: d.emoji || '👶🏻',
     avatar_url: d.avatar_url || null,

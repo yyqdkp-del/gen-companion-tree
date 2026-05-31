@@ -3,6 +3,7 @@ export const dynamic = 'force-dynamic'
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { getAuthUser } from '@/lib/auth/getAuthUser'
+import { assertCanAddChild } from '@/lib/limits/usage'
 
 export async function GET(_req: NextRequest) {
   const { user, error: authError } = await getAuthUser(_req)
@@ -40,6 +41,18 @@ export async function POST(req: NextRequest) {
   const name = typeof rawName === 'string' ? rawName.trim() : ''
   if (!name) {
     return NextResponse.json({ error: '孩子姓名不能为空' }, { status: 400 })
+  }
+
+  const childQuota = await assertCanAddChild(user.id, user.email)
+  if (!childQuota.ok) {
+    return NextResponse.json(
+      {
+        error: 'limit_reached',
+        message: childQuota.message,
+        feature: 'children',
+      },
+      { status: 429 },
+    )
   }
 
   const supabase = createClient(

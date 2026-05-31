@@ -13,6 +13,7 @@ import { StepAddress }   from './steps/StepAddress'
 import { StepEmergency } from './steps/StepEmergency'
 import { useApp } from '@/app/context/AppContext'
 import { logOrAlertNetworkError } from '@/lib/errors/logOrAlertNetworkError'
+import { handleLimitReached } from '@/lib/limits/client'
 import { fetchWithAuth } from '@/lib/auth/fetchWithAuth'
 import TourGuide, { type TourStep } from '@/app/components/TourGuide'
 
@@ -363,7 +364,10 @@ function ProfileContent() {
         signal: AbortSignal.timeout(180_000),
       })
       const data = await res.json().catch(() => ({}))
-      if (!res.ok) throw new Error(data?.error || '热点分析失败')
+      if (!res.ok) {
+        if (handleLimitReached(data, () => router.push('/upgrade'))) return
+        throw new Error(data?.error || '热点分析失败')
+      }
       if (data.skipped === 'no_resident_city') {
         setOauthBanner({ type: 'err', text: '请填写居住城市后再生成本地热点' })
       } else if ((data.saved ?? 0) > 0) {
