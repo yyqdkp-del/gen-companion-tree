@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useState, type CSSProperties } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Settings, Volume2, VolumeX, X, User, Baby, Car, Plane, Sparkles, LogIn } from 'lucide-react'
+import { Settings, Volume2, VolumeX, X, User, Baby, Car, Plane, LogIn } from 'lucide-react'
 import { useApp } from '@/app/context/AppContext'
 import { THEME } from '@/app/_shared/_constants/theme'
 import { fetchWithAuth } from '@/lib/auth/fetchWithAuth'
@@ -169,33 +169,6 @@ export default function SettingsButton() {
                     </div>
                   </motion.div>
                 )}
-
-                <motion.div
-                  whileTap={{ scale: managingSubscription ? 1 : 0.98 }}
-                  onClick={() => void handleSubscription()}
-                  style={{
-                    ...menuItemStyle,
-                    background: isPro ? 'rgba(164,99,85,0.08)' : 'rgba(92,122,94,0.06)',
-                    border: `1px solid ${isPro ? 'rgba(164,99,85,0.2)' : 'rgba(92,122,94,0.15)'}`,
-                    opacity: managingSubscription ? 0.7 : 1,
-                  }}
-                >
-                  <Sparkles size={16} color={isPro ? THEME.gold : '#5c7a5e'} />
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: THEME.text }}>
-                      {loggedIn ? (isPro ? '根陪伴 Pro' : '升级 Pro') : '根陪伴 Pro'}
-                    </div>
-                    <div style={{ fontSize: 11, color: THEME.muted, marginTop: 1 }}>
-                      {managingSubscription
-                        ? '打开中…'
-                        : loggedIn
-                          ? isPro
-                            ? '管理订阅'
-                            : '解锁全部功能'
-                          : '登录后订阅'}
-                    </div>
-                  </div>
-                </motion.div>
 
                 {/* 语音开关 */}
                 <motion.div whileTap={{ scale: 0.98 }} onClick={toggleSpeech}
