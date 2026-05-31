@@ -6,7 +6,6 @@ import { createClient } from '@/lib/supabase/client'
 import { saveSessionBundle } from '@/lib/auth/saveSessionBundle'
 import {
   navigateAfterAuth,
-  peekAuthNext,
   sanitizeAuthNext,
   stashAuthNextFromUrl,
 } from '@/lib/auth/authNextPath'
@@ -16,6 +15,22 @@ const supabase = createClient(
 )
 
 const LINE_CLIENT_ID = process.env.NEXT_PUBLIC_LINE_CLIENT_ID || '2009745649'
+const EMAIL_VERIFY_PENDING_KEY = 'auth_email_verify_pending'
+
+async function ensureAuthSession(email: string, password: string): Promise<boolean> {
+  let session = (await supabase.auth.getSession()).data.session
+  if (!session) {
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password })
+    if (error) return false
+    session = data.session
+  }
+  if (!session) return false
+  await saveSessionBundle(session)
+  if (typeof window !== 'undefined') {
+    localStorage.setItem('app_user_id', session.user.id)
+  }
+  return true
+}
 
 export default function AuthPage() {
   const router = useRouter()
@@ -26,6 +41,7 @@ export default function AuthPage() {
   const [lineLoading, setLineLoading] = useState(false)
   const [error, setError] = useState('')
   const [done, setDone] = useState(false)
+  const [exploreLoading, setExploreLoading] = useState(false)
   const [consentPrivacy, setConsentPrivacy] = useState(false)
   const [consentAI, setConsentAI] = useState(false)
   const [returnPath, setReturnPath] = useState('/')
@@ -35,6 +51,12 @@ export default function AuthPage() {
     setReturnPath(stashAuthNextFromUrl(params))
     if (params.get('error')) setError('登录失败，请重试')
     if (params.get('mode') === 'login') setMode('login')
+
+    const pendingEmail = sessionStorage.getItem(EMAIL_VERIFY_PENDING_KEY)
+    if (pendingEmail) {
+      setEmail(pendingEmail)
+      setDone(true)
+    }
 
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (!session?.user) return
@@ -134,6 +156,12 @@ export default function AuthPage() {
             version: '1.0',
           })
         }
+        if (data.session) {
+          await saveSessionBundle(data.session)
+        } else {
+          await ensureAuthSession(email, password)
+        }
+        sessionStorage.setItem(EMAIL_VERIFY_PENDING_KEY, email)
         setDone(true)
       } else {
         const { data, error } = await supabase.auth.signInWithPassword({ email, password })
@@ -176,6 +204,28 @@ export default function AuthPage() {
     window.location.href = `https://access.line.me/oauth2/v2.1/authorize?${params}`
   }
 
+  const handleGoAhead = async () => {
+    setExploreLoading(true)
+    setError('')
+    try {
+      const hasSession = await ensureAuthSession(email, password)
+      if (hasSession) {
+        const checkRes = await fetch('/api/auth/check', { credentials: 'include' })
+        const checkData = await checkRes.json()
+        if (checkData.authenticated) {
+          sessionStorage.removeItem(EMAIL_VERIFY_PENDING_KEY)
+          navigateAfterAuth(router, returnPath)
+          return
+        }
+      }
+      setError('请先点击邮件中的验证链接，或稍后再试')
+    } catch {
+      setError('网络错误，请重试')
+    } finally {
+      setExploreLoading(false)
+    }
+  }
+
   const handleGoogle = async () => {
     await supabase.auth.signInWithOAuth({
       provider: 'google',
@@ -200,9 +250,23 @@ export default function AuthPage() {
             请检查 <strong style={{ color: '#2d322f' }}>{email}</strong><br />
             点击邮件中的链接完成注册
           </div>
-          <button onClick={() => navigateAfterAuth(router, peekAuthNext())} style={styles.btnPrimary}>
-            先去看看 →
+          <button
+            type="button"
+            onClick={() => { void handleGoAhead() }}
+            disabled={exploreLoading}
+            style={{
+              ...styles.btnPrimary,
+              opacity: exploreLoading ? 0.7 : 1,
+              cursor: exploreLoading ? 'wait' : 'pointer',
+            }}
+          >
+            {exploreLoading ? '进入中…' : '先去看看 →'}
           </button>
+          {error && (
+            <div style={{ fontSize: 13, color: '#E8892A', marginTop: 12, lineHeight: 1.6 }}>
+              {error}
+            </div>
+          )}
         </div>
       </motion.div>
     </main>
