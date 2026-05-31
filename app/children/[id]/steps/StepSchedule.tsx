@@ -206,7 +206,7 @@ function StepSchedule({ data, onChange }: { data: any; onChange: (d: any) => voi
   return (
     <div>
       <div style={{ fontSize: 15, fontWeight: 600, color: THEME.navy, marginBottom: 4 }}>课程表 📚</div>
-      <div style={{ fontSize: 12, color: THEME.muted, marginBottom: 16, lineHeight: 1.6 }}>拍照识别或点击星期手动编辑</div>
+      <div style={{ fontSize: 12, color: THEME.muted, marginBottom: 16, lineHeight: 1.6 }}>拍照识别课表（清晰照片效果更好，可手动修改）</div>
 
       {/* 上传按钮 */}
       <input ref={fileRef} type="file" accept="image/*" onChange={handlePhoto} style={{ display: 'none' }} />

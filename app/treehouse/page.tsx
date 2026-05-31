@@ -510,7 +510,7 @@ export default function TreehousePage() {
             letterSpacing: '0.08em',
             fontFamily: "'Noto Serif SC', serif",
           }}>
-          🌸 妈妈的树洞
+          🌸 木棉树洞
         </motion.button>
         <motion.button whileTap={{ scale: 0.85 }} onClick={() => router.push('/')}
           style={{ background: 'none', border: 'none', color: THEME.textDim, fontSize: '18px', cursor: 'pointer', opacity: 0.35, padding: '4px 8px' }}>

@@ -336,14 +336,14 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
           <div style={{ textAlign: 'center', paddingTop: 20 }}>
             <div style={{ fontSize: 48, marginBottom: 24 }}>✨</div>
             <h2 style={{ fontSize: 22, fontWeight: 500, marginBottom: 32 }}>
-              你的专属根已就绪
+              基本设置完成，进入后可继续完善档案
             </h2>
 
             {[
-              { icon: '🌸', title: '木棉树洞', desc: '深夜有人陪，说说心里话' },
+              { icon: '🌸', title: '木棉树洞', desc: '深夜文字倾诉（需 PIN）' },
               { icon: '📚', title: '汉字解码', desc: '让中文学习变得有趣' },
-              { icon: '⚡', title: '一键办事', desc: '繁琐的事务交给根' },
-              { icon: '🏫', title: '学校通知', desc: '自动解析英文邮件' },
+              { icon: '⚡', title: '一键办事', desc: '根帮你查资料列步骤（首次生成需稍等）' },
+              { icon: '🏫', title: '学校通知', desc: '连接 Gmail 后自动解析学校英文邮件（需在档案中授权）' },
             ].map(card => (
               <div
                 key={card.title}

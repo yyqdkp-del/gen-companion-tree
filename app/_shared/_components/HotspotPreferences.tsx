@@ -176,7 +176,7 @@ export default function HotspotPreferences({ userId, onClose, onSave }: Props) {
               热点关注设置
             </h2>
             <p style={{ margin: '4px 0 0', fontSize: 12, color: THEME.muted }}>
-              选择你想关注的内容，根会替你盯着
+              设置关注偏好，巡逻时会参考
             </p>
           </div>
           <motion.div whileTap={{ scale: 0.85 }} onClick={onClose}
@@ -191,7 +191,7 @@ export default function HotspotPreferences({ userId, onClose, onSave }: Props) {
           <div style={{ marginBottom: 20 }}>
             <div style={{ fontSize: 11, color: THEME.muted, fontWeight: 600,
               marginBottom: 10, letterSpacing: '0.1em' }}>
-              必选关注（系统自动）
+              安全/签证/天气等（默认关注）
             </div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
               {REQUIRED_TOPICS.map(t => (

@@ -127,6 +127,34 @@ export default function SettingsButton() {
 
               <div style={{ padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: 8 }}>
 
+                {loggedIn && (
+                  <motion.div
+                    whileTap={{ scale: isPro && managingSubscription ? 1 : 0.98 }}
+                    onClick={() => {
+                      if (isPro) void handleSubscription()
+                      else goTo('/upgrade')
+                    }}
+                    style={{
+                      padding: '8px 12px',
+                      marginBottom: 8,
+                      borderRadius: 10,
+                      background: isPro ? 'rgba(34,197,94,0.12)' : 'rgba(164,99,85,0.1)',
+                      border: isPro ? '1px solid rgba(34,197,94,0.25)' : '1px solid rgba(164,99,85,0.2)',
+                      borderBottom: '1px solid rgba(0,0,0,0.06)',
+                      cursor: isPro ? (managingSubscription ? 'wait' : 'pointer') : 'pointer',
+                      opacity: managingSubscription ? 0.7 : 1,
+                      fontSize: 12,
+                      fontWeight: 600,
+                      color: isPro ? '#166534' : '#a46355',
+                      textAlign: 'center',
+                    }}
+                  >
+                    {isPro
+                      ? (managingSubscription ? '打开中…' : '✓ 根陪伴 Pro')
+                      : '🌱 升级 Pro · 解锁全部功能'}
+                  </motion.div>
+                )}
+
                 {showLoginPrompt && (
                   <motion.div whileTap={{ scale: 0.98 }} onClick={() => goTo('/auth?next=/')}
                     style={{

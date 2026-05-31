@@ -45,7 +45,7 @@ type Greeting = { text: string; sub: string }
 const getEnergyColor = (v: number) => v > 70 ? '#8ca88d' : v > 40 ? '#b88e5e' : '#d58074'
 
 function getGreetingForHour(h: number): Greeting {
-  if (h < 6) return { text: '深夜了，好好休息', sub: '树洞随时为你亮着' }
+  if (h < 6) return { text: '深夜了，好好休息', sub: '树洞深夜开放，输入 PIN 后可倾诉' }
   if (h < 12) return { text: '早安', sub: '今天也是新的开始' }
   if (h < 18) return { text: '下午好', sub: '喝杯水，歇一歇' }
   if (h < 21) return { text: '晚上好', sub: '今天辛苦了' }
@@ -262,7 +262,7 @@ const HOME_TOUR: TourStep[] = [
   {
     id: 'water',
     title: '三颗水珠，你的家庭全貌',
-    desc: '左边是孩子状态，中间是今日待办，右边是本地热点。点击水珠展开详情。',
+    desc: '上方是孩子状态，下方左边是待办、右边是热点。点击水珠展开详情。',
     emoji: '💧',
     position: 'bottom',
     targetHint: '试试点击中间那颗水珠',
@@ -270,7 +270,7 @@ const HOME_TOUR: TourStep[] = [
   {
     id: 'hotspot',
     title: '根在帮你巡逻',
-    desc: '每天三次，自动扫描本地天气、学校通知、签证政策，只推送对你重要的信息。',
+    desc: '每天早/午/晚根据你的城市更新本地热点；学校邮件需连接 Gmail 后单独同步。',
     emoji: '⚡',
     position: 'center',
   },
@@ -601,7 +601,7 @@ export default function BasePage() {
           <div style={{ width: 90, height: 90, borderRadius: '40% 60% 50% 40%', background: 'rgba(164,99,85,0.08)', animation: 'pulse 1.5s ease infinite 0.4s' }} />
         </div>
         <div style={{ fontSize: 13, color: 'rgba(45,50,47,0.4)', fontFamily: 'sans-serif', letterSpacing: '0.2em' }}>
-          {!sessionReady ? '根·启动中' : '根·同步中'}
+          {!sessionReady ? '根·启动中' : '根·加载中'}
         </div>
         <style>{`
           @keyframes pulse {

@@ -48,7 +48,7 @@ const RIAN_TOUR: TourStep[] = [
   {
     id: 'todo',
     title: '说出来，根来整理',
-    desc: '点击底部相机或麦克风，说一件事、拍一张通知，自动变成待办和日历。',
+    desc: '点击底部相机或麦克风，说出或拍下通知，根会整理成待办或日程（通常需几秒到一分钟）。',
     emoji: '✨',
     position: 'bottom',
     targetHint: '试试底部右侧相机按钮',
@@ -56,7 +56,7 @@ const RIAN_TOUR: TourStep[] = [
   {
     id: 'report',
     title: '每周成长周报',
-    desc: '点击「给爷爷奶奶的成长周报」，自动生成本周故事，一键发微信给国内家人。',
+    desc: '点击「给爷爷奶奶的成长周报」，生成本周成长故事，Pro 可复制链接发给家人。',
     emoji: '💌',
     position: 'center',
   },
@@ -350,7 +350,7 @@ const actionReminders = useMemo<Reminder[]>(() => {
                     wordBreak: 'break-word',
                   }}
                 >
-                  根·生成本周成长故事，一键分享到微信
+                  生成成长周报 · Pro 可复制分享链接
                 </div>
               </div>
               <div style={{ fontSize: 18, color: 'rgba(45,50,47,0.3)', flexShrink: 0 }}>→</div>

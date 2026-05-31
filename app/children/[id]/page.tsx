@@ -83,10 +83,8 @@ function ChildEditContent() {
   const [currentChildId, setCurrentChildId] = useState<string | null>(paramChildId)
   const [isDirty, setIsDirty] = useState(false)
   const [autoSaveHint, setAutoSaveHint] = useState('')
-  const [schoolSyncHint, setSchoolSyncHint] = useState(false)
   const [childHydrated, setChildHydrated] = useState(isNew)
   const autoSaveBusyRef = useRef(false)
-  const schoolSyncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const lastSchoolSyncKeyRef = useRef('')
   const [deleting, setDeleting] = useState(false)
 
@@ -136,10 +134,6 @@ function ChildEditContent() {
     if (lastSchoolSyncKeyRef.current === syncKey) return
     lastSchoolSyncKeyRef.current = syncKey
 
-    setSchoolSyncHint(true)
-    if (schoolSyncTimerRef.current) clearTimeout(schoolSyncTimerRef.current)
-    schoolSyncTimerRef.current = setTimeout(() => setSchoolSyncHint(false), 3000)
-
     void fetchWithAuth('/api/children/sync-school-calendar', {
       method: 'POST',
       body: JSON.stringify({
@@ -149,13 +143,18 @@ function ChildEditContent() {
         grade: schoolData.grade || '',
       }),
     })
+      .then(async (res) => {
+        const data = await res.json().catch(() => ({}))
+        if (res.ok && (data.success || data.skipped)) {
+          toast('校历已更新', 'success')
+        } else {
+          toast('校历同步失败，可稍后重试', 'error')
+        }
+      })
+      .catch(() => {
+        toast('校历同步失败，可稍后重试', 'error')
+      })
   }, [schoolData.school_name, schoolData.school, schoolData.grade])
-
-  useEffect(() => {
-    return () => {
-      if (schoolSyncTimerRef.current) clearTimeout(schoolSyncTimerRef.current)
-    }
-  }, [])
 
   useEffect(() => {
     loadSchools()
@@ -668,12 +667,6 @@ function ChildEditContent() {
             </>
           )}
         </div>
-
-        {(schoolData.school_name || schoolData.school) && schoolSyncHint && (
-          <div style={{ fontSize: 11, color: '#5c7a5e', textAlign: 'center', marginTop: -4, marginBottom: 12 }}>
-            学校日历同步中…
-          </div>
-        )}
 
         {!isNew && childId && (
           <button
