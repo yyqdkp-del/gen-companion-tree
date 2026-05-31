@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useState, type CSSProperties } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Settings, Volume2, VolumeX, X, User, Baby, Car, Plane, LogIn } from 'lucide-react'
+import { Settings, Volume2, VolumeX, X, User, Baby, Car, Plane, LogIn, LogOut } from 'lucide-react'
 import { useApp } from '@/app/context/AppContext'
 import { THEME } from '@/app/_shared/_constants/theme'
 import { fetchWithAuth } from '@/lib/auth/fetchWithAuth'
@@ -20,10 +20,11 @@ const menuItemStyle: CSSProperties = {
 
 export default function SettingsButton() {
   const router = useRouter()
-  const { speechEnabled, toggleSpeech, userId, sessionReady } = useApp()
+  const { speechEnabled, toggleSpeech, userId, sessionReady, signOut } = useApp()
   const [open, setOpen] = useState(false)
   const [isPro, setIsPro] = useState(false)
   const [managingSubscription, setManagingSubscription] = useState(false)
+  const [signingOut, setSigningOut] = useState(false)
 
   const goTo = (path: string) => {
     setOpen(false)
@@ -88,6 +89,17 @@ export default function SettingsButton() {
 
   const loggedIn = !!userId
   const showLoginPrompt = sessionReady && !userId
+
+  const handleSignOut = useCallback(async () => {
+    if (signingOut) return
+    setSigningOut(true)
+    setOpen(false)
+    try {
+      await signOut()
+    } finally {
+      setSigningOut(false)
+    }
+  }, [signOut, signingOut])
 
   return (
     <>
@@ -245,6 +257,28 @@ export default function SettingsButton() {
                     <div style={{ fontSize: 11, color: THEME.muted, marginTop: 1 }}>行程规划 · 比价与购票建议</div>
                   </div>
                 </motion.div>
+
+                {loggedIn && (
+                  <motion.div
+                    whileTap={{ scale: signingOut ? 1 : 0.98 }}
+                    onClick={() => void handleSignOut()}
+                    style={{
+                      ...menuItemStyle,
+                      marginTop: 4,
+                      borderTop: '1px solid rgba(0,0,0,0.06)',
+                      paddingTop: 14,
+                      opacity: signingOut ? 0.6 : 1,
+                      cursor: signingOut ? 'wait' : 'pointer',
+                    }}
+                  >
+                    <LogOut size={16} color="#7a5a35" />
+                    <div>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: '#7a5a35' }}>
+                        {signingOut ? '退出中…' : '退出登录'}
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
 
               </div>
             </motion.div>
