@@ -88,6 +88,12 @@ function Timeline({ items, timeZone }: { items: TimelineItem[]; timeZone: string
   })
   const upcoming = sorted.filter((item) => timelineToMin(item.time) > nowMin)
   const past = sorted.filter((item) => timelineToMin(item.time) + 45 <= nowMin)
+  console.log('Timeline groups:', {
+    nowMin,
+    current: current.map(i => ({ time: i.time, title: i.title, min: timelineToMin(i.time) })),
+    upcoming: upcoming.map(i => ({ time: i.time, title: i.title, min: timelineToMin(i.time) })),
+    past: past.map(i => ({ time: i.time, title: i.title, min: timelineToMin(i.time) })),
+  })
 
   if (!sorted.length) {
     return (
