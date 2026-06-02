@@ -54,11 +54,54 @@ function timelineToMin(time: string | undefined): number {
 function Timeline({ items }: { items: TimelineItem[] }) {
   const now = new Date()
   const nowMin = now.getHours() * 60 + now.getMinutes()
-  const valid = items.filter((it) => timelineToMin(it.time) !== -1)
-  const sorted = [...valid].sort((a, b) => timelineToMin(a.time) - timelineToMin(b.time))
+  console.log('Timeline items:', JSON.stringify(items))
+
+  const validSorted = items.filter((it) => timelineToMin(it.time) !== -1)
+  console.log(
+    'Timeline validSorted:',
+    JSON.stringify({
+      total: items.length,
+      valid: validSorted.length,
+      invalidExamples: items
+        .filter((it) => timelineToMin(it.time) === -1)
+        .slice(0, 10)
+        .map((it) => ({ id: it.id, time: it.time, title: it.title, type: it.type, source: it.source })),
+    }),
+  )
+
+  const sorted = [...validSorted].sort((a, b) => timelineToMin(a.time) - timelineToMin(b.time))
+  console.log(
+    'Timeline sorted:',
+    JSON.stringify({
+      count: sorted.length,
+      first10: sorted.slice(0, 10).map((it) => ({ id: it.id, time: it.time, title: it.title, type: it.type, source: it.source })),
+    }),
+  )
+
   const upcoming = sorted
     .filter(item => timelineToMin(item.time) + 45 >= nowMin)
     .filter(item => item.title?.trim())
+  console.log(
+    'Timeline upcoming:',
+    JSON.stringify({
+      now: now.toISOString(),
+      nowMin,
+      count: upcoming.length,
+      first10: upcoming.slice(0, 10).map((it) => ({ id: it.id, time: it.time, title: it.title, type: it.type, source: it.source })),
+    }),
+  )
+
+  const dashItems = items.filter((it: any) => {
+    const t = typeof it?.title === 'string' ? it.title : ''
+    const emoji = EVENT_TYPE_EMOJI[(it as any)?.type]
+    return t.includes('—') || emoji === '📚'
+  })
+  if (dashItems.length) {
+    console.log(
+      'Timeline 📚/— items:',
+      JSON.stringify(dashItems.map((it) => ({ id: it.id, time: it.time, title: it.title, type: it.type, source: it.source }))),
+    )
+  }
 
   if (!sorted.length) {
     return (
