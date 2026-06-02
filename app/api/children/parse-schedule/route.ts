@@ -1,6 +1,7 @@
 export const dynamic = 'force-dynamic'
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthUser } from '@/lib/auth/getAuthUser'
+import { isPlaceholderSubject } from '@/lib/schedule/placeholderSubject'
 
 const DAYS = ['mon', 'tue', 'wed', 'thu', 'fri'] as const
 const TIME_RE = /^(\d{1,2}):([0-5]\d)$/
@@ -16,7 +17,8 @@ function normalizeTime(v: unknown): string | null {
 function normalizeSubject(v: unknown): string | null {
   if (typeof v !== 'string') return null
   const s = v.trim()
-  return s ? s : null
+  if (!s || isPlaceholderSubject(s)) return null
+  return s
 }
 
 function cleanDayEntries(raw: unknown): Array<{ time: string; subject: string }> {

@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/client'
 import { calculateEnergy } from '../_engine/energy'
 import type { TimelineItem, HealthStatus, MoodStatus } from '../_types'
 import { addDaysStr, getTodayStr } from '@/lib/date/localDate'
+import { isPlaceholderSubject } from '@/lib/schedule/placeholderSubject'
 
 const supabase = createClient()
 
@@ -212,6 +213,7 @@ export async function fetchChildSchedule(childId: string, userId: string, today:
   daySchedule.forEach((item: any, i: number) => {
     const isObject = typeof item === 'object' && item !== null
     const rawSubject = isObject ? String(item.subject ?? item.title ?? '') : String(item)
+    if (isPlaceholderSubject(rawSubject)) return
     items.push({
       id: `sched_${i}`,
       time:  isObject ? item.time    : '08:00',
