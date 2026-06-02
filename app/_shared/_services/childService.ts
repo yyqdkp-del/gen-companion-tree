@@ -170,19 +170,20 @@ function parseGradeNumber(grade?: string | null): number | undefined {
   return m ? parseInt(m[1], 10) : undefined
 }
 
-export async function fetchChildSchedule(childId: string, today: string) {
+export async function fetchChildSchedule(childId: string, userId: string, today: string) {
   const dow = new Date(`${today}T12:00:00`).getDay()
   const dowKey = DOW_KEY_BY_NUM[dow]
   const y = new Date().getFullYear()
   const yearEnd = getTodayStr(new Date(y, 11, 31))
 
-  const [profileRes, calRes, healthRes, packRes] = await Promise.all([
+  const [profileRes, calRes, healthRes, packRes, actsRes] = await Promise.all([
     supabase.from('child_profiles')
       .select('class_schedule, activities')
       .eq('child_id', childId)
       .maybeSingle(),
     supabase.from('child_school_calendar')
       .select('*').eq('child_id', childId)
+      .eq('user_id', userId)
       .gte('date_start', today).lte('date_start', yearEnd)
       .order('date_start'),
     supabase.from('child_health_records')
@@ -190,14 +191,21 @@ export async function fetchChildSchedule(childId: string, today: string) {
     supabase.from('packing_lists')
       .select('items')
       .eq('child_id', childId)
+      .eq('user_id', userId)
       .eq('date', today)
       .maybeSingle(),
+    supabase.from('child_activities')
+      .select('name, days, start_time, end_time')
+      .eq('child_id', childId)
+      .eq('user_id', userId)
+      .eq('is_active', true),
   ])
 
   const schedData  = profileRes.data
   const calData    = calRes.data    ?? []
   const healthData = healthRes.data ?? []
   const activities = schedData?.activities ?? []
+  const tableActivities = actsRes.data ?? []
   const items: TimelineItem[] = []
 
   const daySchedule = schedData?.class_schedule?.[dowKey] ?? []
@@ -241,6 +249,28 @@ export async function fetchChildSchedule(childId: string, today: string) {
           id: `act_${i}`, time: a.time || a.start_time || '15:00',
           end_time: a.end_time, title: a.name || a.title,
           type: 'extracurricular', source: 'profile', event: a,
+        })
+      }
+    })
+  }
+
+  // child_activities（表）补充：与 child_profiles.activities 合并
+  if (Array.isArray(tableActivities)) {
+    tableActivities.forEach((a: any, i: number) => {
+      const dayList = normalizeActDays(a.days)
+      if (
+        a.day_of_week === dow ||
+        a.day === dow ||
+        dayList.includes(dowKey)
+      ) {
+        items.push({
+          id: `act_tbl_${i}`,
+          time: a.start_time || a.time || '15:00',
+          end_time: a.end_time,
+          title: a.name || a.title,
+          type: 'extracurricular',
+          source: 'profile',
+          event: a,
         })
       }
     })

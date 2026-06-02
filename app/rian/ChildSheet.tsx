@@ -54,7 +54,8 @@ function timelineToMin(time: string | undefined): number {
 function Timeline({ items }: { items: TimelineItem[] }) {
   const now = new Date()
   const nowMin = now.getHours() * 60 + now.getMinutes()
-  const sorted = [...items].sort((a, b) => timelineToMin(a.time) - timelineToMin(b.time))
+  const valid = items.filter((it) => timelineToMin(it.time) !== -1)
+  const sorted = [...valid].sort((a, b) => timelineToMin(a.time) - timelineToMin(b.time))
   const upcoming = sorted
     .filter(item => timelineToMin(item.time) + 45 >= nowMin)
     .filter(item => item.title?.trim())
@@ -326,7 +327,7 @@ export default function ChildSheet({ childList, sel, onSel, onClose, onAdd, user
   const in7days  = getIn7Days()
   const in30days = getIn30Days()
 
-  const { timeline, calendar, packingItems, loading } = useChildSchedule(sel?.id, today)
+  const { timeline, calendar, packingItems, loading } = useChildSchedule(sel?.id, userId, today)
   const { dailyLog, saveStatus }        = useChildDailyLog(
     sel?.id, userId, today,
   )
@@ -357,11 +358,12 @@ export default function ChildSheet({ childList, sel, onSel, onClose, onAdd, user
     await onStatusSaved?.()
   }
 
-  const todayEvents      = calendar.filter(e => e.date_start === today)
-  const eveningEvents    = calendar.filter(e => e.date_start === tomorrow)
-  const weekEvents       = calendar.filter(e => e.date_start > tomorrow  && e.date_start <= in7days)
-  const monthEvents      = calendar.filter(e => e.date_start > in7days   && e.date_start <= in30days)
-  const yearEvents       = calendar.filter(e => e.date_start > in30days)
+  const isNonEmptyTitle = (e: any) => typeof e?.title === 'string' && e.title.trim().length > 0
+  const todayEvents      = calendar.filter(e => e.date_start === today).filter(isNonEmptyTitle)
+  const eveningEvents    = calendar.filter(e => e.date_start === tomorrow).filter(isNonEmptyTitle)
+  const weekEvents       = calendar.filter(e => e.date_start > tomorrow  && e.date_start <= in7days).filter(isNonEmptyTitle)
+  const monthEvents      = calendar.filter(e => e.date_start > in7days   && e.date_start <= in30days).filter(isNonEmptyTitle)
+  const yearEvents       = calendar.filter(e => e.date_start > in30days).filter(isNonEmptyTitle)
   const calendarPackEvents = todayEvents.filter(
     e => Array.isArray(e.requires_items) && e.requires_items.length > 0,
   )
