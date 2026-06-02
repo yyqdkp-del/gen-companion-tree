@@ -5,6 +5,7 @@ import { Loader, Check, X, Plus, Camera } from 'lucide-react'
 import { THEME } from '@/app/_shared/_constants/theme'
 import { fetchWithAuth } from '@/lib/auth/fetchWithAuth'
 import { toast } from '@/app/components/Toast'
+import { formatSubjectDisplay } from '@/app/_shared/_services/childService'
 
 const DAYS = [
   { key: 'mon', label: '周一' },
@@ -239,7 +240,9 @@ function StepSchedule({ data, onChange }: { data: any; onChange: (d: any) => voi
           const count = getDayCount(d.key)
           const dayData = schedule[d.key] || []
           const preview = dayData.slice(0, 2).map((item: any) =>
-            typeof item === 'object' ? item.subject : item
+            typeof item === 'object'
+              ? formatSubjectDisplay(String(item.subject ?? item.title ?? ''))
+              : formatSubjectDisplay(String(item)),
           ).join(' · ')
 
           return (

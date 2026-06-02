@@ -9,39 +9,130 @@ const DOW_KEY_BY_NUM: Record<number, string> = {
   0: 'sun', 1: 'mon', 2: 'tue', 3: 'wed', 4: 'thu', 5: 'fri', 6: 'sat',
 }
 
-/** 英文课名 → 中文（key 为小写） */
+/** 英文课名 → 中文（key 为小写，较长 key 优先用于前缀匹配） */
 const SUBJECT_ZH_MAP: Record<string, string> = {
-  mathematics: '数学',
-  math: '数学',
-  english: '英语',
+  // 语言类
+  'english language arts': '英语语言',
+  'english language': '英语',
+  'language arts': '语言艺术',
+  'mandarin chinese': '普通话',
+  mandarin: '普通话',
+  'chinese language': '中文',
   chinese: '中文',
-  mandarin: '中文',
+  eal: '英语强化',
+  esl: '英语强化',
+  english: '英语',
+  // 探究/综合类
+  'unit of inquiry': '探究单元',
+  uoi: '探究单元',
+  ipc: '国际课程',
+  inquiry: '探究',
+  homeroom: '班会',
+  'morning meeting': '晨会',
+  'morning routine': '晨间例行',
+  'circle time': '圆圈时间',
+  assembly: '全校集会',
+  // 科学/人文
+  'science & technology': '科学与技术',
+  'science and technology': '科学与技术',
+  'social studies': '社会学习',
+  'personal social': '个人社会',
+  pshe: '个人社会健康',
   science: '科学',
-  pe: '体育',
-  'physical education': '体育',
-  art: '美术',
-  music: '音乐',
-  'social studies': '社会',
-  computing: '电脑',
-  computer: '电脑',
-  thai: '泰语',
-  japanese: '日语',
   history: '历史',
   geography: '地理',
+  // 体育/艺术
+  'physical education': '体育',
+  swimming: '游泳',
+  drama: '戏剧',
+  'visual arts': '视觉艺术',
+  'performing arts': '表演艺术',
+  pe: '体育',
+  art: '美术',
+  music: '音乐',
+  // 数学/逻辑
+  mathematics: '数学',
+  maths: '数学',
+  math: '数学',
+  numeracy: '数感',
+  literacy: '读写',
   reading: '阅读',
+  computing: '电脑',
+  computer: '电脑',
+  // 生活类
+  breakfast: '早餐',
+  lunch: '午餐',
+  recess: '课间休息',
+  snack: '点心时间',
+  'free play': '自由活动',
+  nap: '午休',
+  // 其他常见
+  thai: '泰语',
+  japanese: '日语',
 }
 
-function isPureAsciiEnglishSubject(s: string): boolean {
+const SUBJECT_ZH_KEYS_BY_LENGTH = Object.keys(SUBJECT_ZH_MAP).sort((a, b) => b.length - a.length)
+
+function countChineseChars(s: string): number {
+  return (s.match(/[\u4e00-\u9fff]/g) || []).length
+}
+
+function normalizeSubjectKey(s: string): string {
+  return s.trim().toLowerCase().replace(/\s+/g, ' ')
+}
+
+function subjectKeyMatches(normalized: string, key: string): boolean {
+  if (normalized === key) return true
+  if (!normalized.startsWith(key)) return false
+  const next = normalized[key.length]
+  return next === undefined || next === ' ' || next === '/' || next === '&' || next === '('
+}
+
+function lookupSubjectZh(subject: string): string | null {
+  const base = normalizeSubjectKey(subject)
+  const variants = [
+    base,
+    base.replace(/\s*&\s*/g, ' and '),
+    base.replace(/\s+and\s+/g, ' & '),
+  ]
+  const seen = new Set<string>()
+
+  for (const normalized of variants) {
+    if (!normalized || seen.has(normalized)) continue
+    seen.add(normalized)
+
+    if (SUBJECT_ZH_MAP[normalized]) return SUBJECT_ZH_MAP[normalized]
+
+    for (const key of SUBJECT_ZH_KEYS_BY_LENGTH) {
+      if (subjectKeyMatches(normalized, key)) return SUBJECT_ZH_MAP[key]
+    }
+  }
+
+  return null
+}
+
+/** 中文字符少于 2 个时尝试英→中双语标注 */
+function shouldFormatSubjectBilingual(s: string): boolean {
   const t = s.trim()
   if (!t) return false
-  return /^[A-Za-z\s.\-/]+$/.test(t)
+  return countChineseChars(t) < 2
 }
 
 export function formatSubjectDisplay(subject: string): string {
   const raw = String(subject || '').trim()
-  if (!raw || !isPureAsciiEnglishSubject(raw)) return raw
-  const zh = SUBJECT_ZH_MAP[raw.toLowerCase()]
+  if (!raw || !shouldFormatSubjectBilingual(raw)) return raw
+  const zh = lookupSubjectZh(raw)
   return zh ? `${raw}（${zh}）` : raw
+}
+
+/** 课表项展示用（对象保留 time，字符串直接格式化） */
+export function formatClassScheduleEntry(item: unknown): unknown {
+  if (typeof item === 'object' && item !== null) {
+    const o = item as { subject?: string; title?: string; time?: string }
+    const raw = String(o.subject ?? o.title ?? '')
+    return { ...o, subject: formatSubjectDisplay(raw) }
+  }
+  return formatSubjectDisplay(String(item))
 }
 
 export function packingListItemsToNames(items: unknown): string[] {
@@ -264,7 +355,9 @@ export async function enrichOneChild(c: any, uid: string, today: string): Promis
   const todayDow = new Date(`${today}T12:00:00`).getDay()
   const todayKey = DOW_KEY_BY_NUM[todayDow]
   const todayClassesRaw = classSchedule[todayKey]
-  const today_classes = Array.isArray(todayClassesRaw) ? todayClassesRaw : []
+  const today_classes = Array.isArray(todayClassesRaw)
+    ? todayClassesRaw.map((cls) => formatClassScheduleEntry(cls))
+    : []
 
   const tableRows = actsRes.status === 'fulfilled' ? (actsRes.value.data || []) : []
   const tableActivities = tableRows.map((row: any) => ({
@@ -322,7 +415,9 @@ export async function enrichOneChild(c: any, uid: string, today: string): Promis
 
   const classEvents = today_classes.map((cls: any) => ({
     event_type: 'class' as const,
-    title: typeof cls === 'object' ? (cls.subject || cls.title || '课程') : String(cls),
+    title: typeof cls === 'object' && cls !== null
+      ? formatSubjectDisplay(String(cls.subject || cls.title || '课程'))
+      : formatSubjectDisplay(String(cls)),
   }))
   const activityEvents = todayActivities.map((a: any) => ({
     event_type: 'extracurricular' as const,
