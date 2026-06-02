@@ -3,12 +3,14 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getAuthUser } from '@/lib/auth/getAuthUser'
 
 const DAYS = ['mon', 'tue', 'wed', 'thu', 'fri'] as const
-const TIME_RE = /^([01]\d|2[0-3]):([0-5]\d)$/
+const TIME_RE = /^(\d{1,2}):([0-5]\d)$/
 
 function normalizeTime(v: unknown): string | null {
-  if (typeof v !== 'string') return null
-  const t = v.trim()
-  return TIME_RE.test(t) ? t : null
+  const t = String(v || '').trim()
+  if (!TIME_RE.test(t)) return null
+  const [h, m] = t.split(':').map(Number)
+  if (h > 23) return null
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
 }
 
 function normalizeSubject(v: unknown): string | null {
