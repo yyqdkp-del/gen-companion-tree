@@ -14,6 +14,7 @@ const DOW_KEY_BY_NUM: Record<number, string> = {
 const SUBJECT_ZH_MAP: Record<string, string> = {
   // 语言类
   'english language arts': '英语语言',
+  ela: '英语语言艺术',
   'english language': '英语',
   'language arts': '语言艺术',
   'mandarin chinese': '普通话',
@@ -31,6 +32,7 @@ const SUBJECT_ZH_MAP: Record<string, string> = {
   homeroom: '班会',
   'morning meeting': '晨会',
   'morning routine': '晨间例行',
+  pledge: '宣誓礼',
   'circle time': '圆圈时间',
   assembly: '全校集会',
   // 科学/人文
@@ -65,9 +67,17 @@ const SUBJECT_ZH_MAP: Record<string, string> = {
   lunch: '午餐',
   recess: '课间休息',
   snack: '点心时间',
+  'rest time': '休息时间',
+  bedrest: '午休',
+  'outdoor play': '户外活动',
+  'choice time': '自由选择时间',
   'free play': '自由活动',
   nap: '午休',
+  'pick up': '接送',
+  stack: '叠叠乐',
   // 其他常见
+  'cornerstone publishing': '出版课',
+  the: '阅读课',
   thai: '泰语',
   japanese: '日语',
 }

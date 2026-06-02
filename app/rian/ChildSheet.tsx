@@ -1,7 +1,7 @@
 'use client'
 import { createClient } from '@/lib/supabase/client'
 const supabase = createClient()
-import React, { useState, useCallback, useEffect } from 'react'
+import React, { useState, useCallback, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, Plus, ChevronRight } from 'lucide-react'
 import VoiceBtn from '@/app/components/VoiceBtn'
@@ -18,6 +18,7 @@ import { calculateEnergy, getEnergyColor } from '@/app/_shared/_engine/energy'
 import ChildEnergyCard from '@/app/_shared/_components/ChildEnergyCard'
 import { formatSubjectDisplay } from '@/app/_shared/_services/childService'
 import { isPlaceholderSubject } from '@/lib/schedule/placeholderSubject'
+import { getUserLocation } from '@/lib/geofence'
 import type { Child, TimelineItem, HealthStatus, MoodStatus } from '@/app/_shared/_types'
 import { addDaysStr, getTodayStr } from '@/lib/date/localDate'
 import { toast } from '@/app/components/Toast'
@@ -73,6 +74,7 @@ function getNowMinInTimeZone(timeZone: string): number {
 function Timeline({ items, timeZone }: { items: TimelineItem[]; timeZone: string }) {
   const [showCompleted, setShowCompleted] = useState(false)
   const nowMin = getNowMinInTimeZone(timeZone)
+  console.log('Timeline timezone/nowMin:', timeZone, nowMin)
 
   const validItems = items
     .filter((it) => timelineToMin(it.time) !== -1)
@@ -479,13 +481,14 @@ export default function ChildSheet({ childList, sel, onSel, onClose, onAdd, user
     sel?.id, userId, today,
   )
 
-  const [timeZone, setTimeZone] = useState<string>(() => {
+  const timeZoneRef = useRef<string>('')
+  if (!timeZoneRef.current) {
     try {
-      return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
+      timeZoneRef.current = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
     } catch {
-      return 'UTC'
+      timeZoneRef.current = 'UTC'
     }
-  })
+  }
 
   useEffect(() => {
     let cancelled = false
@@ -499,15 +502,29 @@ export default function ChildSheet({ childList, sel, onSel, onClose, onAdd, user
           .maybeSingle()
         const tz = (data as any)?.timezone
         if (!cancelled && typeof tz === 'string' && tz.trim()) {
-          setTimeZone(tz.trim())
+          timeZoneRef.current = tz.trim()
+          return
         }
       } catch (e) {
         // ignore; fallback to browser tz
+      }
+
+      try {
+        const loc = await getUserLocation(userId)
+        const tz2 = loc?.timezone
+        if (!cancelled && typeof tz2 === 'string' && tz2.trim()) {
+          timeZoneRef.current = tz2.trim()
+          return
+        }
+      } catch {
+        // ignore
       }
     }
     void loadTz()
     return () => { cancelled = true }
   }, [userId])
+
+  const timeZone = timeZoneRef.current
 
   const [showStatusEditor, setShowStatusEditor] = useState(false)
   const [selectedEvent,    setSelectedEvent]    = useState<ChildEvent | null>(null)
