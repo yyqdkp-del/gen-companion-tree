@@ -53,10 +53,26 @@ function timelineToMin(time: string | undefined): number {
   return parts[0] * 60 + (parts[1] || 0)
 }
 
-function Timeline({ items }: { items: TimelineItem[] }) {
+function getNowMinInTimeZone(timeZone: string): number {
+  try {
+    const parts = new Intl.DateTimeFormat('en-GB', {
+      timeZone,
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    }).formatToParts(new Date())
+    const h = parseInt(parts.find(p => p.type === 'hour')?.value ?? '0', 10)
+    const m = parseInt(parts.find(p => p.type === 'minute')?.value ?? '0', 10)
+    return h * 60 + m
+  } catch {
+    const now = new Date()
+    return now.getHours() * 60 + now.getMinutes()
+  }
+}
+
+function Timeline({ items, timeZone }: { items: TimelineItem[]; timeZone: string }) {
   const [showCompleted, setShowCompleted] = useState(false)
-  const now = new Date()
-  const nowMin = now.getHours() * 60 + now.getMinutes()
+  const nowMin = getNowMinInTimeZone(timeZone)
 
   const base = items
     .filter((it) => timelineToMin(it.time) !== -1)
@@ -208,8 +224,8 @@ function Timeline({ items }: { items: TimelineItem[] }) {
 }
 
 /** 今日日程手风琴计数：仅统计未结束项 */
-function countUpcomingTimeline(items: TimelineItem[]): number {
-  const nowMin = new Date().getHours() * 60 + new Date().getMinutes()
+function countUpcomingTimeline(items: TimelineItem[], timeZone: string): number {
+  const nowMin = getNowMinInTimeZone(timeZone)
   return items.filter(item => timelineToMin(item.time) + 45 >= nowMin).length
 }
 
@@ -423,6 +439,36 @@ export default function ChildSheet({ childList, sel, onSel, onClose, onAdd, user
     sel?.id, userId, today,
   )
 
+  const [timeZone, setTimeZone] = useState<string>(() => {
+    try {
+      return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
+    } catch {
+      return 'UTC'
+    }
+  })
+
+  useEffect(() => {
+    let cancelled = false
+    const loadTz = async () => {
+      if (!userId) return
+      try {
+        const { data } = await supabase
+          .from('user_locations')
+          .select('timezone')
+          .eq('user_id', userId)
+          .maybeSingle()
+        const tz = (data as any)?.timezone
+        if (!cancelled && typeof tz === 'string' && tz.trim()) {
+          setTimeZone(tz.trim())
+        }
+      } catch (e) {
+        // ignore; fallback to browser tz
+      }
+    }
+    void loadTz()
+    return () => { cancelled = true }
+  }, [userId])
+
   const [showStatusEditor, setShowStatusEditor] = useState(false)
   const [selectedEvent,    setSelectedEvent]    = useState<ChildEvent | null>(null)
 
@@ -469,7 +515,7 @@ export default function ChildSheet({ childList, sel, onSel, onClose, onAdd, user
   const tomorrowPack     = [...new Set(eveningEvents.flatMap(e => Array.isArray(e.requires_items) ? e.requires_items : []))]
   const todayMainEventType = todayEvents[0]?.event_type || 'class'
   const todayPackCount   = [...new Set(todayPackEvents.flatMap(e => Array.isArray(e.requires_items) ? e.requires_items : []))].length
-  const upcomingTimelineCount = countUpcomingTimeline(timeline)
+  const upcomingTimelineCount = countUpcomingTimeline(timeline, timeZone)
 
   const hasLoggedStatus = dailyLog.health_status != null && dailyLog.mood_status != null
 
@@ -579,7 +625,7 @@ export default function ChildSheet({ childList, sel, onSel, onClose, onAdd, user
                 ) : (
                   <>
                     <Accordion title="📅 今日日程" count={upcomingTimelineCount} defaultOpen={true}>
-                      <Timeline items={timeline} />
+                      <Timeline items={timeline} timeZone={timeZone} />
                     </Accordion>
                     <Accordion title="🎒 今日携带" count={todayPackCount}
                       badge={todayPackCount > 0 ? '需确认' : undefined}
