@@ -9,6 +9,48 @@ const DOW_KEY_BY_NUM: Record<number, string> = {
   0: 'sun', 1: 'mon', 2: 'tue', 3: 'wed', 4: 'thu', 5: 'fri', 6: 'sat',
 }
 
+/** 英文课名 → 中文（key 为小写） */
+const SUBJECT_ZH_MAP: Record<string, string> = {
+  mathematics: '数学',
+  math: '数学',
+  english: '英语',
+  chinese: '中文',
+  mandarin: '中文',
+  science: '科学',
+  pe: '体育',
+  'physical education': '体育',
+  art: '美术',
+  music: '音乐',
+  'social studies': '社会',
+  computing: '电脑',
+  computer: '电脑',
+  thai: '泰语',
+  japanese: '日语',
+  history: '历史',
+  geography: '地理',
+  reading: '阅读',
+}
+
+function isPureAsciiEnglishSubject(s: string): boolean {
+  const t = s.trim()
+  if (!t) return false
+  return /^[A-Za-z\s.\-/]+$/.test(t)
+}
+
+export function formatSubjectDisplay(subject: string): string {
+  const raw = String(subject || '').trim()
+  if (!raw || !isPureAsciiEnglishSubject(raw)) return raw
+  const zh = SUBJECT_ZH_MAP[raw.toLowerCase()]
+  return zh ? `${raw}（${zh}）` : raw
+}
+
+export function packingListItemsToNames(items: unknown): string[] {
+  if (!Array.isArray(items)) return []
+  return items
+    .map((i: unknown) => (typeof i === 'string' ? i : (i as { name?: string })?.name))
+    .filter((n): n is string => typeof n === 'string' && n.trim().length > 0)
+}
+
 function parseChildAge(child: { birthdate?: string | null; grade?: string | null }): number | undefined {
   if (child.birthdate) {
     const birth = new Date(child.birthdate)
@@ -43,7 +85,7 @@ export async function fetchChildSchedule(childId: string, today: string) {
   const y = new Date().getFullYear()
   const yearEnd = getTodayStr(new Date(y, 11, 31))
 
-  const [profileRes, calRes, healthRes] = await Promise.all([
+  const [profileRes, calRes, healthRes, packRes] = await Promise.all([
     supabase.from('child_profiles')
       .select('class_schedule, activities')
       .eq('child_id', childId)
@@ -54,6 +96,11 @@ export async function fetchChildSchedule(childId: string, today: string) {
       .order('date_start'),
     supabase.from('child_health_records')
       .select('*').eq('child_id', childId).eq('follow_up_date', today),
+    supabase.from('packing_lists')
+      .select('items')
+      .eq('child_id', childId)
+      .eq('date', today)
+      .maybeSingle(),
   ])
 
   const schedData  = profileRes.data
@@ -64,11 +111,12 @@ export async function fetchChildSchedule(childId: string, today: string) {
 
   const daySchedule = schedData?.class_schedule?.[dowKey] ?? []
   daySchedule.forEach((item: any, i: number) => {
-    const isObject = typeof item === 'object'
+    const isObject = typeof item === 'object' && item !== null
+    const rawSubject = isObject ? String(item.subject ?? item.title ?? '') : String(item)
     items.push({
       id: `sched_${i}`,
       time:  isObject ? item.time    : '08:00',
-      title: isObject ? item.subject : item,
+      title: formatSubjectDisplay(rawSubject),
       type: 'class', source: 'schedule', event: item,
     })
   })
@@ -107,7 +155,9 @@ export async function fetchChildSchedule(childId: string, today: string) {
     })
   }
 
-  return { timeline: items, calendar: calData }
+  const packingItems = packingListItemsToNames(packRes.data?.items)
+
+  return { timeline: items, calendar: calData, packingItems }
 }
 
 export async function fetchDailyLog(childId: string, date: string) {

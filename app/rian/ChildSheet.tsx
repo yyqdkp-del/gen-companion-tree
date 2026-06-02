@@ -44,37 +44,48 @@ function formatDate(d: string) {
   if (date.toDateString() === tmr.toDateString()) return '明天'
   return ['周日','周一','周二','周三','周四','周五','周六'][date.getDay()] + ` ${date.getMonth()+1}/${date.getDate()}`
 }
+function timelineToMin(t: string) {
+  const [h, m] = t.split(':').map(Number)
+  return h * 60 + (m || 0)
+}
+
 function Timeline({ items }: { items: TimelineItem[] }) {
   const now = new Date()
   const nowMin = now.getHours() * 60 + now.getMinutes()
-  const sorted = [...items].sort((a, b) => {
-    const toMin = (t: string) => { const [h, m] = t.split(':').map(Number); return h * 60 + (m || 0) }
-    return toMin(a.time) - toMin(b.time)
-  })
-  if (!sorted.length) return (
-    <div style={{ fontSize: 12, color: THEME.muted, opacity: 0.6, textAlign: 'center', padding: '8px 0' }}>
-      今天没有课程安排
-    </div>
-  )
+  const sorted = [...items].sort((a, b) => timelineToMin(a.time) - timelineToMin(b.time))
+  const upcoming = sorted.filter(item => timelineToMin(item.time) + 45 >= nowMin)
+
+  if (!sorted.length) {
+    return (
+      <div style={{ fontSize: 12, color: THEME.muted, opacity: 0.6, textAlign: 'center', padding: '8px 0' }}>
+        今天暂无课程安排
+      </div>
+    )
+  }
+  if (!upcoming.length) {
+    return (
+      <div style={{ fontSize: 12, color: THEME.muted, opacity: 0.6, textAlign: 'center', padding: '8px 0' }}>
+        今天课程已全部结束 ✓
+      </div>
+    )
+  }
   return (
     <div style={{ position: 'relative', paddingLeft: 30 }}>
       <div style={{ position: 'absolute', left: 8, top: 6, bottom: 6,
         width: 2, background: 'linear-gradient(180deg,#cddce5,#e8e4dc)', borderRadius: 1 }} />
-      {sorted.map((item, i) => {
-        const [h, m] = item.time.split(':').map(Number)
-        const itemMin = h * 60 + (m || 0)
-        const isPast    = itemMin + 45 < nowMin
+      {upcoming.map((item, i) => {
+        const itemMin = timelineToMin(item.time)
         const isCurrent = itemMin <= nowMin && itemMin + 45 > nowMin
         return (
-          <div key={item.id} style={{ position: 'relative', marginBottom: i < sorted.length - 1 ? 8 : 0 }}>
+          <div key={item.id} style={{ position: 'relative', marginBottom: i < upcoming.length - 1 ? 8 : 0 }}>
             <div style={{ position: 'absolute', left: -24, top: 4, width: 10, height: 10,
               borderRadius: '50%',
-              background: isCurrent ? '#8a7355' : isPast ? 'rgba(0,0,0,0.15)' : GREEN.mid,
+              background: isCurrent ? '#8a7355' : GREEN.mid,
               boxShadow: isCurrent ? `0 0 0 4px rgba(164,99,85,0.2)` : 'none' }} />
             <div style={{ padding: '6px 10px', borderRadius: 9,
-              background: isCurrent ? 'rgba(164,99,85,0.08)' : isPast ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.7)',
+              background: isCurrent ? 'rgba(164,99,85,0.08)' : 'rgba(255,255,255,0.7)',
               border: `0.5px solid ${isCurrent ? 'rgba(164,99,85,0.25)' : 'rgba(0,0,0,0.05)'}`,
-              opacity: isPast ? 0.55 : 1 }}>
+              opacity: 1 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                 <span style={{ fontSize: 10, color: isCurrent ? '#8a7355' : THEME.muted,
                   fontWeight: isCurrent ? 600 : 400, minWidth: 32, flexShrink: 0 }}>
@@ -82,7 +93,7 @@ function Timeline({ items }: { items: TimelineItem[] }) {
                 </span>
                 <span style={{ fontSize: 13 }}>{EVENT_TYPE_EMOJI[item.type] || '📌'}</span>
                 <span style={{ fontSize: 12, fontWeight: isCurrent ? 600 : 400,
-                  color: isCurrent ? THEME.text : isPast ? THEME.muted : THEME.text, flex: 1 }}>
+                  color: isCurrent ? THEME.text : THEME.text, flex: 1 }}>
                   {item.title}
                 </span>
                 {isCurrent && (
@@ -98,6 +109,12 @@ function Timeline({ items }: { items: TimelineItem[] }) {
       })}
     </div>
   )
+}
+
+/** 今日日程手风琴计数：仅统计未结束项 */
+function countUpcomingTimeline(items: TimelineItem[]): number {
+  const nowMin = new Date().getHours() * 60 + new Date().getMinutes()
+  return items.filter(item => timelineToMin(item.time) + 45 >= nowMin).length
 }
 
 function PackingSection({ childId, userId, events, eventType }: {
@@ -305,7 +322,7 @@ export default function ChildSheet({ childList, sel, onSel, onClose, onAdd, user
   const in7days  = getIn7Days()
   const in30days = getIn30Days()
 
-  const { timeline, calendar, loading } = useChildSchedule(sel?.id, today)
+  const { timeline, calendar, packingItems, loading } = useChildSchedule(sel?.id, today)
   const { dailyLog, saveStatus }        = useChildDailyLog(
     sel?.id, userId, today,
   )
@@ -341,10 +358,21 @@ export default function ChildSheet({ childList, sel, onSel, onClose, onAdd, user
   const weekEvents       = calendar.filter(e => e.date_start > tomorrow  && e.date_start <= in7days)
   const monthEvents      = calendar.filter(e => e.date_start > in7days   && e.date_start <= in30days)
   const yearEvents       = calendar.filter(e => e.date_start > in30days)
-  const todayPackEvents  = [...todayEvents, ...timeline.filter(t => t.source === 'schedule').map(t => t.event || {})]
+  const calendarPackEvents = todayEvents.filter(
+    e => Array.isArray(e.requires_items) && e.requires_items.length > 0,
+  )
+  const schedulePackEvents = timeline
+    .filter(t => t.source === 'schedule')
+    .map(t => t.event || {})
+    .filter(e => Array.isArray(e.requires_items) && e.requires_items.length > 0)
+  const packingListEvents = packingItems.length
+    ? [{ requires_items: packingItems, _source: 'packing_list' as const }]
+    : []
+  const todayPackEvents  = [...calendarPackEvents, ...schedulePackEvents, ...packingListEvents]
   const tomorrowPack     = [...new Set(eveningEvents.flatMap(e => Array.isArray(e.requires_items) ? e.requires_items : []))]
   const todayMainEventType = todayEvents[0]?.event_type || 'class'
   const todayPackCount   = [...new Set(todayPackEvents.flatMap(e => Array.isArray(e.requires_items) ? e.requires_items : []))].length
+  const upcomingTimelineCount = countUpcomingTimeline(timeline)
 
   const hasLoggedStatus = dailyLog.health_status != null && dailyLog.mood_status != null
 
@@ -453,7 +481,7 @@ export default function ChildSheet({ childList, sel, onSel, onClose, onAdd, user
                   </div>
                 ) : (
                   <>
-                    <Accordion title="📅 今日日程" count={timeline.length} defaultOpen={true}>
+                    <Accordion title="📅 今日日程" count={upcomingTimelineCount} defaultOpen={true}>
                       <Timeline items={timeline} />
                     </Accordion>
                     <Accordion title="🎒 今日携带" count={todayPackCount}

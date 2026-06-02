@@ -1,12 +1,10 @@
 export const dynamic = 'force-dynamic'
 // app/api/cron/gmail-scan/route.ts
-// Vercel Cron Job：每天4次自动扫描Gmail，兜底Make.com
-// 使用fetch调用Anthropic API，无需额外安装SDK
+// Vercel Cron Job：每天4次自动扫描已连接 Gmail 的用户邮箱
 
 import { NextRequest, NextResponse } from 'next/server'
-import { getTodayStr } from '@/lib/date/localDate'
-
-const GMAIL_MCP_URL = 'https://gmail.mcp.claude.com/mcp'
+import { createClient } from '@supabase/supabase-js'
+import { getValidAccessToken } from '@/lib/google/tokenStore'
 
 const SCHOOL_FILTERS = [
   'school', 'academy', 'college', 'international',
@@ -19,59 +17,142 @@ const SCHOOL_FILTERS = [
   'ClassDojo', 'dojo', 'class story', 'portfolio', 'behavior report',
 ]
 
-async function fetchRecentEmails(): Promise<any[]> {
-  try {
-    const since = new Date(Date.now() - 6 * 60 * 60 * 1000)
-    const sinceStr = getTodayStr(since)
+type GmailMessageRow = {
+  message_id: string
+  from: string
+  subject: string
+  date: string
+  body: string
+  snippet: string
+}
 
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': process.env.ANTHROPIC_API_KEY || '',
-        'anthropic-version': '2023-06-01',
-        'anthropic-beta': 'mcp-client-2025-04-04',
-      },
-      body: JSON.stringify({
-        model: 'claude-opus-4-5',
-        max_tokens: 8000,
-        mcp_servers: [{
-          type: 'url',
-          url: GMAIL_MCP_URL,
-          name: 'gmail-mcp',
-        }],
-        messages: [{
-          role: 'user',
-          content: `搜索Gmail中 ${sinceStr} 之后的邮件，优先找学校/通知/缴费相关。
+function decodeBase64Url(data: string): string {
+  const padded = data.replace(/-/g, '+').replace(/_/g, '/')
+  return Buffer.from(padded, 'base64').toString('utf8')
+}
 
-每封邮件提取以下信息，输出JSON数组：
-[{"message_id":"","from":"","subject":"","date":"","body":"正文最多2000字","snippet":""}]
+function extractBody(payload: { body?: { data?: string }; parts?: unknown[] } | undefined): string {
+  if (!payload) return ''
+  if (payload.body?.data) return decodeBase64Url(payload.body.data)
+  for (const part of payload.parts || []) {
+    const text = extractBody(part as { body?: { data?: string }; parts?: unknown[] })
+    if (text) return text
+  }
+  return ''
+}
 
-只返回JSON数组，无邮件返回[]`
-        }],
-      }),
-    })
+function parseGmailMessage(msg: {
+  id?: string
+  snippet?: string
+  payload?: { headers?: { name: string; value: string }[]; body?: { data?: string }; parts?: unknown[] }
+}): GmailMessageRow {
+  const headers = msg.payload?.headers || []
+  const getHeader = (name: string) =>
+    headers.find((h) => h.name.toLowerCase() === name.toLowerCase())?.value || ''
 
-    const data = await response.json()
-    const text = (data.content || [])
-      .filter((b: any) => b.type === 'text')
-      .map((b: any) => b.text)
-      .join('')
-
-    const jsonMatch = text.match(/\[[\s\S]*\]/)
-    return jsonMatch ? JSON.parse(jsonMatch[0]) : []
-
-  } catch (e: any) {
-    console.error('Gmail MCP读取失败:', e?.message || e)
-    return []
+  return {
+    message_id: msg.id || '',
+    from: getHeader('From'),
+    subject: getHeader('Subject'),
+    date: getHeader('Date'),
+    body: extractBody(msg.payload).slice(0, 2000),
+    snippet: msg.snippet || '',
   }
 }
 
-function filterRelevantEmails(emails: any[]): any[] {
-  return emails.filter(email => {
-    const text = `${email.subject} ${email.from} ${email.snippet || ''}`.toLowerCase()
-    return SCHOOL_FILTERS.some(kw => text.includes(kw.toLowerCase()))
+async function listGmailUserIds(): Promise<string[]> {
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+    process.env.SUPABASE_SERVICE_ROLE_KEY || '',
+  )
+  const { data, error } = await supabase
+    .from('user_google_tokens')
+    .select('user_id')
+    .eq('service', 'gmail')
+    .not('refresh_token', 'is', null)
+
+  if (error) {
+    console.error('[gmail-scan] list users failed:', error.message)
+    return []
+  }
+
+  return [...new Set((data || []).map((row) => row.user_id).filter(Boolean))]
+}
+
+async function fetchRecentEmailsForUser(userId: string): Promise<GmailMessageRow[]> {
+  const accessToken = await getValidAccessToken(userId, 'gmail')
+  if (!accessToken) {
+    console.warn(`[gmail-scan] user=${userId} skip: no valid Gmail token`)
+    return []
+  }
+
+  const sinceSec = Math.floor((Date.now() - 6 * 60 * 60 * 1000) / 1000)
+  const listUrl = new URL('https://gmail.googleapis.com/gmail/v1/users/me/messages')
+  listUrl.searchParams.set('q', `after:${sinceSec}`)
+  listUrl.searchParams.set('maxResults', '30')
+
+  const listRes = await fetch(listUrl.toString(), {
+    headers: { Authorization: `Bearer ${accessToken}` },
   })
+
+  if (!listRes.ok) {
+    const errText = await listRes.text().catch(() => '')
+    throw new Error(`Gmail list failed (${listRes.status}): ${errText.slice(0, 200)}`)
+  }
+
+  const listData = (await listRes.json()) as { messages?: { id: string }[] }
+  const ids = (listData.messages || []).map((m) => m.id).filter(Boolean)
+  const emails: GmailMessageRow[] = []
+
+  for (const id of ids) {
+    try {
+      const msgRes = await fetch(
+        `https://gmail.googleapis.com/gmail/v1/users/me/messages/${id}?format=full`,
+        { headers: { Authorization: `Bearer ${accessToken}` } },
+      )
+      if (!msgRes.ok) continue
+      const msg = await msgRes.json()
+      emails.push(parseGmailMessage(msg))
+    } catch (e) {
+      console.warn(`[gmail-scan] user=${userId} message=${id} read failed:`, (e as Error).message)
+    }
+  }
+
+  return emails
+}
+
+function filterRelevantEmails(emails: GmailMessageRow[]): GmailMessageRow[] {
+  return emails.filter((email) => {
+    const text = `${email.subject} ${email.from} ${email.snippet || ''}`.toLowerCase()
+    return SCHOOL_FILTERS.some((kw) => text.includes(kw.toLowerCase()))
+  })
+}
+
+async function parseEmailsForUser(
+  baseUrl: string,
+  userId: string,
+  emails: GmailMessageRow[],
+): Promise<{ ok: boolean; processed?: number; results?: unknown[]; error?: string }> {
+  const parseRes = await fetch(`${baseUrl}/api/email/parse`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-cron-secret': process.env.CRON_SECRET || '',
+    },
+    body: JSON.stringify(
+      emails.map((e) => ({
+        ...e,
+        user_id: userId,
+        source: 'mcp_scan' as const,
+      })),
+    ),
+  })
+
+  const result = await parseRes.json().catch(() => ({}))
+  if (!parseRes.ok) {
+    return { ok: false, error: result.error || `parse HTTP ${parseRes.status}` }
+  }
+  return { ok: true, processed: result.processed, results: result.results }
 }
 
 export async function GET(req: NextRequest) {
@@ -80,39 +161,78 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  try {
-    const allEmails = await fetchRecentEmails()
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || req.nextUrl.origin
+  const userIds = await listGmailUserIds()
 
-    if (!allEmails.length) {
-      return NextResponse.json({ ok: true, message: '无新邮件', scanned: 0 })
-    }
-
-    const relevant = filterRelevantEmails(allEmails)
-
-    if (!relevant.length) {
-      return NextResponse.json({ ok: true, message: '无相关邮件', scanned: allEmails.length })
-    }
-
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://gen-companion-tree.vercel.app'
-    const parseRes = await fetch(`${baseUrl}/api/email/parse`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(relevant.map(e => ({ ...e, source: 'mcp_scan' }))),
-    })
-
-    const result = await parseRes.json()
-
-    return NextResponse.json({
-      ok: true,
-      scanned: allEmails.length,
-      relevant: relevant.length,
-      processed: result.processed,
-    })
-
-  } catch (e: any) {
-    console.error('Gmail扫描错误:', e?.message || e)
-    return NextResponse.json({ ok: false, error: e?.message }, { status: 500 })
+  if (!userIds.length) {
+    console.log('[gmail-scan] no users with Gmail connected')
+    return NextResponse.json({ ok: true, message: '无已连接 Gmail 的用户', users: 0, results: [] })
   }
+
+  const results: Array<Record<string, unknown>> = []
+
+  for (const userId of userIds) {
+    try {
+      const allEmails = await fetchRecentEmailsForUser(userId)
+      const relevant = filterRelevantEmails(allEmails)
+
+      if (!relevant.length) {
+        console.log(
+          `[gmail-scan] user=${userId} ok scanned=${allEmails.length} relevant=0 processed=0`,
+        )
+        results.push({
+          userId,
+          ok: true,
+          scanned: allEmails.length,
+          relevant: 0,
+          processed: 0,
+        })
+        continue
+      }
+
+      const parsed = await parseEmailsForUser(baseUrl, userId, relevant)
+      if (!parsed.ok) {
+        console.error(
+          `[gmail-scan] user=${userId} parse failed scanned=${allEmails.length} relevant=${relevant.length} error=${parsed.error}`,
+        )
+        results.push({
+          userId,
+          ok: false,
+          scanned: allEmails.length,
+          relevant: relevant.length,
+          error: parsed.error,
+        })
+        continue
+      }
+
+      console.log(
+        `[gmail-scan] user=${userId} ok scanned=${allEmails.length} relevant=${relevant.length} processed=${parsed.processed ?? 0}`,
+      )
+      results.push({
+        userId,
+        ok: true,
+        scanned: allEmails.length,
+        relevant: relevant.length,
+        processed: parsed.processed ?? 0,
+        details: parsed.results,
+      })
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e)
+      console.error(`[gmail-scan] user=${userId} failed:`, message)
+      results.push({ userId, ok: false, error: message })
+    }
+  }
+
+  const succeeded = results.filter((r) => r.ok).length
+  const failed = results.length - succeeded
+
+  return NextResponse.json({
+    ok: failed === 0,
+    users: userIds.length,
+    succeeded,
+    failed,
+    results,
+  })
 }
 
 export async function POST(req: NextRequest) {

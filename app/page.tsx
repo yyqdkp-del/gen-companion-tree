@@ -30,7 +30,6 @@ import { fetchWithAuth } from '@/lib/auth/fetchWithAuth'
 import { logOrAlertNetworkError } from '@/lib/errors/logOrAlertNetworkError'
 import { handleLimitReached } from '@/lib/limits/client'
 import { toast, toastRegisterPrompt } from '@/app/components/Toast'
-import TourGuide, { type TourStep } from '@/app/components/TourGuide'
 import { sanitizeFileName } from '@/lib/storage/sanitizeFileName'
 import { useRouter } from 'next/navigation'
 import HomeRefreshFromQuery from '@/app/components/HomeRefreshFromQuery'
@@ -258,31 +257,198 @@ function InputSheet({ onClose, userId, onProcessing }: {
   )
 }
 
-const HOME_TOUR: TourStep[] = [
+type HomeDropletGuideStep = {
+  id: string
+  title: string
+  lines: string[]
+  anchor: React.CSSProperties
+}
+
+const HOME_DROPLET_GUIDE: HomeDropletGuideStep[] = [
   {
-    id: 'water',
-    title: '三颗水珠，你的家庭全貌',
-    desc: '上方是孩子状态，下方左边是待办、右边是热点。点击水珠展开详情。',
-    emoji: '💧',
-    position: 'bottom',
-    targetHint: '试试点击中间那颗水珠',
+    id: 'child',
+    title: '👶 孩子状态',
+    lines: [
+      '查看今日课表和活动',
+      '能量状态、健康记录',
+      '成长档案一目了然',
+    ],
+    anchor: {
+      top: 'calc(28% + env(safe-area-inset-top, 0px))',
+      left: '50%',
+      transform: 'translateX(-50%)',
+      width: 'min(280px, 86vw)',
+    },
+  },
+  {
+    id: 'todo',
+    title: '📋 今日待办',
+    lines: [
+      '拍张通知、说一件事',
+      '根自动整理成待办和日程',
+      '一键办理签证、预约、填表',
+    ],
+    anchor: {
+      top: 'calc(62% + env(safe-area-inset-top, 0px))',
+      left: 'max(12px, 4vw)',
+      width: 'min(240px, 44vw)',
+    },
   },
   {
     id: 'hotspot',
-    title: '根在帮你巡逻',
-    desc: '每天早/午/晚根据你的城市更新本地热点；学校邮件需连接 Gmail 后单独同步。',
-    emoji: '⚡',
-    position: 'center',
-  },
-  {
-    id: 'nav',
-    title: '底部导航',
-    desc: '🏠首页 · 📚学字 · 📅日安 · 🌳树屋 · 👤档案，每个功能都为海外华人家庭设计。',
-    emoji: '🧭',
-    position: 'bottom',
-    targetHint: '底部导航栏',
+    title: '🌏 本地热点',
+    lines: [
+      '每天早/午/晚自动巡逻',
+      '天气、学校通知、签证政策',
+      '只推对你家重要的资讯',
+    ],
+    anchor: {
+      top: 'calc(62% + env(safe-area-inset-top, 0px))',
+      right: 'max(12px, 4vw)',
+      left: 'auto',
+      width: 'min(240px, 44vw)',
+    },
   },
 ]
+
+function HomeDropletGuide() {
+  const [visible, setVisible] = useState(false)
+  const [stepIndex, setStepIndex] = useState(0)
+
+  useEffect(() => {
+    try {
+      if (localStorage.getItem('tour_home_droplets') === 'done') return
+      const t = setTimeout(() => setVisible(true), 900)
+      return () => clearTimeout(t)
+    } catch {
+      /* ignore */
+    }
+  }, [])
+
+  const dismiss = useCallback(() => {
+    try {
+      localStorage.setItem('tour_home_droplets', 'done')
+    } catch {
+      /* ignore */
+    }
+    setVisible(false)
+  }, [])
+
+  const step = HOME_DROPLET_GUIDE[stepIndex]
+  if (!visible || !step) return null
+
+  const isLast = stepIndex >= HOME_DROPLET_GUIDE.length - 1
+
+  return (
+    <AnimatePresence>
+      {visible && (
+        <>
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={dismiss}
+            style={{
+              position: 'fixed',
+              inset: 0,
+              zIndex: 880,
+              background: 'rgba(45,50,47,0.42)',
+              backdropFilter: 'blur(2px)',
+            }}
+            aria-hidden
+          />
+          <motion.div
+            key={step.id}
+            initial={{ opacity: 0, y: 12, scale: 0.96 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 8, scale: 0.98 }}
+            transition={{ type: 'spring', damping: 22, stiffness: 320 }}
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              position: 'fixed',
+              zIndex: 881,
+              ...step.anchor,
+              background: 'rgba(251,249,246,0.96)',
+              backdropFilter: 'blur(16px)',
+              WebkitBackdropFilter: 'blur(16px)',
+              borderRadius: 18,
+              padding: '16px 18px 14px',
+              boxShadow: '0 12px 40px rgba(45,50,47,0.18)',
+              border: '1px solid rgba(164,99,85,0.18)',
+              pointerEvents: 'auto',
+            }}
+            role="dialog"
+            aria-modal="true"
+          >
+            <div style={{
+              fontSize: 15,
+              fontWeight: 700,
+              color: '#2d322f',
+              fontFamily: "'Noto Serif SC', serif",
+              marginBottom: 10,
+              lineHeight: 1.4,
+            }}>
+              {step.title}
+            </div>
+            <div style={{
+              fontSize: 12,
+              color: 'rgba(45,50,47,0.72)',
+              fontFamily: 'sans-serif',
+              lineHeight: 1.75,
+            }}>
+              {step.lines.map((line) => (
+                <div key={line}>{line}</div>
+              ))}
+            </div>
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              marginTop: 14,
+              gap: 10,
+            }}>
+              <div style={{ display: 'flex', gap: 5 }}>
+                {HOME_DROPLET_GUIDE.map((s, i) => (
+                  <div
+                    key={s.id}
+                    style={{
+                      width: i === stepIndex ? 16 : 5,
+                      height: 5,
+                      borderRadius: 3,
+                      background: i === stepIndex ? '#a46355' : 'rgba(164,99,85,0.22)',
+                      transition: 'all 0.25s ease',
+                    }}
+                  />
+                ))}
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  if (isLast) dismiss()
+                  else setStepIndex((i) => i + 1)
+                }}
+                style={{
+                  padding: '7px 14px',
+                  borderRadius: 12,
+                  border: 'none',
+                  background: '#a46355',
+                  color: '#fff',
+                  fontSize: 12,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  fontFamily: 'sans-serif',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {isLast ? '知道了' : '下一步'}
+              </button>
+            </div>
+          </motion.div>
+        </>
+      )}
+    </AnimatePresence>
+  )
+}
 
 export default function BasePage() {
   const router = useRouter()
@@ -898,7 +1064,7 @@ export default function BasePage() {
 
       {!keyboardOpen && <InstallPWA />}
 
-      <TourGuide tourId="home" steps={HOME_TOUR} />
+      <HomeDropletGuide />
     </main>
   )
 }
