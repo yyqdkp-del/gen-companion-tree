@@ -18,7 +18,6 @@ import { calculateEnergy, getEnergyColor } from '@/app/_shared/_engine/energy'
 import ChildEnergyCard from '@/app/_shared/_components/ChildEnergyCard'
 import { formatSubjectDisplay } from '@/app/_shared/_services/childService'
 import { isPlaceholderSubject } from '@/lib/schedule/placeholderSubject'
-import { getUserLocation } from '@/lib/geofence'
 import type { Child, TimelineItem, HealthStatus, MoodStatus } from '@/app/_shared/_types'
 import { addDaysStr, getTodayStr } from '@/lib/date/localDate'
 import { toast } from '@/app/components/Toast'
@@ -507,17 +506,6 @@ export default function ChildSheet({ childList, sel, onSel, onClose, onAdd, user
         }
       } catch (e) {
         // ignore; fallback to browser tz
-      }
-
-      try {
-        const loc = await getUserLocation(userId)
-        const tz2 = loc?.timezone
-        if (!cancelled && typeof tz2 === 'string' && tz2.trim()) {
-          timeZoneRef.current = tz2.trim()
-          return
-        }
-      } catch {
-        // ignore
       }
     }
     void loadTz()
