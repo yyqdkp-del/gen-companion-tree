@@ -1,7 +1,7 @@
 'use client'
 import { createClient } from '@/lib/supabase/client'
 const supabase = createClient()
-import React, { useState, useCallback, useEffect, useRef } from 'react'
+import React, { useState, useCallback, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, Plus, ChevronRight } from 'lucide-react'
 import VoiceBtn from '@/app/components/VoiceBtn'
@@ -73,7 +73,6 @@ function getNowMinInTimeZone(timeZone: string): number {
 function Timeline({ items, timeZone }: { items: TimelineItem[]; timeZone: string }) {
   const [showCompleted, setShowCompleted] = useState(false)
   const nowMin = getNowMinInTimeZone(timeZone)
-  console.log('Timeline timezone/nowMin:', timeZone, nowMin)
 
   const validItems = items
     .filter((it) => timelineToMin(it.time) !== -1)
@@ -480,14 +479,13 @@ export default function ChildSheet({ childList, sel, onSel, onClose, onAdd, user
     sel?.id, userId, today,
   )
 
-  const timeZoneRef = useRef<string>('')
-  if (!timeZoneRef.current) {
+  const [timeZone, setTimeZone] = useState(() => {
     try {
-      timeZoneRef.current = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
+      return Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Bangkok'
     } catch {
-      timeZoneRef.current = 'UTC'
+      return 'Asia/Bangkok'
     }
-  }
+  })
 
   useEffect(() => {
     let cancelled = false
@@ -501,8 +499,7 @@ export default function ChildSheet({ childList, sel, onSel, onClose, onAdd, user
           .maybeSingle()
         const tz = (data as any)?.timezone
         if (!cancelled && typeof tz === 'string' && tz.trim()) {
-          timeZoneRef.current = tz.trim()
-          return
+          setTimeZone(tz.trim())
         }
       } catch (e) {
         // ignore; fallback to browser tz
@@ -511,8 +508,6 @@ export default function ChildSheet({ childList, sel, onSel, onClose, onAdd, user
     void loadTz()
     return () => { cancelled = true }
   }, [userId])
-
-  const timeZone = timeZoneRef.current
 
   const [showStatusEditor, setShowStatusEditor] = useState(false)
   const [selectedEvent,    setSelectedEvent]    = useState<ChildEvent | null>(null)
