@@ -44,16 +44,20 @@ function formatDate(d: string) {
   if (date.toDateString() === tmr.toDateString()) return '明天'
   return ['周日','周一','周二','周三','周四','周五','周六'][date.getDay()] + ` ${date.getMonth()+1}/${date.getDate()}`
 }
-function timelineToMin(t: string) {
-  const [h, m] = t.split(':').map(Number)
-  return h * 60 + (m || 0)
+function timelineToMin(time: string | undefined): number {
+  if (!time) return -1
+  const parts = time.split(':').map(Number)
+  if (parts.length < 2 || isNaN(parts[0]) || isNaN(parts[1])) return -1
+  return parts[0] * 60 + (parts[1] || 0)
 }
 
 function Timeline({ items }: { items: TimelineItem[] }) {
   const now = new Date()
   const nowMin = now.getHours() * 60 + now.getMinutes()
   const sorted = [...items].sort((a, b) => timelineToMin(a.time) - timelineToMin(b.time))
-  const upcoming = sorted.filter(item => timelineToMin(item.time) + 45 >= nowMin)
+  const upcoming = sorted
+    .filter(item => timelineToMin(item.time) + 45 >= nowMin)
+    .filter(item => item.title?.trim())
 
   if (!sorted.length) {
     return (
@@ -94,7 +98,7 @@ function Timeline({ items }: { items: TimelineItem[] }) {
                 <span style={{ fontSize: 13 }}>{EVENT_TYPE_EMOJI[item.type] || '📌'}</span>
                 <span style={{ fontSize: 12, fontWeight: isCurrent ? 600 : 400,
                   color: isCurrent ? THEME.text : THEME.text, flex: 1 }}>
-                  {item.title}
+                  {item.title || '课程'}
                 </span>
                 {isCurrent && (
                   <span style={{ fontSize: 9, padding: '2px 6px', borderRadius: 8,

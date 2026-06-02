@@ -191,13 +191,31 @@ function StepSchedule({ data, onChange }: { data: any; onChange: (d: any) => voi
     setEditDay(day)
   }
 
+  const normalizeTime = (time: string): string | null => {
+    const t = String(time || '').trim()
+    if (!/^\d{1,2}:\d{2}$/.test(t)) return null
+    const [h, m] = t.split(':').map(Number)
+    if (!Number.isFinite(h) || !Number.isFinite(m)) return null
+    if (h < 0 || h > 23) return null
+    if (m < 0 || m > 59) return null
+    return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
+  }
+
   const saveEdit = () => {
     if (!editDay) return
-    const slots = editText.split('\n').map(s => s.trim()).filter(Boolean).map(s => {
-      const timeMatch = s.match(/^(\d{1,2}:\d{2})\s+(.+)$/)
-      if (timeMatch) return { time: timeMatch[1], subject: timeMatch[2] }
-      return { time: '', subject: s }
-    })
+    const slots = editText
+      .split('\n')
+      .map(s => s.trim())
+      .filter(Boolean)
+      .map(s => {
+        const timeMatch = s.match(/^(\d{1,2}:\d{2})\s+(.+)$/)
+        if (!timeMatch) return null
+        const time = normalizeTime(timeMatch[1])
+        const subject = String(timeMatch[2] || '').trim()
+        if (!time || !subject) return null
+        return { time, subject }
+      })
+      .filter(Boolean) as { time: string; subject: string }[]
     onChange({ ...data, class_schedule: { ...schedule, [editDay]: slots } })
     setEditDay(null)
   }

@@ -5,7 +5,7 @@ import { waitUntil } from '@vercel/functions'
 import { getUserLocation } from '@/lib/geofence'
 import { getAuthUser } from '@/lib/auth/getAuthUser'
 import { checkLimit, recordUsage } from '@/lib/limits/usage'
-import { getTodayStrInTimeZone } from '@/lib/date/localDate'
+import { getTodayStr, getTodayStrInTimeZone } from '@/lib/date/localDate'
 import { isValidHotspotUrl } from '@/lib/hotspot/url'
 
 function normalizePatrolSourceUrl(item: Record<string, unknown>): string {
@@ -63,19 +63,169 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY || ''
 )
 
-async function getFamilySnapshot(userId: string) {
+export type PatrolHealthStatus = 'sick' | 'recovering' | 'healthy'
+
+export type PatrolScenario = {
+  daysUntilBirthday: number | null
+  daysUntilSemesterEnd: number | null
+  dayOfWeek: string
+  isWeekend: boolean
+  healthStatus: PatrolHealthStatus
+  activities: unknown
+}
+
+type SnapshotContext = {
+  todayYmd: string
+  timezone: string
+}
+
+function daysBetweenYmd(fromYmd: string, toYmd: string): number {
+  const from = new Date(`${fromYmd}T12:00:00`)
+  const to = new Date(`${toYmd}T12:00:00`)
+  return Math.round((to.getTime() - from.getTime()) / 86400000)
+}
+
+function daysUntilNextBirthday(birthdate: string | null | undefined, todayYmd: string): number | null {
+  if (!birthdate) return null
+  const datePart = String(birthdate).slice(0, 10)
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(datePart)) return null
+  const birth = new Date(`${datePart}T12:00:00`)
+  if (Number.isNaN(birth.getTime())) return null
+
+  const today = new Date(`${todayYmd}T12:00:00`)
+  let next = new Date(today.getFullYear(), birth.getMonth(), birth.getDate(), 12, 0, 0)
+  if (next.getTime() < today.getTime()) {
+    next = new Date(today.getFullYear() + 1, birth.getMonth(), birth.getDate(), 12, 0, 0)
+  }
+  return daysBetweenYmd(todayYmd, getTodayStr(next))
+}
+
+function getLocalDayContext(todayYmd: string, timezone: string): { dayOfWeek: string; isWeekend: boolean } {
+  const [y, m, d] = todayYmd.split('-').map(Number)
+  const probe = new Date(Date.UTC(y, m - 1, d, 12, 0, 0))
+  const dayOfWeek = new Intl.DateTimeFormat('zh-CN', {
+    timeZone: timezone,
+    weekday: 'long',
+  }).format(probe)
+  const isWeekend = dayOfWeek === '星期六' || dayOfWeek === '星期日'
+  return { dayOfWeek, isWeekend }
+}
+
+function mapHealthStatus(raw: string | null | undefined): PatrolHealthStatus {
+  if (raw === 'sick') return 'sick'
+  if (raw === 'recovering') return 'recovering'
+  return 'healthy'
+}
+
+function healthStatusLabel(status: PatrolHealthStatus): string {
+  if (status === 'sick') return '生病中'
+  if (status === 'recovering') return '恢复中'
+  return '健康'
+}
+
+function buildScenarioContextBlock(scenario: PatrolScenario): string {
+  const lines: string[] = [
+    '【场景上下文】',
+    `今天：${scenario.dayOfWeek}，${scenario.isWeekend ? '周末' : '工作日'}`,
+  ]
+  if (scenario.daysUntilBirthday !== null && scenario.daysUntilBirthday <= 7) {
+    lines.push(`⚠️ 距孩子生日还有 ${scenario.daysUntilBirthday} 天`)
+  }
+  if (scenario.daysUntilSemesterEnd !== null && scenario.daysUntilSemesterEnd <= 14) {
+    lines.push(`⚠️ 距学期结束还有 ${scenario.daysUntilSemesterEnd} 天（期末阶段）`)
+  }
+  if (scenario.healthStatus !== 'healthy') {
+    lines.push(`⚠️ 孩子当前健康状态：${healthStatusLabel(scenario.healthStatus)}，避免推荐高体能户外活动`)
+  }
+
+  lines.push(
+    '',
+    '【场景规则】',
+    '- 若距生日 ≤7 天：必须推送一条生日主题热点（亲子餐厅/儿童乐园/惊喜策划）',
+    '- 若是周末：优先推送本周末适合孩子参加的本地活动',
+    '- 若距学期结束 ≤14 天：推送廉价航空/旅行建议/假期规划',
+    '- 若孩子生病：只推室内活动、饮食恢复、护理建议，禁止户外高体能',
+    '- 若是工作日：优先推送学校相关、家长需要处理的事项',
+  )
+
+  return lines.join('\n')
+}
+
+async function getFamilySnapshot(userId: string, ctx: SnapshotContext) {
+  const firstChildQuery = supabase
+    .from('children')
+    .select('id, name, school_name, grade, birthdate')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: true })
+    .limit(5)
+
   const [
     { data: children },
     { data: places },
     { data: interests },
     { data: habits },
+    { data: latestLog },
+    { data: termRows },
+    { data: childRows },
   ] = await Promise.all([
-    supabase.from('children').select('name, school_name, grade').eq('user_id', userId).limit(5),
+    firstChildQuery,
     supabase.from('family_places').select('name, city, lat, lng, is_primary, visit_frequency').eq('user_id', userId).limit(20),
     supabase.from('interest_weights').select('topic, weight').eq('user_id', userId).gte('weight', 20).order('weight', { ascending: false }).limit(10),
     supabase.from('family_habits').select('notes').eq('user_id', userId).limit(10),
+    supabase.from('child_daily_log')
+      .select('health_status, mood_status, date')
+      .eq('user_id', userId)
+      .order('date', { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    supabase.from('child_school_calendar')
+      .select('date_end, date_start, title')
+      .eq('user_id', userId)
+      .eq('event_type', 'term')
+      .gte('date_end', ctx.todayYmd)
+      .order('date_end', { ascending: true })
+      .limit(1),
+    firstChildQuery,
   ])
-  return { children, places, interests, habits }
+
+  const firstChildId = children?.[0]?.id
+  let profileActivities: unknown = []
+  if (firstChildId) {
+    const { data: prof } = await supabase
+      .from('child_profiles')
+      .select('activities')
+      .eq('child_id', firstChildId)
+      .maybeSingle()
+    profileActivities = prof?.activities ?? []
+  }
+
+  const birthdayCandidates = (children || [])
+    .map((c: { birthdate?: string | null }) => daysUntilNextBirthday(c.birthdate, ctx.todayYmd))
+    .filter((d): d is number => d !== null)
+  const daysUntilBirthday = birthdayCandidates.length
+    ? Math.min(...birthdayCandidates)
+    : null
+
+  const termEnd = termRows?.[0]?.date_end as string | undefined
+  const daysUntilSemesterEnd = termEnd
+    ? daysBetweenYmd(ctx.todayYmd, String(termEnd).slice(0, 10))
+    : null
+
+  const { dayOfWeek, isWeekend } = getLocalDayContext(ctx.todayYmd, ctx.timezone)
+  const healthStatus = mapHealthStatus(latestLog?.health_status)
+
+  const scenario: PatrolScenario = {
+    daysUntilBirthday,
+    daysUntilSemesterEnd: daysUntilSemesterEnd !== null && daysUntilSemesterEnd >= 0
+      ? daysUntilSemesterEnd
+      : null,
+    dayOfWeek,
+    isWeekend,
+    healthStatus,
+    activities: profileActivities,
+  }
+
+  return { children, places, interests, habits, scenario }
 }
 
 async function fetchFamilyContextForHotspots(userId: string, locationCityFallback: string) {
@@ -134,6 +284,21 @@ async function callGrok(
   const frequentPlaces = snapshot.places
     ?.filter((p: any) => ['weekly', 'daily'].includes(p.visit_frequency))
     ?.map((p: any) => p.name).slice(0, 5).join('、') || ''
+  const scenario: PatrolScenario | undefined = snapshot.scenario
+  const scenarioQueries: string[] = []
+  if (scenario?.isWeekend) {
+    scenarioQueries.push(`${location}本周末亲子活动儿童活动`)
+  }
+  if (scenario && scenario.daysUntilBirthday !== null && scenario.daysUntilBirthday <= 7) {
+    scenarioQueries.push(`${location}儿童生日聚会餐厅推荐`)
+  }
+  if (scenario && scenario.daysUntilSemesterEnd !== null && scenario.daysUntilSemesterEnd <= 14) {
+    scenarioQueries.push(`${location}出发廉价航空特价机票`)
+  }
+  if (scenario && scenario.healthStatus !== 'healthy') {
+    scenarioQueries.push(`儿童${scenario.healthStatus}期间饮食调理恢复建议`)
+  }
+
   const hour = new Date().getHours()
   const timeCtx = hour < 10 ? '早上出门前' : hour < 14 ? '午间' : hour < 17 ? '放学前' : '晚间'
 
@@ -141,6 +306,20 @@ async function callGrok(
   const searchPrompt = patrolPrompt || `${location}今日本地情况：天气AQI、突发事件、汇率、路况、活动`
 
   try {
+    const baseSearchItems = [
+      `1. ${location}今日天气+明日预报（含降雨概率和AQI）`,
+      `2. ${location}过去6小时突发事件（封路/火灾/示威/事故）`,
+      `3. 当地主要货币兑人民币今日汇率+近7日走势`,
+      `4. ${child?.school_name || location + '国际学校'}周边今日路况`,
+      `5. ${frequentPlaces ? `${frequentPlaces}近期活动/特卖预告` : location + '当地商场近期活动'}`,
+    ]
+    scenarioQueries.forEach(q => {
+      baseSearchItems.push(`${baseSearchItems.length + 1}. ${q}`)
+    })
+    if (topInterests) {
+      baseSearchItems.push(`${baseSearchItems.length + 1}. 关注话题最新动态：${topInterests}`)
+    }
+
     const res = await fetch('https://api.x.ai/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -160,12 +339,7 @@ async function callGrok(
             content: `${recencyBlock}
 
 现在是${location} ${timeCtx}，搜索以下内容并返回真实数据：
-1. ${location}今日天气+明日预报（含降雨概率和AQI）
-2. ${location}过去6小时突发事件（封路/火灾/示威/事故）
-3. 当地主要货币兑人民币今日汇率+近7日走势
-4. ${child?.school_name || location + '国际学校'}周边今日路况
-5. ${frequentPlaces ? `${frequentPlaces}近期活动/特卖预告` : location + '当地商场近期活动'}
-${topInterests ? `6. 关注话题最新动态：${topInterests}` : ''}
+${baseSearchItems.join('\n')}
 搜索重点：${searchPrompt}
 每条必须包含具体数据、时间、来源。无真实信息不输出。`
           }
@@ -219,8 +393,11 @@ async function callGemini(
   }
 }
 
-function buildPatrolSystem(familyContext: string, recencyBlock: string): string {
+function buildPatrolSystem(familyContext: string, recencyBlock: string, scenario: PatrolScenario): string {
+  const scenarioBlock = buildScenarioContextBlock(scenario)
   return `${recencyBlock}
+
+${scenarioBlock}
 
 你是海外华人家庭的私人安全秘书，专门过滤对妈妈真正重要的信息。
 
@@ -275,7 +452,11 @@ async function callClaude(
   recencyBlock: string,
 ): Promise<any[]> {
   const children = snapshot.children?.map((c: any) => `${c.name}(${c.school_name})`).join('、') || '孩子'
-  const patrolSystem = buildPatrolSystem(familyContext, recencyBlock)
+  const patrolSystem = buildPatrolSystem(
+    familyContext,
+    recencyBlock,
+    snapshot.scenario as PatrolScenario,
+  )
 
   try {
     const res = await fetch('https://api.anthropic.com/v1/messages', {
@@ -451,7 +632,10 @@ async function runPatrolForUsers(userIds: string[], _patrolTime: string) {
       const recencyBlock = buildRecencyBlock(todayYmd)
 
       await archiveOldHotspots(userId)
-      const snapshot = await getFamilySnapshot(userId)
+      const snapshot = await getFamilySnapshot(userId, {
+        todayYmd,
+        timezone: userLocation?.timezone || 'UTC',
+      })
 
       const [grokData, geminiData, familyContext] = await Promise.all([
         callGrok(snapshot, location, recencyBlock, patrolPrompt),

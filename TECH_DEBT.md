@@ -1,52 +1,85 @@
 # 技术债记录
 
-## 高优先级（有真实用户后优先处理）
+## 已解决 ✅
 
 ### 1. 数据同步层架构重构
-- 问题：useChildData + AppContext + syncService 用手写依赖链管理服务端数据
-- 症状：kids 数组引用变化导致同一 child_id 重复 enrich，ERR_INSUFFICIENT_RESOURCES
-- 临时修复：page.tsx setActiveKid effect 加字段比较跳过无效更新
-- 根本方案：用 SWR 或 React Query 替换整个同步层
-- 涉及文件：AppContext.tsx、useChildData.ts、syncService.ts、page.tsx
+- 状态：✅ 已解决（2026-06-02）
+- 方案：AppContext 换 SWR useSWR app-core，useChildData enrich 换 SWR
 
-### 2. 热点设置与巡逻不对应
-- 问题：用户勾选的关注项只有弱关联，Gemini 搜索列表写死，关不掉
-- 临时状态：仅 Grok/Claude 轻微受偏好影响
-- 根本方案：topic → 搜索关键词映射表，Gemini 按开启项动态生成 query
-- 涉及文件：app/api/base/patrol/route.ts、HotspotPreferences.tsx
+### 2. Gmail cron 缺 user_id
+- 状态：✅ 已解决（2026-06-02）
+- 方案：逐用户扫描，每封邮件传 user_id，单用户失败不影响其他用户
 
-### 3. Gmail cron 缺 user_id
-- 问题：gmail-scan cron 多用户场景易整批跳过
-- 临时状态：未修复
-- 根本方案：修复 user_id 传递链路
-- 涉及文件：app/api/cron/gmail-scan/route.ts
+### 3. child_profiles 依赖用户手动保存
+- 状态：✅ 已解决
+- 方案：addChild 后自动创建空 profile
+
+### 4. 热点旧新闻
+- 状态：✅ P0 已修复
+- 方案：recencyBlock + 年份过滤
+- 待做：P1 搜索 API 加 dateRestrict
+
+---
+
+## 高优先级（现在处理）
+
+### 5. 热点设置与巡逻不对应
+- 问题：用户勾选的关注项只有弱关联，Gemini 搜索列表写死
+- 分析完成：topicRegistry 方案已设计
+- 根本方案：
+  - 抽 lib/hotspot/topicRegistry.ts 共享映射
+  - Gemini 按 enabled topics 动态生成 query
+  - Claude 输出后按 topic 过滤兜底
+  - 修 HotspotPreferences 加载逻辑（去掉强制开启 IMPORTANT_TOPICS）
+- 涉及文件：patrol/route.ts、HotspotPreferences.tsx、新建 topicRegistry.ts
+
+### 6. 场景化巡逻（新增）
+- 问题：巡逻是通用信息流，缺少生活场景触发的精准推送
+- 已识别场景：
+  - 周末 → 推荐适合孩子的本地活动
+  - 学期末 → 廉价航空/旅行建议
+  - 孩子生病 → 饮食恢复提示
+  - 孩子生日月 → 亲子餐厅/儿童乐园
+  - 签证到期前 → 提前提醒
+- 所需数据：children.birthday、child_daily_log.health_status、
+  child_school_calendar 学期结束日、当前星期几
+- 根本方案：getFamilySnapshot 增加场景信号，patrol prompt 按场景动态注入
+
+### 7. trialing 用户 Pro 判断不一致
+- 问题：limits/check 里 trialing=Pro，pro/status 里 trialing 可能=false
+- 症状：试用用户周报分享可能被误拦
+- 方案：统一 pro/status 也接受 trialing 状态
+
+---
 
 ## 中优先级
 
-### 4. child_profiles 依赖用户手动保存
-- 问题：已修复（addChild 后自动创建空 profile）
-- 状态：✅ 已解决
+### 8. school_email_domain 没有表单
+- 问题：邮件过滤域名字段无填写入口，过滤基本失效
+- 方案：在 StepSchool 加一个可选输入框「学校邮件域名（如 nis.ac.th）」
 
-### 5. 热点旧新闻
-- 问题：搜索无日期边界，出现 2025 年旧闻
-- 状态：✅ P0 已修复（recencyBlock + 年份过滤）
-- 待做：P1 搜索 API 加 dateRestrict
-
-### 6. 单页 Tab 壳
-- 问题：4 个 Tab 是独立路由，切换时完整 unmount/mount
+### 9. 单页 Tab 壳
+- 问题：4 个 Tab 切换时完整 unmount/mount
 - 临时修复：Link prefetch + 去掉 force-dynamic
-- 根本方案：单页 Tab 壳，4 个模块同页切换
-- 评估：改动大，等用户量上来再做
+- 评估：等用户量上来再做
+
+### 10. 热点 P1：搜索 API 加 dateRestrict
+- 问题：Grok/Gemini query 无日期边界
+- 方案：query 显式加 after:日期 或接入 Tavily
+
+---
 
 ## 低优先级
 
-### 7. AppContext 两处 setTimeout 未清理
-- 位置：initSession 3s 跳转、process_status 回调
-- 风险：unmount 后可能 setState，AppProvider 通常不 unmount 风险较低
+### 11. AppContext setTimeout 未清理
+- 位置：process_status 回调里 3s/4s timer
+- 风险低：AppProvider 通常不 unmount
 
-### 8. pathway_watch channel 名固定
-- 问题：多 Tab 可能共用同名 channel
+### 12. pathway_watch channel 名固定
 - 方案：改为 pathway_watch_${childId}
 
+### 13. TypeScript any 警告
+- 全项目 100+ 处，不影响运行，等有时间统一清理
+
 ---
-最后更新：2026-05-31
+最后更新：2026-06-02
