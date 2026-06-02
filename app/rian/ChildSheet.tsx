@@ -71,6 +71,7 @@ function getNowMinInTimeZone(timeZone: string): number {
 }
 
 function Timeline({ items, timeZone }: { items: TimelineItem[]; timeZone: string }) {
+  console.log('Timeline render - timezone:', timeZone, 'nowMin:', getNowMinInTimeZone(timeZone))
   const [showCompleted, setShowCompleted] = useState(false)
   const nowMin = getNowMinInTimeZone(timeZone)
 
