@@ -16,6 +16,8 @@ import { useChildDailyLog } from '@/app/_shared/_hooks/useChildDailyLog'
 import { logOrAlertNetworkError } from '@/lib/errors/logOrAlertNetworkError'
 import { calculateEnergy, getEnergyColor } from '@/app/_shared/_engine/energy'
 import ChildEnergyCard from '@/app/_shared/_components/ChildEnergyCard'
+import { formatSubjectDisplay } from '@/app/_shared/_services/childService'
+import { isPlaceholderSubject } from '@/lib/schedule/placeholderSubject'
 import type { Child, TimelineItem, HealthStatus, MoodStatus } from '@/app/_shared/_types'
 import { addDaysStr, getTodayStr } from '@/lib/date/localDate'
 import { toast } from '@/app/components/Toast'
@@ -52,13 +54,23 @@ function timelineToMin(time: string | undefined): number {
 }
 
 function Timeline({ items }: { items: TimelineItem[] }) {
+  const [showCompleted, setShowCompleted] = useState(false)
   const now = new Date()
   const nowMin = now.getHours() * 60 + now.getMinutes()
-  const validSorted = items.filter((it) => timelineToMin(it.time) !== -1)
-  const sorted = [...validSorted].sort((a, b) => timelineToMin(a.time) - timelineToMin(b.time))
-  const upcoming = sorted
-    .filter(item => timelineToMin(item.time) + 45 >= nowMin)
-    .filter(item => item.title?.trim())
+
+  const base = items
+    .filter((it) => timelineToMin(it.time) !== -1)
+    .filter((it) => it.title?.trim())
+    .filter((it) => !isPlaceholderSubject(it.title))
+
+  const sorted = [...base].sort((a, b) => timelineToMin(a.time) - timelineToMin(b.time))
+
+  const current = sorted.filter((item) => {
+    const itemMin = timelineToMin(item.time)
+    return itemMin <= nowMin && itemMin + 45 > nowMin
+  })
+  const upcoming = sorted.filter((item) => timelineToMin(item.time) > nowMin)
+  const past = sorted.filter((item) => timelineToMin(item.time) + 45 <= nowMin)
 
   if (!sorted.length) {
     return (
@@ -67,51 +79,130 @@ function Timeline({ items }: { items: TimelineItem[] }) {
       </div>
     )
   }
-  if (!upcoming.length) {
+  if (current.length === 0 && upcoming.length === 0) {
     return (
       <div style={{ fontSize: 12, color: THEME.muted, opacity: 0.6, textAlign: 'center', padding: '8px 0' }}>
-        今天课程已全部结束 ✓
+        今天课程已全部完成 ✓
       </div>
     )
   }
+
+  const renderItem = (item: TimelineItem, opts?: { isCurrent?: boolean; isPast?: boolean }) => {
+    const itemMin = timelineToMin(item.time)
+    const isCurrent = !!opts?.isCurrent
+    const isPast = !!opts?.isPast
+    const title = formatSubjectDisplay(String(item.title || ''))
+    return (
+      <div key={item.id} style={{ position: 'relative', marginBottom: 8, opacity: isPast ? 0.5 : 1 }}>
+        <div style={{
+          position: 'absolute',
+          left: -24,
+          top: 6,
+          width: 10,
+          height: 10,
+          borderRadius: '50%',
+          background: isCurrent ? '#DC2626' : GREEN.mid,
+          boxShadow: isCurrent ? '0 0 0 4px rgba(220,38,38,0.18)' : 'none',
+        }} />
+        <div style={{
+          padding: '7px 10px',
+          borderRadius: 9,
+          background: isCurrent ? 'rgba(220,38,38,0.07)' : 'rgba(255,255,255,0.7)',
+          border: `0.5px solid ${isCurrent ? 'rgba(220,38,38,0.28)' : 'rgba(0,0,0,0.05)'}`,
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{
+              fontSize: 10,
+              color: isCurrent ? '#DC2626' : THEME.muted,
+              fontWeight: isCurrent ? 700 : 400,
+              minWidth: 32,
+              flexShrink: 0,
+            }}>
+              {item.time}
+            </span>
+            <span style={{ fontSize: 13 }}>{EVENT_TYPE_EMOJI[item.type] || '📌'}</span>
+            <span style={{
+              fontSize: 12,
+              fontWeight: isCurrent ? 700 : 400,
+              color: THEME.text,
+              flex: 1,
+            }}>
+              {title || '课程'}
+            </span>
+            {isCurrent && (
+              <span style={{
+                fontSize: 9,
+                padding: '2px 6px',
+                borderRadius: 8,
+                background: '#DC2626',
+                color: '#fff',
+                fontWeight: 700,
+                flexShrink: 0,
+              }}>
+                进行中
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div style={{ position: 'relative', paddingLeft: 30 }}>
       <div style={{ position: 'absolute', left: 8, top: 6, bottom: 6,
         width: 2, background: 'linear-gradient(180deg,#cddce5,#e8e4dc)', borderRadius: 1 }} />
-      {upcoming.map((item, i) => {
-        const itemMin = timelineToMin(item.time)
-        const isCurrent = itemMin <= nowMin && itemMin + 45 > nowMin
-        return (
-          <div key={item.id} style={{ position: 'relative', marginBottom: i < upcoming.length - 1 ? 8 : 0 }}>
-            <div style={{ position: 'absolute', left: -24, top: 4, width: 10, height: 10,
-              borderRadius: '50%',
-              background: isCurrent ? '#8a7355' : GREEN.mid,
-              boxShadow: isCurrent ? `0 0 0 4px rgba(164,99,85,0.2)` : 'none' }} />
-            <div style={{ padding: '6px 10px', borderRadius: 9,
-              background: isCurrent ? 'rgba(164,99,85,0.08)' : 'rgba(255,255,255,0.7)',
-              border: `0.5px solid ${isCurrent ? 'rgba(164,99,85,0.25)' : 'rgba(0,0,0,0.05)'}`,
-              opacity: 1 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <span style={{ fontSize: 10, color: isCurrent ? '#8a7355' : THEME.muted,
-                  fontWeight: isCurrent ? 600 : 400, minWidth: 32, flexShrink: 0 }}>
-                  {item.time}
-                </span>
-                <span style={{ fontSize: 13 }}>{EVENT_TYPE_EMOJI[item.type] || '📌'}</span>
-                <span style={{ fontSize: 12, fontWeight: isCurrent ? 600 : 400,
-                  color: isCurrent ? THEME.text : THEME.text, flex: 1 }}>
-                  {item.title || '课程'}
-                </span>
-                {isCurrent && (
-                  <span style={{ fontSize: 9, padding: '2px 6px', borderRadius: 8,
-                    background: '#8a7355', color: '#fff', fontWeight: 600, flexShrink: 0 }}>
-                    进行中
-                  </span>
-                )}
-              </div>
-            </div>
-          </div>
-        )
-      })}
+      {current.length > 0 && (
+        <div style={{ marginBottom: 12 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: '#DC2626', marginBottom: 6 }}>🔴 进行中</div>
+          {current.map((it) => renderItem(it, { isCurrent: true }))}
+        </div>
+      )}
+
+      {upcoming.length > 0 && (
+        <div style={{ marginBottom: past.length > 0 ? 10 : 0 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: THEME.muted, marginBottom: 6 }}>⏰ 接下来</div>
+          {upcoming.map((it) => renderItem(it))}
+        </div>
+      )}
+
+      {past.length > 0 && (
+        <div>
+          <motion.div
+            whileTap={{ scale: 0.98 }}
+            onClick={() => setShowCompleted((v) => !v)}
+            style={{
+              fontSize: 11,
+              fontWeight: 700,
+              color: THEME.muted,
+              marginBottom: showCompleted ? 8 : 0,
+              cursor: 'pointer',
+              userSelect: 'none',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6,
+              padding: '4px 8px',
+              borderRadius: 10,
+              background: 'rgba(0,0,0,0.03)',
+              border: '0.5px solid rgba(0,0,0,0.05)',
+            }}
+          >
+            ✓ 已完成 {past.length} 节 {showCompleted ? '▴' : '▾'}
+          </motion.div>
+          <AnimatePresence>
+            {showCompleted && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                style={{ overflow: 'hidden', marginTop: 8 }}
+              >
+                {past.map((it) => renderItem(it, { isPast: true }))}
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+      )}
     </div>
   )
 }
