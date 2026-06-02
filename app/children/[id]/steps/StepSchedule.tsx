@@ -2,6 +2,7 @@
 import React, { useState, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Loader, Check, X, Plus, Camera } from 'lucide-react'
+import { useParams } from 'next/navigation'
 import { THEME } from '@/app/_shared/_constants/theme'
 import { fetchWithAuth } from '@/lib/auth/fetchWithAuth'
 import { toast } from '@/app/components/Toast'
@@ -129,6 +130,8 @@ function MultiSelect({ label, options, selected, onChange }: {
 
 // ── Step 0：基本信息 ──
 function StepSchedule({ data, onChange }: { data: any; onChange: (d: any) => void }) {
+  const params = useParams()
+  const childId = params.id as string
   const [parsing, setParsing] = useState(false)
   const [parseSuccess, setParseSuccess] = useState(false)
   const [parseError, setParseError] = useState('')
@@ -169,11 +172,17 @@ function StepSchedule({ data, onChange }: { data: any; onChange: (d: any) => voi
       const resp = await fetchWithAuth('/api/children/parse-schedule', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ image: base64, mediaType: 'image/jpeg' }),
+        body: JSON.stringify({ image: base64, mediaType: 'image/jpeg', childId }),
       })
       const result = await resp.json()
       if (result.error) throw new Error(result.error)
-      onChange({ ...data, class_schedule: result.schedule })
+      onChange({
+        ...data,
+        class_schedule: result.schedule,
+        ...(result.school_start_time ? { school_start_time: result.school_start_time } : {}),
+        ...(result.school_end_time ? { school_end_time: result.school_end_time } : {}),
+        ...(result.schedule_summary ? { schedule_summary: result.schedule_summary } : {}),
+      })
       setParseSuccess(true)
       setTimeout(() => setParseSuccess(false), 3000)
     } catch (err: any) {

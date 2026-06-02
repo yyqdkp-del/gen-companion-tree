@@ -74,12 +74,12 @@ function Timeline({ items, timeZone }: { items: TimelineItem[]; timeZone: string
   const [showCompleted, setShowCompleted] = useState(false)
   const nowMin = getNowMinInTimeZone(timeZone)
 
-  const base = items
+  const validItems = items
     .filter((it) => timelineToMin(it.time) !== -1)
     .filter((it) => it.title?.trim())
     .filter((it) => !isPlaceholderSubject(it.title))
 
-  const sorted = [...base].sort((a, b) => timelineToMin(a.time) - timelineToMin(b.time))
+  const sorted = [...validItems].sort((a, b) => timelineToMin(a.time) - timelineToMin(b.time))
 
   const current = sorted.filter((item) => {
     const itemMin = timelineToMin(item.time)
@@ -95,16 +95,8 @@ function Timeline({ items, timeZone }: { items: TimelineItem[]; timeZone: string
       </div>
     )
   }
-  if (current.length === 0 && upcoming.length === 0) {
-    return (
-      <div style={{ fontSize: 12, color: THEME.muted, opacity: 0.6, textAlign: 'center', padding: '8px 0' }}>
-        今天课程已全部完成 ✓
-      </div>
-    )
-  }
 
   const renderItem = (item: TimelineItem, opts?: { isCurrent?: boolean; isPast?: boolean }) => {
-    const itemMin = timelineToMin(item.time)
     const isCurrent = !!opts?.isCurrent
     const isPast = !!opts?.isPast
     const title = formatSubjectDisplay(String(item.title || ''))
@@ -159,6 +151,54 @@ function Timeline({ items, timeZone }: { items: TimelineItem[]; timeZone: string
               </span>
             )}
           </div>
+        </div>
+      </div>
+    )
+  }
+
+  // current + upcoming 为空，但有 past：显示完成提示 + 仍可展开已完成
+  if (current.length === 0 && upcoming.length === 0 && past.length > 0) {
+    return (
+      <div style={{ position: 'relative', paddingLeft: 30 }}>
+        <div style={{ position: 'absolute', left: 8, top: 6, bottom: 6,
+          width: 2, background: 'linear-gradient(180deg,#cddce5,#e8e4dc)', borderRadius: 1 }} />
+        <div style={{ fontSize: 12, color: THEME.muted, opacity: 0.6, textAlign: 'center', padding: '8px 0 10px' }}>
+          今天课程已全部完成 ✓
+        </div>
+        <div>
+          <motion.div
+            whileTap={{ scale: 0.98 }}
+            onClick={() => setShowCompleted((v) => !v)}
+            style={{
+              fontSize: 11,
+              fontWeight: 700,
+              color: THEME.muted,
+              marginBottom: showCompleted ? 8 : 0,
+              cursor: 'pointer',
+              userSelect: 'none',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6,
+              padding: '4px 8px',
+              borderRadius: 10,
+              background: 'rgba(0,0,0,0.03)',
+              border: '0.5px solid rgba(0,0,0,0.05)',
+            }}
+          >
+            ✓ 已完成 {past.length} 节 {showCompleted ? '▴' : '▾'}
+          </motion.div>
+          <AnimatePresence>
+            {showCompleted && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                style={{ overflow: 'hidden', marginTop: 8 }}
+              >
+                {past.map((it) => renderItem(it, { isPast: true }))}
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
       </div>
     )
