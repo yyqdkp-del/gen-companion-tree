@@ -71,7 +71,6 @@ function getNowMinInTimeZone(timeZone: string): number {
 }
 
 function Timeline({ items, timeZone }: { items: TimelineItem[]; timeZone: string }) {
-  console.log('Timeline render - timezone:', timeZone, 'nowMin:', getNowMinInTimeZone(timeZone))
   const [showCompleted, setShowCompleted] = useState(false)
   const nowMin = getNowMinInTimeZone(timeZone)
 
@@ -88,14 +87,8 @@ function Timeline({ items, timeZone }: { items: TimelineItem[]; timeZone: string
   })
   const upcoming = sorted.filter((item) => timelineToMin(item.time) > nowMin)
   const past = sorted.filter((item) => timelineToMin(item.time) + 45 <= nowMin)
-  console.log('Timeline groups:', {
-    nowMin,
-    current: current.map(i => ({ time: i.time, title: i.title, min: timelineToMin(i.time) })),
-    upcoming: upcoming.map(i => ({ time: i.time, title: i.title, min: timelineToMin(i.time) })),
-    past: past.map(i => ({ time: i.time, title: i.title, min: timelineToMin(i.time) })),
-  })
 
-  if (!sorted.length) {
+  if (!validItems.length) {
     return (
       <div style={{ fontSize: 12, color: THEME.muted, opacity: 0.6, textAlign: 'center', padding: '8px 0' }}>
         今天暂无课程安排
@@ -103,12 +96,15 @@ function Timeline({ items, timeZone }: { items: TimelineItem[]; timeZone: string
     )
   }
 
-  const renderItem = (item: TimelineItem, opts?: { isCurrent?: boolean; isPast?: boolean }) => {
+  const renderItem = (
+    item: TimelineItem,
+    opts?: { isCurrent?: boolean; isPast?: boolean; itemKey?: string },
+  ) => {
     const isCurrent = !!opts?.isCurrent
     const isPast = !!opts?.isPast
     const title = formatSubjectDisplay(String(item.title || ''))
     return (
-      <div key={item.id} style={{ position: 'relative', marginBottom: 8, opacity: isPast ? 0.5 : 1 }}>
+      <div key={opts?.itemKey ?? item.id} style={{ position: 'relative', marginBottom: 8, opacity: isPast ? 0.5 : 1 }}>
         <div style={{
           position: 'absolute',
           left: -24,
@@ -163,16 +159,20 @@ function Timeline({ items, timeZone }: { items: TimelineItem[]; timeZone: string
     )
   }
 
-  // current + upcoming 为空，但有 past：显示完成提示 + 仍可展开已完成
-  if (current.length === 0 && upcoming.length === 0 && past.length > 0) {
-    return (
-      <div style={{ position: 'relative', paddingLeft: 30 }}>
-        <div style={{ position: 'absolute', left: 8, top: 6, bottom: 6,
-          width: 2, background: 'linear-gradient(180deg,#cddce5,#e8e4dc)', borderRadius: 1 }} />
-        <div style={{ fontSize: 12, color: THEME.muted, opacity: 0.6, textAlign: 'center', padding: '8px 0 10px' }}>
-          今天课程已全部完成 ✓
-        </div>
-        <div>
+  return (
+    <div style={{ position: 'relative', paddingLeft: 30 }}>
+      <div style={{
+        position: 'absolute',
+        left: 8,
+        top: 6,
+        bottom: 6,
+        width: 2,
+        background: 'linear-gradient(180deg,#cddce5,#e8e4dc)',
+        borderRadius: 1,
+      }} />
+
+      {past.length > 0 && (
+        <div style={{ marginBottom: current.length > 0 || upcoming.length > 0 ? 12 : 0 }}>
           <motion.div
             whileTap={{ scale: 0.98 }}
             onClick={() => setShowCompleted((v) => !v)}
@@ -202,68 +202,30 @@ function Timeline({ items, timeZone }: { items: TimelineItem[]; timeZone: string
                 exit={{ opacity: 0, height: 0 }}
                 style={{ overflow: 'hidden', marginTop: 8 }}
               >
-                {past.map((it) => renderItem(it, { isPast: true }))}
+                {past.map((it) => renderItem(it, { isPast: true, itemKey: `past-${it.id}` }))}
               </motion.div>
             )}
           </AnimatePresence>
         </div>
-      </div>
-    )
-  }
+      )}
 
-  return (
-    <div style={{ position: 'relative', paddingLeft: 30 }}>
-      <div style={{ position: 'absolute', left: 8, top: 6, bottom: 6,
-        width: 2, background: 'linear-gradient(180deg,#cddce5,#e8e4dc)', borderRadius: 1 }} />
       {current.length > 0 && (
-        <div style={{ marginBottom: 12 }}>
+        <div style={{ marginBottom: upcoming.length > 0 ? 12 : 0 }}>
           <div style={{ fontSize: 11, fontWeight: 700, color: '#DC2626', marginBottom: 6 }}>🔴 进行中</div>
-          {current.map((it) => renderItem(it, { isCurrent: true }))}
+          {current.map((it) => renderItem(it, { isCurrent: true, itemKey: `current-${it.id}` }))}
         </div>
       )}
 
       {upcoming.length > 0 && (
-        <div style={{ marginBottom: past.length > 0 ? 10 : 0 }}>
+        <div>
           <div style={{ fontSize: 11, fontWeight: 700, color: THEME.muted, marginBottom: 6 }}>⏰ 接下来</div>
-          {upcoming.map((it) => renderItem(it))}
+          {upcoming.map((it) => renderItem(it, { itemKey: `upcoming-${it.id}` }))}
         </div>
       )}
 
-      {past.length > 0 && (
-        <div>
-          <motion.div
-            whileTap={{ scale: 0.98 }}
-            onClick={() => setShowCompleted((v) => !v)}
-            style={{
-              fontSize: 11,
-              fontWeight: 700,
-              color: THEME.muted,
-              marginBottom: showCompleted ? 8 : 0,
-              cursor: 'pointer',
-              userSelect: 'none',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 6,
-              padding: '4px 8px',
-              borderRadius: 10,
-              background: 'rgba(0,0,0,0.03)',
-              border: '0.5px solid rgba(0,0,0,0.05)',
-            }}
-          >
-            ✓ 已完成 {past.length} 节 {showCompleted ? '▴' : '▾'}
-          </motion.div>
-          <AnimatePresence>
-            {showCompleted && (
-              <motion.div
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: 'auto' }}
-                exit={{ opacity: 0, height: 0 }}
-                style={{ overflow: 'hidden', marginTop: 8 }}
-              >
-                {past.map((it) => renderItem(it, { isPast: true }))}
-              </motion.div>
-            )}
-          </AnimatePresence>
+      {current.length === 0 && upcoming.length === 0 && (
+        <div style={{ fontSize: 12, color: THEME.muted, opacity: 0.6, textAlign: 'center', padding: '8px 0' }}>
+          今天课程已全部完成 ✓
         </div>
       )}
     </div>

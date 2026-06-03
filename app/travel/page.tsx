@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState, type ReactNode, type CSSProperties } from 'react'
+import { useCallback, useEffect, useRef, useState, type ReactNode, type CSSProperties } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
 import { ArrowLeft, Plane, Loader, MapPin, Calendar as CalIcon, Bookmark } from 'lucide-react'
@@ -52,6 +52,28 @@ const BUDGET_OPTIONS = [
   { value: '>$2000', label: '> $2000' },
 ]
 
+const inputStyle: CSSProperties = {
+  width: '100%',
+  padding: '11px 12px',
+  borderRadius: 12,
+  border: '1.5px solid rgba(164,99,85,0.15)',
+  background: '#f7f4ee',
+  fontSize: 16,
+  color: THEME.text,
+  boxSizing: 'border-box',
+  WebkitAppearance: 'none',
+  appearance: 'none',
+}
+
+function TravelField({ label, children }: { label: ReactNode; children: ReactNode }) {
+  return (
+    <div style={{ marginBottom: 14 }}>
+      <div style={{ fontSize: 12, color: THEME.muted, marginBottom: 6 }}>{label}</div>
+      {children}
+    </div>
+  )
+}
+
 function ageFromBirth(birthdate: string | null | undefined): number | null {
   if (!birthdate) return null
   const b = new Date(birthdate)
@@ -81,10 +103,11 @@ export default function TravelPage() {
   const [flightResult, setFlightResult] = useState<any>(null)
   const [history, setHistory] = useState<any[]>([])
   const [savingPlan, setSavingPlan] = useState(false)
+  const childrenCountTouchedRef = useRef(false)
 
   useEffect(() => {
-    const n = kids?.length ?? 0
-    setChildrenCount(n)
+    if (childrenCountTouchedRef.current) return
+    setChildrenCount(kids?.length ?? 0)
   }, [kids])
 
   const loadProfileCity = useCallback(async () => {
@@ -215,13 +238,6 @@ export default function TravelPage() {
     setSavingPlan(false)
   }
 
-  const Field = ({ label, children }: { label: ReactNode; children: ReactNode }) => (
-    <div style={{ marginBottom: 14 }}>
-      <div style={{ fontSize: 12, color: THEME.muted, marginBottom: 6 }}>{label}</div>
-      {children}
-    </div>
-  )
-
   return (
     <main style={{ minHeight: '100dvh', ...TRAVEL_PAGE_BG, paddingBottom: NAV_HEIGHT_CSS, fontFamily: "'Noto Sans SC', sans-serif" }}>
       <header style={{
@@ -272,44 +288,68 @@ export default function TravelPage() {
             )}
           </div>
         ) : (
-          <>
-            <Field label={<><MapPin size={14} style={{ verticalAlign: 'middle' }} /> 出发地</>}>
-              <input value={departure} onChange={e => setDeparture(e.target.value)}
-                style={inputStyle} placeholder="城市" />
-            </Field>
-            <Field label="目的地">
-              <input value={destination} onChange={e => setDestination(e.target.value)} style={inputStyle} placeholder="国家/城市" />
-            </Field>
+          <div style={{ position: 'relative', zIndex: 1 }}>
+            <TravelField label={<><MapPin size={14} style={{ verticalAlign: 'middle' }} /> 出发地</>}>
+              <input
+                type="text"
+                name="travel-departure"
+                autoComplete="off"
+                value={departure}
+                onChange={e => setDeparture(e.target.value)}
+                style={inputStyle}
+                placeholder="城市"
+              />
+            </TravelField>
+            <TravelField label="目的地">
+              <input
+                type="text"
+                name="travel-destination"
+                autoComplete="off"
+                value={destination}
+                onChange={e => setDestination(e.target.value)}
+                style={inputStyle}
+                placeholder="国家/城市"
+              />
+            </TravelField>
             <div style={{ display: 'flex', gap: 10 }}>
               <div style={{ flex: 1 }}>
-                <Field label={<><CalIcon size={14} style={{ verticalAlign: 'middle' }} /> 出发日期</>}>
+                <TravelField label={<><CalIcon size={14} style={{ verticalAlign: 'middle' }} /> 出发日期</>}>
                   <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} style={inputStyle} />
-                </Field>
+                </TravelField>
               </div>
               <div style={{ flex: 1 }}>
-                <Field label="返回日期">
+                <TravelField label="返回日期">
                   <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} style={inputStyle} />
-                </Field>
+                </TravelField>
               </div>
             </div>
             <div style={{ display: 'flex', gap: 10 }}>
               <div style={{ flex: 1 }}>
-                <Field label="大人">
+                <TravelField label="大人">
                   <input type="number" min={1} value={adults} onChange={e => setAdults(Number(e.target.value) || 1)} style={inputStyle} />
-                </Field>
+                </TravelField>
               </div>
               <div style={{ flex: 1 }}>
-                <Field label="小孩">
-                  <input type="number" min={0} value={childrenCount} onChange={e => setChildrenCount(Number(e.target.value) || 0)} style={inputStyle} />
-                </Field>
+                <TravelField label="小孩">
+                  <input
+                    type="number"
+                    min={0}
+                    value={childrenCount}
+                    onChange={e => {
+                      childrenCountTouchedRef.current = true
+                      setChildrenCount(Number(e.target.value) || 0)
+                    }}
+                    style={inputStyle}
+                  />
+                </TravelField>
               </div>
             </div>
-            <Field label="预算（可选）">
+            <TravelField label="预算（可选）">
               <select value={budget} onChange={e => setBudget(e.target.value)} style={inputStyle}>
                 {BUDGET_OPTIONS.map(o => <option key={o.value || 'any'} value={o.value}>{o.label}</option>)}
               </select>
-            </Field>
-            <Field label="旅行偏好">
+            </TravelField>
+            <TravelField label="旅行偏好">
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
                 {PREF_OPTIONS.map(p => (
                   <motion.button
@@ -325,7 +365,7 @@ export default function TravelPage() {
                   </motion.button>
                 ))}
               </div>
-            </Field>
+            </TravelField>
 
             <motion.button
               type="button"
@@ -499,15 +539,10 @@ export default function TravelPage() {
                 </div>
               </div>
             )}
-          </>
+          </div>
         )}
       </div>
     </main>
   )
 }
 
-const inputStyle: CSSProperties = {
-  width: '100%', padding: '11px 12px', borderRadius: 12,
-  border: '1.5px solid rgba(164,99,85,0.15)',
-  background: '#f7f4ee', fontSize: 14, color: THEME.text, boxSizing: 'border-box',
-}

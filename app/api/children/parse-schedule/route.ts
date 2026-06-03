@@ -71,8 +71,6 @@ type ClaudeDay = {
   schedule?: unknown
   school_start?: unknown
   school_end?: unknown
-  key_transitions?: unknown
-  tonight_prep?: unknown
 }
 
 type ClaudeResponse = {
@@ -84,13 +82,12 @@ function cleanClaude(raw: unknown): {
   schedule: Record<string, LegacyEntry[]>
   school_start_time: string | null
   school_end_time: string | null
-  schedule_summary: string | null
 } {
   const out: Record<string, LegacyEntry[]> = {}
   for (const d of DAYS) out[d] = []
 
   if (!raw || typeof raw !== 'object') {
-    return { schedule: out, school_start_time: null, school_end_time: null, schedule_summary: null }
+    return { schedule: out, school_start_time: null, school_end_time: null }
   }
 
   const input = raw as ClaudeResponse
@@ -104,7 +101,6 @@ function cleanClaude(raw: unknown): {
     const entries = cleanDayEntries(day?.schedule)
     out[d] = entries
 
-    // 从任意一天取到第一份有效 school_start/end 即可（通常一周一致）
     if (!schoolStart) {
       const t = normalizeTime((day as any)?.school_start)
       if (t) schoolStart = t
@@ -115,8 +111,7 @@ function cleanClaude(raw: unknown): {
     }
   }
 
-  const schedule_summary = normalizeDescription(input.summary)
-  return { schedule: out, school_start_time: schoolStart, school_end_time: schoolEnd, schedule_summary }
+  return { schedule: out, school_start_time: schoolStart, school_end_time: schoolEnd }
 }
 
 function createAuthedSupabase(req: NextRequest) {
@@ -135,9 +130,21 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const { image, childId } = await req.json()
+  let image: string | undefined
+  let childId: string | undefined
+  try {
+    const body = await req.json()
+    image = body.image
+    childId = body.childId
+  } catch (parseBodyErr) {
+    console.error('[parse-schedule] req.json failed:', parseBodyErr)
+    return NextResponse.json({ error: '请求体解析失败' }, { status: 400 })
+  }
+
   if (!image) return NextResponse.json({ error: '没有图片' }, { status: 400 })
   if (!childId) return NextResponse.json({ error: '缺少 childId' }, { status: 400 })
+
+  console.error('[parse-schedule] start', { userId: user.id, childId, imageLen: image.length })
 
   try {
     const response = await fetch('https://api.anthropic.com/v1/messages', {
@@ -149,7 +156,7 @@ export async function POST(req: NextRequest) {
       },
       body: JSON.stringify({
         model: 'claude-haiku-4-5-20251001',
-        max_tokens: 2000,
+        max_tokens: 4000,
         messages: [{
           role: 'user',
           content: [
@@ -159,8 +166,7 @@ export async function POST(req: NextRequest) {
             },
             {
               type: 'text',
-  text: `你是一个了解孩子日常的智能助手。
-请分析这份课表，不只是识别时间和科目，而是真正理解这个孩子的一天。
+              text: `你是一个了解孩子日常的智能助手。请分析这份课表，识别时间和科目。
 
 返回 JSON，直接以 { 开头 } 结尾，不要输出任何其他文字。
 
@@ -168,26 +174,17 @@ export async function POST(req: NextRequest) {
   "days": {
     "mon": {
       "schedule": [
-        {
-          "time": "07:50",
-          "subject": "Pick up",
-          "category": "transition",
-          "description": "上学接送时间"
-        }
+        { "time": "08:00", "subject": "Math", "category": "class", "description": "数学课" }
       ],
       "school_start": "08:00",
-      "school_end": "13:15",
-      "key_transitions": [
-        { "time": "07:50", "event": "到校", "type": "arrival" },
-        { "time": "13:15", "event": "放学", "type": "departure" }
-      ],
-      "tonight_prep": [
-        "检查明天的书包",
-        "准备体育课装备"
-      ]
-    }
+      "school_end": "15:00"
+    },
+    "tue": { "schedule": [], "school_start": "08:00", "school_end": "15:00" },
+    "wed": { "schedule": [], "school_start": "08:00", "school_end": "15:00" },
+    "thu": { "schedule": [], "school_start": "08:00", "school_end": "15:00" },
+    "fri": { "schedule": [], "school_start": "08:00", "school_end": "15:00" }
   },
-  "summary": "这是一所国际学校，上课时间07:50-13:15，下午有课外活动时间"
+  "summary": "简要描述学校类型和作息时间"
 }
 
 category 分类规则：
@@ -198,49 +195,112 @@ category 分类规则：
 - activity：课外活动、兴趣班
 
 规则：
-1. time 使用 24 小时制 HH:MM（例如 8:00 也可以，但务必能明确分钟）
+1. time 使用 24 小时制 HH:MM
 2. 每天 schedule 必须按 time 从早到晚排列
 3. subject 保持原文，中英文都保留
 4. 看不清的格填 "—"
-5. school_start/school_end 尽量从表中推断出来（如果无法确定可留空字符串）`,
+5. school_start/school_end 尽量从表中推断（无法确定可留空字符串）`,
             },
           ],
         }],
       }),
     })
 
-    const data = await response.json()
-    const raw = data.content?.[0]?.text || ''
-    const m = raw.match(/\{[\s\S]*\}/)
-    if (!m) return NextResponse.json({ error: '识别失败，请手动填写' }, { status: 400 })
+    console.error('[parse-schedule] anthropic status:', response.status, response.statusText)
 
-    const cleaned = cleanClaude(JSON.parse(m[0]))
+    const data = await response.json()
+    if (!response.ok) {
+      console.error('[parse-schedule] anthropic error body:', JSON.stringify(data).slice(0, 2000))
+    }
+
+    const raw = data.content?.[0]?.text || ''
+    console.error('[parse-schedule] claude raw length:', raw.length, 'stop_reason:', data.stop_reason)
+    if (data.stop_reason === 'max_tokens') {
+      console.error('[parse-schedule] WARNING: response truncated at max_tokens, JSON may be invalid')
+    }
+    console.error('[parse-schedule] claude raw preview:', raw.slice(0, 500), '...tail:', raw.slice(-200))
+
+    const m = raw.match(/\{[\s\S]*\}/)
+    if (!m) {
+      console.error('[parse-schedule] no JSON block in claude response')
+      return NextResponse.json({ error: '识别失败，请手动填写' }, { status: 400 })
+    }
+
+    let parsed: unknown
+    try {
+      parsed = JSON.parse(m[0])
+    } catch (jsonErr) {
+      console.error('[parse-schedule] JSON.parse failed:', jsonErr)
+      console.error('[parse-schedule] JSON.parse failed, raw:', raw.slice(0, 500))
+      return NextResponse.json({ error: '识别失败，请重试' }, { status: 400 })
+    }
+
+    const cleaned = cleanClaude(parsed)
+    console.error('[parse-schedule] cleaned summary:', {
+      daysWithEntries: DAYS.filter((d) => (cleaned.schedule[d]?.length ?? 0) > 0),
+      school_start_time: cleaned.school_start_time,
+      school_end_time: cleaned.school_end_time,
+    })
 
     const supabase = createAuthedSupabase(req)
-    await supabase
+
+    const { error: profileError } = await supabase
       .from('child_profiles')
       .upsert(
         {
           user_id: user.id,
           child_id: childId,
           class_schedule: cleaned.schedule,
-          school_start_time: cleaned.school_start_time,
-          // 新增字段：school_end_time（DB 需存在）
-          school_end_time: cleaned.school_end_time,
-          // 新增字段：schedule_summary（DB 需存在）
-          schedule_summary: cleaned.schedule_summary,
-        } as any,
+        },
         { onConflict: 'child_id' },
       )
+
+    if (profileError) {
+      console.error('[parse-schedule] child_profiles upsert failed:', {
+        message: profileError.message,
+        code: profileError.code,
+        details: profileError.details,
+        hint: profileError.hint,
+        childId,
+        userId: user.id,
+      })
+    }
+
+    if (cleaned.school_start_time || cleaned.school_end_time) {
+      const childUpdate: { school_start_time?: string; school_end_time?: string } = {}
+      if (cleaned.school_start_time) childUpdate.school_start_time = cleaned.school_start_time
+      if (cleaned.school_end_time) childUpdate.school_end_time = cleaned.school_end_time
+
+      const { error: childError } = await supabase
+        .from('children')
+        .update(childUpdate)
+        .eq('id', childId)
+        .eq('user_id', user.id)
+
+      if (childError) {
+        console.error('[parse-schedule] children update failed:', {
+          message: childError.message,
+          code: childError.code,
+          details: childError.details,
+          hint: childError.hint,
+          childId,
+          userId: user.id,
+        })
+      }
+    }
 
     return NextResponse.json({
       schedule: cleaned.schedule,
       school_start_time: cleaned.school_start_time,
       school_end_time: cleaned.school_end_time,
-      schedule_summary: cleaned.schedule_summary,
     })
 
-  } catch (e: any) {
-    return NextResponse.json({ error: e.message || '服务器错误' }, { status: 500 })
+  } catch (e: unknown) {
+    console.error('[parse-schedule] unhandled error:', e)
+    if (e instanceof Error) {
+      console.error('[parse-schedule] error name:', e.name, 'message:', e.message, 'stack:', e.stack)
+    }
+    const message = e instanceof Error ? e.message : '服务器错误'
+    return NextResponse.json({ error: message }, { status: 500 })
   }
 }
