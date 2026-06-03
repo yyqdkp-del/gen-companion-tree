@@ -5,6 +5,13 @@ import { isPlaceholderSubject } from '@/lib/schedule/placeholderSubject'
 import { createClient } from '@supabase/supabase-js'
 
 const DAYS = ['mon', 'tue', 'wed', 'thu', 'fri'] as const
+const DAY_KEY_ALIASES: Record<string, (typeof DAYS)[number]> = {
+  mon: 'mon', monday: 'mon',
+  tue: 'tue', tuesday: 'tue',
+  wed: 'wed', wednesday: 'wed',
+  thu: 'thu', thursday: 'thu',
+  fri: 'fri', friday: 'fri',
+}
 const TIME_RE = /^(\d{1,2}):([0-5]\d)$/
 const CATEGORY_SET = new Set(['class', 'life', 'break', 'transition', 'activity'] as const)
 type ScheduleCategory = 'class' | 'life' | 'break' | 'transition' | 'activity'
@@ -67,10 +74,22 @@ function cleanDayEntries(raw: unknown, withSemantic = false): ScheduleEntry[] {
   return out
 }
 
-/** 解析 Claude 返回：支持 {"mon":[...]} 或 {"days":{"mon":[...]}} */
+function resolveDayKey(key: string): (typeof DAYS)[number] | null {
+  return DAY_KEY_ALIASES[key.trim().toLowerCase()] ?? null
+}
+
+/** 解析 Claude 返回：支持 {"mon":[...]}、{"days":{...}}、根级数组、Monday 等 key */
 function normalizeSchedule(raw: unknown, withSemantic = false): ScheduleByDay {
   const out = emptySchedule()
-  if (!raw || typeof raw !== 'object') return out
+  if (!raw) return out
+
+  // Claude 有时直接返回单日数组 [{time,subject},...]
+  if (Array.isArray(raw)) {
+    out.mon = cleanDayEntries(raw, withSemantic)
+    return out
+  }
+
+  if (typeof raw !== 'object') return out
 
   const root = raw as Record<string, unknown>
   const daysObj =
@@ -78,15 +97,27 @@ function normalizeSchedule(raw: unknown, withSemantic = false): ScheduleByDay {
       ? (root.days as Record<string, unknown>)
       : root
 
-  for (const d of DAYS) {
-    const dayRaw = daysObj[d]
+  for (const [key, dayRaw] of Object.entries(daysObj)) {
+    const day = resolveDayKey(key)
+    if (!day) continue
+
     if (Array.isArray(dayRaw)) {
-      out[d] = cleanDayEntries(dayRaw, withSemantic)
+      out[day] = [...out[day], ...cleanDayEntries(dayRaw, withSemantic)]
     } else if (dayRaw && typeof dayRaw === 'object' && !Array.isArray(dayRaw)) {
-      out[d] = cleanDayEntries((dayRaw as { schedule?: unknown }).schedule, withSemantic)
+      out[day] = [...out[day], ...cleanDayEntries((dayRaw as { schedule?: unknown }).schedule, withSemantic)]
     }
   }
   return out
+}
+
+function countRawDayEntries(daysObj: Record<string, unknown>): Record<string, number> {
+  const counts: Record<string, number> = {}
+  for (const [key, dayRaw] of Object.entries(daysObj)) {
+    if (Array.isArray(dayRaw)) counts[key] = dayRaw.length
+    else if (dayRaw && typeof dayRaw === 'object') counts[key] = Array.isArray((dayRaw as { schedule?: unknown }).schedule) ? ((dayRaw as { schedule: unknown[] }).schedule.length) : 0
+    else counts[key] = 0
+  }
+  return counts
 }
 
 function inferSchoolTimes(schedule: ScheduleByDay): {
@@ -144,8 +175,38 @@ async function callClaude(body: object, label: string): Promise<ClaudeCallResult
 }
 
 function parseClaudeJson(raw: string, label: string): unknown | null {
+  const trimmed = raw.trim()
+
+  // 整段即为 JSON（无 markdown 包裹时）
+  if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+    try {
+      return JSON.parse(trimmed)
+    } catch {
+      // 继续尝试从文本中提取
+    }
+  }
+
+  // markdown ```json ... ```
+  const fenced = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/i)
+  if (fenced?.[1]) {
+    try {
+      return JSON.parse(fenced[1].trim())
+    } catch {
+      // fall through
+    }
+  }
+
+  // 贪婪匹配第一个 { ... } 块（旧逻辑）
   const m = raw.match(/\{[\s\S]*\}/)
   if (!m) {
+    const arr = raw.match(/\[[\s\S]*\]/)
+    if (arr) {
+      try {
+        return JSON.parse(arr[0])
+      } catch (jsonErr) {
+        console.error(`[parse-schedule] ${label} array JSON.parse failed:`, jsonErr)
+      }
+    }
     console.error(`[parse-schedule] ${label}: no JSON block`)
     return null
   }
@@ -158,8 +219,8 @@ function parseClaudeJson(raw: string, label: string): unknown | null {
   }
 }
 
-/** 第一步：Vision 只识别 time + subject */
-async function callVision(image: string): Promise<ScheduleByDay | null> {
+/** 第一步：Vision 只识别 time + subject（visionExtractSchedule） */
+async function visionExtractSchedule(image: string): Promise<ScheduleByDay | null> {
   const result = await callClaude({
     model: CLAUDE_MODEL,
     max_tokens: 2000,
@@ -183,18 +244,39 @@ async function callVision(image: string): Promise<ScheduleByDay | null> {
     }],
   }, 'vision')
 
-  if (!result.ok) return null
+  const visionRaw = result.text
+
+  if (!result.ok) {
+    console.error('[parse-schedule] vision raw response:', visionRaw)
+    return null
+  }
   if (result.stop_reason === 'max_tokens') {
     console.error('[parse-schedule] vision WARNING: truncated at max_tokens')
   }
 
-  const parsed = parseClaudeJson(result.text, 'vision')
-  if (!parsed) return null
+  const parsed = parseClaudeJson(visionRaw, 'vision')
+  if (!parsed) {
+    console.error('[parse-schedule] vision raw response:', visionRaw)
+    return null
+  }
 
   const schedule = normalizeSchedule(parsed, false)
   const total = DAYS.reduce((n, d) => n + schedule[d].length, 0)
   if (total === 0) {
-    console.error('[parse-schedule] vision: no entries extracted')
+    console.error('[parse-schedule] vision raw response:', visionRaw)
+    if (Array.isArray(parsed)) {
+      console.error('[parse-schedule] vision parsed as root array, length:', parsed.length)
+    } else {
+      const root = parsed as Record<string, unknown>
+      const daysObj =
+        root.days && typeof root.days === 'object' && !Array.isArray(root.days)
+          ? (root.days as Record<string, unknown>)
+          : root
+      console.error('[parse-schedule] vision parsed top-level keys:', Object.keys(parsed as object))
+      console.error('[parse-schedule] vision raw per-key lengths (before filter):', countRawDayEntries(daysObj))
+    }
+    console.error('[parse-schedule] vision cleaned per-day counts:', Object.fromEntries(DAYS.map((d) => [d, schedule[d].length])))
+    console.error('[parse-schedule] vision: no entries extracted (check: day keys mon-fri? time HH:MM? subject not "—"?)')
     return null
   }
   return schedule
@@ -253,7 +335,7 @@ export async function POST(req: NextRequest) {
   console.error('[parse-schedule] start', { userId: user.id, childId, imageLen: image.length })
 
   try {
-    const step1 = await callVision(image)
+    const step1 = await visionExtractSchedule(image)
     if (!step1) {
       return NextResponse.json({ error: '识别失败，请重试' }, { status: 400 })
     }
