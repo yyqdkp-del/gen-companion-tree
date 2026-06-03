@@ -34,7 +34,7 @@ function normalizeDescription(v: unknown): string | null {
   return s ? s : null
 }
 
-type LegacyEntry = { time: string; subject: string; category?: ScheduleCategory; description?: string }
+type LegacyEntry = { time: string; subject: string; name_zh?: string; category?: ScheduleCategory; description?: string }
 
 function cleanDayEntries(raw: unknown): LegacyEntry[] {
   if (!Array.isArray(raw)) return []
@@ -56,13 +56,14 @@ function cleanDayEntries(raw: unknown): LegacyEntry[] {
     }
 
     if (!entry || typeof entry !== 'object') continue
-    const obj = entry as { time?: unknown; subject?: unknown; category?: unknown; description?: unknown }
+    const obj = entry as { time?: unknown; subject?: unknown; name_zh?: unknown; category?: unknown; description?: unknown }
     const time = normalizeTime(obj.time)
     const subject = normalizeSubject(obj.subject)
     if (!time || !subject) continue
     const category = normalizeCategory(obj.category)
     const description = normalizeDescription(obj.description)
-    out.push({ time, subject, category, ...(description ? { description } : {}) })
+    const name_zh = normalizeDescription(obj.name_zh) ?? undefined
+    out.push({ time, subject, category, ...(name_zh ? { name_zh } : {}), ...(description ? { description } : {}) })
   }
   return out
 }
@@ -174,7 +175,13 @@ export async function POST(req: NextRequest) {
   "days": {
     "mon": {
       "schedule": [
-        { "time": "08:00", "subject": "Math", "category": "class", "description": "数学课" }
+        {
+          "time": "08:00",
+          "subject": "Science Curriculum Learning",
+          "name_zh": "科学课",
+          "category": "class",
+          "description": "自然科学学习"
+        }
       ],
       "school_start": "08:00",
       "school_end": "15:00"
@@ -199,7 +206,8 @@ category 分类规则：
 2. 每天 schedule 必须按 time 从早到晚排列
 3. subject 保持原文，中英文都保留
 4. 看不清的格填 "—"
-5. school_start/school_end 尽量从表中推断（无法确定可留空字符串）`,
+5. school_start/school_end 尽量从表中推断（无法确定可留空字符串）
+6. name_zh 是该课程的中文简称（2-6个字），即使课程名是英文缩写或拼写错误也要给出合理的中文名称，例如 E.L.A. → 英语语言艺术，Cicence → 科学，Redding → 阅读`,
             },
           ],
         }],

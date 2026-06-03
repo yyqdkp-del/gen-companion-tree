@@ -129,19 +129,22 @@ function shouldFormatSubjectBilingual(s: string): boolean {
   return countChineseChars(t) < 2
 }
 
-export function formatSubjectDisplay(subject: string): string {
+export function formatSubjectDisplay(subject: string, nameZh?: string): string {
   const raw = String(subject || '').trim()
-  if (!raw || !shouldFormatSubjectBilingual(raw)) return raw
-  const zh = lookupSubjectZh(raw)
-  return zh ? `${raw}（${zh}）` : raw
+  if (!raw) return raw
+  const zh = String(nameZh || '').trim()
+  if (zh) return `${raw}（${zh}）`
+  if (!shouldFormatSubjectBilingual(raw)) return raw
+  const mapped = lookupSubjectZh(raw)
+  return mapped ? `${raw}（${mapped}）` : raw
 }
 
 /** 课表项展示用（对象保留 time，字符串直接格式化） */
 export function formatClassScheduleEntry(item: unknown): unknown {
   if (typeof item === 'object' && item !== null) {
-    const o = item as { subject?: string; title?: string; time?: string }
+    const o = item as { subject?: string; title?: string; time?: string; name_zh?: string }
     const raw = String(o.subject ?? o.title ?? '')
-    return { ...o, subject: formatSubjectDisplay(raw) }
+    return { ...o, subject: formatSubjectDisplay(raw, o.name_zh) }
   }
   return formatSubjectDisplay(String(item))
 }
@@ -227,7 +230,7 @@ export async function fetchChildSchedule(childId: string, userId: string, today:
     items.push({
       id: `sched_${i}`,
       time:  isObject ? item.time    : '08:00',
-      title: formatSubjectDisplay(rawSubject),
+      title: formatSubjectDisplay(rawSubject, isObject ? item.name_zh : undefined),
       type: 'class', source: 'schedule', event: item,
     })
   })
@@ -458,7 +461,7 @@ export async function enrichOneChild(c: any, uid: string, today: string): Promis
   const classEvents = today_classes.map((cls: any) => ({
     event_type: 'class' as const,
     title: typeof cls === 'object' && cls !== null
-      ? formatSubjectDisplay(String(cls.subject || cls.title || '课程'))
+      ? formatSubjectDisplay(String(cls.subject || cls.title || '课程'), cls.name_zh)
       : formatSubjectDisplay(String(cls)),
   }))
   const activityEvents = todayActivities.map((a: any) => ({
