@@ -12,7 +12,6 @@ const DAY_KEY_ALIASES: Record<string, (typeof DAYS)[number]> = {
   thu: 'thu', thursday: 'thu',
   fri: 'fri', friday: 'fri',
 }
-const TIME_RE = /^(\d{1,2}):([0-5]\d)$/
 const CATEGORY_SET = new Set(['class', 'life', 'break', 'transition', 'activity'] as const)
 type ScheduleCategory = 'class' | 'life' | 'break' | 'transition' | 'activity'
 
@@ -68,9 +67,12 @@ function emptySchedule(): ScheduleByDay {
 
 function normalizeTime(v: unknown): string | null {
   const t = String(v || '').trim()
-  if (!TIME_RE.test(t)) return null
-  const [h, m] = t.split(':').map(Number)
-  if (h > 23) return null
+  const timeStr = t.includes('-') ? t.split('-')[0].trim() : t
+  const match = timeStr.match(/^(\d{1,2}):(\d{2})$/)
+  if (!match) return null
+  const h = parseInt(match[1], 10)
+  const m = parseInt(match[2], 10)
+  if (h > 23 || m > 59) return null
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
 }
 
