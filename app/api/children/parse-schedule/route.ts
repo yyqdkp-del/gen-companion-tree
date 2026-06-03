@@ -9,6 +9,21 @@ const TIME_RE = /^(\d{1,2}):([0-5]\d)$/
 const CATEGORY_SET = new Set(['class', 'life', 'break', 'transition', 'activity'] as const)
 type ScheduleCategory = 'class' | 'life' | 'break' | 'transition' | 'activity'
 
+const CLAUDE_MODEL = 'claude-haiku-4-5-20251001'
+
+type ScheduleEntry = {
+  time: string
+  subject: string
+  name_zh?: string
+  category?: ScheduleCategory
+}
+
+type ScheduleByDay = Record<(typeof DAYS)[number], ScheduleEntry[]>
+
+function emptySchedule(): ScheduleByDay {
+  return { mon: [], tue: [], wed: [], thu: [], fri: [] }
+}
+
 function normalizeTime(v: unknown): string | null {
   const t = String(v || '').trim()
   if (!TIME_RE.test(t)) return null
@@ -24,105 +39,195 @@ function normalizeSubject(v: unknown): string | null {
   return s
 }
 
-function normalizeCategory(v: unknown): ScheduleCategory {
+function normalizeCategory(v: unknown): ScheduleCategory | undefined {
   const s = String(v || '').trim().toLowerCase()
-  return (CATEGORY_SET.has(s as any) ? (s as ScheduleCategory) : 'class')
+  return CATEGORY_SET.has(s as ScheduleCategory) ? (s as ScheduleCategory) : undefined
 }
 
-function normalizeDescription(v: unknown): string | null {
-  const s = String(v || '').trim()
-  return s ? s : null
-}
-
-type LegacyEntry = { time: string; subject: string; name_zh?: string; category?: ScheduleCategory; description?: string }
-
-function cleanDayEntries(raw: unknown): LegacyEntry[] {
+function cleanDayEntries(raw: unknown, withSemantic = false): ScheduleEntry[] {
   if (!Array.isArray(raw)) return []
 
-  const out: LegacyEntry[] = []
+  const out: ScheduleEntry[] = []
   for (const entry of raw) {
-    // 旧格式数组：字符串（仅过滤空字符串；其余没有 time 则不入库）
-    if (typeof entry === 'string') {
-      const s = entry.trim()
-      if (!s) continue
-      // 允许 "HH:MM subject" 的字符串格式，转为对象
-      const m = s.match(/^(\d{1,2}:\d{2})\s+(.+)$/)
-      if (!m) continue
-      const time = normalizeTime(m[1])
-      const subject = normalizeSubject(m[2])
-      if (!time || !subject) continue
-      out.push({ time, subject })
-      continue
-    }
-
     if (!entry || typeof entry !== 'object') continue
-    const obj = entry as { time?: unknown; subject?: unknown; name_zh?: unknown; category?: unknown; description?: unknown }
+    const obj = entry as { time?: unknown; subject?: unknown; name_zh?: unknown; category?: unknown }
     const time = normalizeTime(obj.time)
     const subject = normalizeSubject(obj.subject)
     if (!time || !subject) continue
-    const category = normalizeCategory(obj.category)
-    const description = normalizeDescription(obj.description)
-    const name_zh = normalizeDescription(obj.name_zh) ?? undefined
-    out.push({ time, subject, category, ...(name_zh ? { name_zh } : {}), ...(description ? { description } : {}) })
+
+    const item: ScheduleEntry = { time, subject }
+    if (withSemantic) {
+      const name_zh = String(obj.name_zh || '').trim()
+      const category = normalizeCategory(obj.category)
+      if (name_zh) item.name_zh = name_zh
+      if (category) item.category = category
+    }
+    out.push(item)
   }
   return out
 }
 
-type ClaudeDay = {
-  schedule?: unknown
-  school_start?: unknown
-  school_end?: unknown
+/** 解析 Claude 返回：支持 {"mon":[...]} 或 {"days":{"mon":[...]}} */
+function normalizeSchedule(raw: unknown, withSemantic = false): ScheduleByDay {
+  const out = emptySchedule()
+  if (!raw || typeof raw !== 'object') return out
+
+  const root = raw as Record<string, unknown>
+  const daysObj =
+    root.days && typeof root.days === 'object' && !Array.isArray(root.days)
+      ? (root.days as Record<string, unknown>)
+      : root
+
+  for (const d of DAYS) {
+    const dayRaw = daysObj[d]
+    if (Array.isArray(dayRaw)) {
+      out[d] = cleanDayEntries(dayRaw, withSemantic)
+    } else if (dayRaw && typeof dayRaw === 'object' && !Array.isArray(dayRaw)) {
+      out[d] = cleanDayEntries((dayRaw as { schedule?: unknown }).schedule, withSemantic)
+    }
+  }
+  return out
 }
 
-type ClaudeResponse = {
-  days?: Record<string, ClaudeDay>
-  summary?: unknown
-}
-
-function cleanClaude(raw: unknown): {
-  schedule: Record<string, LegacyEntry[]>
+function inferSchoolTimes(schedule: ScheduleByDay): {
   school_start_time: string | null
   school_end_time: string | null
 } {
-  const out: Record<string, LegacyEntry[]> = {}
-  for (const d of DAYS) out[d] = []
-
-  if (!raw || typeof raw !== 'object') {
-    return { schedule: out, school_start_time: null, school_end_time: null }
-  }
-
-  const input = raw as ClaudeResponse
-  const daysObj = (input.days && typeof input.days === 'object') ? input.days : {}
-
   let schoolStart: string | null = null
   let schoolEnd: string | null = null
 
   for (const d of DAYS) {
-    const day = (daysObj as any)[d] as ClaudeDay | undefined
-    const entries = cleanDayEntries(day?.schedule)
-    out[d] = entries
-
-    if (!schoolStart) {
-      const t = normalizeTime((day as any)?.school_start)
-      if (t) schoolStart = t
-    }
-    if (!schoolEnd) {
-      const t = normalizeTime((day as any)?.school_end)
-      if (t) schoolEnd = t
-    }
+    const entries = schedule[d]
+    if (!entries.length) continue
+    if (!schoolStart) schoolStart = entries[0].time
+    schoolEnd = entries[entries.length - 1].time
   }
 
-  return { schedule: out, school_start_time: schoolStart, school_end_time: schoolEnd }
+  return { school_start_time: schoolStart, school_end_time: schoolEnd }
 }
 
 function createAuthedSupabase(req: NextRequest) {
   const authHeader = req.headers.get('Authorization') ?? req.headers.get('authorization')
-  const token = authHeader?.replace(/^Bearer\\s+/i, '') || ''
+  const token = authHeader?.replace(/^Bearer\s+/i, '') || ''
   return createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     { global: { headers: token ? { Authorization: `Bearer ${token}` } : {} } },
   )
+}
+
+type ClaudeCallResult = { text: string; stop_reason?: string; ok: boolean }
+
+async function callClaude(body: object, label: string): Promise<ClaudeCallResult> {
+  const response = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': process.env.ANTHROPIC_API_KEY || '',
+      'anthropic-version': '2023-06-01',
+    },
+    body: JSON.stringify(body),
+  })
+
+  const data = await response.json()
+  console.error(`[parse-schedule] ${label} status:`, response.status, data.stop_reason ?? '')
+
+  if (!response.ok) {
+    console.error(`[parse-schedule] ${label} error:`, JSON.stringify(data).slice(0, 2000))
+  }
+
+  return {
+    ok: response.ok,
+    text: data.content?.[0]?.text || '',
+    stop_reason: data.stop_reason,
+  }
+}
+
+function parseClaudeJson(raw: string, label: string): unknown | null {
+  const m = raw.match(/\{[\s\S]*\}/)
+  if (!m) {
+    console.error(`[parse-schedule] ${label}: no JSON block`)
+    return null
+  }
+  try {
+    return JSON.parse(m[0])
+  } catch (jsonErr) {
+    console.error(`[parse-schedule] ${label} JSON.parse failed:`, jsonErr)
+    console.error(`[parse-schedule] ${label} raw preview:`, raw.slice(0, 500))
+    return null
+  }
+}
+
+/** 第一步：Vision 只识别 time + subject */
+async function callVision(image: string): Promise<ScheduleByDay | null> {
+  const result = await callClaude({
+    model: CLAUDE_MODEL,
+    max_tokens: 2000,
+    messages: [{
+      role: 'user',
+      content: [
+        {
+          type: 'image',
+          source: { type: 'base64', media_type: 'image/jpeg', data: image },
+        },
+        {
+          type: 'text',
+          text: `这是一张学校课表图片。请提取所有课程信息，
+只返回 JSON 数组，格式：
+[{"time":"08:00","subject":"P.E."},...]
+每天用星期作为 key：
+{"mon":[...],"tue":[...],...}
+只返回 JSON，不要任何解释`,
+        },
+      ],
+    }],
+  }, 'vision')
+
+  if (!result.ok) return null
+  if (result.stop_reason === 'max_tokens') {
+    console.error('[parse-schedule] vision WARNING: truncated at max_tokens')
+  }
+
+  const parsed = parseClaudeJson(result.text, 'vision')
+  if (!parsed) return null
+
+  const schedule = normalizeSchedule(parsed, false)
+  const total = DAYS.reduce((n, d) => n + schedule[d].length, 0)
+  if (total === 0) {
+    console.error('[parse-schedule] vision: no entries extracted')
+    return null
+  }
+  return schedule
+}
+
+/** 第二步：语义理解，补充 name_zh + category */
+async function callSemantic(step1: ScheduleByDay): Promise<ScheduleByDay | null> {
+  const inputJson = JSON.stringify(step1)
+
+  const result = await callClaude({
+    model: CLAUDE_MODEL,
+    max_tokens: 3000,
+    messages: [{
+      role: 'user',
+      content: `以下是国际学校课表数据，请为每个 subject 补充：
+- name_zh：中文简称2-6字
+- category：class（正式课）/life（生活事项）/break（休息）/transition（接送过渡）/activity（活动）
+
+返回相同结构，每个条目加上 name_zh 和 category 字段
+只返回 JSON
+
+${inputJson}`,
+    }],
+  }, 'semantic')
+
+  if (!result.ok) return null
+  if (result.stop_reason === 'max_tokens') {
+    console.error('[parse-schedule] semantic WARNING: truncated at max_tokens')
+  }
+
+  const parsed = parseClaudeJson(result.text, 'semantic')
+  if (!parsed) return null
+  return normalizeSchedule(parsed, true)
 }
 
 export async function POST(req: NextRequest) {
@@ -148,136 +253,39 @@ export async function POST(req: NextRequest) {
   console.error('[parse-schedule] start', { userId: user.id, childId, imageLen: image.length })
 
   try {
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': process.env.ANTHROPIC_API_KEY || '',
-        'anthropic-version': '2023-06-01',
-      },
-      body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 4000,
-        messages: [{
-          role: 'user',
-          content: [
-            {
-              type: 'image',
-              source: { type: 'base64', media_type: 'image/jpeg', data: image },
-            },
-            {
-              type: 'text',
-              text: `你是一个了解孩子日常的智能助手。请分析这份课表，识别时间和科目。
-
-返回 JSON，直接以 { 开头 } 结尾，不要输出任何其他文字。
-
-{
-  "days": {
-    "mon": {
-      "schedule": [
-        {
-          "time": "08:00",
-          "subject": "Science Curriculum Learning",
-          "name_zh": "科学课",
-          "category": "class",
-          "description": "自然科学学习"
-        }
-      ],
-      "school_start": "08:00",
-      "school_end": "15:00"
-    },
-    "tue": { "schedule": [], "school_start": "08:00", "school_end": "15:00" },
-    "wed": { "schedule": [], "school_start": "08:00", "school_end": "15:00" },
-    "thu": { "schedule": [], "school_start": "08:00", "school_end": "15:00" },
-    "fri": { "schedule": [], "school_start": "08:00", "school_end": "15:00" }
-  },
-  "summary": "简要描述学校类型和作息时间"
-}
-
-category 分类规则：
-- class：正式学科课程（数学、英语、科学等）
-- life：生活事件（午餐、点心、午休等）
-- break：课间休息、户外活动
-- transition：接送、过渡时间
-- activity：课外活动、兴趣班
-
-规则：
-1. time 使用 24 小时制 HH:MM
-2. 每天 schedule 必须按 time 从早到晚排列
-3. subject 保持原文，中英文都保留
-4. 看不清的格填 "—"
-5. school_start/school_end 尽量从表中推断（无法确定可留空字符串）
-6. name_zh 是该课程的中文简称（2-6个字），即使课程名是英文缩写或拼写错误也要给出合理的中文名称，例如 E.L.A. → 英语语言艺术，Cicence → 科学，Redding → 阅读`,
-            },
-          ],
-        }],
-      }),
-    })
-
-    console.error('[parse-schedule] anthropic status:', response.status, response.statusText)
-
-    const data = await response.json()
-    if (!response.ok) {
-      console.error('[parse-schedule] anthropic error body:', JSON.stringify(data).slice(0, 2000))
-    }
-
-    const raw = data.content?.[0]?.text || ''
-    console.error('[parse-schedule] claude raw length:', raw.length, 'stop_reason:', data.stop_reason)
-    if (data.stop_reason === 'max_tokens') {
-      console.error('[parse-schedule] WARNING: response truncated at max_tokens, JSON may be invalid')
-    }
-    console.error('[parse-schedule] claude raw preview:', raw.slice(0, 500), '...tail:', raw.slice(-200))
-
-    const m = raw.match(/\{[\s\S]*\}/)
-    if (!m) {
-      console.error('[parse-schedule] no JSON block in claude response')
-      return NextResponse.json({ error: '识别失败，请手动填写' }, { status: 400 })
-    }
-
-    let parsed: unknown
-    try {
-      parsed = JSON.parse(m[0])
-    } catch (jsonErr) {
-      console.error('[parse-schedule] JSON.parse failed:', jsonErr)
-      console.error('[parse-schedule] JSON.parse failed, raw:', raw.slice(0, 500))
+    const step1 = await callVision(image)
+    if (!step1) {
       return NextResponse.json({ error: '识别失败，请重试' }, { status: 400 })
     }
 
-    const cleaned = cleanClaude(parsed)
-    console.error('[parse-schedule] cleaned summary:', {
-      daysWithEntries: DAYS.filter((d) => (cleaned.schedule[d]?.length ?? 0) > 0),
-      school_start_time: cleaned.school_start_time,
-      school_end_time: cleaned.school_end_time,
-    })
+    console.error('[parse-schedule] step1 entries:', DAYS.reduce((n, d) => n + step1[d].length, 0))
+
+    const step2 = await callSemantic(step1)
+    const schedule = step2 ?? step1
+
+    if (!step2) {
+      console.error('[parse-schedule] step2 failed, using step1 only')
+    }
+
+    const { school_start_time, school_end_time } = inferSchoolTimes(schedule)
 
     const supabase = createAuthedSupabase(req)
 
     const { error: profileError } = await supabase
       .from('child_profiles')
       .upsert(
-        {
-          user_id: user.id,
-          child_id: childId,
-          class_schedule: cleaned.schedule,
-        },
+        { user_id: user.id, child_id: childId, class_schedule: schedule },
         { onConflict: 'child_id' },
       )
 
     if (profileError) {
-      console.error('[parse-schedule] child_profiles upsert failed:', {
-        message: profileError.message,
-        code: profileError.code,
-        details: profileError.details,
-        hint: profileError.hint,
-        childId,
-        userId: user.id,
-      })
+      console.error('[parse-schedule] child_profiles upsert failed:', profileError.message)
     }
 
-    if (cleaned.school_start_time || cleaned.school_end_time) {
+    if (school_start_time || school_end_time) {
       const childUpdate: { school_start_time?: string; school_end_time?: string } = {}
-      if (cleaned.school_start_time) childUpdate.school_start_time = cleaned.school_start_time
-      if (cleaned.school_end_time) childUpdate.school_end_time = cleaned.school_end_time
+      if (school_start_time) childUpdate.school_start_time = school_start_time
+      if (school_end_time) childUpdate.school_end_time = school_end_time
 
       const { error: childError } = await supabase
         .from('children')
@@ -286,28 +294,14 @@ category 分类规则：
         .eq('user_id', user.id)
 
       if (childError) {
-        console.error('[parse-schedule] children update failed:', {
-          message: childError.message,
-          code: childError.code,
-          details: childError.details,
-          hint: childError.hint,
-          childId,
-          userId: user.id,
-        })
+        console.error('[parse-schedule] children update failed:', childError.message)
       }
     }
 
-    return NextResponse.json({
-      schedule: cleaned.schedule,
-      school_start_time: cleaned.school_start_time,
-      school_end_time: cleaned.school_end_time,
-    })
+    return NextResponse.json({ schedule, school_start_time, school_end_time })
 
   } catch (e: unknown) {
     console.error('[parse-schedule] unhandled error:', e)
-    if (e instanceof Error) {
-      console.error('[parse-schedule] error name:', e.name, 'message:', e.message, 'stack:', e.stack)
-    }
     const message = e instanceof Error ? e.message : '服务器错误'
     return NextResponse.json({ error: message }, { status: 500 })
   }
