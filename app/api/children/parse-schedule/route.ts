@@ -18,6 +18,41 @@ type ScheduleCategory = 'class' | 'life' | 'break' | 'transition' | 'activity'
 
 const CLAUDE_MODEL = 'claude-haiku-4-5-20251001'
 
+type VisionMediaType = 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp'
+const VISION_MEDIA_TYPES = new Set<VisionMediaType>(['image/jpeg', 'image/png', 'image/gif', 'image/webp'])
+
+/** 剥离 data URL 前缀、空白，并校正 media_type（与 Anthropic Vision 要求一致） */
+function prepareVisionImageInput(image: string, mediaTypeHint?: string): {
+  data: string
+  media_type: VisionMediaType
+  hasDataUrlPrefix: boolean
+} {
+  let raw = image.trim()
+  let media_type: VisionMediaType = 'image/jpeg'
+  let hasDataUrlPrefix = false
+
+  const dataUrl = raw.match(/^data:(image\/[a-z+]+);base64,(.+)$/i)
+  if (dataUrl) {
+    hasDataUrlPrefix = true
+    const mt = dataUrl[1].toLowerCase()
+    if (VISION_MEDIA_TYPES.has(mt as VisionMediaType)) media_type = mt as VisionMediaType
+    raw = dataUrl[2]
+  } else if (mediaTypeHint && VISION_MEDIA_TYPES.has(mediaTypeHint as VisionMediaType)) {
+    media_type = mediaTypeHint as VisionMediaType
+  }
+
+  const data = raw.replace(/\s/g, '')
+
+  if (!dataUrl && !mediaTypeHint) {
+    if (data.startsWith('iVBORw0KGgo')) media_type = 'image/png'
+    else if (data.startsWith('R0lGOD')) media_type = 'image/gif'
+    else if (data.startsWith('UklGR')) media_type = 'image/webp'
+    else if (data.startsWith('/9j/')) media_type = 'image/jpeg'
+  }
+
+  return { data, media_type, hasDataUrlPrefix }
+}
+
 type ScheduleEntry = {
   time: string
   subject: string
@@ -220,7 +255,26 @@ function parseClaudeJson(raw: string, label: string): unknown | null {
 }
 
 /** 第一步：Vision 只识别 time + subject（visionExtractSchedule） */
-async function visionExtractSchedule(image: string): Promise<ScheduleByDay | null> {
+async function visionExtractSchedule(image: string, mediaTypeHint?: string): Promise<ScheduleByDay | null> {
+  const { data: imageData, media_type, hasDataUrlPrefix } = prepareVisionImageInput(image, mediaTypeHint)
+
+  if (!imageData || imageData.length < 100) {
+    console.error('[parse-schedule] vision image invalid:', {
+      base64Len: imageData?.length ?? 0,
+      media_type,
+      hasDataUrlPrefix,
+    })
+    return null
+  }
+
+  console.error('[parse-schedule] vision image payload:', {
+    media_type,
+    base64Len: imageData.length,
+    hasDataUrlPrefix,
+    mediaTypeHint: mediaTypeHint ?? null,
+    base64Prefix: imageData.slice(0, 32),
+  })
+
   const result = await callClaude({
     model: CLAUDE_MODEL,
     max_tokens: 2000,
@@ -229,7 +283,7 @@ async function visionExtractSchedule(image: string): Promise<ScheduleByDay | nul
       content: [
         {
           type: 'image',
-          source: { type: 'base64', media_type: 'image/jpeg', data: image },
+          source: { type: 'base64', media_type, data: imageData },
         },
         {
           type: 'text',
@@ -245,25 +299,19 @@ async function visionExtractSchedule(image: string): Promise<ScheduleByDay | nul
   }, 'vision')
 
   const visionRaw = result.text
+  console.error('[parse-schedule] vision raw FULL:', visionRaw?.slice(0, 2000))
 
-  if (!result.ok) {
-    console.error('[parse-schedule] vision raw response:', visionRaw)
-    return null
-  }
+  if (!result.ok) return null
   if (result.stop_reason === 'max_tokens') {
     console.error('[parse-schedule] vision WARNING: truncated at max_tokens')
   }
 
   const parsed = parseClaudeJson(visionRaw, 'vision')
-  if (!parsed) {
-    console.error('[parse-schedule] vision raw response:', visionRaw)
-    return null
-  }
+  if (!parsed) return null
 
   const schedule = normalizeSchedule(parsed, false)
   const total = DAYS.reduce((n, d) => n + schedule[d].length, 0)
   if (total === 0) {
-    console.error('[parse-schedule] vision raw response:', visionRaw)
     if (Array.isArray(parsed)) {
       console.error('[parse-schedule] vision parsed as root array, length:', parsed.length)
     } else {
@@ -320,10 +368,12 @@ export async function POST(req: NextRequest) {
 
   let image: string | undefined
   let childId: string | undefined
+  let mediaType: string | undefined
   try {
     const body = await req.json()
     image = body.image
     childId = body.childId
+    mediaType = body.mediaType
   } catch (parseBodyErr) {
     console.error('[parse-schedule] req.json failed:', parseBodyErr)
     return NextResponse.json({ error: '请求体解析失败' }, { status: 400 })
@@ -335,7 +385,7 @@ export async function POST(req: NextRequest) {
   console.error('[parse-schedule] start', { userId: user.id, childId, imageLen: image.length })
 
   try {
-    const step1 = await visionExtractSchedule(image)
+    const step1 = await visionExtractSchedule(image, mediaType)
     if (!step1) {
       return NextResponse.json({ error: '识别失败，请重试' }, { status: 400 })
     }
