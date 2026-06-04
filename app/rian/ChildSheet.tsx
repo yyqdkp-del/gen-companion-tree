@@ -16,7 +16,6 @@ import { useChildDailyLog } from '@/app/_shared/_hooks/useChildDailyLog'
 import { logOrAlertNetworkError } from '@/lib/errors/logOrAlertNetworkError'
 import { calculateEnergy, getEnergyColor } from '@/app/_shared/_engine/energy'
 import ChildEnergyCard from '@/app/_shared/_components/ChildEnergyCard'
-import { formatSubjectDisplay } from '@/app/_shared/_services/childService'
 import { isPlaceholderSubject } from '@/lib/schedule/placeholderSubject'
 import type { Child, TimelineItem, HealthStatus, MoodStatus } from '@/app/_shared/_types'
 import { addDaysStr, getTodayStr } from '@/lib/date/localDate'
@@ -70,11 +69,34 @@ function getNowMinInTimeZone(timeZone: string): number {
   }
 }
 
+function dedupeTimelineItems(items: TimelineItem[]): TimelineItem[] {
+  const seen = new Set<string>()
+  return items.filter((it) => {
+    const min = timelineToMin(it.time)
+    const title = String(it.title || '').trim().toLowerCase()
+    if (min < 0 || !title) return true
+    const key = `${min}|${title}`
+    if (seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
+}
+
+function dedupeCalendarEvents<T extends { date_start?: string; title?: string }>(events: T[]): T[] {
+  const seen = new Set<string>()
+  return events.filter((e) => {
+    const key = `${e.date_start}|${String(e.title || '').trim().toLowerCase()}`
+    if (seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
+}
+
 function Timeline({ items, timeZone }: { items: TimelineItem[]; timeZone: string }) {
   const [showCompleted, setShowCompleted] = useState(false)
   const nowMin = getNowMinInTimeZone(timeZone)
 
-  const validItems = items
+  const validItems = dedupeTimelineItems(items)
     .filter((it) => timelineToMin(it.time) !== -1)
     .filter((it) => it.title?.trim())
     .filter((it) => !isPlaceholderSubject(it.title))
@@ -102,7 +124,7 @@ function Timeline({ items, timeZone }: { items: TimelineItem[]; timeZone: string
   ) => {
     const isCurrent = !!opts?.isCurrent
     const isPast = !!opts?.isPast
-    const title = formatSubjectDisplay(String(item.title || ''))
+    const title = String(item.title || '').trim() || '课程'
     return (
       <div key={opts?.itemKey ?? item.id} style={{ position: 'relative', marginBottom: 8, opacity: isPast ? 0.5 : 1 }}>
         <div style={{
@@ -505,11 +527,11 @@ export default function ChildSheet({ childList, sel, onSel, onClose, onAdd, user
   }
 
   const isNonEmptyTitle = (e: any) => typeof e?.title === 'string' && e.title.trim().length > 0
-  const todayEvents      = calendar.filter(e => e.date_start === today).filter(isNonEmptyTitle)
-  const eveningEvents    = calendar.filter(e => e.date_start === tomorrow).filter(isNonEmptyTitle)
-  const weekEvents       = calendar.filter(e => e.date_start > tomorrow  && e.date_start <= in7days).filter(isNonEmptyTitle)
-  const monthEvents      = calendar.filter(e => e.date_start > in7days   && e.date_start <= in30days).filter(isNonEmptyTitle)
-  const yearEvents       = calendar.filter(e => e.date_start > in30days).filter(isNonEmptyTitle)
+  const todayEvents      = dedupeCalendarEvents(calendar.filter(e => e.date_start === today).filter(isNonEmptyTitle))
+  const eveningEvents    = dedupeCalendarEvents(calendar.filter(e => e.date_start === tomorrow).filter(isNonEmptyTitle))
+  const weekEvents       = dedupeCalendarEvents(calendar.filter(e => e.date_start > tomorrow  && e.date_start <= in7days).filter(isNonEmptyTitle))
+  const monthEvents      = dedupeCalendarEvents(calendar.filter(e => e.date_start > in7days   && e.date_start <= in30days).filter(isNonEmptyTitle))
+  const yearEvents       = dedupeCalendarEvents(calendar.filter(e => e.date_start > in30days).filter(isNonEmptyTitle))
   const calendarPackEvents = todayEvents.filter(
     e => Array.isArray(e.requires_items) && e.requires_items.length > 0,
   )

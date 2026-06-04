@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/client'
 import { calculateEnergy } from '../_engine/energy'
 import type { TimelineItem, HealthStatus, MoodStatus } from '../_types'
 import { addDaysStr, getTodayStr } from '@/lib/date/localDate'
+import { dedupeRawScheduleItems } from '@/lib/schedule/dedupeScheduleEntries'
 import { isPlaceholderSubject } from '@/lib/schedule/placeholderSubject'
 
 const supabase = createClient()
@@ -222,7 +223,7 @@ export async function fetchChildSchedule(childId: string, userId: string, today:
   const tableActivities = actsRes.data ?? []
   const items: TimelineItem[] = []
 
-  const daySchedule = schedData?.class_schedule?.[dowKey] ?? []
+  const daySchedule = dedupeRawScheduleItems(schedData?.class_schedule?.[dowKey] ?? [])
   daySchedule.forEach((item: any, i: number) => {
     const isObject = typeof item === 'object' && item !== null
     const rawSubject = isObject ? String(item.subject ?? item.title ?? '') : String(item)

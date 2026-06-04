@@ -1,6 +1,7 @@
 export const dynamic = 'force-dynamic'
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthUser } from '@/lib/auth/getAuthUser'
+import { dedupeScheduleEntries } from '@/lib/schedule/dedupeScheduleEntries'
 import { isPlaceholderSubject } from '@/lib/schedule/placeholderSubject'
 import { createClient } from '@supabase/supabase-js'
 
@@ -122,7 +123,7 @@ function normalizeSchedule(raw: unknown, withSemantic = false): ScheduleByDay {
 
   // Claude 有时直接返回单日数组 [{time,subject},...]
   if (Array.isArray(raw)) {
-    out.mon = cleanDayEntries(raw, withSemantic)
+    out.mon = dedupeScheduleEntries(cleanDayEntries(raw, withSemantic))
     return out
   }
 
@@ -139,9 +140,9 @@ function normalizeSchedule(raw: unknown, withSemantic = false): ScheduleByDay {
     if (!day) continue
 
     if (Array.isArray(dayRaw)) {
-      out[day] = [...out[day], ...cleanDayEntries(dayRaw, withSemantic)]
+      out[day] = dedupeScheduleEntries(cleanDayEntries(dayRaw, withSemantic))
     } else if (dayRaw && typeof dayRaw === 'object' && !Array.isArray(dayRaw)) {
-      out[day] = [...out[day], ...cleanDayEntries((dayRaw as { schedule?: unknown }).schedule, withSemantic)]
+      out[day] = dedupeScheduleEntries(cleanDayEntries((dayRaw as { schedule?: unknown }).schedule, withSemantic))
     }
   }
   return out
@@ -289,11 +290,17 @@ async function visionExtractSchedule(image: string, mediaTypeHint?: string): Pro
         },
         {
           type: 'text',
-          text: `这是一张学校课表图片。请提取所有课程信息，
-只返回 JSON 数组，格式：
-[{"time":"08:00","subject":"P.E."},...]
-每天用星期作为 key：
-{"mon":[...],"tue":[...],...}
+          text: `请分析这张学校课表图片，识别表格结构。
+
+表格通常有：
+- 时间列（显示上课时间段）
+- 星期行（Monday 到 Friday）
+- 课程单元格
+
+请按每天提取课程，输出：
+{"mon":[{"time":"07:50","subject":"Breakfast"}],...}
+
+time 只输出开始时间 HH:MM 格式，保留图片原始时间不要换算。
 只返回 JSON，不要任何解释`,
         },
       ],

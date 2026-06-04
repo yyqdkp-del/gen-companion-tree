@@ -6,6 +6,7 @@ import { useParams } from 'next/navigation'
 import { THEME } from '@/app/_shared/_constants/theme'
 import { fetchWithAuth } from '@/lib/auth/fetchWithAuth'
 import { toast } from '@/app/components/Toast'
+import { prepareSchedulePhotoForUpload } from '@/lib/image/prepareSchedulePhoto'
 import { formatSubjectDisplay } from '@/app/_shared/_services/childService'
 
 const DAYS = [
@@ -149,21 +150,11 @@ function StepSchedule({ data, onChange }: { data: any; onChange: (d: any) => voi
     setParseError('')
     setParseSuccess(false)
     try {
-      const base64 = await new Promise<string>((res, rej) => {
-        const img = new Image()
-        const url = URL.createObjectURL(file)
-        img.onload = () => {
-          const canvas = document.createElement('canvas')
-          canvas.width = img.width
-          canvas.height = img.height
-          canvas.getContext('2d')?.drawImage(img, 0, 0)
-          URL.revokeObjectURL(url)
-          const dataUrl = canvas.toDataURL('image/jpeg', 0.9)
-          res(dataUrl.split(',')[1])
-        }
-        img.onerror = rej
-        img.src = url
-      })
+      const prepared = await prepareSchedulePhotoForUpload(file)
+      if (prepared.isPortraitTall) {
+        toast('建议横向拍摄课表，效果更好', 'info')
+      }
+      const base64 = prepared.base64
       if (!base64 || base64.length < 100) {
         toast('图片读取失败，请重试', 'error')
         setParsing(false)
@@ -172,7 +163,11 @@ function StepSchedule({ data, onChange }: { data: any; onChange: (d: any) => voi
       const resp = await fetchWithAuth('/api/children/parse-schedule', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ image: base64, mediaType: 'image/jpeg', childId }),
+        body: JSON.stringify({
+          image: base64,
+          mediaType: prepared.mediaType,
+          childId,
+        }),
       })
       const result = await resp.json()
       if (result.error) throw new Error(result.error)
