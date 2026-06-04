@@ -180,16 +180,37 @@ export async function POST(req: NextRequest) {
 
     let calendar_count = 0
     if (calendarRows.length) {
-      const { data: upserted, error: calError } = await supabase
+      const dateStarts = [...new Set(calendarRows.map((r) => r.date_start))]
+      const { data: existingRows, error: existingError } = await supabase
         .from('child_school_calendar')
-        .upsert(calendarRows, { onConflict: 'child_id,date_start,title' })
-        .select('id')
+        .select('date_start, title')
+        .eq('child_id', child_id)
+        .in('date_start', dateStarts)
 
-      if (calError) {
-        console.error('sync-school-calendar: calendar upsert', calError.message)
-        return NextResponse.json({ success: false, error: calError.message })
+      if (existingError) {
+        console.error('sync-school-calendar: calendar lookup', existingError.message)
+        return NextResponse.json({ success: false, error: existingError.message })
       }
-      calendar_count = upserted?.length ?? calendarRows.length
+
+      const existingKeys = new Set(
+        (existingRows || []).map((r) => `${r.date_start}\0${r.title}`),
+      )
+      const toInsert = calendarRows.filter(
+        (r) => !existingKeys.has(`${r.date_start}\0${r.title}`),
+      )
+
+      if (toInsert.length) {
+        const { data: inserted, error: calError } = await supabase
+          .from('child_school_calendar')
+          .insert(toInsert)
+          .select('id')
+
+        if (calError) {
+          console.error('sync-school-calendar: calendar insert', calError.message)
+          return NextResponse.json({ success: false, error: calError.message })
+        }
+        calendar_count = inserted?.length ?? toInsert.length
+      }
     }
 
     const todoRows = (activitiesParsed || [])
