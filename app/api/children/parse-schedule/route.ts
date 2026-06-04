@@ -332,8 +332,11 @@ async function visionExtractSchedule(image: string, mediaTypeHint?: string): Pro
   return schedule
 }
 
-/** 第二步：语义理解，补充 name_zh + category */
-async function callSemantic(step1: ScheduleByDay): Promise<ScheduleByDay | null> {
+/** 第二步：语义理解，补充 name_zh + category（enrichSchedule） */
+async function enrichSchedule(step1: ScheduleByDay): Promise<ScheduleByDay | null> {
+  const totalEntries = DAYS.reduce((n, d) => n + step1[d].length, 0)
+  console.error('[parse-schedule] enrich start, entries:', totalEntries)
+
   const inputJson = JSON.stringify(step1)
 
   const result = await callClaude({
@@ -352,14 +355,26 @@ ${inputJson}`,
     }],
   }, 'semantic')
 
+  const enrichRaw = result.text
+  console.error('[parse-schedule] enrich raw FULL:', enrichRaw?.slice(0, 1000))
+
   if (!result.ok) return null
   if (result.stop_reason === 'max_tokens') {
-    console.error('[parse-schedule] semantic WARNING: truncated at max_tokens')
+    console.error('[parse-schedule] enrich WARNING: truncated at max_tokens')
   }
 
-  const parsed = parseClaudeJson(result.text, 'semantic')
-  if (!parsed) return null
-  return normalizeSchedule(parsed, true)
+  let parsed: unknown
+  try {
+    parsed = parseClaudeJson(enrichRaw, 'semantic')
+    if (!parsed) throw new Error('no valid JSON in enrich response')
+  } catch (e) {
+    console.error('[parse-schedule] enrich parse failed:', e)
+    return null
+  }
+
+  const enriched = normalizeSchedule(parsed, true)
+  console.error('[parse-schedule] enrich success, sample:', JSON.stringify(enriched.mon?.slice(0, 2)))
+  return enriched
 }
 
 export async function POST(req: NextRequest) {
@@ -394,7 +409,7 @@ export async function POST(req: NextRequest) {
 
     console.error('[parse-schedule] step1 entries:', DAYS.reduce((n, d) => n + step1[d].length, 0))
 
-    const step2 = await callSemantic(step1)
+    const step2 = await enrichSchedule(step1)
     const schedule = step2 ?? step1
 
     if (!step2) {
