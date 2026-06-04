@@ -2,6 +2,10 @@ import { createClient } from '@/lib/supabase/client'
 import { calculateEnergy } from '../_engine/energy'
 import type { TimelineItem, HealthStatus, MoodStatus } from '../_types'
 import { addDaysStr, getTodayStr } from '@/lib/date/localDate'
+import {
+  normalizePackingPreferences,
+  type PackingPreferencesMap,
+} from '@/lib/packing/packingPreferences'
 import { dedupeRawScheduleItems } from '@/lib/schedule/dedupeScheduleEntries'
 import { isPlaceholderSubject } from '@/lib/schedule/placeholderSubject'
 
@@ -193,7 +197,7 @@ export async function fetchChildSchedule(childId: string, userId: string, today:
 
   const [profileRes, calRes, healthRes, packRes, actsRes] = await Promise.all([
     supabase.from('child_profiles')
-      .select('class_schedule, activities')
+      .select('class_schedule, activities, packing_preferences')
       .eq('child_id', childId)
       .maybeSingle(),
     supabase.from('child_school_calendar')
@@ -293,8 +297,54 @@ export async function fetchChildSchedule(childId: string, userId: string, today:
   }
 
   const packingItems = packingListItemsToNames(packRes.data?.items)
+  const packingPreferences = normalizePackingPreferences(schedData?.packing_preferences)
 
-  return { timeline: items, calendar: calData, packingItems }
+  return { timeline: items, calendar: calData, packingItems, packingPreferences }
+}
+
+export async function savePackingPreferences(
+  childId: string,
+  userId: string,
+  prefs: PackingPreferencesMap,
+): Promise<void> {
+  const { error } = await supabase.from('child_profiles').upsert(
+    { child_id: childId, user_id: userId, packing_preferences: prefs },
+    { onConflict: 'child_id' },
+  )
+  if (error) throw error
+}
+
+export async function appendPackingListItem(
+  childId: string,
+  userId: string,
+  date: string,
+  itemName: string,
+): Promise<void> {
+  const { data: existing } = await supabase
+    .from('packing_lists')
+    .select('id, items')
+    .eq('child_id', childId)
+    .eq('user_id', userId)
+    .eq('date', date)
+    .maybeSingle()
+
+  const newItem = { name: itemName, one_time: true }
+  if (existing?.id) {
+    const items = Array.isArray(existing.items) ? existing.items : []
+    const { error } = await supabase
+      .from('packing_lists')
+      .update({ items: [...items, newItem] })
+      .eq('id', existing.id)
+    if (error) throw error
+  } else {
+    const { error } = await supabase.from('packing_lists').insert({
+      child_id: childId,
+      user_id: userId,
+      date,
+      items: [newItem],
+    })
+    if (error) throw error
+  }
 }
 
 export async function fetchDailyLog(childId: string, date: string) {

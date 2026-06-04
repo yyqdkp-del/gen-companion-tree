@@ -1,6 +1,7 @@
 export const dynamic = 'force-dynamic'
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthUser } from '@/lib/auth/getAuthUser'
+import { normalizeRequiresItems } from '@/lib/packing/packingPreferences'
 import { dedupeScheduleEntries } from '@/lib/schedule/dedupeScheduleEntries'
 import { isPlaceholderSubject } from '@/lib/schedule/placeholderSubject'
 import { createClient } from '@supabase/supabase-js'
@@ -58,6 +59,7 @@ type ScheduleEntry = {
   subject: string
   name_zh?: string
   category?: ScheduleCategory
+  requires_items?: string[]
 }
 
 type ScheduleByDay = Record<(typeof DAYS)[number], ScheduleEntry[]>
@@ -95,7 +97,13 @@ function cleanDayEntries(raw: unknown, withSemantic = false): ScheduleEntry[] {
   const out: ScheduleEntry[] = []
   for (const entry of raw) {
     if (!entry || typeof entry !== 'object') continue
-    const obj = entry as { time?: unknown; subject?: unknown; name_zh?: unknown; category?: unknown }
+    const obj = entry as {
+      time?: unknown
+      subject?: unknown
+      name_zh?: unknown
+      category?: unknown
+      requires_items?: unknown
+    }
     const time = normalizeTime(obj.time)
     const subject = normalizeSubject(obj.subject)
     if (!time || !subject) continue
@@ -104,8 +112,10 @@ function cleanDayEntries(raw: unknown, withSemantic = false): ScheduleEntry[] {
     if (withSemantic) {
       const name_zh = String(obj.name_zh || '').trim()
       const category = normalizeCategory(obj.category)
+      const requires_items = normalizeRequiresItems(obj.requires_items)
       if (name_zh) item.name_zh = name_zh
       if (category) item.category = category
+      if (requires_items.length) item.requires_items = requires_items
     }
     out.push(item)
   }
@@ -354,8 +364,18 @@ async function enrichSchedule(step1: ScheduleByDay): Promise<ScheduleByDay | nul
       content: `以下是国际学校课表数据，请为每个 subject 补充：
 - name_zh：中文简称2-6字
 - category：class（正式课）/life（生活事项）/break（休息）/transition（接送过渡）/activity（活动）
+- requires_items：需要携带物品的中文数组（可选）
 
-返回相同结构，每个条目加上 name_zh 和 category 字段
+对需要携带物品的课程，添加 requires_items 字段（中文数组）。
+根据课程常识判断，例如：
+- P.E./体育 → ["运动服", "运动鞋"]
+- Swimming/游泳 → ["泳衣", "泳镜", "毛巾"]
+- Art/美术 → ["美术围裙"]
+- Music/音乐（有乐器） → 根据具体乐器判断
+- 普通学科课 → 不加或空数组
+只加有把握的，不确定留空数组
+
+返回相同结构，每个条目加上 name_zh、category、requires_items 字段
 只返回 JSON
 
 ${inputJson}`,

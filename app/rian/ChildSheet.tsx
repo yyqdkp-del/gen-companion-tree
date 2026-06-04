@@ -1,7 +1,7 @@
 'use client'
 import { createClient } from '@/lib/supabase/client'
 const supabase = createClient()
-import React, { useState, useCallback, useEffect } from 'react'
+import React, { useState, useCallback, useEffect, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, Plus, ChevronRight } from 'lucide-react'
 import VoiceBtn from '@/app/components/VoiceBtn'
@@ -16,7 +16,18 @@ import { useChildDailyLog } from '@/app/_shared/_hooks/useChildDailyLog'
 import { logOrAlertNetworkError } from '@/lib/errors/logOrAlertNetworkError'
 import { calculateEnergy, getEnergyColor } from '@/app/_shared/_engine/energy'
 import ChildEnergyCard from '@/app/_shared/_components/ChildEnergyCard'
+import { buildPackingRows, countPendingPackingRows } from '@/lib/packing/buildPackingRows'
+import {
+  mergeDismissedItem,
+  mergeManualItem,
+  packingSubjectKey,
+  type PackingPreferencesMap,
+} from '@/lib/packing/packingPreferences'
 import { isPlaceholderSubject } from '@/lib/schedule/placeholderSubject'
+import {
+  appendPackingListItem,
+  savePackingPreferences,
+} from '@/app/_shared/_services/childService'
 import type { Child, TimelineItem, HealthStatus, MoodStatus } from '@/app/_shared/_types'
 import { addDaysStr, getTodayStr } from '@/lib/date/localDate'
 import { toast } from '@/app/components/Toast'
@@ -260,86 +271,212 @@ function countUpcomingTimeline(items: TimelineItem[], timeZone: string): number 
   return items.filter(item => timelineToMin(item.time) + 45 >= nowMin).length
 }
 
-function PackingSection({ childId, userId, events, eventType }: {
-  childId: string; userId: string; events: any[]; eventType: string
+function loadBroughtMap(storageKey: string): Record<string, boolean> {
+  try {
+    return JSON.parse(localStorage.getItem(storageKey) || '{}') as Record<string, boolean>
+  } catch {
+    return {}
+  }
+}
+
+function PackingSection({
+  childId,
+  userId,
+  today,
+  timeline,
+  calendarToday,
+  packingItems,
+  packingPreferences,
+  onPrefsChange,
+  onReload,
+}: {
+  childId: string
+  userId: string
+  today: string
+  timeline: TimelineItem[]
+  calendarToday: { title?: string; requires_items?: unknown }[]
+  packingItems: string[]
+  packingPreferences: PackingPreferencesMap
+  onPrefsChange: (p: PackingPreferencesMap) => void
+  onReload: () => void
 }) {
-  const today = getTodayKey()
-  const storageKey = `packing_${childId}_${today}`
-  const [extraInput, setExtraInput] = useState('')
-  const [extraItems, setExtraItems] = useState<string[]>([])
-  const [askHabit, setAskHabit] = useState<string | null>(null)
-  const baseItems = [...new Set(events.flatMap(e => Array.isArray(e.requires_items) ? e.requires_items : []))]
-  const allItems  = [...new Set([...baseItems, ...extraItems])]
+  const broughtKey = `packing_brought_${childId}_${today}`
+  const [brought, setBrought] = useState<Record<string, boolean>>(() => loadBroughtMap(broughtKey))
+  const [showAdd, setShowAdd] = useState(false)
+  const [addName, setAddName] = useState('')
+  const [addCourse, setAddCourse] = useState('__once__')
+  const [busy, setBusy] = useState(false)
 
-  const saveHabit = async (item: string, pref: 'always' | 'never') => {
-    try {
-      await supabase.from('child_packing_habits').upsert({
-        user_id: userId, child_id: childId,
-        event_type: eventType, item_name: item, preference: pref,
-      }, { onConflict: 'child_id,event_type,item_name' })
-    } catch (e) { logOrAlertNetworkError(e) }
-    setAskHabit(null)
-  }
+  useEffect(() => {
+    setBrought(loadBroughtMap(broughtKey))
+  }, [broughtKey, childId, today])
 
-  const addExtra = () => {
-    const trimmed = extraInput.trim()
-    if (!trimmed) return
-    setExtraItems(prev => [...prev, trimmed])
-    setExtraInput('')
-    setAskHabit(trimmed)
-  }
-
-  if (!allItems.length && !extraInput && !extraItems.length) return (
-    <div style={{ fontSize: 12, color: THEME.muted, opacity: 0.6, textAlign: 'center', padding: '8px 0' }}>
-      今天没有需要携带的物品
-    </div>
+  const rows = useMemo(
+    () => buildPackingRows(timeline, calendarToday, packingItems, packingPreferences),
+    [timeline, calendarToday, packingItems, packingPreferences],
   )
-  return (
-    <div>
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
-        {allItems.map((item, i) => (
-          <PackCheckItem key={i} item={item} storageKey={storageKey}
-            itemKey={`${eventType}-${item}`} size="md" />
-        ))}
-      </div>
-      <div style={{ display: 'flex', gap: 6 }}>
-        <input value={extraInput} onChange={e => setExtraInput(e.target.value)}
-          onKeyDown={e => e.key === 'Enter' && addExtra()}
-          placeholder="添加其他物品..."
-          style={{ flex: 1, padding: '6px 10px', borderRadius: 8, fontSize: 12,
-            border: '0.5px solid rgba(0,0,0,0.1)', background: 'rgba(255,255,255,0.8)',
-            color: THEME.text, outline: 'none' }} />
-        <motion.button whileTap={{ scale: 0.88 }} onClick={addExtra}
-          style={{ padding: '6px 12px', borderRadius: 8, border: 'none',
-            background: GREEN.dark, color: '#fff', fontSize: 12, cursor: 'pointer' }}>
-          添加
+
+  const courseOptions = useMemo(() => {
+    const opts: { key: string; label: string }[] = [{ key: '__once__', label: '今天一次性' }]
+    const seen = new Set<string>()
+    for (const t of timeline.filter((x) => x.source === 'schedule')) {
+      const ev = (t.event || {}) as { subject?: string }
+      const key = packingSubjectKey(ev.subject)
+      if (!key || seen.has(key)) continue
+      seen.add(key)
+      opts.push({ key, label: t.title || key })
+    }
+    return opts
+  }, [timeline])
+
+  const markBrought = (rowId: string) => {
+    setBrought((prev) => {
+      const next = { ...prev, [rowId]: true }
+      try {
+        localStorage.setItem(broughtKey, JSON.stringify(next))
+      } catch { /* ignore */ }
+      return next
+    })
+  }
+
+  const dismissItem = async (row: { id: string; item: string; courseLabel: string; subjectKey: string | null }) => {
+    if (!row.subjectKey) {
+      if (!window.confirm(`今天不再提示「${row.item}」吗？`)) return
+      markBrought(row.id)
+      return
+    }
+    if (!window.confirm(`不再为「${row.courseLabel}」提示「${row.item}」吗？`)) return
+    setBusy(true)
+    try {
+      const next = mergeDismissedItem(packingPreferences, row.subjectKey, row.item)
+      await savePackingPreferences(childId, userId, next)
+      onPrefsChange(next)
+      toast('已设为不再提示', 'info')
+    } catch (e) {
+      logOrAlertNetworkError(e)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const submitManualAdd = async () => {
+    const name = addName.trim()
+    if (!name) return
+    setBusy(true)
+    try {
+      if (addCourse === '__once__') {
+        await appendPackingListItem(childId, userId, today, name)
+        onReload()
+      } else {
+        const next = mergeManualItem(packingPreferences, addCourse, name)
+        await savePackingPreferences(childId, userId, next)
+        onPrefsChange(next)
+      }
+      setAddName('')
+      setShowAdd(false)
+      toast('已添加', 'info')
+    } catch (e) {
+      logOrAlertNetworkError(e)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const visibleRows = rows.filter((r) => !brought[r.id])
+
+  if (!rows.length && !showAdd) {
+    return (
+      <div>
+        <div style={{ fontSize: 12, color: THEME.muted, opacity: 0.6, textAlign: 'center', padding: '8px 0' }}>
+          今天没有需要携带的物品
+        </div>
+        <motion.button whileTap={{ scale: 0.97 }} onClick={() => setShowAdd(true)}
+          style={{ width: '100%', marginTop: 8, padding: '8px 12px', borderRadius: 10,
+            border: `0.5px dashed ${GREEN.mid}`, background: 'transparent',
+            color: GREEN.dark, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+          + 手动添加
         </motion.button>
       </div>
-      <AnimatePresence>
-        {askHabit && (
-          <motion.div initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
-            style={{ marginTop: 8, padding: '8px 10px', borderRadius: 10,
-              background: GREEN.bg, border: `0.5px solid ${GREEN.border}` }}>
-            <div style={{ fontSize: 11, color: GREEN.dark, marginBottom: 6 }}>
-              「{askHabit}」下次也要提醒吗？
-            </div>
-            <div style={{ display: 'flex', gap: 6 }}>
-              <motion.button whileTap={{ scale: 0.88 }} onClick={() => saveHabit(askHabit, 'always')}
-                style={{ flex: 1, padding: '5px', borderRadius: 7,
-                  border: `0.5px solid ${GREEN.mid}`, background: GREEN.bg,
-                  color: GREEN.dark, fontSize: 11, cursor: 'pointer', fontWeight: 500 }}>
-                是，下次提醒
+    )
+  }
+
+  return (
+    <div>
+      {visibleRows.length === 0 && rows.length > 0 ? (
+        <div style={{ fontSize: 12, color: GREEN.dark, textAlign: 'center', padding: '8px 0', fontWeight: 600 }}>
+          今日携带已全部确认 ✓
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 10 }}>
+          {visibleRows.map((row) => (
+            <div key={row.id} style={{
+              display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px',
+              borderRadius: 10, background: 'rgba(255,255,255,0.75)',
+              border: '0.5px solid rgba(0,0,0,0.06)',
+            }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: THEME.text }}>{row.item}</div>
+                <div style={{ fontSize: 10, color: THEME.muted, marginTop: 2 }}>{row.courseLabel}</div>
+              </div>
+              <motion.button whileTap={{ scale: 0.92 }} disabled={busy}
+                onClick={() => markBrought(row.id)}
+                style={{ padding: '5px 10px', borderRadius: 8, border: 'none',
+                  background: GREEN.dark, color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer', flexShrink: 0 }}>
+                ✓ 带了
               </motion.button>
-              <motion.button whileTap={{ scale: 0.88 }} onClick={() => saveHabit(askHabit, 'never')}
-                style={{ flex: 1, padding: '5px', borderRadius: 7,
-                  border: '0.5px solid rgba(0,0,0,0.1)', background: 'transparent',
-                  color: THEME.muted, fontSize: 11, cursor: 'pointer' }}>
-                只用这次
+              <motion.button whileTap={{ scale: 0.92 }} disabled={busy}
+                onClick={() => dismissItem(row)}
+                style={{ padding: '5px 10px', borderRadius: 8,
+                  border: '0.5px solid rgba(0,0,0,0.12)', background: 'transparent',
+                  color: THEME.muted, fontSize: 11, cursor: 'pointer', flexShrink: 0 }}>
+                ✗ 不需要
+              </motion.button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <AnimatePresence>
+        {showAdd ? (
+          <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}
+            style={{ overflow: 'hidden', marginBottom: 8 }}>
+            <input value={addName} onChange={(e) => setAddName(e.target.value)}
+              placeholder="物品名称，如：泳衣"
+              style={{ width: '100%', padding: '8px 10px', borderRadius: 8, fontSize: 12,
+                border: '0.5px solid rgba(0,0,0,0.1)', background: 'rgba(255,255,255,0.85)',
+                color: THEME.text, outline: 'none', boxSizing: 'border-box', marginBottom: 6 }} />
+            <select value={addCourse} onChange={(e) => setAddCourse(e.target.value)}
+              style={{ width: '100%', padding: '8px 10px', borderRadius: 8, fontSize: 12,
+                border: '0.5px solid rgba(0,0,0,0.1)', background: 'rgba(255,255,255,0.85)',
+                color: THEME.text, marginBottom: 8, boxSizing: 'border-box' }}>
+              {courseOptions.map((o) => (
+                <option key={o.key} value={o.key}>{o.label}</option>
+              ))}
+            </select>
+            <div style={{ display: 'flex', gap: 6 }}>
+              <motion.button whileTap={{ scale: 0.92 }} disabled={busy} onClick={submitManualAdd}
+                style={{ flex: 1, padding: '7px', borderRadius: 8, border: 'none',
+                  background: GREEN.dark, color: '#fff', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+                保存
+              </motion.button>
+              <motion.button whileTap={{ scale: 0.92 }} onClick={() => { setShowAdd(false); setAddName('') }}
+                style={{ padding: '7px 12px', borderRadius: 8, border: '0.5px solid rgba(0,0,0,0.1)',
+                  background: 'transparent', color: THEME.muted, fontSize: 12, cursor: 'pointer' }}>
+                取消
               </motion.button>
             </div>
           </motion.div>
-        )}
+        ) : null}
       </AnimatePresence>
+
+      {!showAdd && (
+        <motion.button whileTap={{ scale: 0.97 }} onClick={() => setShowAdd(true)}
+          style={{ width: '100%', padding: '8px 12px', borderRadius: 10,
+            border: `0.5px dashed ${GREEN.mid}`, background: 'transparent',
+            color: GREEN.dark, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+          + 手动添加
+        </motion.button>
+      )}
     </div>
   )
 }
@@ -465,7 +602,18 @@ export default function ChildSheet({ childList, sel, onSel, onClose, onAdd, user
   const in7days  = getIn7Days()
   const in30days = getIn30Days()
 
-  const { timeline, calendar, packingItems, loading } = useChildSchedule(sel?.id, userId, today)
+  const {
+    timeline,
+    calendar,
+    packingItems,
+    packingPreferences,
+    loading,
+    reload: reloadSchedule,
+  } = useChildSchedule(sel?.id, userId, today)
+  const [packPrefs, setPackPrefs] = useState<PackingPreferencesMap>({})
+  useEffect(() => {
+    setPackPrefs(packingPreferences)
+  }, [packingPreferences, sel?.id])
   const { dailyLog, saveStatus }        = useChildDailyLog(
     sel?.id, userId, today,
   )
@@ -532,20 +680,14 @@ export default function ChildSheet({ childList, sel, onSel, onClose, onAdd, user
   const weekEvents       = dedupeCalendarEvents(calendar.filter(e => e.date_start > tomorrow  && e.date_start <= in7days).filter(isNonEmptyTitle))
   const monthEvents      = dedupeCalendarEvents(calendar.filter(e => e.date_start > in7days   && e.date_start <= in30days).filter(isNonEmptyTitle))
   const yearEvents       = dedupeCalendarEvents(calendar.filter(e => e.date_start > in30days).filter(isNonEmptyTitle))
-  const calendarPackEvents = todayEvents.filter(
-    e => Array.isArray(e.requires_items) && e.requires_items.length > 0,
-  )
-  const schedulePackEvents = timeline
-    .filter(t => t.source === 'schedule')
-    .map(t => t.event || {})
-    .filter(e => Array.isArray(e.requires_items) && e.requires_items.length > 0)
-  const packingListEvents = packingItems.length
-    ? [{ requires_items: packingItems, _source: 'packing_list' as const }]
-    : []
-  const todayPackEvents  = [...calendarPackEvents, ...schedulePackEvents, ...packingListEvents]
   const tomorrowPack     = [...new Set(eveningEvents.flatMap(e => Array.isArray(e.requires_items) ? e.requires_items : []))]
-  const todayMainEventType = todayEvents[0]?.event_type || 'class'
-  const todayPackCount   = [...new Set(todayPackEvents.flatMap(e => Array.isArray(e.requires_items) ? e.requires_items : []))].length
+  const broughtStorageKey = sel ? `packing_brought_${sel.id}_${today}` : ''
+  const todayPackCount = useMemo(() => {
+    if (!sel) return 0
+    const brought = loadBroughtMap(broughtStorageKey)
+    const rows = buildPackingRows(timeline, todayEvents, packingItems, packPrefs)
+    return countPendingPackingRows(rows, brought)
+  }, [sel, timeline, todayEvents, packingItems, packPrefs, broughtStorageKey])
   const upcomingTimelineCount = countUpcomingTimeline(timeline, timeZone)
 
   const hasLoggedStatus = dailyLog.health_status != null && dailyLog.mood_status != null
@@ -661,8 +803,17 @@ export default function ChildSheet({ childList, sel, onSel, onClose, onAdd, user
                     <Accordion title="🎒 今日携带" count={todayPackCount}
                       badge={todayPackCount > 0 ? '需确认' : undefined}
                       defaultOpen={todayPackCount > 0}>
-                      <PackingSection childId={sel.id} userId={userId}
-                        events={todayPackEvents} eventType={todayMainEventType} />
+                      <PackingSection
+                        childId={sel.id}
+                        userId={userId}
+                        today={today}
+                        timeline={timeline}
+                        calendarToday={todayEvents}
+                        packingItems={packingItems}
+                        packingPreferences={packPrefs}
+                        onPrefsChange={setPackPrefs}
+                        onReload={reloadSchedule}
+                      />
                     </Accordion>
                     <Accordion title="📋 今日安排" count={todayEvents.length}
                       defaultOpen={todayEvents.length > 0}>
