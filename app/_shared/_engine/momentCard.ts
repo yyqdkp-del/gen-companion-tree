@@ -1,5 +1,6 @@
 import type { RootBriefing } from '@/app/_shared/_components/design'
 import type { HotspotItem, TodoItem } from '@/app/_shared/_types'
+import { isPlaceholderSubject } from '@/lib/schedule/placeholderSubject'
 
 export type MomentKind =
   | 'sick'
@@ -34,8 +35,11 @@ export type ScheduleClass = {
   name?: string
   title?: string
   time?: string
+  category?: string
   requires_items?: string[]
 }
+
+export type NextClassInfo = { name: string; time?: string }
 
 export type MomentCardData = {
   kind: MomentKind
@@ -43,6 +47,11 @@ export type MomentCardData = {
   theme: MomentTheme
   title: string
   subtitle?: string
+  eyebrow?: string
+  kidName?: string
+  nextClass?: NextClassInfo
+  showRainTip?: boolean
+  pickupLocation?: string
   bullets?: PackLine[]
   pulse?: boolean
   primaryAction?: { label: string; action: MomentAction }
@@ -52,7 +61,35 @@ export type MomentCardData = {
   briefing?: RootBriefing
 }
 
+const PICKUP_LIFE_RE = /pick\s*up|pickup|接送|drop\s*off/i
+const EXCLUDED_CATEGORIES = new Set(['transition', 'life', 'break'])
+
+function subjectCandidates(cls: ScheduleClass): string[] {
+  return [cls?.subject, cls?.name, cls?.name_zh]
+    .map((s) => String(s ?? '').trim())
+    .filter(Boolean)
+}
+
+export function isRealScheduleClass(cls: ScheduleClass | null | undefined): boolean {
+  if (!cls) return false
+
+  const cat = String(cls?.category ?? '').trim().toLowerCase()
+  if (EXCLUDED_CATEGORIES.has(cat)) return false
+  if (cat && cat !== 'class' && cat !== 'activity') return false
+
+  const candidates = subjectCandidates(cls)
+  if (!candidates.length) return false
+
+  for (const raw of candidates) {
+    if (PICKUP_LIFE_RE.test(raw)) return false
+    if (isPlaceholderSubject(raw)) return false
+  }
+
+  return true
+}
+
 export function getClassName(cls: ScheduleClass | null | undefined): string {
+  if (!isRealScheduleClass(cls)) return '课程'
   const name = cls?.name_zh || cls?.subject || cls?.name
   return name ? String(name).trim() : '课程'
 }
@@ -78,18 +115,23 @@ export function isAfterSchool(hour: number, minute: number, schoolEndTime?: stri
   return nowMin >= endMin && nowMin < endMin + 90
 }
 
-export function findNextClassToday(classes: ScheduleClass[], nowMin: number): string {
+export function findNextClassToday(classes: ScheduleClass[], nowMin: number): NextClassInfo | null {
   const sorted = [...classes].sort(
     (a, b) => parseTimeMin(a?.time) - parseTimeMin(b?.time),
   )
   for (const cls of sorted) {
+    if (!isRealScheduleClass(cls)) continue
     const t = parseTimeMin(cls?.time)
-    if (t >= 0 && t > nowMin) return getClassName(cls)
+    if (t >= 0 && t > nowMin) {
+      const name = getClassName(cls)
+      if (name === '课程') continue
+      return { name, time: cls?.time }
+    }
   }
-  return '课程'
+  return null
 }
 
-function hasRainOrFloodAlert(hotspots: HotspotItem[]): boolean {
+export function hasRainOrFloodAlert(hotspots: HotspotItem[]): boolean {
   return hotspots.some((h) =>
     /雨|洪水|暴雨|台风|洪涝|flood|rain|storm/i.test(
       `${h?.title || ''} ${h?.summary || ''}`,
@@ -97,15 +139,11 @@ function hasRainOrFloodAlert(hotspots: HotspotItem[]): boolean {
   )
 }
 
-function buildPickupTips(hotspots: HotspotItem[]): PackLine[] {
-  if (!hasRainOrFloodAlert(hotspots)) return []
-  return [{ item: '记得带雨伞' }, { item: '路上注意安全' }]
-}
-
 export function buildPackLines(classes: ScheduleClass[]): PackLine[] {
   const seen = new Set<string>()
   const out: PackLine[] = []
   for (const c of classes) {
+    if (!isRealScheduleClass(c)) continue
     const ctx = getClassName(c)
     const ctxLabel = ctx !== '课程' ? ctx : undefined
     for (const raw of c?.requires_items || []) {
@@ -125,6 +163,7 @@ export type BuildMomentParams = {
     display_health?: string
     health_status?: string
     school_end_time?: string
+    school_name?: string
   } | null
   todayClasses: ScheduleClass[]
   visaDaysLeft: number | null
@@ -142,12 +181,15 @@ export function buildMomentCard(p: BuildMomentParams): MomentCardData {
   const kidName = p.activeKid?.name || '孩子'
   const health = p.activeKid?.display_health || p.activeKid?.health_status
   const hotspots = p.hotspots || []
+  const rainAlert = hasRainOrFloodAlert(hotspots)
+  const pickupLocation = p.activeKid?.school_name?.trim() || ''
 
   if (health === 'sick') {
     return {
       kind: 'sick',
       tier: 'urgent',
       theme: 'warm-orange',
+      eyebrow: '根对此刻的感知',
       title: `${kidName}今天生病了`,
       subtitle: '记得带药，注意休息\n需要请假吗？',
       primaryAction: { label: '查看孩子状态', action: { type: 'child' } },
@@ -160,6 +202,7 @@ export function buildMomentCard(p: BuildMomentParams): MomentCardData {
       tier: 'urgent',
       theme: 'clay-red',
       pulse: true,
+      eyebrow: '根对此刻的感知',
       title: `签证还有 ${p.visaDaysLeft} 天`,
       subtitle: '现在必须处理',
       primaryAction: { label: '查看续签清单', action: { type: 'visa' } },
@@ -172,7 +215,9 @@ export function buildMomentCard(p: BuildMomentParams): MomentCardData {
       kind: 'packing',
       tier: 'important',
       theme: 'neutral',
-      title: `今天 ${kidName} 需要带`,
+      eyebrow: '今天要带',
+      kidName,
+      title: `${kidName} 的装备清单`,
       bullets: packLines,
       primaryAction: { label: '✓ 都准备好了', action: { type: 'pack_ready' } },
     }
@@ -180,16 +225,15 @@ export function buildMomentCard(p: BuildMomentParams): MomentCardData {
 
   const schoolEnd = p.activeKid?.school_end_time
   if (isInPickupWindow(hour, minute, schoolEnd)) {
-    const minutesLeft = minutesUntilSchoolEnd(p.now, schoolEnd) ?? 0
-    const tips = buildPickupTips(hotspots)
     return {
       kind: 'pickup',
       tier: 'important',
       theme: 'neutral',
+      eyebrow: '接孩子',
+      kidName,
       title: `距接 ${kidName} 还有`,
-      subtitle: `${minutesLeft} 分钟`,
-      bullets: tips.length > 0 ? tips : undefined,
       schoolEndTime: schoolEnd,
+      pickupLocation,
     }
   }
 
@@ -199,8 +243,11 @@ export function buildMomentCard(p: BuildMomentParams): MomentCardData {
       kind: 'after_school',
       tier: 'important',
       theme: 'neutral',
+      eyebrow: '放学后',
+      kidName,
       title: `${kidName} 放学了`,
-      subtitle: nextClass,
+      nextClass: nextClass ?? undefined,
+      showRainTip: rainAlert,
     }
   }
 
@@ -211,6 +258,7 @@ export function buildMomentCard(p: BuildMomentParams): MomentCardData {
       kind: 'todo',
       tier: 'normal',
       theme: 'neutral',
+      eyebrow: '根对此刻的感知',
       title: '今日必须处理',
       subtitle: todoTitle,
       todoId: top.id,
@@ -224,6 +272,7 @@ export function buildMomentCard(p: BuildMomentParams): MomentCardData {
       kind: 'night',
       tier: 'normal',
       theme: 'neutral',
+      eyebrow: '根对此刻的感知',
       title: '今天辛苦了',
       subtitle: `${kidName} 睡了吗？根在这里陪你`,
       primaryAction: { label: '和根说说话', action: { type: 'treehouse' } },
@@ -234,6 +283,7 @@ export function buildMomentCard(p: BuildMomentParams): MomentCardData {
     kind: 'overview',
     tier: 'normal',
     theme: 'neutral',
+    eyebrow: '根对此刻的感知',
     title: p.overviewBriefing.greeting,
     briefing: p.overviewBriefing,
   }

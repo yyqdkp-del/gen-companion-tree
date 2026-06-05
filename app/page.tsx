@@ -19,7 +19,13 @@ import TodoSheet from '@/app/rian/TodoSheet'
 import { THEME } from '@/app/_shared/_constants/theme'
 import { DesignWaterDrop, type RootBriefing, type BriefingItem } from '@/app/_shared/_components/design'
 import MomentCard from '@/app/components/MomentCard'
-import { buildMomentCard, getClassName, type MomentAction, type ScheduleClass } from '@/app/_shared/_engine/momentCard'
+import {
+  buildMomentCard,
+  getClassName,
+  isRealScheduleClass,
+  type MomentAction,
+  type ScheduleClass,
+} from '@/app/_shared/_engine/momentCard'
 import type { TodoItem, HotspotItem } from '@/app/_shared/_types'
 import { useChildData } from '@/app/_shared/_hooks/useChildData'
 import { useTodoActions } from '@/app/_shared/_hooks/useTodoActions'
@@ -97,7 +103,9 @@ function collectPackItems(classes: ScheduleItem[]): string[] {
 }
 
 function findPeClass(classes: ScheduleItem[]): ScheduleItem | undefined {
-  return classes.find((c) => /体育|游泳|PE|Sport|physical/i.test(getClassName(c)))
+  return classes.find(
+    (c) => isRealScheduleClass(c) && /体育|游泳|PE|Sport|physical/i.test(getClassName(c)),
+  )
 }
 
 function getTomorrowClasses(activeKid: any | null): ScheduleItem[] {
@@ -113,6 +121,7 @@ function getTomorrowClasses(activeKid: any | null): ScheduleItem[] {
         title?: string
         name?: string
         name_zh?: string
+        category?: string
         time?: string
         requires_items?: string[]
       }
@@ -121,6 +130,7 @@ function getTomorrowClasses(activeKid: any | null): ScheduleItem[] {
         subject: o.subject,
         name: o.name,
         name_zh: o.name_zh,
+        category: o.category,
         title: o.title,
         requires_items: o.requires_items,
       }
@@ -274,9 +284,10 @@ function buildDaytimeFocus(params: BriefingParams): RootBriefing {
     items.push({ icon: '🚗', text: `接送约 ${pickupTime}`, urgent: period === '刚放学' })
   } else {
     const nextClass = todayClasses.find((c) => {
+      if (!isRealScheduleClass(c)) return false
       const t = parseTimeMin(c.time)
       return t >= 0 && t > hour * 60 + minute
-    }) || todayClasses[0]
+    }) || todayClasses.find(isRealScheduleClass)
     if (nextClass?.time) {
       items.push({ icon: '⏰', text: `下一节 ${nextClass?.time || ''} ${getClassName(nextClass)}`.trim() })
     }
@@ -524,10 +535,14 @@ function AddChildSheet({ onClose, onSave }: { onClose: () => void; onSave: (d: a
   )
 }
 
-function InputSheet({ onClose, userId, onProcessing }: {
-  onClose: () => void; userId: string; onProcessing?: () => void
+function InputSheet({ onClose, userId, onProcessing, prefill }: {
+  onClose: () => void; userId: string; onProcessing?: () => void; prefill?: string
 }) {
-  const [text, setText] = useState('')
+  const [text, setText] = useState(prefill || '')
+
+  useEffect(() => {
+    setText(prefill || '')
+  }, [prefill])
   const [sending, setSending] = useState(false)
   const handleSend = async () => {
     if (!text.trim()) return
@@ -791,6 +806,7 @@ export default function BasePage() {
   const openModal = (m: typeof modal) => { setModal(m); setModalOpen(true) }
   const closeModal = () => { setModal(null); setModalOpen(false) }
   const [oneTapTodo, setOneTapTodo] = useState<TodoItem | null>(null)
+  const [inputPrefill, setInputPrefill] = useState<string | undefined>()
   const [patrolling, setPatrolling] = useState(false)
   const patrolTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const lastMinuteOfDayRef = useRef<number | null>(null)
@@ -1263,6 +1279,23 @@ export default function BasePage() {
     router,
   ])
 
+  const handleOpenChild = useCallback(() => {
+    openModal('child')
+  }, [])
+
+  const handleOpenInput = useCallback((prefill?: string) => {
+    setInputPrefill(prefill)
+    openModal('input')
+  }, [])
+
+  const handleOneTap = useCallback((todoId: string) => {
+    const todo = todayFocusTodos.find((t) => t.id === todoId)
+      || displayTodos.find((t) => t.id === todoId)
+    if (!todo) return
+    setOneTapTodo(todo)
+    openModal('oneTap')
+  }, [todayFocusTodos, displayTodos])
+
   const handlePhotoCapture = () => {
     if (!userId) {
       promptRegister('登录后拍照交给根处理，现在注册体验')
@@ -1395,7 +1428,17 @@ export default function BasePage() {
               : '今天的事，根都替你盯着。'}
           </p>
 
-          <MomentCard data={momentCard} now={now} onAction={handleMomentAction} />
+          <AnimatePresence mode="wait">
+            <MomentCard
+              key={`${momentCard.kind}-${packReadyDismissed}`}
+              data={momentCard}
+              now={now}
+              onAction={handleMomentAction}
+              onOpenChild={handleOpenChild}
+              onOpenInput={handleOpenInput}
+              onOneTap={handleOneTap}
+            />
+          </AnimatePresence>
 
           <div
             style={{
@@ -1533,8 +1576,13 @@ export default function BasePage() {
             onSnooze={handleSnooze} />
         )}
         {modal === 'input' && (
-          <InputSheet key="input" onClose={() => closeModal()} userId={userId}
-            onProcessing={() => setProcessStatus({ status: 'processing', message: '根正在整理中...' })} />
+          <InputSheet
+            key="input"
+            prefill={inputPrefill}
+            onClose={() => { setInputPrefill(undefined); closeModal() }}
+            userId={userId}
+            onProcessing={() => setProcessStatus({ status: 'processing', message: '根正在整理中...' })}
+          />
         )}
       </AnimatePresence>
 
