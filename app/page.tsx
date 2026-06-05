@@ -32,7 +32,7 @@ import { toast, toastRegisterPrompt } from '@/app/components/Toast'
 import { sanitizeFileName } from '@/lib/storage/sanitizeFileName'
 import { useRouter } from 'next/navigation'
 import HomeRefreshFromQuery from '@/app/components/HomeRefreshFromQuery'
-import { PAGE_BOTTOM_WITH_FLOAT } from '@/app/_shared/_constants/layout'
+import { PAGE_BOTTOM_TAB_ONLY } from '@/app/_shared/_constants/layout'
 
 type ScheduleItem = { time: string; title: string; location?: string; requires_action?: string }
 type UrgentItem = { title: string; level: 'red' | 'orange' | 'yellow' }
@@ -54,6 +54,26 @@ function getTimeGreetingLabel(h: number): string {
   if (h < 12) return '早安'
   if (h < 18) return '下午好'
   return '晚上好'
+}
+
+const PRIORITY_DOT: Record<string, string> = {
+  red: '#d58074',
+  orange: '#e6a89e',
+  yellow: '#c9a227',
+  green: '#8ca88d',
+  blue: '#6c828f',
+  grey: '#9a9a8a',
+}
+
+function getTodoFocusSubtitle(todo: TodoItem): string {
+  if (todo.due_date) {
+    const d = new Date(todo.due_date)
+    if (!Number.isNaN(d.getTime())) {
+      return `截止 ${d.toLocaleDateString('zh-CN', { month: 'numeric', day: 'numeric' })}`
+    }
+  }
+  if (todo.category) return todo.category
+  return '今日待办'
 }
 
 function daysUntilYmd(dateStr: string): number | null {
@@ -895,7 +915,7 @@ export default function BasePage() {
   const visaDaysLeft = visaTodo?.due_date ? daysUntilYmd(visaTodo.due_date) : null
   const showVisaWarning = visaDaysLeft != null && visaDaysLeft <= 30 && visaDaysLeft >= 0
   const visaWarningText = showVisaWarning
-    ? `⚠️ ${activeKid?.name || '孩子'} 学生签证 · 还有${visaDaysLeft}天`
+    ? `⚠️ ${activeKid?.name || '孩子'} 学生签证 · 还有${visaDaysLeft}天到期`
     : ''
   const userDisplayName = userId ? '妈妈' : ''
   const nextClassLine = todayClasses[0]
@@ -905,17 +925,7 @@ export default function BasePage() {
     const order: Record<string, number> = { red: 3, orange: 2, yellow: 1 }
     return (order[b.priority] || 0) - (order[a.priority] || 0)
   })
-  const focusItemStyle: React.CSSProperties = {
-    background: 'var(--canvas-card)',
-    borderRadius: 12,
-    padding: '12px 16px',
-    marginBottom: 8,
-    boxShadow: 'var(--sh-soft)',
-    border: '1px solid rgba(164, 99, 85, 0.04)',
-  }
-  const headerPadTop = showProfileBanner
-    ? 'calc(max(env(safe-area-inset-top), 0px) + 44px)'
-    : 'max(env(safe-area-inset-top), 0px)'
+  const todayFocusTop3 = todayFocusTodos.slice(0, 3)
 
   const handlePhotoCapture = () => {
     if (!userId) {
@@ -957,11 +967,7 @@ export default function BasePage() {
   return (
     <main
       style={{
-        position: 'fixed',
-        inset: 0,
-        width: '100vw',
-        height: '100dvh',
-        overflow: 'hidden',
+        minHeight: '100dvh',
         backgroundColor: 'var(--canvas-light)',
         color: 'var(--text-primary)',
         fontFamily: "'Noto Serif SC', 'Songti SC', serif",
@@ -980,280 +986,257 @@ export default function BasePage() {
         />
       )}
 
-      {showProfileBanner && (
-        <div
-          role="button"
-          tabIndex={0}
-          onClick={() => router.push('/children')}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' || e.key === ' ') router.push('/children')
-          }}
+      <div
+        style={{
+          padding: `calc(max(env(safe-area-inset-top), 0px) + 12px) 16px ${PAGE_BOTTOM_TAB_ONLY}`,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 16,
+        }}
+      >
+        {showProfileBanner && (
+          <div
+            role="button"
+            tabIndex={0}
+            onClick={() => router.push('/children')}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') router.push('/children')
+            }}
+            style={{
+              background: 'var(--accent-clay)',
+              borderRadius: 12,
+              padding: '10px 16px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              cursor: 'pointer',
+            }}
+          >
+            <span style={{ fontSize: 13, color: '#fff', fontFamily: 'PingFang SC, sans-serif' }}>
+              📋 完善孩子档案，让根更懂你
+            </span>
+            <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.8)' }}>→</span>
+          </div>
+        )}
+
+        {/* 区块1：顶部 */}
+        <header
           style={{
-            position: 'fixed',
-            top: headerPadTop,
-            left: 0,
-            right: 0,
-            zIndex: 60,
-            background: 'var(--accent-clay)',
-            backdropFilter: 'blur(10px)',
-            padding: '10px 16px',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            cursor: 'pointer',
+            gap: 12,
           }}
         >
-          <span style={{ fontSize: 13, color: '#fff', fontFamily: 'PingFang SC, sans-serif' }}>
-            📋 完善孩子档案，让根更懂你
-          </span>
-          <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.8)' }}>→</span>
-        </div>
-      )}
-
-      <header
-        style={{
-          position: 'fixed',
-          top: showProfileBanner ? 'calc(max(env(safe-area-inset-top), 0px) + 44px)' : 'max(env(safe-area-inset-top), 0px)',
-          left: 0,
-          right: 0,
-          zIndex: 50,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: 12,
-          padding: '12px 16px',
-          background: 'linear-gradient(180deg, var(--canvas-light) 70%, transparent)',
-        }}
-      >
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div
-            style={{
-              fontFamily: "'Noto Serif SC', serif",
-              fontSize: 16,
-              fontWeight: 500,
-              color: 'var(--text-primary)',
-              lineHeight: 1.35,
-            }}
-          >
-            {userDisplayName ? `${greetingLabel} · ${userDisplayName}` : greetingLabel}
-          </div>
-          {mounted && greeting?.sub && (
+          <div style={{ flex: 1, minWidth: 0 }}>
             <div
               style={{
-                marginTop: 4,
-                fontSize: 13,
-                color: 'var(--text-secondary)',
-                lineHeight: 1.45,
+                fontFamily: "'Noto Serif SC', serif",
+                fontSize: 20,
+                fontWeight: 500,
+                color: 'var(--text-primary)',
+                lineHeight: 1.35,
               }}
             >
-              {greeting.sub}
+              {userDisplayName ? `${greetingLabel} · ${userDisplayName}` : greetingLabel}
             </div>
-          )}
-        </div>
+            {mounted && greeting?.sub && (
+              <div
+                style={{
+                  marginTop: 4,
+                  fontSize: 13,
+                  color: 'var(--text-secondary)',
+                  lineHeight: 1.45,
+                }}
+              >
+                {greeting.sub}
+              </div>
+            )}
+          </div>
+          <motion.button
+            type="button"
+            whileTap={{ scale: 0.94 }}
+            onClick={() => {
+              if (!kids.length) {
+                router.push('/children')
+                return
+              }
+              if (kids.length > 1) {
+                const idx = kids.findIndex((k: { id?: string }) => k.id === activeKid?.id)
+                const next = kids[(idx + 1) % kids.length]
+                void handleSwitchKid(enrichedKids.find((k: { id?: string }) => k.id === next.id) || next)
+              } else {
+                void track({ event_type: 'droplet_click', meta: { type: 'child' } })
+                openModal('child')
+              }
+            }}
+            style={{
+              width: 40,
+              height: 40,
+              borderRadius: '50%',
+              border: kids.length ? '2px solid var(--canvas-card)' : '1.5px dashed var(--accent-clay)',
+              background: kids.length ? 'var(--canvas-card)' : 'var(--accent-clay-alpha)',
+              boxShadow: kids.length ? 'var(--sh-soft)' : 'none',
+              overflow: 'hidden',
+              cursor: 'pointer',
+              padding: 0,
+              fontSize: 20,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0,
+            }}
+            aria-label={activeKid?.name || '用户头像'}
+          >
+            {activeKid?.avatar_url ? (
+              <img
+                src={activeKid.avatar_url}
+                alt=""
+                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+              />
+            ) : (
+              activeKid?.emoji || '🌱'
+            )}
+          </motion.button>
+        </header>
 
-        <div style={{ display: 'flex', alignItems: 'center', flexShrink: 0 }}>
-          {!kids.length ? (
-            <motion.button
-              type="button"
-              whileTap={{ scale: 0.94 }}
-              onClick={() => router.push('/children')}
-              style={{
-                width: 44,
-                height: 44,
-                borderRadius: '50%',
-                border: '1.5px dashed var(--accent-clay)',
-                background: 'var(--accent-clay-alpha)',
-                fontSize: 22,
-                cursor: 'pointer',
-                padding: 0,
-              }}
-              aria-label="添加孩子"
-            >
-              🌱
-            </motion.button>
-          ) : (
-            <motion.button
-              type="button"
-              whileTap={{ scale: 0.94 }}
-              onClick={() => {
-                if (kids.length > 1) {
-                  const idx = kids.findIndex((k: { id?: string }) => k.id === activeKid?.id)
-                  const next = kids[(idx + 1) % kids.length]
-                  void handleSwitchKid(enrichedKids.find((k: { id?: string }) => k.id === next.id) || next)
-                } else {
-                  void track({ event_type: 'droplet_click', meta: { type: 'child' } })
-                  openModal('child')
-                }
-              }}
-              style={{
-                width: 44,
-                height: 44,
-                borderRadius: '50%',
-                border: '2px solid var(--canvas-card)',
-                background: 'var(--canvas-card)',
-                boxShadow: 'var(--sh-soft)',
-                overflow: 'hidden',
-                cursor: 'pointer',
-                padding: 0,
-                fontSize: 22,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-              aria-label={activeKid?.name || '切换孩子'}
-            >
-              {activeKid?.avatar_url ? (
-                <img
-                  src={activeKid.avatar_url}
-                  alt=""
-                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                />
-              ) : (
-                activeKid?.emoji || '👶🏻'
-              )}
-            </motion.button>
-          )}
-        </div>
-      </header>
-
-      <div
-        style={{
-          position: 'absolute',
-          inset: 0,
-          top: showProfileBanner
-            ? 'calc(max(env(safe-area-inset-top), 0px) + 100px)'
-            : 'calc(max(env(safe-area-inset-top), 0px) + 56px)',
-          bottom: 0,
-          overflowY: 'auto',
-          overflowX: 'hidden',
-          WebkitOverflowScrolling: 'touch',
-          padding: `0 16px ${PAGE_BOTTOM_WITH_FLOAT}`,
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 14,
-        }}
-      >
+        {/* 区块2：签证警告条 */}
         {showVisaWarning && (
           <button
             type="button"
             onClick={() => router.push('/profile/cards')}
             style={{
               width: '100%',
-              marginTop: 4,
-              padding: '12px 14px 12px 16px',
+              padding: '12px 16px',
               border: 'none',
-              borderRadius: 'var(--r-md)',
+              borderRadius: 12,
               background: 'rgba(164, 99, 85, 0.08)',
               borderLeft: '3px solid var(--accent-clay)',
-              textAlign: 'left',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: 12,
               cursor: 'pointer',
               fontFamily: "'Noto Serif SC', serif",
-              fontSize: 13,
-              fontWeight: 500,
-              color: 'var(--accent-clay)',
-              lineHeight: 1.45,
-              boxShadow: 'var(--sh-soft)',
+              textAlign: 'left',
             }}
           >
-            {visaWarningText}
+            <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--accent-clay)', lineHeight: 1.45, flex: 1 }}>
+              {visaWarningText}
+            </span>
+            <span style={{ fontSize: 13, color: 'var(--accent-clay)', flexShrink: 0 }}>查看 &gt;</span>
           </button>
         )}
 
-        <section style={{ flex: '1 1 auto', marginTop: 4 }}>
+        {/* 区块3：今日焦点卡片 */}
+        <section
+          style={{
+            padding: 20,
+            borderRadius: 22,
+            background: 'var(--canvas-card)',
+            boxShadow: 'var(--sh-warm)',
+            border: '1px solid rgba(164, 99, 85, 0.06)',
+          }}
+        >
           <div
             style={{
-              fontSize: 9,
-              fontWeight: 700,
-              letterSpacing: '0.2em',
-              textTransform: 'uppercase',
-              color: 'var(--accent-clay)',
-              marginBottom: 10,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              marginBottom: 16,
             }}
           >
-            今天
+            <h2 style={{ margin: 0, fontSize: 16, fontWeight: 600, color: 'var(--text-primary)' }}>
+              今日焦点
+            </h2>
+            {todayFocusTodos.length > 0 && (
+              <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+                还有{todayFocusTodos.length}件
+              </span>
+            )}
           </div>
-          {todayFocusTodos.length > 0 ? (
-            todayFocusTodos.map((todo) => (
-              <button
-                key={todo.id}
-                type="button"
-                onClick={() => {
-                  setOneTapTodo(todo)
-                  openModal('oneTap')
-                }}
-                style={{
-                  ...focusItemStyle,
-                  width: '100%',
-                  border: '1px solid rgba(164, 99, 85, 0.04)',
-                  textAlign: 'left',
-                  cursor: 'pointer',
-                  fontFamily: 'inherit',
-                }}
-              >
-                <div
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {todayFocusTop3.length > 0 ? (
+              todayFocusTop3.map((todo) => (
+                <button
+                  key={todo.id}
+                  type="button"
+                  onClick={() => {
+                    setOneTapTodo(todo)
+                    openModal('oneTap')
+                  }}
                   style={{
-                    fontSize: 15,
-                    fontWeight: 600,
-                    lineHeight: 1.45,
-                    color: 'var(--text-primary)',
+                    width: '100%',
+                    border: 'none',
+                    background: 'transparent',
+                    padding: 0,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 12,
+                    cursor: 'pointer',
+                    fontFamily: 'inherit',
+                    textAlign: 'left',
                   }}
                 >
-                  {todo.title?.replace(/^📅\s*/, '') || '待办'}
-                </div>
-                {todo.due_date && (
-                  <div style={{ marginTop: 4, fontSize: 12, color: 'var(--text-secondary)' }}>
-                    截止 {new Date(todo.due_date).toLocaleDateString('zh-CN', { month: 'numeric', day: 'numeric' })}
+                  <span
+                    style={{
+                      width: 8,
+                      height: 8,
+                      borderRadius: '50%',
+                      background: PRIORITY_DOT[todo.priority] || PRIORITY_DOT.grey,
+                      flexShrink: 0,
+                    }}
+                  />
+                  <span style={{ flex: 1, minWidth: 0 }}>
+                    <div
+                      style={{
+                        fontSize: 15,
+                        fontWeight: 600,
+                        color: 'var(--text-primary)',
+                        lineHeight: 1.4,
+                      }}
+                    >
+                      {todo.title?.replace(/^📅\s*/, '') || '待办'}
+                    </div>
+                    <div
+                      style={{
+                        marginTop: 2,
+                        fontSize: 12,
+                        color: 'var(--text-secondary)',
+                        lineHeight: 1.4,
+                      }}
+                    >
+                      {getTodoFocusSubtitle(todo)}
+                    </div>
+                  </span>
+                  <ChevronRight size={16} color="var(--text-muted)" style={{ flexShrink: 0 }} />
+                </button>
+              ))
+            ) : (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <span
+                  style={{
+                    width: 8,
+                    height: 8,
+                    borderRadius: '50%',
+                    background: PRIORITY_DOT.grey,
+                    flexShrink: 0,
+                  }}
+                />
+                <span style={{ flex: 1 }}>
+                  <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-primary)', lineHeight: 1.4 }}>
+                    {todayFocus.headline}
                   </div>
-                )}
-              </button>
-            ))
-          ) : (
-            <div style={focusItemStyle}>
-              <h2
-                style={{
-                  margin: 0,
-                  fontSize: 18,
-                  fontWeight: 600,
-                  lineHeight: 1.35,
-                  color: 'var(--text-primary)',
-                }}
-              >
-                {todayFocus.headline}
-              </h2>
-              <p
-                style={{
-                  margin: '8px 0 0',
-                  fontSize: 14,
-                  lineHeight: 1.6,
-                  color: 'var(--text-secondary)',
-                }}
-              >
-                {todayFocus.detail}
-              </p>
-            </div>
-          )}
-          {(currentHour >= 22 || currentHour < 6) && (
-            <motion.button
-              type="button"
-              whileTap={{ scale: 0.98 }}
-              onClick={() => router.push('/treehouse')}
-              style={{
-                ...focusItemStyle,
-                width: '100%',
-                border: '1px solid var(--treehole-ink)',
-                background: 'var(--treehole-deep)',
-                color: '#f0ebe4',
-                fontSize: 13,
-                fontFamily: "'Noto Serif SC', serif",
-                cursor: 'pointer',
-                textAlign: 'left',
-              }}
-            >
-              进入树洞 →
-            </motion.button>
-          )}
+                  <div style={{ marginTop: 2, fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.4 }}>
+                    {todayFocus.detail}
+                  </div>
+                </span>
+              </div>
+            )}
+          </div>
         </section>
 
+        {/* 区块4：拍照大按钮 */}
         <motion.button
           type="button"
           whileTap={{ scale: 0.98 }}
@@ -1270,40 +1253,38 @@ export default function BasePage() {
             fontFamily: 'PingFang SC, -apple-system, sans-serif',
             cursor: 'pointer',
             boxShadow: 'var(--sh-warm)',
-            flexShrink: 0,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
           }}
         >
           📷 拍给根处理
         </motion.button>
 
+        {/* 区块5：孩子状态横卡 */}
         <section
           style={{
             display: 'grid',
             gridTemplateColumns: 'repeat(3, 1fr)',
-            gap: 10,
-            padding: 14,
-            borderRadius: 'var(--r-lg)',
+            gap: 8,
+            padding: '14px 12px',
+            borderRadius: 16,
             background: 'var(--canvas-card)',
             boxShadow: 'var(--sh-soft)',
           }}
         >
           {[
-            { label: '今日课程', value: todayClasses.length ? nextClassLine : '暂无', onClick: () => openModal('child') },
+            { label: '今日课程', value: todayClasses.length ? nextClassLine : '暂无' },
             {
               label: '精力',
               value: activeKid ? (activeKid as { energy_label?: string }).energy_label || childValue : '—',
-              onClick: () => openModal('child'),
             },
-            {
-              label: '今日携带',
-              value: packItemCount ? `${packItemCount} 项` : '无',
-              onClick: () => openModal('child'),
-            },
+            { label: '今日携带', value: packItemCount ? `${packItemCount} 项` : '无' },
           ].map((cell) => (
             <button
               key={cell.label}
               type="button"
-              onClick={cell.onClick}
+              onClick={() => openModal('child')}
               style={{
                 border: 'none',
                 background: 'transparent',
@@ -1313,13 +1294,13 @@ export default function BasePage() {
                 fontFamily: 'inherit',
               }}
             >
-              <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 6 }}>{cell.label}</div>
+              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 6 }}>{cell.label}</div>
               <div
                 style={{
-                  fontSize: 12,
+                  fontSize: 15,
                   fontWeight: 600,
                   color: 'var(--text-primary)',
-                  lineHeight: 1.45,
+                  lineHeight: 1.4,
                   display: '-webkit-box',
                   WebkitLineClamp: 2,
                   WebkitBoxOrient: 'vertical',
@@ -1332,14 +1313,14 @@ export default function BasePage() {
           ))}
         </section>
 
+        {/* 区块6：三颗水珠 */}
         <section
           style={{
             display: 'flex',
             justifyContent: 'center',
             alignItems: 'center',
-            gap: 20,
-            paddingBottom: 8,
-            flexShrink: 0,
+            gap: 24,
+            padding: '8px 0 4px',
           }}
         >
           <WaterDrop

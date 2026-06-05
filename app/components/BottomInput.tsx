@@ -16,7 +16,8 @@ import { subscribePushIfPermitted } from '@/lib/push/subscribePushClient'
 import { logOrAlertNetworkError } from '@/lib/errors/logOrAlertNetworkError'
 import { toast, toastRegisterPrompt } from '@/app/components/Toast'
 
-const SHOW_ON = ['/', '/rian']
+const CAMERA_PAGES = ['/', '/rian']
+const FLOAT_CHROME_PAGES = ['/rian']
 
 const FLOAT_BTN: React.CSSProperties = {
   width: 48,
@@ -155,8 +156,9 @@ export default function BottomInput() {
     await upload(file, category)
   }
 
-  if (!SHOW_ON.includes(pathname)) return null
+  if (!CAMERA_PAGES.includes(pathname)) return null
 
+  const showFloatChrome = FLOAT_CHROME_PAGES.includes(pathname)
   const floatBottom = `calc(${FLOAT_INPUT_BOTTOM} + var(--keyboard-height, 0px))`
   const panelBottom = `calc(${TAB_BAR_HEIGHT_PX}px + env(safe-area-inset-bottom, 0px) + 16px + 104px + 12px + var(--keyboard-height, 0px))`
 
@@ -178,7 +180,7 @@ export default function BottomInput() {
         onChange={handleFileChange}
       />
 
-      {/* 展开的输入面板 — 在浮动按钮上方 */}
+      {showFloatChrome && (
       <div
         style={{
           position: 'fixed',
@@ -378,8 +380,9 @@ export default function BottomInput() {
           )}
         </AnimatePresence>
       </div>
+      )}
 
-      {/* 右下角浮动：相机在上、话筒在下 */}
+      {showFloatChrome && (
       <div
         style={{
           position: 'fixed',
@@ -391,26 +394,24 @@ export default function BottomInput() {
           gap: 8,
         }}
       >
-        {pathname !== '/' && (
-          <motion.button
-            type="button"
-            aria-label="拍照或上传"
-            whileTap={{ scale: 0.92 }}
-            disabled={!sessionReady}
-            onClick={() => {
-              if (requireRianLogin()) return
-              if (sessionReady) setInputMode(inputMode === 'vision_file' ? 'none' : 'vision_file')
-            }}
-            style={{
-              ...FLOAT_BTN,
-              border: inputMode === 'vision_file' ? '1.5px solid rgba(164,99,85,0.4)' : FLOAT_BTN.border,
-              opacity: !sessionReady ? 0.45 : 1,
-              cursor: sessionReady ? 'pointer' : 'default',
-            }}
-          >
-            <Camera size={21} color={inputMode === 'vision_file' ? THEME.gold : THEME.text} />
-          </motion.button>
-        )}
+        <motion.button
+          type="button"
+          aria-label="拍照或上传"
+          whileTap={{ scale: 0.92 }}
+          disabled={!sessionReady}
+          onClick={() => {
+            if (requireRianLogin()) return
+            if (sessionReady) setInputMode(inputMode === 'vision_file' ? 'none' : 'vision_file')
+          }}
+          style={{
+            ...FLOAT_BTN,
+            border: inputMode === 'vision_file' ? '1.5px solid rgba(164,99,85,0.4)' : FLOAT_BTN.border,
+            opacity: !sessionReady ? 0.45 : 1,
+            cursor: sessionReady ? 'pointer' : 'default',
+          }}
+        >
+          <Camera size={21} color={inputMode === 'vision_file' ? THEME.gold : THEME.text} />
+        </motion.button>
         <motion.button
           type="button"
           aria-label="语音与文字"
@@ -430,6 +431,7 @@ export default function BottomInput() {
           <Mic size={21} color={inputMode === 'audio_text' ? THEME.gold : THEME.text} />
         </motion.button>
       </div>
+      )}
     </>
   )
 }
