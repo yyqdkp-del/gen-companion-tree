@@ -1,6 +1,5 @@
 import type { RootBriefing } from '@/app/_shared/_components/design'
 import type { HotspotItem, TodoItem } from '@/app/_shared/_types'
-import { isPlaceholderSubject } from '@/lib/schedule/placeholderSubject'
 
 export type MomentKind =
   | 'sick'
@@ -61,8 +60,7 @@ export type MomentCardData = {
   briefing?: RootBriefing
 }
 
-const PICKUP_LIFE_RE = /pick\s*up|pickup|接送|drop\s*off/i
-const EXCLUDED_CATEGORIES = new Set(['transition', 'life', 'break'])
+const PICKUP_RE = /pick\s*up|pickup|drop\s*off|dropoff|接送/i
 
 function subjectCandidates(cls: ScheduleClass): string[] {
   return [cls?.subject, cls?.name, cls?.name_zh]
@@ -70,22 +68,21 @@ function subjectCandidates(cls: ScheduleClass): string[] {
     .filter(Boolean)
 }
 
+function isPickupSubject(cls: ScheduleClass): boolean {
+  return subjectCandidates(cls).some((raw) => PICKUP_RE.test(raw))
+}
+
 export function isRealScheduleClass(cls: ScheduleClass | null | undefined): boolean {
   if (!cls) return false
 
   const cat = String(cls?.category ?? '').trim().toLowerCase()
-  if (EXCLUDED_CATEGORIES.has(cat)) return false
-  if (cat && cat !== 'class' && cat !== 'activity') return false
+  if (cat) {
+    return cat === 'class' || cat === 'activity'
+  }
 
   const candidates = subjectCandidates(cls)
   if (!candidates.length) return false
-
-  for (const raw of candidates) {
-    if (PICKUP_LIFE_RE.test(raw)) return false
-    if (isPlaceholderSubject(raw)) return false
-  }
-
-  return true
+  return !isPickupSubject(cls)
 }
 
 export function getClassName(cls: ScheduleClass | null | undefined): string {

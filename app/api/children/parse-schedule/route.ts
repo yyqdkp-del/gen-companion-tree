@@ -366,8 +366,18 @@ async function enrichSchedule(step1: ScheduleByDay): Promise<ScheduleByDay | nul
       role: 'user',
       content: `以下是国际学校课表数据，请为每个 subject 补充：
 - name_zh：中文简称2-6字
-- category：class（正式课）/life（生活事项）/break（休息）/transition（接送过渡）/activity（活动）
+- category：见下方分类规则
 - requires_items：需要携带物品的中文数组（可选）
+
+对每个课程条目，判断 category：
+- class：真实学科课程（Math/Science/ELA/Thai 等）
+- activity：课外活动/特色课（Stack/Art/Music/PE/Swimming 等）
+- transition：过渡性安排（Pick up/Drop off/Morning Routine 等）
+- break：休息时间（Snack/Lunch/Rest Time/Recess 等）
+
+请为每个条目加上 category 字段。
+transition 和 break 类别的条目，妈妈不需要在课程提醒里看到，
+但需要保留在完整课表里供时间线参考。
 
 对需要携带物品的课程，添加 requires_items 字段（中文数组）。
 根据课程常识判断，例如：
