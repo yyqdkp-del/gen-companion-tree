@@ -17,7 +17,9 @@ import Onboarding from '@/app/components/Onboarding'
 import { useApp } from '@/app/context/AppContext'
 import TodoSheet from '@/app/rian/TodoSheet'
 import { THEME } from '@/app/_shared/_constants/theme'
-import { DesignWaterDrop, FocusCard, VisaCountdown, type RootBriefing, type BriefingItem } from '@/app/_shared/_components/design'
+import { DesignWaterDrop, type RootBriefing, type BriefingItem } from '@/app/_shared/_components/design'
+import MomentCard from '@/app/components/MomentCard'
+import { buildMomentCard, type MomentAction } from '@/app/_shared/_engine/momentCard'
 import type { TodoItem, HotspotItem } from '@/app/_shared/_types'
 import { useChildData } from '@/app/_shared/_hooks/useChildData'
 import { useTodoActions } from '@/app/_shared/_hooks/useTodoActions'
@@ -772,6 +774,8 @@ export default function BasePage() {
     modalOpen, setModalOpen, showOnboarding, setShowOnboarding } = useApp()
   const [clockTime, setClockTime] = useState('')
   const [dateLabel, setDateLabel] = useState('')
+  const [now, setNow] = useState(() => new Date())
+  const [packReadyDismissed, setPackReadyDismissed] = useState(false)
   const [modal, setModal] = useState<'child' | 'todo' | 'hotspot' | 'addChild' | 'oneTap' | 'input' | null>(null)
 
   const openModal = (m: typeof modal) => { setModal(m); setModalOpen(true) }
@@ -864,16 +868,17 @@ export default function BasePage() {
   useEffect(() => {
     setMounted(true)
     const tick = () => {
-      const now = new Date()
-      const hour = now.getHours()
-      const minute = now.getMinutes()
+      const tickNow = new Date()
+      setNow(tickNow)
+      const hour = tickNow.getHours()
+      const minute = tickNow.getMinutes()
       const minuteOfDay = hour * 60 + minute
 
       if (lastMinuteOfDayRef.current !== minuteOfDay) {
         lastMinuteOfDayRef.current = minuteOfDay
         setClockTime(`${hour}:${String(minute).padStart(2, '0')}`)
 
-        const nextDateLabel = `${now.getMonth() + 1}.${now.getDate()}`
+        const nextDateLabel = `${tickNow.getMonth() + 1}.${tickNow.getDate()}`
         if (lastDateLabelRef.current !== nextDateLabel) {
           lastDateLabelRef.current = nextDateLabel
           setDateLabel(nextDateLabel)
@@ -902,6 +907,22 @@ export default function BasePage() {
   useEffect(() => () => {
     if (patrolTimerRef.current) clearTimeout(patrolTimerRef.current)
   }, [])
+
+  const packReadyKey = activeKid?.id
+    ? `pack_ready_${activeKid.id}_${now.getFullYear()}-${now.getMonth() + 1}-${now.getDate()}`
+    : null
+
+  useEffect(() => {
+    if (!packReadyKey) {
+      setPackReadyDismissed(false)
+      return
+    }
+    try {
+      setPackReadyDismissed(localStorage.getItem(packReadyKey) === '1')
+    } catch {
+      setPackReadyDismissed(false)
+    }
+  }, [packReadyKey])
 
   const handleMarkDone = async (id: string) => {
     const todo = oneTapTodo ?? todos.find(t => t.id === id)
@@ -1096,8 +1117,8 @@ export default function BasePage() {
 
   const showBootSkeleton = !sessionReady || (loading && kids.length === 0 && todos.length === 0)
 
-  const currentHour = lastHourRef.current ?? new Date().getHours()
-  const currentMinute = new Date().getMinutes()
+  const currentHour = now.getHours()
+  const currentMinute = now.getMinutes()
   const greetingLabel = mounted ? getTimeGreetingLabel(currentHour) : '你好'
   const doneTodayCount = useMemo(
     () => todos.filter((t) => t.status === 'done').length,
@@ -1115,16 +1136,11 @@ export default function BasePage() {
     (t) => t.due_date && (t.title?.includes('签证') || t.title?.includes('护照') || t.category === 'compliance'),
   )
   const visaDaysLeft = visaTodo?.due_date ? daysUntilYmd(visaTodo.due_date) : null
-  const showVisaWarning = visaDaysLeft != null && visaDaysLeft <= 30 && visaDaysLeft >= 0
   const userDisplayName = userId ? '妈妈' : ''
   const todayFocusTodos = [...(todoGroups?.today || [])].sort((a, b) => {
     const order: Record<string, number> = { red: 3, orange: 2, yellow: 1 }
     return (order[b.priority] || 0) - (order[a.priority] || 0)
   })
-  const visaPriorityKind = visaDaysLeft != null && visaDaysLeft <= 7 ? 'red' : 'orange'
-  const visaDescription = showVisaWarning && visaTodo
-    ? `${activeKid?.name || '孩子'} 的学生签${visaTodo.due_date ? ` ${String(visaTodo.due_date).slice(0, 10)}` : ''} 到期。根已备好续签材料清单，建议本周内预约。`
-    : undefined
   const rootBriefing = useMemo(
     () => buildRootBriefing({
       hour: currentHour,
@@ -1149,6 +1165,91 @@ export default function BasePage() {
       unreadHotspots,
     ],
   )
+
+  const momentCard = useMemo(
+    () => buildMomentCard({
+      now,
+      activeKid,
+      todayClasses,
+      visaDaysLeft,
+      todayTodos: todayFocusTodos,
+      topTodo,
+      packReadyDismissed,
+      overviewBriefing: rootBriefing,
+    }),
+    [
+      now,
+      activeKid,
+      todayClasses,
+      visaDaysLeft,
+      todayFocusTodos,
+      topTodo,
+      packReadyDismissed,
+      rootBriefing,
+    ],
+  )
+
+  const handleMomentAction = useCallback((action: MomentAction) => {
+    switch (action.type) {
+      case 'child':
+        openModal('child')
+        break
+      case 'visa':
+        router.push('/profile/cards')
+        break
+      case 'pack_ready':
+        if (packReadyKey) {
+          try {
+            localStorage.setItem(packReadyKey, '1')
+          } catch {
+            /* ignore */
+          }
+          setPackReadyDismissed(true)
+        }
+        break
+      case 'one_tap':
+      case 'briefing_todo': {
+        const todo = todayFocusTodos.find((t) => t.id === action.todoId)
+          || displayTodos.find((t) => t.id === action.todoId)
+        if (!todo) return
+        setOneTapTodo(todo)
+        openModal('oneTap')
+        break
+      }
+      case 'treehouse':
+        router.push('/treehouse')
+        break
+      case 'briefing_link':
+        router.push(action.href)
+        break
+      case 'todo_sheet':
+        openModal('todo')
+        break
+      case 'briefing_urgent': {
+        const urgent = rootBriefing.urgentTodoId
+          ? todayFocusTodos.find((t) => t.id === rootBriefing.urgentTodoId)
+            || displayTodos.find((t) => t.id === rootBriefing.urgentTodoId)
+          : todayFocusTodos.find((t) => t.priority === 'red' || t.priority === 'orange')
+            || topTodo
+        if (!urgent) {
+          openModal('todo')
+          return
+        }
+        setOneTapTodo(urgent)
+        openModal('oneTap')
+        break
+      }
+      default:
+        break
+    }
+  }, [
+    packReadyKey,
+    todayFocusTodos,
+    displayTodos,
+    rootBriefing.urgentTodoId,
+    topTodo,
+    router,
+  ])
 
   const handlePhotoCapture = () => {
     if (!userId) {
@@ -1282,12 +1383,14 @@ export default function BasePage() {
               : '今天的事，根都替你盯着。'}
           </p>
 
+          <MomentCard data={momentCard} now={now} onAction={handleMomentAction} />
+
           <div
             style={{
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-around',
-              margin: '28px 0 6px',
+              margin: '6px 0 24px',
               minHeight: 160,
             }}
           >
@@ -1337,43 +1440,6 @@ export default function BasePage() {
               className="animate-droplet-3"
             />
           </div>
-
-          {showVisaWarning && visaDaysLeft != null && (
-            <VisaCountdown
-              daysLeft={visaDaysLeft}
-              childName={activeKid?.name || '孩子'}
-              description={visaDescription}
-              priorityKind={visaPriorityKind}
-              onViewClick={() => router.push('/profile/cards')}
-            />
-          )}
-
-          <FocusCard
-            briefing={rootBriefing}
-            onItemClick={(id) => {
-              const todo = todayFocusTodos.find((t) => t.id === id)
-                || displayTodos.find((t) => t.id === id)
-              if (!todo) return
-              setOneTapTodo(todo)
-              openModal('oneTap')
-            }}
-            onUrgentAction={() => {
-              const urgent = rootBriefing.urgentTodoId
-                ? todayFocusTodos.find((t) => t.id === rootBriefing.urgentTodoId)
-                  || displayTodos.find((t) => t.id === rootBriefing.urgentTodoId)
-                : todayFocusTodos.find((t) => t.priority === 'red' || t.priority === 'orange')
-                  || topTodo
-              if (!urgent) {
-                openModal('todo')
-                return
-              }
-              setOneTapTodo(urgent)
-              openModal('oneTap')
-            }}
-            onBriefingAction={(item) => {
-              if (item.href) router.push(item.href)
-            }}
-          />
         </div>
       </div>
 
