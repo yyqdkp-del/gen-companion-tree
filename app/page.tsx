@@ -4,7 +4,6 @@ const supabase = createClient()
 import InstallPWA from '@/app/components/InstallPWA'
 import React, { Suspense, useEffect, useState, useRef, useCallback, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import nextDynamic from 'next/dynamic'
 import {
   X, Plus, ChevronRight, CheckCircle2, Bell,
   Zap, Heart, Clock, Loader, FileText,
@@ -33,8 +32,8 @@ import { toast, toastRegisterPrompt } from '@/app/components/Toast'
 import { sanitizeFileName } from '@/lib/storage/sanitizeFileName'
 import { useRouter } from 'next/navigation'
 import HomeRefreshFromQuery from '@/app/components/HomeRefreshFromQuery'
-
-const ChildAvatar = nextDynamic(() => import('@/app/components/ChildAvatar'), { ssr: false })
+import SettingsButton from '@/app/components/SettingsButton'
+import { PAGE_BOTTOM_WITH_FLOAT } from '@/app/_shared/_constants/layout'
 
 type ScheduleItem = { time: string; title: string; location?: string; requires_action?: string }
 type UrgentItem = { title: string; level: 'red' | 'orange' | 'yellow' }
@@ -49,6 +48,98 @@ function getGreetingForHour(h: number): Greeting {
   if (h < 18) return { text: '下午好', sub: '喝杯水，歇一歇' }
   if (h < 21) return { text: '晚上好', sub: '今天辛苦了' }
   return { text: '夜深了', sub: '放下今天，好好睡觉' }
+}
+
+function getTimeGreetingLabel(h: number): string {
+  if (h >= 22 || h < 6) return '晚安'
+  if (h < 12) return '早安'
+  if (h < 18) return '下午好'
+  return '晚上好'
+}
+
+function daysUntilYmd(dateStr: string): number | null {
+  const d = new Date(`${String(dateStr).slice(0, 10)}T12:00:00`)
+  if (Number.isNaN(d.getTime())) return null
+  const today = new Date()
+  today.setHours(12, 0, 0, 0)
+  return Math.ceil((d.getTime() - today.getTime()) / 86400000)
+}
+
+function buildTodayFocus(params: {
+  hour: number
+  activeKid: any | null
+  todayClasses: ScheduleItem[]
+  topTodo: TodoItem | undefined
+  todayTodoCount: number
+  doneTodayCount: number
+}): { headline: string; detail: string } {
+  const { hour, activeKid, todayClasses, topTodo, todayTodoCount, doneTodayCount } = params
+  const kidName = activeKid?.name || '孩子'
+
+  if (hour >= 22 || hour < 6) {
+    return {
+      headline: '今晚好好休息',
+      detail: '树洞深夜开放，想说的话可以随时进去',
+    }
+  }
+
+  if (hour >= 6 && hour < 9) {
+    const packItems = todayClasses.flatMap((c: ScheduleItem & { requires_items?: string[] }) => {
+      const items = (c as { requires_items?: string[] }).requires_items
+      return Array.isArray(items) ? items : []
+    })
+    const unique = [...new Set(packItems.map((s) => String(s).trim()).filter(Boolean))]
+    if (unique.length) {
+      return {
+        headline: `${kidName}今天要带`,
+        detail: unique.slice(0, 4).join('、') + (unique.length > 4 ? '…' : ''),
+      }
+    }
+    const firstClass = todayClasses[0]
+    if (firstClass) {
+      const wear = firstClass.requires_action || firstClass.title
+      return {
+        headline: `${kidName}今天要带`,
+        detail: wear || '看一下课表确认穿戴',
+      }
+    }
+    return {
+      headline: `${kidName}的早晨`,
+      detail: '暂无课表携带提醒，拍一张通知给根也可以',
+    }
+  }
+
+  if (hour >= 9 && hour < 18) {
+    if (topTodo) {
+      return {
+        headline: '下一件要做的事',
+        detail: topTodo.title?.replace(/^📅\s*/, '') || '查看待办',
+      }
+    }
+    const nextClass = todayClasses[0]
+    if (nextClass) {
+      const time = nextClass.time ? `${nextClass.time} ` : ''
+      return {
+        headline: '下一节课',
+        detail: `${time}${nextClass.title || '课程'}`.trim(),
+      }
+    }
+    return {
+      headline: '白天过得怎样',
+      detail: todayTodoCount > 0 ? `还有 ${todayTodoCount} 件待办可以关注` : '今天暂无紧急待办',
+    }
+  }
+
+  if (doneTodayCount > 0) {
+    return {
+      headline: '今天已经完成',
+      detail: `已处理 ${doneTodayCount} 件事${todayTodoCount > 0 ? `，还有 ${todayTodoCount} 件待办` : ''}`,
+    }
+  }
+  return {
+    headline: '今天辛苦了',
+    detail: todayTodoCount > 0 ? `还有 ${todayTodoCount} 件待办` : '暂无待办，可以放松一下',
+  }
 }
 
 function dropState(type: string, data: any) {
@@ -781,11 +872,49 @@ export default function BasePage() {
 
   const showBootSkeleton = !sessionReady || (loading && kids.length === 0 && todos.length === 0)
 
+  const currentHour = lastHourRef.current ?? new Date().getHours()
+  const greetingLabel = mounted ? getTimeGreetingLabel(currentHour) : '你好'
+  const todayFocus = buildTodayFocus({
+    hour: currentHour,
+    activeKid,
+    todayClasses,
+    topTodo,
+    todayTodoCount: todoGroups?.today?.length ?? 0,
+    doneTodayCount: 0,
+  })
+  const packItemCount = [
+    ...new Set(
+      todayClasses.flatMap((c: ScheduleItem & { requires_items?: string[] }) => {
+        const items = (c as { requires_items?: string[] }).requires_items
+        return Array.isArray(items) ? items.map(String) : []
+      }).filter(Boolean),
+    ),
+  ].length
+  const visaTodo = displayTodos.find(
+    (t) => t.due_date && (t.title?.includes('签证') || t.title?.includes('护照') || t.category === 'compliance'),
+  )
+  const visaDaysLeft = visaTodo?.due_date ? daysUntilYmd(visaTodo.due_date) : null
+  const showVisaWarning = visaDaysLeft != null && visaDaysLeft <= 30 && visaDaysLeft >= 0
+  const nextClassLine = todayClasses[0]
+    ? `${todayClasses[0].time ? `${todayClasses[0].time} ` : ''}${todayClasses[0].title || '课程'}`.trim()
+    : '暂无课程'
+  const headerPadTop = showProfileBanner
+    ? 'calc(max(env(safe-area-inset-top), 0px) + 44px)'
+    : 'max(env(safe-area-inset-top), 0px)'
+
+  const handlePhotoCapture = () => {
+    if (!userId) {
+      promptRegister('登录后拍照交给根处理，现在注册体验')
+      return
+    }
+    window.dispatchEvent(new CustomEvent('openCamera'))
+  }
+
   if (showBootSkeleton) {
     return (
       <main style={{
         position: 'fixed', inset: 0,
-        backgroundColor: '#fbf9f6',
+        backgroundColor: 'var(--canvas-light)',
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
@@ -797,7 +926,7 @@ export default function BasePage() {
           <div style={{ width: 120, height: 120, borderRadius: '50% 60% 40% 50%', background: 'rgba(164,99,85,0.1)', animation: 'pulse 1.5s ease infinite 0.2s' }} />
           <div style={{ width: 90, height: 90, borderRadius: '40% 60% 50% 40%', background: 'rgba(164,99,85,0.08)', animation: 'pulse 1.5s ease infinite 0.4s' }} />
         </div>
-        <div style={{ fontSize: 13, color: 'rgba(45,50,47,0.4)', fontFamily: 'sans-serif', letterSpacing: '0.2em' }}>
+        <div style={{ fontSize: 13, color: 'var(--text-muted)', fontFamily: 'sans-serif', letterSpacing: '0.2em' }}>
           {!sessionReady ? '根·启动中' : '根·加载中'}
         </div>
         <style>{`
@@ -811,27 +940,29 @@ export default function BasePage() {
   }
 
   return (
-    <main style={{
-      position: 'fixed',
-      inset: 0,
-      width: '100vw',
-      height: '100dvh',
-      overflow: 'hidden',
-      backgroundColor: '#fbf9f6',
-      backgroundImage: `
-  radial-gradient(at 100% 0%, rgba(245,214,209,0.25) 0px, transparent 55%),
-  radial-gradient(at 0% 100%, rgba(217,230,218,0.2) 0px, transparent 55%),
-  radial-gradient(at 50% 50%, rgba(251,249,246,0.8) 0px, transparent 80%)
-`,
-    }}>
+    <main
+      style={{
+        position: 'fixed',
+        inset: 0,
+        width: '100vw',
+        height: '100dvh',
+        overflow: 'hidden',
+        backgroundColor: 'var(--canvas-light)',
+        color: 'var(--text-primary)',
+        fontFamily: "'Noto Serif SC', 'Songti SC', serif",
+      }}
+    >
       <Suspense fallback={null}>
         <HomeRefreshFromQuery onRefresh={() => { void refreshKids(); void ctxSync() }} />
       </Suspense>
+
       {showOnboarding && (
-        <Onboarding onComplete={() => {
-          setShowOnboarding(false)
-          localStorage.setItem('onboarding_completed', 'true')
-        }} />
+        <Onboarding
+          onComplete={() => {
+            setShowOnboarding(false)
+            localStorage.setItem('onboarding_completed', 'true')
+          }}
+        />
       )}
 
       {showProfileBanner && (
@@ -839,16 +970,16 @@ export default function BasePage() {
           role="button"
           tabIndex={0}
           onClick={() => router.push('/children')}
-          onKeyDown={e => {
+          onKeyDown={(e) => {
             if (e.key === 'Enter' || e.key === ' ') router.push('/children')
           }}
           style={{
             position: 'fixed',
-            top: 'max(env(safe-area-inset-top), 0px)',
+            top: headerPadTop,
             left: 0,
             right: 0,
             zIndex: 60,
-            background: 'rgba(164,99,85,0.9)',
+            background: 'var(--accent-clay)',
             backdropFilter: 'blur(10px)',
             padding: '10px 16px',
             display: 'flex',
@@ -857,109 +988,365 @@ export default function BasePage() {
             cursor: 'pointer',
           }}
         >
-          <span style={{ fontSize: 13, color: '#fff', fontFamily: 'sans-serif' }}>
+          <span style={{ fontSize: 13, color: '#fff', fontFamily: 'PingFang SC, sans-serif' }}>
             📋 完善孩子档案，让根更懂你
           </span>
           <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.8)' }}>→</span>
         </div>
       )}
 
-      {mounted && greeting && (
-        <div style={{
+      <header
+        style={{
           position: 'fixed',
-          top: showProfileBanner
-            ? 'calc(max(env(safe-area-inset-top), 12px) + 96px)'
-            : 'calc(max(env(safe-area-inset-top), 12px) + 72px)',
-          right: '22%',
-          left: 'auto',
-          zIndex: 10,
-          textAlign: 'right',
-          maxWidth: 'min(38vw, 200px)',
-          pointerEvents: 'none',
-        }}>
-          <div style={{
-            fontFamily: "'Noto Serif SC', serif",
-            fontWeight: 300,
-            fontSize: '14px',
-            color: '#2d322f',
-            letterSpacing: '0.03em',
-            lineHeight: 1.4,
-          }}>
-            {greeting.text}
+          top: showProfileBanner ? 'calc(max(env(safe-area-inset-top), 0px) + 44px)' : 'max(env(safe-area-inset-top), 0px)',
+          left: 0,
+          right: 0,
+          zIndex: 50,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 12,
+          padding: '12px 16px',
+          background: 'linear-gradient(180deg, var(--canvas-light) 70%, transparent)',
+        }}
+      >
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div
+            style={{
+              fontFamily: "'Noto Serif SC', serif",
+              fontSize: 16,
+              fontWeight: 500,
+              color: 'var(--text-primary)',
+              lineHeight: 1.35,
+            }}
+          >
+            {greetingLabel}
+            {userId ? '，妈妈' : ''}
+          </div>
+          {mounted && greeting?.sub && (
+            <div
+              style={{
+                marginTop: 2,
+                fontSize: 12,
+                color: 'var(--text-muted)',
+                lineHeight: 1.4,
+              }}
+            >
+              {greeting.sub}
+            </div>
+          )}
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+          {!kids.length ? (
+            <motion.button
+              type="button"
+              whileTap={{ scale: 0.94 }}
+              onClick={() => router.push('/children')}
+              style={{
+                width: 44,
+                height: 44,
+                borderRadius: '50%',
+                border: '1.5px dashed var(--accent-clay)',
+                background: 'var(--accent-clay-alpha)',
+                fontSize: 22,
+                cursor: 'pointer',
+                padding: 0,
+              }}
+              aria-label="添加孩子"
+            >
+              🌱
+            </motion.button>
+          ) : (
+            <motion.button
+              type="button"
+              whileTap={{ scale: 0.94 }}
+              onClick={() => {
+                if (kids.length > 1) {
+                  const idx = kids.findIndex((k: { id?: string }) => k.id === activeKid?.id)
+                  const next = kids[(idx + 1) % kids.length]
+                  void handleSwitchKid(enrichedKids.find((k: { id?: string }) => k.id === next.id) || next)
+                } else {
+                  void track({ event_type: 'droplet_click', meta: { type: 'child' } })
+                  openModal('child')
+                }
+              }}
+              style={{
+                width: 44,
+                height: 44,
+                borderRadius: '50%',
+                border: '2px solid var(--canvas-card)',
+                background: 'var(--canvas-card)',
+                boxShadow: 'var(--sh-soft)',
+                overflow: 'hidden',
+                cursor: 'pointer',
+                padding: 0,
+                fontSize: 22,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+              aria-label={activeKid?.name || '切换孩子'}
+            >
+              {activeKid?.avatar_url ? (
+                <img
+                  src={activeKid.avatar_url}
+                  alt=""
+                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                />
+              ) : (
+                activeKid?.emoji || '👶🏻'
+              )}
+            </motion.button>
+          )}
+          <div style={{ position: 'relative', zIndex: 51 }}>
+            <SettingsButton />
           </div>
         </div>
-      )}
-
-      <div style={{ position: 'absolute', top: '12%', right: '-4%',
-        fontSize: 'clamp(60px, 18vw, 130px)', fontWeight: 'bold',
-        color: THEME.text, opacity: 0.07, pointerEvents: 'none',
-        fontStyle: 'italic', whiteSpace: 'nowrap', lineHeight: 1, userSelect: 'none' }}>
-        根·陪伴
-      </div>
-
-      <ChildAvatar
-        kids={kids}
-        enrichedKids={enrichedKids}
-        activeKid={activeKid}
-        onSwitch={handleSwitchKid}
-      />
-
-      <header style={{ position: 'fixed',
-        top: 'max(48px, env(safe-area-inset-top, 48px))',
-        right: '6%', zIndex: 50, textAlign: 'right' }}>
-        <h1 style={{ fontSize: 'clamp(48px, 15vw, 76px)', fontWeight: 100,
-          color: THEME.text, opacity: 0.9, lineHeight: 1, margin: 0 }}>
-          {mounted ? clockTime || '--:--' : '--:--'}
-        </h1>
-        <p style={{ fontSize: 10, color: THEME.text, opacity: 0.35,
-          letterSpacing: '0.25em', marginTop: 3 }}>
-          {mounted ? dateLabel : ''}
-        </p>
       </header>
 
-      <div style={{ position: 'absolute', top: '42%', left: '50%',
-          transform: 'translate(-50%, -50%)',
-          display: 'flex', flexDirection: 'column', alignItems: 'center',
-          gap: 'clamp(20px, 5vw, 36px)' }}>
-          <div style={{ position: 'relative', display: 'inline-flex', flexDirection: 'column', alignItems: 'center' }}>
-            <WaterDrop state={childState} icon={<Heart size={24} />} label="孩子"
-              value={childValue}
-              subValue={childSubValue}
-              badge={childUrgent} pulse={childUrgent > 0}
-              onClick={() => { void track({ event_type: 'droplet_click', meta: { type: 'child' } }); openModal('child') }} size={124} delay={0}
-              className="animate-droplet-1" />
-            {activeKid && (activeKid.total_hanzi ?? 0) > 0 && (
-              <div style={{
-                marginTop: childSubValue ? 4 : 6,
-                background: '#a46355',
-                color: '#fff',
-                fontSize: 10,
-                padding: '2px 8px',
-                borderRadius: 10,
-                fontFamily: 'sans-serif',
-                whiteSpace: 'nowrap',
+      <div
+        style={{
+          position: 'absolute',
+          inset: 0,
+          top: showProfileBanner
+            ? 'calc(max(env(safe-area-inset-top), 0px) + 100px)'
+            : 'calc(max(env(safe-area-inset-top), 0px) + 56px)',
+          bottom: 0,
+          overflowY: 'auto',
+          overflowX: 'hidden',
+          WebkitOverflowScrolling: 'touch',
+          padding: `0 16px ${PAGE_BOTTOM_WITH_FLOAT}`,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 14,
+        }}
+      >
+        <section
+          style={{
+            flex: '1 1 auto',
+            minHeight: 'min(42vh, 360px)',
+            marginTop: 4,
+            padding: 20,
+            borderRadius: 'var(--r-xl)',
+            background: 'var(--canvas-card)',
+            boxShadow: 'var(--sh-warm)',
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'center',
+            gap: 12,
+          }}
+        >
+          <div
+            style={{
+              fontSize: 9,
+              fontWeight: 700,
+              letterSpacing: '0.2em',
+              textTransform: 'uppercase',
+              color: 'var(--accent-clay)',
+            }}
+          >
+            今天
+          </div>
+          <div>
+            <h2
+              style={{
+                margin: 0,
+                fontSize: 22,
+                fontWeight: 600,
+                lineHeight: 1.35,
+                color: 'var(--text-primary)',
               }}
+            >
+              {todayFocus.headline}
+            </h2>
+            <p
+              style={{
+                margin: '10px 0 0',
+                fontSize: 15,
+                lineHeight: 1.65,
+                color: 'var(--text-secondary)',
+              }}
+            >
+              {todayFocus.detail}
+            </p>
+          </div>
+          {showVisaWarning && (
+            <div
+              style={{
+                padding: '10px 12px',
+                borderRadius: 'var(--r-sm)',
+                background: 'var(--accent-clay-alpha)',
+                border: '1px solid var(--accent-clay)',
+                fontSize: 13,
+                color: 'var(--accent-clay)',
+                lineHeight: 1.5,
+              }}
+            >
+              ⚠️ 签证相关：约 {visaDaysLeft} 天内到期，请尽快处理
+            </div>
+          )}
+          {(currentHour >= 22 || currentHour < 6) && (
+            <motion.button
+              type="button"
+              whileTap={{ scale: 0.98 }}
+              onClick={() => router.push('/treehouse')}
+              style={{
+                alignSelf: 'flex-start',
+                marginTop: 4,
+                padding: '10px 14px',
+                borderRadius: 'var(--r-sm)',
+                border: '1px solid var(--treehole-ink)',
+                background: 'var(--treehole-deep)',
+                color: '#f0ebe4',
+                fontSize: 13,
+                fontFamily: "'Noto Serif SC', serif",
+                cursor: 'pointer',
+              }}
+            >
+              进入树洞 →
+            </motion.button>
+          )}
+        </section>
+
+        <motion.button
+          type="button"
+          whileTap={{ scale: 0.98 }}
+          onClick={handlePhotoCapture}
+          style={{
+            height: 56,
+            width: '100%',
+            border: 'none',
+            borderRadius: 'var(--r-md)',
+            background: 'var(--accent-clay)',
+            color: '#fff',
+            fontSize: 16,
+            fontWeight: 600,
+            fontFamily: 'PingFang SC, -apple-system, sans-serif',
+            cursor: 'pointer',
+            boxShadow: 'var(--sh-warm)',
+            flexShrink: 0,
+          }}
+        >
+          📷 拍给根处理
+        </motion.button>
+
+        <section
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(3, 1fr)',
+            gap: 10,
+            padding: 14,
+            borderRadius: 'var(--r-lg)',
+            background: 'var(--canvas-card)',
+            boxShadow: 'var(--sh-soft)',
+          }}
+        >
+          {[
+            { label: '今日课程', value: todayClasses.length ? nextClassLine : '暂无', onClick: () => openModal('child') },
+            {
+              label: '精力',
+              value: activeKid ? (activeKid as { energy_label?: string }).energy_label || childValue : '—',
+              onClick: () => openModal('child'),
+            },
+            {
+              label: '今日携带',
+              value: packItemCount ? `${packItemCount} 项` : '无',
+              onClick: () => openModal('child'),
+            },
+          ].map((cell) => (
+            <button
+              key={cell.label}
+              type="button"
+              onClick={cell.onClick}
+              style={{
+                border: 'none',
+                background: 'transparent',
+                padding: '4px 2px',
+                cursor: 'pointer',
+                textAlign: 'center',
+                fontFamily: 'inherit',
+              }}
+            >
+              <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 6 }}>{cell.label}</div>
+              <div
+                style={{
+                  fontSize: 12,
+                  fontWeight: 600,
+                  color: 'var(--text-primary)',
+                  lineHeight: 1.45,
+                  display: '-webkit-box',
+                  WebkitLineClamp: 2,
+                  WebkitBoxOrient: 'vertical',
+                  overflow: 'hidden',
+                }}
               >
-                识{activeKid.total_hanzi}字
+                {cell.value}
               </div>
-            )}
-          </div>
-          <div style={{ display: 'flex', gap: 'clamp(28px, 8vw, 52px)', alignItems: 'center' }}>
-            <WaterDrop state={todoEngine.state} icon={<Bell size={20} />} label="待办"
-              value={todoValue}
-              subValue={todoSubValue}
-              badge={todoEngine.badge} pulse={todoEngine.badge > 0}
-              onClick={() => { void track({ event_type: 'droplet_click', meta: { type: 'todo' } }); openModal('todo') }} size={98} delay={1.8}
-              className="animate-droplet-2" />
-            <WaterDrop state={hotspotEngine.state}
-              icon={patrolling ? <Loader size={20} /> : <Zap size={20} />}
-              label="热点" value={hotspotValue}
-              subValue={hotspotSubValue}
-              badge={hotspotEngine.badge} pulse={hotspotEngine.badge > 0}
-              onClick={() => { void track({ event_type: 'droplet_click', meta: { type: 'hotspot' } }); openModal('hotspot') }} size={98} delay={3.4}
-              className="animate-droplet-3" />
-          </div>
-        </div>
+            </button>
+          ))}
+        </section>
+
+        <section
+          style={{
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            gap: 20,
+            paddingBottom: 8,
+            flexShrink: 0,
+          }}
+        >
+          <WaterDrop
+            state={childState}
+            icon={<Heart size={18} />}
+            label="孩子"
+            value={childValue}
+            subValue={childSubValue}
+            badge={childUrgent}
+            pulse={childUrgent > 0}
+            onClick={() => {
+              void track({ event_type: 'droplet_click', meta: { type: 'child' } })
+              openModal('child')
+            }}
+            size={72}
+            delay={0}
+            className="animate-droplet-1"
+          />
+          <WaterDrop
+            state={todoEngine.state}
+            icon={<Bell size={16} />}
+            label="待办"
+            value={todoValue}
+            subValue={todoSubValue}
+            badge={todoEngine.badge}
+            pulse={todoEngine.badge > 0}
+            onClick={() => {
+              void track({ event_type: 'droplet_click', meta: { type: 'todo' } })
+              openModal('todo')
+            }}
+            size={64}
+            delay={1.8}
+            className="animate-droplet-2"
+          />
+          <WaterDrop
+            state={hotspotEngine.state}
+            icon={patrolling ? <Loader size={16} /> : <Zap size={16} />}
+            label="热点"
+            value={hotspotValue}
+            subValue={hotspotSubValue}
+            badge={hotspotEngine.badge}
+            pulse={hotspotEngine.badge > 0}
+            onClick={() => {
+              void track({ event_type: 'droplet_click', meta: { type: 'hotspot' } })
+              openModal('hotspot')
+            }}
+            size={64}
+            delay={3.4}
+            className="animate-droplet-3"
+          />
+        </section>
+      </div>
 
       <AnimatePresence>
         {modal === 'child' && (
