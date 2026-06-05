@@ -17,7 +17,7 @@ import Onboarding from '@/app/components/Onboarding'
 import { useApp } from '@/app/context/AppContext'
 import TodoSheet from '@/app/rian/TodoSheet'
 import { THEME } from '@/app/_shared/_constants/theme'
-import WaterDrop from '@/app/_shared/_components/WaterDrop'
+import { DesignWaterDrop, FocusCard, VisaCountdown } from '@/app/_shared/_components/design'
 import type { TodoItem, HotspotItem } from '@/app/_shared/_types'
 import { useChildData } from '@/app/_shared/_hooks/useChildData'
 import { useTodoActions } from '@/app/_shared/_hooks/useTodoActions'
@@ -54,15 +54,6 @@ function getTimeGreetingLabel(h: number): string {
   if (h < 12) return '早安'
   if (h < 18) return '下午好'
   return '晚上好'
-}
-
-const PRIORITY_DOT: Record<string, string> = {
-  red: '#d58074',
-  orange: '#e6a89e',
-  yellow: '#c9a227',
-  green: '#8ca88d',
-  blue: '#6c828f',
-  grey: '#9a9a8a',
 }
 
 function getTodoFocusSubtitle(todo: TodoItem): string {
@@ -914,18 +905,21 @@ export default function BasePage() {
   )
   const visaDaysLeft = visaTodo?.due_date ? daysUntilYmd(visaTodo.due_date) : null
   const showVisaWarning = visaDaysLeft != null && visaDaysLeft <= 30 && visaDaysLeft >= 0
-  const visaWarningText = showVisaWarning
-    ? `⚠️ ${activeKid?.name || '孩子'} 学生签证 · 还有${visaDaysLeft}天到期`
-    : ''
   const userDisplayName = userId ? '妈妈' : ''
-  const nextClassLine = todayClasses[0]
-    ? `${todayClasses[0].time ? `${todayClasses[0].time} ` : ''}${todayClasses[0].title || '课程'}`.trim()
-    : '暂无课程'
   const todayFocusTodos = [...(todoGroups?.today || [])].sort((a, b) => {
     const order: Record<string, number> = { red: 3, orange: 2, yellow: 1 }
     return (order[b.priority] || 0) - (order[a.priority] || 0)
   })
-  const todayFocusTop3 = todayFocusTodos.slice(0, 3)
+  const visaPriorityKind = visaDaysLeft != null && visaDaysLeft <= 7 ? 'red' : 'orange'
+  const visaDescription = showVisaWarning && visaTodo
+    ? `${activeKid?.name || '孩子'} 的学生签${visaTodo.due_date ? ` ${String(visaTodo.due_date).slice(0, 10)}` : ''} 到期。根已备好续签材料清单，建议本周内预约。`
+    : undefined
+  const focusCardItems = todayFocusTodos.map((todo) => ({
+    id: todo.id,
+    title: todo.title?.replace(/^📅\s*/, '') || '待办',
+    subtitle: getTodoFocusSubtitle(todo),
+    priority: todo.priority,
+  }))
 
   const handlePhotoCapture = () => {
     if (!userId) {
@@ -966,11 +960,12 @@ export default function BasePage() {
 
   return (
     <main
+      className="canvas-texture"
       style={{
         minHeight: '100dvh',
-        backgroundColor: 'var(--canvas-light)',
-        color: 'var(--text-primary)',
-        fontFamily: "'Noto Serif SC', 'Songti SC', serif",
+        color: 'var(--fg1)',
+        fontFamily: 'var(--font-serif)',
+        position: 'relative',
       }}
     >
       <Suspense fallback={null}>
@@ -986,390 +981,184 @@ export default function BasePage() {
         />
       )}
 
-      <div
-        style={{
-          padding: `calc(max(env(safe-area-inset-top), 0px) + 12px) 16px ${PAGE_BOTTOM_TAB_ONLY}`,
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 16,
-        }}
-      >
-        {showProfileBanner && (
-          <div
-            role="button"
-            tabIndex={0}
-            onClick={() => router.push('/children')}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' || e.key === ' ') router.push('/children')
-            }}
-            style={{
-              background: 'var(--accent-clay)',
-              borderRadius: 12,
-              padding: '10px 16px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              cursor: 'pointer',
-            }}
-          >
-            <span style={{ fontSize: 13, color: '#fff', fontFamily: 'PingFang SC, sans-serif' }}>
-              📋 完善孩子档案，让根更懂你
-            </span>
-            <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.8)' }}>→</span>
-          </div>
-        )}
-
-        {/* 区块1：顶部 */}
-        <header
+      <div style={{ flex: 1, overflowY: 'auto', position: 'relative' }}>
+        <div
           style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            gap: 12,
+            position: 'absolute',
+            inset: 0,
+            pointerEvents: 'none',
+            background:
+              'radial-gradient(at 100% 0%, rgba(245,214,209,0.28) 0, transparent 50%), radial-gradient(at 0% 90%, rgba(217,230,218,0.22) 0, transparent 55%)',
+          }}
+        />
+
+        <div
+          style={{
+            position: 'relative',
+            padding: `calc(max(env(safe-area-inset-top), 0px) + 14px) 24px ${PAGE_BOTTOM_TAB_ONLY}`,
           }}
         >
-          <div style={{ flex: 1, minWidth: 0 }}>
+          {showProfileBanner && (
             <div
+              role="button"
+              tabIndex={0}
+              onClick={() => router.push('/children')}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') router.push('/children')
+              }}
               style={{
-                fontFamily: "'Noto Serif SC', serif",
-                fontSize: 20,
-                fontWeight: 500,
-                color: 'var(--text-primary)',
-                lineHeight: 1.35,
+                background: 'var(--clay)',
+                borderRadius: 12,
+                padding: '10px 16px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                cursor: 'pointer',
+                marginBottom: 16,
               }}
             >
-              {userDisplayName ? `${greetingLabel} · ${userDisplayName}` : greetingLabel}
+              <span style={{ fontSize: 13, color: '#fff', fontFamily: 'var(--font-body)' }}>
+                📋 完善孩子档案，让根更懂你
+              </span>
+              <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.8)' }}>→</span>
             </div>
-            {mounted && greeting?.sub && (
-              <div
-                style={{
-                  marginTop: 4,
-                  fontSize: 13,
-                  color: 'var(--text-secondary)',
-                  lineHeight: 1.45,
-                }}
-              >
-                {greeting.sub}
-              </div>
-            )}
-          </div>
-          <motion.button
-            type="button"
-            whileTap={{ scale: 0.94 }}
-            onClick={() => {
-              if (!kids.length) {
-                router.push('/children')
-                return
-              }
-              if (kids.length > 1) {
-                const idx = kids.findIndex((k: { id?: string }) => k.id === activeKid?.id)
-                const next = kids[(idx + 1) % kids.length]
-                void handleSwitchKid(enrichedKids.find((k: { id?: string }) => k.id === next.id) || next)
-              } else {
+          )}
+
+          {mounted && dateLabel && (
+            <div className="gc-eyebrow">{dateLabel}</div>
+          )}
+          <h1
+            style={{
+              fontFamily: 'var(--font-serif)',
+              fontWeight: 500,
+              fontSize: 25,
+              color: 'var(--fg1)',
+              letterSpacing: '0.04em',
+              margin: '10px 0 3px',
+            }}
+          >
+            {userDisplayName ? `${greetingLabel}，${userDisplayName}` : greetingLabel}
+          </h1>
+          <p
+            style={{
+              fontFamily: 'var(--font-serif)',
+              fontWeight: 300,
+              fontSize: 14,
+              color: 'var(--fg2)',
+              margin: 0,
+            }}
+          >
+            {mounted && greeting?.sub
+              ? `${greeting.sub}。今天的事，根都替你盯着。`
+              : '今天的事，根都替你盯着。'}
+          </p>
+
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-around',
+              margin: '28px 0 6px',
+              minHeight: 160,
+            }}
+          >
+            <DesignWaterDrop
+              state={childState}
+              size={104}
+              value={childValue}
+              label="孩子"
+              icon={<Heart size={22} />}
+              delay={0}
+              badge={childUrgent}
+              pulse={childUrgent > 0}
+              onClick={() => {
                 void track({ event_type: 'droplet_click', meta: { type: 'child' } })
                 openModal('child')
-              }
-            }}
-            style={{
-              width: 40,
-              height: 40,
-              borderRadius: '50%',
-              border: kids.length ? '2px solid var(--canvas-card)' : '1.5px dashed var(--accent-clay)',
-              background: kids.length ? 'var(--canvas-card)' : 'var(--accent-clay-alpha)',
-              boxShadow: kids.length ? 'var(--sh-soft)' : 'none',
-              overflow: 'hidden',
-              cursor: 'pointer',
-              padding: 0,
-              fontSize: 20,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              flexShrink: 0,
-            }}
-            aria-label={activeKid?.name || '用户头像'}
-          >
-            {activeKid?.avatar_url ? (
-              <img
-                src={activeKid.avatar_url}
-                alt=""
-                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-              />
-            ) : (
-              activeKid?.emoji || '🌱'
-            )}
-          </motion.button>
-        </header>
-
-        {/* 区块2：签证警告条 */}
-        {showVisaWarning && (
-          <button
-            type="button"
-            onClick={() => router.push('/profile/cards')}
-            style={{
-              width: '100%',
-              padding: '12px 16px',
-              border: 'none',
-              borderRadius: 12,
-              background: 'rgba(164, 99, 85, 0.08)',
-              borderLeft: '3px solid var(--accent-clay)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              gap: 12,
-              cursor: 'pointer',
-              fontFamily: "'Noto Serif SC', serif",
-              textAlign: 'left',
-            }}
-          >
-            <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--accent-clay)', lineHeight: 1.45, flex: 1 }}>
-              {visaWarningText}
-            </span>
-            <span style={{ fontSize: 13, color: 'var(--accent-clay)', flexShrink: 0 }}>查看 &gt;</span>
-          </button>
-        )}
-
-        {/* 区块3：今日焦点卡片 */}
-        <section
-          style={{
-            padding: 20,
-            borderRadius: 22,
-            background: 'var(--canvas-card)',
-            boxShadow: 'var(--sh-warm)',
-            border: '1px solid rgba(164, 99, 85, 0.06)',
-          }}
-        >
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              marginBottom: 16,
-            }}
-          >
-            <h2 style={{ margin: 0, fontSize: 16, fontWeight: 600, color: 'var(--text-primary)' }}>
-              今日焦点
-            </h2>
-            {todayFocusTodos.length > 0 && (
-              <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
-                还有{todayFocusTodos.length}件
-              </span>
-            )}
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {todayFocusTop3.length > 0 ? (
-              todayFocusTop3.map((todo) => (
-                <button
-                  key={todo.id}
-                  type="button"
-                  onClick={() => {
-                    setOneTapTodo(todo)
-                    openModal('oneTap')
-                  }}
-                  style={{
-                    width: '100%',
-                    border: 'none',
-                    background: 'transparent',
-                    padding: 0,
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 12,
-                    cursor: 'pointer',
-                    fontFamily: 'inherit',
-                    textAlign: 'left',
-                  }}
-                >
-                  <span
-                    style={{
-                      width: 8,
-                      height: 8,
-                      borderRadius: '50%',
-                      background: PRIORITY_DOT[todo.priority] || PRIORITY_DOT.grey,
-                      flexShrink: 0,
-                    }}
-                  />
-                  <span style={{ flex: 1, minWidth: 0 }}>
-                    <div
-                      style={{
-                        fontSize: 15,
-                        fontWeight: 600,
-                        color: 'var(--text-primary)',
-                        lineHeight: 1.4,
-                      }}
-                    >
-                      {todo.title?.replace(/^📅\s*/, '') || '待办'}
-                    </div>
-                    <div
-                      style={{
-                        marginTop: 2,
-                        fontSize: 12,
-                        color: 'var(--text-secondary)',
-                        lineHeight: 1.4,
-                      }}
-                    >
-                      {getTodoFocusSubtitle(todo)}
-                    </div>
-                  </span>
-                  <ChevronRight size={16} color="var(--text-muted)" style={{ flexShrink: 0 }} />
-                </button>
-              ))
-            ) : (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <span
-                  style={{
-                    width: 8,
-                    height: 8,
-                    borderRadius: '50%',
-                    background: PRIORITY_DOT.grey,
-                    flexShrink: 0,
-                  }}
-                />
-                <span style={{ flex: 1 }}>
-                  <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-primary)', lineHeight: 1.4 }}>
-                    {todayFocus.headline}
-                  </div>
-                  <div style={{ marginTop: 2, fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.4 }}>
-                    {todayFocus.detail}
-                  </div>
-                </span>
-              </div>
-            )}
-          </div>
-        </section>
-
-        {/* 区块4：拍照大按钮 */}
-        <motion.button
-          type="button"
-          whileTap={{ scale: 0.98 }}
-          onClick={handlePhotoCapture}
-          style={{
-            width: '100%',
-            height: 56,
-            border: 'none',
-            borderRadius: 16,
-            background: 'var(--accent-clay)',
-            color: '#fff',
-            fontSize: 16,
-            fontWeight: 600,
-            fontFamily: 'PingFang SC, -apple-system, sans-serif',
-            cursor: 'pointer',
-            boxShadow: 'var(--sh-warm)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
-          📷 拍给根处理
-        </motion.button>
-
-        {/* 区块5：孩子状态横卡 */}
-        <section
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(3, 1fr)',
-            gap: 8,
-            padding: '14px 12px',
-            borderRadius: 16,
-            background: 'var(--canvas-card)',
-            boxShadow: 'var(--sh-soft)',
-          }}
-        >
-          {[
-            { label: '今日课程', value: todayClasses.length ? nextClassLine : '暂无' },
-            {
-              label: '精力',
-              value: activeKid ? (activeKid as { energy_label?: string }).energy_label || childValue : '—',
-            },
-            { label: '今日携带', value: packItemCount ? `${packItemCount} 项` : '无' },
-          ].map((cell) => (
-            <button
-              key={cell.label}
-              type="button"
-              onClick={() => openModal('child')}
-              style={{
-                border: 'none',
-                background: 'transparent',
-                padding: '4px 2px',
-                cursor: 'pointer',
-                textAlign: 'center',
-                fontFamily: 'inherit',
               }}
-            >
-              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 6 }}>{cell.label}</div>
-              <div
-                style={{
-                  fontSize: 15,
-                  fontWeight: 600,
-                  color: 'var(--text-primary)',
-                  lineHeight: 1.4,
-                  display: '-webkit-box',
-                  WebkitLineClamp: 2,
-                  WebkitBoxOrient: 'vertical',
-                  overflow: 'hidden',
-                }}
-              >
-                {cell.value}
-              </div>
-            </button>
-          ))}
-        </section>
+              className="animate-droplet-1"
+            />
+            <DesignWaterDrop
+              state={todoEngine.state}
+              size={132}
+              value={todoValue}
+              label="待办"
+              icon={<Bell size={26} />}
+              delay={1}
+              badge={todoEngine.badge}
+              pulse={todoEngine.badge > 0}
+              onClick={() => {
+                void track({ event_type: 'droplet_click', meta: { type: 'todo' } })
+                openModal('todo')
+              }}
+              className="animate-droplet-2"
+            />
+            <DesignWaterDrop
+              state={hotspotEngine.state}
+              size={96}
+              value={patrolling ? '巡逻' : hotspotValue}
+              label="本地"
+              icon={patrolling ? <Loader size={20} /> : <Zap size={20} />}
+              delay={0}
+              badge={hotspotEngine.badge}
+              pulse={hotspotEngine.badge > 0}
+              onClick={() => {
+                void track({ event_type: 'droplet_click', meta: { type: 'hotspot' } })
+                openModal('hotspot')
+              }}
+              className="animate-droplet-3"
+            />
+          </div>
 
-        {/* 区块6：三颗水珠 */}
-        <section
-          style={{
-            display: 'flex',
-            justifyContent: 'center',
-            alignItems: 'center',
-            gap: 24,
-            padding: '8px 0 4px',
-          }}
-        >
-          <WaterDrop
-            state={childState}
-            icon={<Heart size={18} />}
-            label="孩子"
-            badge={childUrgent}
-            pulse={childUrgent > 0}
-            hideLabel={true}
-            onClick={() => {
-              void track({ event_type: 'droplet_click', meta: { type: 'child' } })
-              openModal('child')
+          {showVisaWarning && visaDaysLeft != null && (
+            <VisaCountdown
+              daysLeft={visaDaysLeft}
+              childName={activeKid?.name || '孩子'}
+              description={visaDescription}
+              priorityKind={visaPriorityKind}
+              onViewClick={() => router.push('/profile/cards')}
+            />
+          )}
+
+          <FocusCard
+            items={focusCardItems}
+            remainingCount={todayFocusTodos.length}
+            fallback={{ headline: todayFocus.headline, detail: todayFocus.detail }}
+            onItemClick={(id) => {
+              const todo = todayFocusTodos.find((t) => t.id === id)
+              if (!todo) return
+              setOneTapTodo(todo)
+              openModal('oneTap')
             }}
-            size={64}
-            delay={0}
-            className="animate-droplet-1"
           />
-          <WaterDrop
-            state={todoEngine.state}
-            icon={<Bell size={16} />}
-            label="待办"
-            badge={todoEngine.badge}
-            pulse={todoEngine.badge > 0}
-            hideLabel={true}
-            onClick={() => {
-              void track({ event_type: 'droplet_click', meta: { type: 'todo' } })
-              openModal('todo')
-            }}
-            size={64}
-            delay={1.8}
-            className="animate-droplet-2"
-          />
-          <WaterDrop
-            state={hotspotEngine.state}
-            icon={patrolling ? <Loader size={16} /> : <Zap size={16} />}
-            label="热点"
-            badge={hotspotEngine.badge}
-            pulse={hotspotEngine.badge > 0}
-            hideLabel={true}
-            onClick={() => {
-              void track({ event_type: 'droplet_click', meta: { type: 'hotspot' } })
-              openModal('hotspot')
-            }}
-            size={64}
-            delay={3.4}
-            className="animate-droplet-3"
-          />
-        </section>
+        </div>
       </div>
+
+      <motion.button
+        type="button"
+        whileTap={{ scale: 0.92 }}
+        onClick={handlePhotoCapture}
+        className="warm-tap"
+        aria-label="拍照交给根处理"
+        style={{
+          position: 'fixed',
+          right: 20,
+          bottom: 'calc(var(--tab-bar-h) + env(safe-area-inset-bottom, 0px) + 22px)',
+          zIndex: 5,
+          width: 58,
+          height: 58,
+          borderRadius: '50%',
+          border: 'none',
+          background: 'var(--clay)',
+          cursor: 'pointer',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          color: '#fff',
+          boxShadow: '0 12px 28px -6px rgba(164,99,85,0.5)',
+        }}
+      >
+        <Camera size={26} color="#fff" />
+      </motion.button>
 
       <AnimatePresence>
         {modal === 'child' && (

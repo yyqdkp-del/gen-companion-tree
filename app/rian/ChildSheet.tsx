@@ -16,6 +16,7 @@ import { useChildDailyLog } from '@/app/_shared/_hooks/useChildDailyLog'
 import { logOrAlertNetworkError } from '@/lib/errors/logOrAlertNetworkError'
 import { calculateEnergy, getEnergyColor } from '@/app/_shared/_engine/energy'
 import ChildEnergyCard from '@/app/_shared/_components/ChildEnergyCard'
+import { TimelineSegment, buildTimelineSegments } from '@/app/_shared/_components/design'
 import { buildPackingRows, countPendingPackingRows } from '@/lib/packing/buildPackingRows'
 import {
   mergeDismissedItem,
@@ -56,43 +57,6 @@ function formatDate(d: string) {
   if (date.toDateString() === tmr.toDateString()) return '明天'
   return ['周日','周一','周二','周三','周四','周五','周六'][date.getDay()] + ` ${date.getMonth()+1}/${date.getDate()}`
 }
-function timelineToMin(time: string | undefined): number {
-  if (!time) return -1
-  const parts = time.split(':').map(Number)
-  if (parts.length < 2 || isNaN(parts[0]) || isNaN(parts[1])) return -1
-  return parts[0] * 60 + (parts[1] || 0)
-}
-
-function getNowMinInTimeZone(timeZone: string): number {
-  try {
-    const parts = new Intl.DateTimeFormat('en-GB', {
-      timeZone,
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: false,
-    }).formatToParts(new Date())
-    const h = parseInt(parts.find(p => p.type === 'hour')?.value ?? '0', 10)
-    const m = parseInt(parts.find(p => p.type === 'minute')?.value ?? '0', 10)
-    return h * 60 + m
-  } catch {
-    const now = new Date()
-    return now.getHours() * 60 + now.getMinutes()
-  }
-}
-
-function dedupeTimelineItems(items: TimelineItem[]): TimelineItem[] {
-  const seen = new Set<string>()
-  return items.filter((it) => {
-    const min = timelineToMin(it.time)
-    const title = String(it.title || '').trim().toLowerCase()
-    if (min < 0 || !title) return true
-    const key = `${min}|${title}`
-    if (seen.has(key)) return false
-    seen.add(key)
-    return true
-  })
-}
-
 function dedupeCalendarEvents<T extends { date_start?: string; title?: string }>(events: T[]): T[] {
   const seen = new Set<string>()
   return events.filter((e) => {
@@ -101,174 +65,6 @@ function dedupeCalendarEvents<T extends { date_start?: string; title?: string }>
     seen.add(key)
     return true
   })
-}
-
-function Timeline({ items, timeZone }: { items: TimelineItem[]; timeZone: string }) {
-  const [showCompleted, setShowCompleted] = useState(false)
-  const nowMin = getNowMinInTimeZone(timeZone)
-
-  const validItems = dedupeTimelineItems(items)
-    .filter((it) => timelineToMin(it.time) !== -1)
-    .filter((it) => it.title?.trim())
-    .filter((it) => !isPlaceholderSubject(it.title))
-
-  const sorted = [...validItems].sort((a, b) => timelineToMin(a.time) - timelineToMin(b.time))
-
-  const current = sorted.filter((item) => {
-    const itemMin = timelineToMin(item.time)
-    return itemMin <= nowMin && itemMin + 45 > nowMin
-  })
-  const upcoming = sorted.filter((item) => timelineToMin(item.time) > nowMin)
-  const past = sorted.filter((item) => timelineToMin(item.time) + 45 <= nowMin)
-
-  if (!validItems.length) {
-    return (
-      <div style={{ fontSize: 12, color: THEME.muted, opacity: 0.6, textAlign: 'center', padding: '8px 0' }}>
-        今天暂无课程安排
-      </div>
-    )
-  }
-
-  const renderItem = (
-    item: TimelineItem,
-    opts?: { isCurrent?: boolean; isPast?: boolean; itemKey?: string },
-  ) => {
-    const isCurrent = !!opts?.isCurrent
-    const isPast = !!opts?.isPast
-    const title = String(item.title || '').trim() || '课程'
-    return (
-      <div key={opts?.itemKey ?? item.id} style={{ position: 'relative', marginBottom: 8, opacity: isPast ? 0.5 : 1 }}>
-        <div style={{
-          position: 'absolute',
-          left: -24,
-          top: 6,
-          width: 10,
-          height: 10,
-          borderRadius: '50%',
-          background: isCurrent ? '#DC2626' : GREEN.mid,
-          boxShadow: isCurrent ? '0 0 0 4px rgba(220,38,38,0.18)' : 'none',
-        }} />
-        <div style={{
-          padding: '7px 10px',
-          borderRadius: 9,
-          background: isCurrent ? 'rgba(220,38,38,0.07)' : 'rgba(255,255,255,0.7)',
-          border: `0.5px solid ${isCurrent ? 'rgba(220,38,38,0.28)' : 'rgba(0,0,0,0.05)'}`,
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <span style={{
-              fontSize: 10,
-              color: isCurrent ? '#DC2626' : THEME.muted,
-              fontWeight: isCurrent ? 700 : 400,
-              minWidth: 32,
-              flexShrink: 0,
-            }}>
-              {item.time}
-            </span>
-            <span style={{ fontSize: 13 }}>{EVENT_TYPE_EMOJI[item.type] || '📌'}</span>
-            <span style={{
-              fontSize: 12,
-              fontWeight: isCurrent ? 700 : 400,
-              color: THEME.text,
-              flex: 1,
-            }}>
-              {title || '课程'}
-            </span>
-            {isCurrent && (
-              <span style={{
-                fontSize: 9,
-                padding: '2px 6px',
-                borderRadius: 8,
-                background: '#DC2626',
-                color: '#fff',
-                fontWeight: 700,
-                flexShrink: 0,
-              }}>
-                进行中
-              </span>
-            )}
-          </div>
-        </div>
-      </div>
-    )
-  }
-
-  return (
-    <div style={{ position: 'relative', paddingLeft: 30 }}>
-      <div style={{
-        position: 'absolute',
-        left: 8,
-        top: 6,
-        bottom: 6,
-        width: 2,
-        background: 'linear-gradient(180deg,#cddce5,#e8e4dc)',
-        borderRadius: 1,
-      }} />
-
-      {past.length > 0 && (
-        <div style={{ marginBottom: current.length > 0 || upcoming.length > 0 ? 12 : 0 }}>
-          <motion.div
-            whileTap={{ scale: 0.98 }}
-            onClick={() => setShowCompleted((v) => !v)}
-            style={{
-              fontSize: 11,
-              fontWeight: 700,
-              color: THEME.muted,
-              marginBottom: showCompleted ? 8 : 0,
-              cursor: 'pointer',
-              userSelect: 'none',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 6,
-              padding: '4px 8px',
-              borderRadius: 10,
-              background: 'rgba(0,0,0,0.03)',
-              border: '0.5px solid rgba(0,0,0,0.05)',
-            }}
-          >
-            ✓ 已完成 {past.length} 节 {showCompleted ? '▴' : '▾'}
-          </motion.div>
-          <AnimatePresence>
-            {showCompleted && (
-              <motion.div
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: 'auto' }}
-                exit={{ opacity: 0, height: 0 }}
-                style={{ overflow: 'hidden', marginTop: 8 }}
-              >
-                {past.map((it) => renderItem(it, { isPast: true, itemKey: `past-${it.id}` }))}
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
-      )}
-
-      {current.length > 0 && (
-        <div style={{ marginBottom: upcoming.length > 0 ? 12 : 0 }}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: '#DC2626', marginBottom: 6 }}>🔴 进行中</div>
-          {current.map((it) => renderItem(it, { isCurrent: true, itemKey: `current-${it.id}` }))}
-        </div>
-      )}
-
-      {upcoming.length > 0 && (
-        <div>
-          <div style={{ fontSize: 11, fontWeight: 700, color: THEME.muted, marginBottom: 6 }}>⏰ 接下来</div>
-          {upcoming.map((it) => renderItem(it, { itemKey: `upcoming-${it.id}` }))}
-        </div>
-      )}
-
-      {current.length === 0 && upcoming.length === 0 && (
-        <div style={{ fontSize: 12, color: THEME.muted, opacity: 0.6, textAlign: 'center', padding: '8px 0' }}>
-          今天课程已全部完成 ✓
-        </div>
-      )}
-    </div>
-  )
-}
-
-/** 今日日程手风琴计数：仅统计未结束项 */
-function countUpcomingTimeline(items: TimelineItem[], timeZone: string): number {
-  const nowMin = getNowMinInTimeZone(timeZone)
-  return items.filter(item => timelineToMin(item.time) + 45 >= nowMin).length
 }
 
 function loadBroughtMap(storageKey: string): Record<string, boolean> {
@@ -688,7 +484,14 @@ export default function ChildSheet({ childList, sel, onSel, onClose, onAdd, user
     const rows = buildPackingRows(timeline, todayEvents, packingItems, packPrefs)
     return countPendingPackingRows(rows, brought)
   }, [sel, timeline, todayEvents, packingItems, packPrefs, broughtStorageKey])
-  const upcomingTimelineCount = countUpcomingTimeline(timeline, timeZone)
+  const timelineSegments = useMemo(
+    () => buildTimelineSegments(timeline, todayEvents, sel?.school_start_time),
+    [timeline, todayEvents, sel?.school_start_time],
+  )
+  const timelineSegmentCount = useMemo(
+    () => timelineSegments.reduce((n, seg) => n + seg.items.length, 0),
+    [timelineSegments],
+  )
 
   const hasLoggedStatus = dailyLog.health_status != null && dailyLog.mood_status != null
 
@@ -797,8 +600,9 @@ export default function ChildSheet({ childList, sel, onSel, onClose, onAdd, user
                   </div>
                 ) : (
                   <>
-                    <Accordion title="📅 今日日程" count={upcomingTimelineCount} defaultOpen={true}>
-                      <Timeline items={timeline} timeZone={timeZone} />
+                    <Accordion title="📅 今日时间线" count={timelineSegmentCount} defaultOpen={true}>
+                      <div className="gc-eyebrow" style={{ margin: '4px 2px 0' }}>今日时间线</div>
+                      <TimelineSegment segments={timelineSegments} />
                     </Accordion>
                     <Accordion title="🎒 今日携带" count={todayPackCount}
                       badge={todayPackCount > 0 ? '需确认' : undefined}

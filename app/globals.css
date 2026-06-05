@@ -47,6 +47,86 @@
   --text-main: var(--text-primary);
   --vh: 100dvh;
   --keyboard-height: 0px;
+
+  /* ── Claude Design Kit (additive aliases) ── */
+  --canvas: var(--canvas-light);
+  --canvas-warm: #fbf9f6;
+  --paper: #ffffff;
+  --jade: #4f6b5c;
+  --jade-app: var(--accent-jade);
+  --jade-deep: #2f4030;
+  --jade-tint: #d9e6da;
+  --clay: var(--accent-clay);
+  --clay-deep: #7d3f37;
+  --clay-tint: var(--accent-clay-alpha);
+  --rose: #a37c84;
+  --rose-peach: var(--droplet-peach);
+  --rose-peach-lt: var(--droplet-peach-light);
+  --rose-deep: #6b2f2f;
+  --slate: var(--droplet-slate);
+  --slate-lt: var(--droplet-slate-light);
+  --slate-deep: var(--droplet-slate-dark);
+  --gold: #8a7355;
+  --gold-night: rgba(230, 168, 158, 0.8);
+  --night: #101326;
+  --night-1: #1a2535;
+  --night-2: #243040;
+  --night-glow: #1a4a3a;
+  --fg1: var(--text-primary);
+  --fg2: var(--text-secondary);
+  --fg3: var(--text-muted);
+  --fg-on-dark: #f0ebe4;
+  --fg-on-dark-dim: rgba(230, 232, 214, 0.45);
+  --line: rgba(45, 50, 47, 0.08);
+  --line-clay: rgba(164, 99, 85, 0.18);
+  --pri-red-bg: #fff2f0;
+  --pri-red-border: #fad6d1;
+  --pri-red-dot: #d58074;
+  --pri-red-text: #7d3f37;
+  --pri-orange-bg: #fcf7ed;
+  --pri-orange-border: #f2e2cd;
+  --pri-orange-dot: #b88e5e;
+  --pri-orange-text: #7a5a35;
+  --pri-yellow-bg: #f8f5ea;
+  --pri-yellow-border: #e5dcc5;
+  --pri-yellow-dot: #8ca88d;
+  --pri-yellow-text: #2f4030;
+  --pri-green-bg: #f0f6ef;
+  --pri-green-border: #d9e6da;
+  --pri-green-dot: #8ca88d;
+  --pri-green-text: #2f4030;
+  --pri-blue-bg: #f0f5f6;
+  --pri-blue-border: #d0e1e5;
+  --pri-blue-dot: #537b8e;
+  --pri-blue-text: #2b3942;
+  --pri-grey-bg: #f4f2ed;
+  --pri-grey-border: #ebe8e2;
+  --pri-grey-dot: #94a3b8;
+  --pri-grey-text: #64748b;
+  --font-serif: 'Noto Serif SC', 'Songti SC', 'STSong', Georgia, serif;
+  --font-body: 'PingFang SC', 'Noto Sans SC', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif;
+  --font-latin: 'Montserrat', sans-serif;
+  --t-hero: clamp(40px, 12vw, 72px);
+  --t-display: 36px;
+  --t-h1: 22px;
+  --t-h2: 20px;
+  --t-h3: 16px;
+  --t-body: 15px;
+  --t-ui: 14px;
+  --t-sm: 13px;
+  --t-meta: 11px;
+  --t-eyebrow: 9px;
+  --lh-read: 1.8;
+  --ls-eyebrow: 0.4em;
+  --ls-display: 0.06em;
+  --r-pill: 999px;
+  --r-drop: 66% 34% 71% 29% / 37% 53% 47% 63%;
+  --sh-lift: 0 12px 40px rgba(45, 50, 47, 0.18);
+  --ease-spring: cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  --dur-tap: 0.3s;
+  --dur-ink: 0.8s;
+  --tab-bar-h: 56px;
+  --blur-glass: blur(14px) saturate(112%);
 }
 
 *, *::before, *::after {
@@ -356,4 +436,75 @@ table, th, td {
     animation: none !important;
     transform: none !important;
   }
+}
+
+/* ── Claude Design Kit semantic classes ── */
+.gc-eyebrow {
+  font-family: var(--font-latin);
+  font-size: var(--t-eyebrow);
+  letter-spacing: var(--ls-eyebrow);
+  text-transform: uppercase;
+  color: var(--clay);
+}
+.gc-display {
+  font-family: var(--font-serif);
+  font-weight: 300;
+  font-size: var(--t-display);
+  letter-spacing: 0.3em;
+  color: var(--fg1);
+}
+.gc-h1 {
+  font-family: var(--font-serif);
+  font-weight: 500;
+  font-size: var(--t-h1);
+  letter-spacing: var(--ls-display);
+  color: var(--fg1);
+}
+.gc-h2 { font-family: var(--font-serif); font-weight: 600; font-size: var(--t-h2); color: var(--fg1); }
+.gc-h3 { font-family: var(--font-serif); font-weight: 500; font-size: var(--t-h3); color: var(--fg1); }
+.gc-body {
+  font-family: var(--font-serif);
+  font-weight: 300;
+  font-size: var(--t-body);
+  line-height: var(--lh-read);
+  color: var(--fg1);
+}
+.gc-ui { font-family: var(--font-body); font-size: var(--t-ui); color: var(--fg1); }
+.gc-meta { font-family: var(--font-body); font-size: var(--t-meta); color: var(--fg3); letter-spacing: 0.05em; }
+.gc-paper-bg {
+  background-color: var(--canvas-warm);
+  background-image:
+    radial-gradient(at 100% 0%, rgba(245, 214, 209, 0.25) 0px, transparent 55%),
+    radial-gradient(at 0% 100%, rgba(217, 230, 218, 0.2) 0px, transparent 55%),
+    radial-gradient(at 50% 50%, rgba(251, 249, 246, 0.8) 0px, transparent 80%);
+}
+.gc-card {
+  background: var(--paper);
+  border-radius: var(--r-xl);
+  box-shadow: var(--sh-soft);
+}
+.gc-card-warm {
+  background: rgba(255, 255, 255, 0.82);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  border-radius: var(--r-xl);
+  box-shadow: var(--sh-warm);
+}
+.gc-btn {
+  font-family: var(--font-body);
+  font-size: var(--t-ui);
+  font-weight: 600;
+  color: #fff;
+  background: var(--clay);
+  border: none;
+  border-radius: var(--r-md);
+  padding: 14px 20px;
+  cursor: pointer;
+  transition: transform var(--dur-tap) var(--ease-spring);
+}
+.gc-btn:active { transform: scale(0.96); }
+.gc-btn--ghost {
+  background: var(--clay-tint);
+  color: var(--clay-deep);
 }
