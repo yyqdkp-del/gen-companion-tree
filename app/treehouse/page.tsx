@@ -12,29 +12,67 @@ import { motion, AnimatePresence } from 'framer-motion'
 const supabase = createClient(
 )
 
-// ── 深夜色系 ──
-const TREEHOUSE_BG = 'linear-gradient(135deg, #1a2535 0%, #243040 50%, #1a2535 100%)'
+// ── 深夜树洞视觉 token（对齐 UI Kit Treehouse.jsx）──
+const TREEHOUSE_BASE = 'var(--night)'
+const TREEHOUSE_GRADIENT = 'linear-gradient(135deg, var(--night-1) 0%, var(--night-2) 50%, var(--night-1) 100%)'
 
 const THEME = {
-  bg1: '#1a2535',
-  bg2: '#243040',
-  glow: '#1a4a3a',
-  gold: 'rgba(230,168,158,0.8)',
+  goldNight: 'rgba(230,168,158,0.85)',
   goldDim: 'rgba(230,168,158,0.35)',
+  fgDark: 'var(--fg-on-dark)',
+  fgDim: 'rgba(230,232,214,0.55)',
+  eyebrow: 'rgba(230,232,214,0.4)',
   aiText: '#f0ebe4',
   aiBubble: 'rgba(255,255,255,0.07)',
-  userBubble: 'rgba(255,255,255,0.07)',
-  textDim: 'rgba(230,232,214,0.45)',
+  aiBorder: 'rgba(255,255,255,0.1)',
+  userBubble: 'rgba(164,99,85,0.25)',
+  userText: 'rgba(230,168,158,0.9)',
+  pinBorder: 'rgba(230,168,158,0.4)',
+  pinFill: 'rgba(230,168,158,0.85)',
+  keyBg: 'rgba(255,255,255,0.04)',
+  keyBorder: 'rgba(255,255,255,0.08)',
+  inputBg: 'rgba(255,255,255,0.07)',
+  inputBorder: 'rgba(232,213,184,0.12)',
+  placeholder: 'rgba(230,232,214,0.4)',
+  sendBg: 'rgba(230,168,158,0.2)',
+  glow: 'radial-gradient(circle, rgba(26,74,58,0.5) 0%, rgba(16,19,38,0) 70%)',
   star: 'rgba(230,168,158,0.6)',
 }
 
-const TREEHOUSE_ENTRY_CARD: React.CSSProperties = {
-  background: 'rgba(255,255,255,0.07)',
-  backdropFilter: 'blur(10px)',
-  WebkitBackdropFilter: 'blur(10px)',
-  border: '1px solid rgba(255,255,255,0.12)',
-  borderRadius: 20,
-  padding: '20px',
+function TreehouseBackdrop({ thinking }: { thinking?: boolean }) {
+  return (
+    <>
+      <div
+        className={thinking ? undefined : 'treehouse-breathe'}
+        style={{
+          position: 'absolute',
+          left: '50%',
+          top: thinking ? '25%' : '38%',
+          width: thinking ? '90vw' : 340,
+          height: thinking ? '90vw' : 340,
+          marginLeft: thinking ? '-45vw' : -170,
+          marginTop: thinking ? '-45vw' : -170,
+          borderRadius: '50%',
+          background: THEME.glow,
+          pointerEvents: 'none',
+          zIndex: 0,
+          ...(thinking
+            ? { animation: 'gcBreathe 3s infinite ease-in-out' }
+            : {}),
+        }}
+      />
+      <div
+        style={{
+          position: 'absolute',
+          inset: 0,
+          background: TREEHOUSE_GRADIENT,
+          opacity: 0.6,
+          pointerEvents: 'none',
+          zIndex: 0,
+        }}
+      />
+    </>
+  )
 }
 
 type Message = {
@@ -83,9 +121,6 @@ export default function TreehousePage() {
   // ── 深夜模式 ──
   const hour = new Date().getHours()
   const isLateNight = hour >= 22 || hour < 6
-  const bgOpacityRange = isLateNight ? [0.03, 0.08] : [0.05, 0.15]
-  const glowDuration = isLateNight ? 12 : 8
-
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const messagesRef = useRef<Message[]>([])
   const longPressTimer = useRef<NodeJS.Timeout | null>(null)
@@ -359,79 +394,135 @@ export default function TreehousePage() {
   // ══════════════════════════════════════
   if (!unlocked) {
     return (
-      <main style={{
-        position: 'fixed',
-        inset: 0,
-        minHeight: '100dvh',
-        background: TREEHOUSE_BG,
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        fontFamily: "'Noto Serif SC', 'SimSun', Georgia, serif",
-      }}>
+      <main
+        style={{
+          position: 'fixed',
+          inset: 0,
+          minHeight: '100dvh',
+          background: TREEHOUSE_BASE,
+          fontFamily: 'var(--font-serif)',
+          overflow: 'hidden',
+        }}
+      >
+        <TreehouseBackdrop />
 
-        {/* 呼吸光晕 */}
         <motion.div
-          animate={{ scale: [1, 1.4, 1], opacity: [bgOpacityRange[0], bgOpacityRange[1], bgOpacityRange[0]] }}
-          transition={{ duration: glowDuration, repeat: Infinity, ease: 'easeInOut' }}
-          style={{ position: 'absolute', width: '70vw', height: '70vw', borderRadius: '50%', background: `radial-gradient(circle, ${THEME.glow} 0%, transparent 70%)`, pointerEvents: 'none' }}
-        />
-
-        <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 1.6, ease: 'easeOut' }}
-          style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '44px', zIndex: 10 }}>
-
-          <div style={{ textAlign: 'center' }}>
-            <p style={{ fontSize: '10px', letterSpacing: '0.6em', color: THEME.textDim, textTransform: 'uppercase', marginBottom: '10px', margin: '0 0 10px' }}>私密空间</p>
-            <h1 style={{ fontSize: '36px', fontWeight: 300, color: THEME.gold, letterSpacing: '0.4em', margin: 0, opacity: 0.9 }}>日栖</h1>
+          initial={{ opacity: 0, y: 24 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 1.6, ease: 'easeOut' }}
+          style={{
+            position: 'relative',
+            height: '100%',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '0 36px',
+            gap: 22,
+            zIndex: 10,
+          }}
+        >
+          <div className="gc-eyebrow" style={{ color: THEME.eyebrow, letterSpacing: '0.6em' }}>
+            私密空间
           </div>
 
-          {/* PIN 圆点 */}
-          <motion.div animate={pinShaking ? { x: [-10, 10, -10, 10, 0] } : {}} transition={{ duration: 0.4 }}
-            style={{ display: 'flex', gap: '18px' }}>
-            {[0,1,2,3,4,5].map(i => (
-              <div key={i} style={{
-                width: '11px', height: '11px', borderRadius: '50%',
-                background: i < pin.length ? (pinError ? '#c87a6a' : THEME.gold) : 'transparent',
-                border: `1px solid ${pinError ? '#c87a6a' : THEME.goldDim}`,
-                transition: 'all 0.2s',
-                opacity: 0.8,
-              }} />
+          <div
+            style={{
+              fontFamily: 'var(--font-serif)',
+              fontWeight: 300,
+              fontSize: 34,
+              color: THEME.goldNight,
+              letterSpacing: '0.4em',
+              marginRight: '-0.4em',
+            }}
+          >
+            日栖
+          </div>
+
+          <p
+            style={{
+              fontFamily: 'var(--font-serif)',
+              fontWeight: 300,
+              fontSize: 13.5,
+              lineHeight: 1.9,
+              color: THEME.fgDim,
+              textAlign: 'center',
+              margin: 0,
+            }}
+          >
+            夜深了。这里只有你和根。
+            <br />
+            输入六位密语，进入树洞。
+          </p>
+
+          <motion.div
+            animate={pinShaking ? { x: [-10, 10, -10, 10, 0] } : {}}
+            transition={{ duration: 0.4 }}
+            style={{ display: 'flex', gap: 15, margin: '6px 0 2px' }}
+          >
+            {[0, 1, 2, 3, 4, 5].map((i) => (
+              <span
+                key={i}
+                style={{
+                  width: 11,
+                  height: 11,
+                  borderRadius: '50%',
+                  border: `1px solid ${pinError ? '#c87a6a' : THEME.pinBorder}`,
+                  background: i < pin.length ? (pinError ? '#c87a6a' : THEME.pinFill) : 'transparent',
+                  transition: 'background 0.2s',
+                }}
+              />
             ))}
           </motion.div>
 
-          {/* 数字键盘 */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '14px' }}>
-            {['1','2','3','4','5','6','7','8','9','','0','del'].map((key, i) => (
-              <motion.button key={i} whileTap={key ? { scale: 0.85, opacity: 0.7 } : {}}
-                onClick={() => key && handlePinKey(key)}
-                style={{
-                  width: '74px', height: '74px', borderRadius: '50%',
-                  background: key && key !== 'del' ? 'rgba(255,255,255,0.03)' : 'transparent',
-                  border: key && key !== 'del' ? '1px solid rgba(255,255,255,0.07)' : 'none',
-                  color: key === 'del' ? THEME.textDim : THEME.gold,
-                  fontSize: key === 'del' ? '14px' : '24px',
-                  fontWeight: 300,
-                  cursor: key ? 'pointer' : 'default',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontFamily: "'Noto Serif SC', serif",
-                  opacity: key ? 0.85 : 0,
-                }}
-              >
-                {key === 'del' ? '⌫' : key}
-              </motion.button>
-            ))}
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(3, 1fr)',
+              gap: 16,
+              marginTop: 6,
+            }}
+          >
+            {['1', '2', '3', '4', '5', '6', '7', '8', '9', '', '0', 'del'].map((key, i) =>
+              key === '' ? (
+                <span key={i} />
+              ) : (
+                <motion.button
+                  key={i}
+                  type="button"
+                  whileTap={{ scale: 0.9, opacity: 0.85 }}
+                  onClick={() => handlePinKey(key)}
+                  style={{
+                    width: 58,
+                    height: 58,
+                    borderRadius: '50%',
+                    border: `1px solid ${THEME.keyBorder}`,
+                    background: THEME.keyBg,
+                    color: THEME.fgDark,
+                    fontFamily: 'var(--font-serif)',
+                    fontSize: key === 'del' ? 16 : 20,
+                    fontWeight: 300,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  {key === 'del' ? '⌫' : key}
+                </motion.button>
+              ),
+            )}
           </div>
-
-          <p style={{ fontSize: '10px', color: THEME.textDim, letterSpacing: '0.25em', opacity: 0.4, margin: 0 }}>
-            输入密码进入
-          </p>
         </motion.div>
-
-        <style>{`@import url('https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@300;400&display=swap');`}</style>
       </main>
     )
   }
+
+  const clockLabel = new Date().toLocaleTimeString('zh-CN', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  })
 
   // ══════════════════════════════════════
   // 主界面
@@ -446,45 +537,31 @@ export default function TreehousePage() {
         position: 'fixed',
         inset: 0,
         minHeight: '100dvh',
-        background: TREEHOUSE_BG,
+        background: TREEHOUSE_BASE,
         overflow: 'hidden',
-        fontFamily: "'Noto Serif SC', 'SimSun', Georgia, serif",
+        fontFamily: 'var(--font-serif)',
         display: 'flex',
         flexDirection: 'column',
       }}
     >
+      <TreehouseBackdrop thinking={thinking} />
 
       {!userId && (
-        <p style={{
-          position: 'relative',
-          zIndex: 20,
-          margin: 0,
-          padding: 'max(env(safe-area-inset-top), 8px) 16px 6px',
-          textAlign: 'center',
-          fontSize: 11,
-          color: THEME.textDim,
-          letterSpacing: '0.06em',
-        }}>
+        <p
+          style={{
+            position: 'relative',
+            zIndex: 20,
+            margin: 0,
+            padding: 'max(env(safe-area-inset-top), 8px) 16px 6px',
+            textAlign: 'center',
+            fontSize: 11,
+            color: THEME.fgDim,
+            letterSpacing: '0.06em',
+          }}
+        >
           登录后可保存对话记录
         </p>
       )}
-
-      {/* ── 呼吸背景光晕 ── */}
-      <motion.div
-        animate={{
-          scale: thinking ? [1, 1.5, 1.2, 1.5, 1] : [1, 1.3, 1],
-          opacity: thinking
-            ? [bgOpacityRange[0], bgOpacityRange[1] * 2, bgOpacityRange[0], bgOpacityRange[1] * 1.5, bgOpacityRange[0]]
-            : [bgOpacityRange[0], bgOpacityRange[1], bgOpacityRange[0]],
-        }}
-        transition={{ duration: thinking ? 3 : glowDuration, repeat: Infinity, ease: 'easeInOut' }}
-        style={{
-          position: 'absolute', top: '25%', left: '50%', transform: 'translateX(-50%)',
-          width: '90vw', height: '90vw', borderRadius: '50%',
-          background: `radial-gradient(circle, ${THEME.glow} 0%, transparent 70%)`,
-          pointerEvents: 'none', zIndex: 0,
-        }}
-      />
 
       {/* ── 背景光点（提到孩子时闪现） ── */}
       <AnimatePresence>
@@ -504,67 +581,105 @@ export default function TreehousePage() {
         ))}
       </AnimatePresence>
 
-      {/* ── 水印 ── */}
-      <div style={{
-        position: 'absolute', top: '5%', right: '-2%',
-        fontSize: 'clamp(60px, 20vw, 120px)', fontWeight: 300,
-        color: THEME.gold, opacity: 0.03,
-        pointerEvents: 'none', fontStyle: 'normal',
-        whiteSpace: 'nowrap', lineHeight: 1,
-        letterSpacing: '0.1em', zIndex: 0,
-      }}>
-        日栖
-      </div>
-
-      {/* ── 顶部栏 ── */}
-      <div style={{ position: 'relative', zIndex: 10, padding: '52px 24px 8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0, gap: '12px' }}>
-        <span style={{ fontSize: '11px', color: THEME.textDim, letterSpacing: '0.35em', opacity: 0.5 }}>日栖</span>
-        <motion.button whileTap={{ scale: 0.96 }} onClick={() => router.push('/treehouse/mom')}
+      <div style={{ position: 'absolute', top: 'max(env(safe-area-inset-top), 12px)', right: 12, zIndex: 20, display: 'flex', gap: 8 }}>
+        <motion.button
+          whileTap={{ scale: 0.96 }}
+          onClick={() => router.push('/treehouse/mom')}
           style={{
-            ...TREEHOUSE_ENTRY_CARD,
+            background: THEME.inputBg,
+            border: `1px solid ${THEME.inputBorder}`,
             borderRadius: 999,
-            color: THEME.gold,
-            fontSize: '12px',
+            color: THEME.goldNight,
+            fontSize: 12,
             cursor: 'pointer',
-            opacity: 0.9,
             padding: '7px 14px',
             letterSpacing: '0.08em',
-            fontFamily: "'Noto Serif SC', serif",
-          }}>
+            fontFamily: 'var(--font-serif)',
+          }}
+        >
           🌸 木棉树洞
         </motion.button>
-        <motion.button whileTap={{ scale: 0.85 }} onClick={() => router.push('/')}
-          style={{ background: 'none', border: 'none', color: THEME.textDim, fontSize: '18px', cursor: 'pointer', opacity: 0.35, padding: '4px 8px' }}>
+        <motion.button
+          whileTap={{ scale: 0.85 }}
+          onClick={() => router.push('/')}
+          style={{
+            background: 'none',
+            border: 'none',
+            color: THEME.fgDim,
+            fontSize: 18,
+            cursor: 'pointer',
+            opacity: 0.5,
+            padding: '4px 8px',
+          }}
+        >
           ×
         </motion.button>
       </div>
 
-      {/* ── 消息列表 ── */}
-      <div style={{
-        flex: 1, overflowY: 'auto', padding: '16px 20px 24px',
-        position: 'relative', zIndex: 10,
-        scrollbarWidth: 'none',
-      }}>
+      <div style={{ position: 'relative', zIndex: 10, textAlign: 'center', padding: 'max(env(safe-area-inset-top), 20px) 0 10px', flexShrink: 0 }}>
+        <div className="gc-eyebrow" style={{ color: THEME.eyebrow, letterSpacing: '0.5em' }}>
+          木棉树洞
+        </div>
+        <div
+          style={{
+            fontFamily: 'var(--font-serif)',
+            fontWeight: 300,
+            fontSize: 15,
+            color: THEME.goldNight,
+            marginTop: 6,
+            letterSpacing: '0.1em',
+          }}
+        >
+          {clockLabel} · 只有你和根
+        </div>
+      </div>
+
+      <div
+        style={{
+          flex: 1,
+          overflowY: 'auto',
+          padding: '8px 22px 24px',
+          position: 'relative',
+          zIndex: 10,
+          scrollbarWidth: 'none',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 13,
+        }}
+      >
 
         {/* 逐字开场问候 */}
         <AnimatePresence>
           {greetingText && (
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              style={{ textAlign: 'left', marginBottom: '20px' }}>
-              <div style={{
-                display: 'inline-block',
-                background: THEME.aiBubble,
-                backdropFilter: 'blur(20px)',
-                borderRadius: '20px 20px 20px 4px',
-                padding: '14px 18px',
-                maxWidth: '82%',
-                border: '1px solid rgba(168,196,184,0.1)',
-              }}>
-                <p style={{ color: THEME.aiText, fontSize: '16px', fontWeight: 300, lineHeight: 1.8, margin: 0, letterSpacing: '0.05em' }}>
-                  {greetingText}
-                  <motion.span animate={{ opacity: [1, 0, 1] }} transition={{ duration: 0.8, repeat: Infinity }}
-                    style={{ color: THEME.gold, marginLeft: '2px' }}>|</motion.span>
-                </p>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              style={{ alignSelf: 'flex-start', maxWidth: '80%' }}
+            >
+              <div
+                style={{
+                  background: THEME.aiBubble,
+                  backdropFilter: 'blur(20px)',
+                  border: `1px solid ${THEME.aiBorder}`,
+                  borderRadius: '18px 18px 18px 4px',
+                  padding: '12px 16px',
+                  fontFamily: 'var(--font-serif)',
+                  fontWeight: 300,
+                  fontSize: 14,
+                  lineHeight: 1.85,
+                  letterSpacing: '0.03em',
+                  color: THEME.aiText,
+                }}
+              >
+                {greetingText}
+                <motion.span
+                  animate={{ opacity: [1, 0, 1] }}
+                  transition={{ duration: 0.8, repeat: Infinity }}
+                  style={{ color: THEME.goldNight, marginLeft: 2 }}
+                >
+                  |
+                </motion.span>
               </div>
             </motion.div>
           )}
@@ -572,38 +687,34 @@ export default function TreehousePage() {
 
         {/* 消息 */}
         <AnimatePresence initial={false}>
-          {messages.map((msg, idx) => (
+          {messages.map((msg) => (
             <motion.div
               key={msg.id}
               initial={{ opacity: 0, scale: 0.94, y: 12, filter: 'blur(4px)' }}
               animate={{ opacity: 1, scale: 1, y: 0, filter: 'blur(0px)' }}
               transition={{ duration: 0.7, ease: [0.23, 1, 0.32, 1] }}
               style={{
-                display: 'flex',
-                justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start',
-                marginBottom: idx < messages.length - 1 ? '16px' : '8px',
+                alignSelf: msg.role === 'user' ? 'flex-end' : 'flex-start',
+                maxWidth: '80%',
               }}
             >
-              <div style={{
-                maxWidth: '80%',
-                background: msg.role === 'user' ? THEME.userBubble : THEME.aiBubble,
-                backdropFilter: 'blur(20px)',
-                borderRadius: msg.role === 'user' ? '20px 20px 4px 20px' : '20px 20px 20px 4px',
-                padding: '13px 17px',
-                border: msg.role === 'user'
-                  ? '1px solid rgba(232,213,184,0.12)'
-                  : '1px solid rgba(168,196,184,0.1)',
-              }}>
-                <p style={{
-                  color: msg.role === 'user' ? THEME.gold : THEME.aiText,
-                  fontSize: msg.role === 'assistant' ? '16px' : '15px',
+              <div
+                style={{
+                  background: msg.role === 'user' ? THEME.userBubble : THEME.aiBubble,
+                  backdropFilter: 'blur(20px)',
+                  border: `1px solid ${msg.role === 'user' ? THEME.inputBorder : THEME.aiBorder}`,
+                  borderRadius: msg.role === 'user' ? '18px 18px 4px 18px' : '18px 18px 18px 4px',
+                  padding: '12px 16px',
+                  fontFamily: 'var(--font-serif)',
                   fontWeight: 300,
+                  fontSize: 14,
                   lineHeight: 1.85,
-                  margin: 0,
-                  letterSpacing: '0.04em',
-                }}>
-                  {msg.content}
-                </p>
+                  letterSpacing: '0.03em',
+                  color: msg.role === 'user' ? THEME.userText : THEME.aiText,
+                  whiteSpace: 'pre-wrap',
+                }}
+              >
+                {msg.content}
               </div>
             </motion.div>
           ))}
@@ -612,14 +723,24 @@ export default function TreehousePage() {
         {/* 思考状态 */}
         <AnimatePresence>
           {thinking && (
-            <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
-              style={{ display: 'flex', justifyContent: 'flex-start', marginBottom: '16px' }}>
-              <div style={{
-                background: THEME.aiBubble, backdropFilter: 'blur(20px)',
-                borderRadius: '20px 20px 20px 4px', padding: '14px 20px',
-                border: '1px solid rgba(168,196,184,0.1)',
-                display: 'flex', gap: '8px', alignItems: 'center',
-              }}>
+            <motion.div
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0 }}
+              style={{ alignSelf: 'flex-start' }}
+            >
+              <div
+                style={{
+                  background: THEME.aiBubble,
+                  backdropFilter: 'blur(20px)',
+                  borderRadius: '18px 18px 18px 4px',
+                  padding: '14px 20px',
+                  border: `1px solid ${THEME.aiBorder}`,
+                  display: 'flex',
+                  gap: 8,
+                  alignItems: 'center',
+                }}
+              >
                 {[0,1,2].map(i => (
                   <motion.div key={i}
                     animate={{ opacity: [0.2, 0.8, 0.2], scale: [0.8, 1.1, 0.8] }}
@@ -649,61 +770,108 @@ export default function TreehousePage() {
         )}
       </AnimatePresence>
 
-      {/* ── 底部输入区 ── */}
-      <div style={{
-        position: 'relative', zIndex: 10,
-        padding: '12px 16px',
-        paddingBottom: 'calc(56px + env(safe-area-inset-bottom, 0px) + 12px + var(--treehouse-kb, 0px))',
-        background: 'linear-gradient(to top, rgba(2,6,23,0.95) 0%, transparent 100%)',
-        flexShrink: 0,
-      }}>
+      <div
+        style={{
+          position: 'relative',
+          zIndex: 10,
+          padding: '10px 18px 16px',
+          paddingBottom: 'calc(56px + env(safe-area-inset-bottom, 0px) + 16px + var(--treehouse-kb, 0px))',
+          flexShrink: 0,
+          display: 'flex',
+          gap: 10,
+          alignItems: 'center',
+        }}
+      >
         <AnimatePresence>
           {inputFocused && (
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              style={{ position: 'fixed', inset: 0, background: 'rgba(2,6,23,0.5)', zIndex: -1, pointerEvents: 'none' }} />
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              style={{
+                position: 'fixed',
+                inset: 0,
+                background: 'rgba(16,19,38,0.5)',
+                zIndex: -1,
+                pointerEvents: 'none',
+              }}
+            />
           )}
         </AnimatePresence>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', background: 'rgba(255,255,255,0.07)', borderRadius: '28px', padding: '12px 16px', border: `1px solid ${inputFocused ? 'rgba(232,213,184,0.15)' : 'rgba(255,255,255,0.12)'}`, transition: 'border-color 0.4s' }}>
+        <div
+          style={{
+            flex: 1,
+            background: THEME.inputBg,
+            border: `1px solid ${inputFocused ? 'rgba(232,213,184,0.2)' : THEME.inputBorder}`,
+            borderRadius: 20,
+            padding: '12px 16px',
+            transition: 'border-color 0.4s',
+          }}
+        >
           <input
             ref={inputRef}
             value={inputText}
-            onChange={e => setInputText(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && !e.shiftKey && sendMessage(inputText)}
+            onChange={(e) => setInputText(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && sendMessage(inputText)}
             onFocus={() => setInputFocused(true)}
             onBlur={() => setInputFocused(false)}
-            placeholder={isLateNight ? '夜深了，说说吧…' : '说吧，我在听…'}
+            placeholder={isLateNight ? '夜深了，说说吧…' : '想对根说点什么…'}
             style={{
-              flex: 1, background: 'transparent', border: 'none',
-              color: THEME.gold, fontSize: '16px', fontWeight: 300,
-              outline: 'none', fontFamily: "'Noto Serif SC', serif",
-              letterSpacing: '0.04em', caretColor: THEME.gold,
+              width: '100%',
+              background: 'transparent',
+              border: 'none',
+              color: THEME.aiText,
+              fontSize: 13.5,
+              fontWeight: 300,
+              outline: 'none',
+              fontFamily: 'var(--font-serif)',
+              letterSpacing: '0.03em',
+              caretColor: THEME.goldNight,
             }}
           />
-          <motion.button
-            whileTap={{ scale: 0.8 }}
-            onClick={() => sendMessage(inputText)}
-            style={{
-              background: 'none', border: 'none', cursor: 'pointer',
-              color: inputText.trim() ? THEME.gold : THEME.textDim,
-              fontSize: '20px', padding: '2px 6px',
-              opacity: inputText.trim() ? 0.8 : 0.25,
-              transition: 'all 0.3s', flexShrink: 0,
-            }}
-          >↑</motion.button>
         </div>
 
-        <p style={{ textAlign: 'center', fontSize: '9px', color: THEME.textDim, opacity: 0.25, letterSpacing: '0.2em', margin: '10px 0 0' }}>
-          长按屏幕说话（即将开放）
-        </p>
+        <motion.button
+          type="button"
+          whileTap={{ scale: 0.88 }}
+          onClick={() => sendMessage(inputText)}
+          style={{
+            width: 44,
+            height: 44,
+            borderRadius: '50%',
+            border: 'none',
+            background: THEME.sendBg,
+            color: THEME.goldNight,
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: 18,
+            flexShrink: 0,
+            opacity: inputText.trim() ? 1 : 0.55,
+          }}
+          aria-label="发送"
+        >
+          ↑
+        </motion.button>
       </div>
 
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@300;400&display=swap');
-        * { -webkit-tap-highlight-color: transparent; box-sizing: border-box; }
-        ::-webkit-scrollbar { display: none; }
-        input::placeholder { color: rgba(74,90,82,0.7); }
-      `}</style>
+      <p
+        style={{
+          position: 'relative',
+          zIndex: 10,
+          textAlign: 'center',
+          fontSize: 9,
+          color: THEME.fgDim,
+          opacity: 0.35,
+          letterSpacing: '0.2em',
+          margin: '0 0 8px',
+          paddingBottom: 'calc(56px + env(safe-area-inset-bottom, 0px))',
+        }}
+      >
+        长按屏幕说话（即将开放）
+      </p>
     </main>
   )
 }

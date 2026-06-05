@@ -9,6 +9,7 @@ type RecorderState = {
 type UseRecorderReturn = RecorderState & {
   startRecording: () => Promise<void>
   stopRecording: () => void
+  cancelRecording: () => void
 }
 
 export function useRecorder(
@@ -17,8 +18,10 @@ export function useRecorder(
   const [isRecording, setIsRecording] = useState(false)
   const [recordingSeconds, setRecordingSeconds] = useState(0)
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
+  const streamRef = useRef<MediaStream | null>(null)
   const audioChunksRef = useRef<Blob[]>([])
   const timerRef = useRef<NodeJS.Timeout | null>(null)
+  const cancelRef = useRef(false)
 
   useEffect(() => {
     return () => {
@@ -32,6 +35,8 @@ export function useRecorder(
   const startRecording = useCallback(async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      streamRef.current = stream
+      cancelRef.current = false
       const mediaRecorder = new MediaRecorder(stream)
       mediaRecorderRef.current = mediaRecorder
       audioChunksRef.current = []
@@ -40,8 +45,15 @@ export function useRecorder(
         if (e.data.size > 0) audioChunksRef.current.push(e.data)
       }
       mediaRecorder.onstop = async () => {
+        const tracks = streamRef.current?.getTracks() ?? []
+        tracks.forEach((t) => t.stop())
+        streamRef.current = null
+        if (cancelRef.current) {
+          cancelRef.current = false
+          audioChunksRef.current = []
+          return
+        }
         const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' })
-        stream.getTracks().forEach(t => t.stop())
         await onAudioReady(audioBlob, `voice_${Date.now()}.webm`)
       }
 
@@ -62,5 +74,13 @@ export function useRecorder(
     }
   }, [isRecording])
 
-  return { isRecording, recordingSeconds, startRecording, stopRecording }
+  const cancelRecording = useCallback(() => {
+    if (!mediaRecorderRef.current || !isRecording) return
+    cancelRef.current = true
+    mediaRecorderRef.current.stop()
+    setIsRecording(false)
+    if (timerRef.current) clearInterval(timerRef.current)
+  }, [isRecording])
+
+  return { isRecording, recordingSeconds, startRecording, stopRecording, cancelRecording }
 }

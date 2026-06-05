@@ -508,3 +508,19 @@ table, th, td {
   background: var(--clay-tint);
   color: var(--clay-deep);
 }
+
+/* Treehouse night breathe */
+@keyframes gcBreathe {
+  0%, 100% { transform: scale(0.85); opacity: 0.6; }
+  50% { transform: scale(1.12); opacity: 1; }
+}
+.treehouse-breathe {
+  animation: gcBreathe 12s infinite ease-in-out;
+}
+
+@keyframes gcSpin {
+  to { transform: rotate(360deg); }
+}
+.gc-spin {
+  animation: gcSpin 0.9s linear infinite;
+}
