@@ -47,7 +47,7 @@ type Props = {
   onAction: (action: MomentAction) => void
 }
 
-function PickupCountdown({ schoolEndTime, now }: { schoolEndTime?: string; now: Date }) {
+function PickupMinutes({ schoolEndTime, now }: { schoolEndTime?: string; now: Date }) {
   const [mins, setMins] = useState(() => minutesUntilSchoolEnd(now, schoolEndTime))
 
   useEffect(() => {
@@ -59,23 +59,20 @@ function PickupCountdown({ schoolEndTime, now }: { schoolEndTime?: string; now: 
   }, [schoolEndTime])
 
   return (
-    <div style={{ textAlign: 'center', margin: '12px 0 8px' }}>
-      <div
-        style={{
-          fontFamily: 'var(--font-latin)',
-          fontSize: 56,
-          fontWeight: 300,
-          color: '#2d322f',
-          lineHeight: 1,
-          letterSpacing: '-0.02em',
-        }}
-      >
-        {mins ?? 0}
-      </div>
-      <div style={{ fontFamily: 'var(--font-body)', fontSize: 14, color: 'rgba(45,50,47,0.5)', marginTop: 6 }}>
-        分钟
-      </div>
-    </div>
+    <p
+      style={{
+        fontFamily: 'var(--font-latin)',
+        fontSize: 56,
+        fontWeight: 300,
+        color: '#2d322f',
+        lineHeight: 1.1,
+        letterSpacing: '-0.02em',
+        margin: '14px 0 0',
+        textAlign: 'center',
+      }}
+    >
+      {mins ?? 0} 分钟
+    </p>
   )
 }
 
@@ -185,12 +182,15 @@ export default function MomentCard({ data, now, onAction }: Props) {
         {data.title}
       </h2>
 
-      {data.subtitle ? (
+      {data.kind === 'pickup' ? (
+        <PickupMinutes schoolEndTime={data.schoolEndTime} now={now} />
+      ) : data.subtitle ? (
         <p
           style={{
-            fontFamily: 'var(--font-body)',
-            fontSize: data.tier === 'urgent' ? 15 : 14,
-            color: 'rgba(45,50,47,0.62)',
+            fontFamily: data.kind === 'after_school' ? 'var(--font-serif)' : 'var(--font-body)',
+            fontSize: data.kind === 'after_school' ? 17 : data.tier === 'urgent' ? 15 : 14,
+            fontWeight: data.kind === 'after_school' ? 500 : 400,
+            color: data.kind === 'after_school' ? '#2d322f' : 'rgba(45,50,47,0.62)',
             margin: '10px 0 0',
             lineHeight: 1.55,
             whiteSpace: 'pre-line',
@@ -199,10 +199,6 @@ export default function MomentCard({ data, now, onAction }: Props) {
           {data.subtitle}
         </p>
       ) : null}
-
-      {data.kind === 'pickup' && (
-        <PickupCountdown schoolEndTime={data.schoolEndTime} now={now} />
-      )}
 
       {data.bullets && data.bullets.length > 0 ? (
         <ul style={{ margin: '14px 0 0', padding: '0 0 0 18px', listStyle: 'none' }}>

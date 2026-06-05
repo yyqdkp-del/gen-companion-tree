@@ -19,7 +19,7 @@ import TodoSheet from '@/app/rian/TodoSheet'
 import { THEME } from '@/app/_shared/_constants/theme'
 import { DesignWaterDrop, type RootBriefing, type BriefingItem } from '@/app/_shared/_components/design'
 import MomentCard from '@/app/components/MomentCard'
-import { buildMomentCard, type MomentAction } from '@/app/_shared/_engine/momentCard'
+import { buildMomentCard, getClassName, type MomentAction, type ScheduleClass } from '@/app/_shared/_engine/momentCard'
 import type { TodoItem, HotspotItem } from '@/app/_shared/_types'
 import { useChildData } from '@/app/_shared/_hooks/useChildData'
 import { useTodoActions } from '@/app/_shared/_hooks/useTodoActions'
@@ -36,7 +36,7 @@ import { useRouter } from 'next/navigation'
 import HomeRefreshFromQuery from '@/app/components/HomeRefreshFromQuery'
 import { PAGE_BOTTOM_TAB_ONLY } from '@/app/_shared/_constants/layout'
 
-type ScheduleItem = { time: string; title: string; location?: string; requires_action?: string; requires_items?: string[] }
+type ScheduleItem = ScheduleClass & { location?: string; requires_action?: string }
 type UrgentItem = { title: string; level: 'red' | 'orange' | 'yellow' }
 type PackingAlert = { item: string; level: 1 | 2 | 3 | 'today'; days_left?: number; need_buy: boolean }
 type Greeting = { text: string; sub: string }
@@ -97,7 +97,7 @@ function collectPackItems(classes: ScheduleItem[]): string[] {
 }
 
 function findPeClass(classes: ScheduleItem[]): ScheduleItem | undefined {
-  return classes.find((c) => /体育|游泳|PE|Sport|physical/i.test(String(c.title || '')))
+  return classes.find((c) => /体育|游泳|PE|Sport|physical/i.test(getClassName(c)))
 }
 
 function getTomorrowClasses(activeKid: any | null): ScheduleItem[] {
@@ -108,14 +108,24 @@ function getTomorrowClasses(activeKid: any | null): ScheduleItem[] {
   if (!Array.isArray(raw)) return []
   return raw.map((cls: unknown) => {
     if (typeof cls === 'object' && cls !== null) {
-      const o = cls as { subject?: string; title?: string; time?: string; requires_items?: string[] }
+      const o = cls as {
+        subject?: string
+        title?: string
+        name?: string
+        name_zh?: string
+        time?: string
+        requires_items?: string[]
+      }
       return {
         time: o.time || '',
-        title: String(o.subject || o.title || ''),
+        subject: o.subject,
+        name: o.name,
+        name_zh: o.name_zh,
+        title: o.title,
         requires_items: o.requires_items,
       }
     }
-    return { time: '', title: String(cls) }
+    return { time: '', subject: String(cls) }
   })
 }
 
@@ -223,7 +233,7 @@ function buildMorningBriefing(params: BriefingParams): RootBriefing {
 
   let greeting = `早安，${kidName}的今天`
   if (peClass) {
-    greeting = `今天${kidName}有${peClass.title || '体育课'}`
+    greeting = `今天${kidName}有${getClassName(peClass)}`
   } else if (specialEvents[0]) {
     greeting = `今天有${specialEvents[0].title}`
   } else if (packItems.length) {
@@ -268,7 +278,7 @@ function buildDaytimeFocus(params: BriefingParams): RootBriefing {
       return t >= 0 && t > hour * 60 + minute
     }) || todayClasses[0]
     if (nextClass?.time) {
-      items.push({ icon: '⏰', text: `下一节 ${nextClass.time} ${nextClass.title}` })
+      items.push({ icon: '⏰', text: `下一节 ${nextClass?.time || ''} ${getClassName(nextClass)}`.trim() })
     }
   }
 
@@ -306,7 +316,7 @@ function buildEveningReview(params: BriefingParams): RootBriefing {
 
   const tomorrowPe = findPeClass(tomorrowClasses)
   if (tomorrowPe) {
-    items.push({ icon: '🏊', text: `明天有${tomorrowPe.title}`, urgent: true })
+    items.push({ icon: '🏊', text: `明天有${getClassName(tomorrowPe)}`, urgent: true })
   }
 
   const weekUrgent = ((activeKid?.urgent_items || []) as UrgentItem[])
@@ -1176,6 +1186,7 @@ export default function BasePage() {
       topTodo,
       packReadyDismissed,
       overviewBriefing: rootBriefing,
+      hotspots: unreadHotspots,
     }),
     [
       now,
@@ -1186,6 +1197,7 @@ export default function BasePage() {
       topTodo,
       packReadyDismissed,
       rootBriefing,
+      unreadHotspots,
     ],
   )
 
