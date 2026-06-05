@@ -300,18 +300,21 @@ async function visionExtractSchedule(image: string, mediaTypeHint?: string): Pro
         },
         {
           type: 'text',
-          text: `请分析这张学校课表图片，识别表格结构。
+          text: `这是一张学校课表图片，可能横向或竖向拍摄。
 
-表格通常有：
-- 时间列（显示上课时间段）
-- 星期行（Monday 到 Friday）
-- 课程单元格
+请先判断表格方向：
+- 时间数字（如 7:50、8:00）在图片哪个位置？
+- 星期（Monday-Friday）在哪个位置？
 
-请按每天提取课程，输出：
-{"mon":[{"time":"07:50","subject":"Breakfast"}],...}
+然后正确提取每天的课程安排。
 
-time 只输出开始时间 HH:MM 格式，保留图片原始时间不要换算。
-只返回 JSON，不要任何解释`,
+重要：
+- 只输出图片中实际显示的时间，不做任何换算
+- 时间格式 HH:MM，只取开始时间
+- 按 mon/tue/wed/thu/fri 分组
+
+只返回 JSON：
+{"mon":[{"time":"07:50","subject":"课程名"}],...}`,
         },
       ],
     }],

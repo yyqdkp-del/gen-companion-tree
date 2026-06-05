@@ -3,6 +3,33 @@
 @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600&family=Noto+Serif+SC:wght@300;400;500;700&display=swap');
 
 :root {
+  /* 统一主文字色（原有三套并存：#1e293b / #2C3E50 / #2d322f） */
+  --text-primary: #2d322f;
+  --text-secondary: #5a5a4a;
+  --text-muted: rgba(45, 50, 47, 0.45);
+
+  /* 品牌色别名（原有但无人使用） */
+  --accent-clay: #a46355;
+  --accent-clay-alpha: rgba(164, 99, 85, 0.12);
+  --accent-jade: #5c7a5e;
+
+  /* 圆角别名 */
+  --r-xs: 8px;
+  --r-sm: 12px;
+  --r-md: 16px;
+  --r-lg: 20px;
+  --r-xl: 22px;
+  --r-2xl: 28px;
+
+  /* 阴影 */
+  --sh-soft: 0 8px 32px rgba(45, 50, 47, 0.04), 0 2px 8px rgba(45, 50, 47, 0.02);
+  --sh-warm: 0 12px 40px rgba(164, 99, 85, 0.05), 0 2px 6px rgba(45, 50, 47, 0.02);
+  --sh-sheet: 0 -10px 60px rgba(0, 0, 0, 0.14);
+
+  /* 动效 */
+  --ease-enter: cubic-bezier(0.16, 1, 0.3, 1);
+  --dur-enter: 320ms;
+
   --canvas-light: #fbf9f6;
   --canvas-mist: #f4f2ed;
   --droplet-peach: #e6a89e;
@@ -16,10 +43,7 @@
   --droplet-slate-dark: #2b3942;
   --treehole-deep: #0a0d14;
   --treehole-ink: #121a29;
-  --accent-clay: #a46355;
-  --accent-jade: #5c7a5e;
-  --text-main: #1e293b;
-  --text-muted: #64748b;
+  --text-main: var(--text-primary);
   --vh: 100dvh;
   --keyboard-height: 0px;
 }
@@ -27,14 +51,6 @@
 *, *::before, *::after {
   box-sizing: border-box;
   -webkit-tap-highlight-color: transparent;
-}
-
-body {
-  font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Helvetica Neue', Arial, sans-serif;
-  background-color: var(--canvas-light);
-  color: var(--text-main);
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
 }
 
 .font-serif-cn {
@@ -221,10 +237,21 @@ img {
 
 /* ===== 全站视觉温度升级 ===== */
 
-/* 1. 全局字体回退保护 */
-body, input, button, textarea, select {
+/* 全局字体与画布（Noto Serif SC 为正文栈） */
+body {
   font-family: 'Noto Serif SC', 'Songti SC', 'STSong', 'Georgia',
     -apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif;
+  background-color: var(--canvas-light);
+  color: var(--text-primary);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+input,
+button,
+textarea,
+select {
+  font-family: inherit;
 }
 
 /* 2. 暖阳漫反射投影 */

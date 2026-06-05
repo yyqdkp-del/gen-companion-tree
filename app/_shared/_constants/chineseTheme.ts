@@ -1,21 +1,20 @@
 // ─────────────────────────────────────────
-// 根·中文专属主题色
-// 独立于全局 THEME，体现书卷感
+// 根·中文专属主题色（与 globals.css token 对齐，见 REDESIGN_ROADMAP）
 // ─────────────────────────────────────────
 
 export const CHINESE_THEME = {
-  bg:       '#fbf9f6',
-  white:    '#ffffff',
-  paper:    '#f7f4ee',
-  text:     '#2d322f',
-  textMid:  '#5a5a4a',
-  textDim:  'rgba(45,50,47,0.45)',
-  red:      '#a46355',
-  gold:     '#8a7355',
-  green:    '#5c7a5e',
-  blue:     '#4a6b7a',
-  navy:     '#2d3f4a',
-  orange:   '#b07050',
+  bg: '#fbf9f6', // --canvas-light
+  white: '#ffffff',
+  paper: '#f7f4ee',
+  text: '#2d322f', // --text-primary（已与全局统一）
+  textMid: '#5a5a4a', // --text-secondary
+  textDim: 'rgba(45,50,47,0.45)', // --text-muted
+  red: '#a46355', // --accent-clay
+  gold: '#8a7355', // 课表/旅行次强调，与 THEME.gold 一致
+  green: '#5c7a5e', // --accent-jade
+  blue: '#4a6b7a',
+  navy: '#2d3f4a', // 与 THEME.navy 一致
+  orange: '#b07050',
 } as const
 
 export const CHINESE_LEVELS: Record<string, { color: string; bg: string; label: string }> = {
