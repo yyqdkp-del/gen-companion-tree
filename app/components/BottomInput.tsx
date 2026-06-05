@@ -56,10 +56,16 @@ export default function BottomInput() {
   const cameraInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
-    const handleOpenCamera = () => setInputMode('vision_file')
+    const handleOpenCamera = () => {
+      if (pathname === '/') {
+        if (sessionReady) cameraInputRef.current?.click()
+        return
+      }
+      setInputMode('vision_file')
+    }
     window.addEventListener('openCamera', handleOpenCamera)
     return () => window.removeEventListener('openCamera', handleOpenCamera)
-  }, [])
+  }, [pathname, sessionReady])
 
   const uid = useCallback(
     () => userId || (typeof window !== 'undefined' ? localStorage.getItem('app_user_id') : '') || '',
@@ -385,24 +391,26 @@ export default function BottomInput() {
           gap: 8,
         }}
       >
-        <motion.button
-          type="button"
-          aria-label="拍照或上传"
-          whileTap={{ scale: 0.92 }}
-          disabled={!sessionReady}
-          onClick={() => {
-            if (requireRianLogin()) return
-            if (sessionReady) setInputMode(inputMode === 'vision_file' ? 'none' : 'vision_file')
-          }}
-          style={{
-            ...FLOAT_BTN,
-            border: inputMode === 'vision_file' ? '1.5px solid rgba(164,99,85,0.4)' : FLOAT_BTN.border,
-            opacity: !sessionReady ? 0.45 : 1,
-            cursor: sessionReady ? 'pointer' : 'default',
-          }}
-        >
-          <Camera size={21} color={inputMode === 'vision_file' ? THEME.gold : THEME.text} />
-        </motion.button>
+        {pathname !== '/' && (
+          <motion.button
+            type="button"
+            aria-label="拍照或上传"
+            whileTap={{ scale: 0.92 }}
+            disabled={!sessionReady}
+            onClick={() => {
+              if (requireRianLogin()) return
+              if (sessionReady) setInputMode(inputMode === 'vision_file' ? 'none' : 'vision_file')
+            }}
+            style={{
+              ...FLOAT_BTN,
+              border: inputMode === 'vision_file' ? '1.5px solid rgba(164,99,85,0.4)' : FLOAT_BTN.border,
+              opacity: !sessionReady ? 0.45 : 1,
+              cursor: sessionReady ? 'pointer' : 'default',
+            }}
+          >
+            <Camera size={21} color={inputMode === 'vision_file' ? THEME.gold : THEME.text} />
+          </motion.button>
+        )}
         <motion.button
           type="button"
           aria-label="语音与文字"

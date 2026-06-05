@@ -901,6 +901,18 @@ export default function BasePage() {
   const nextClassLine = todayClasses[0]
     ? `${todayClasses[0].time ? `${todayClasses[0].time} ` : ''}${todayClasses[0].title || '课程'}`.trim()
     : '暂无课程'
+  const todayFocusTodos = [...(todoGroups?.today || [])].sort((a, b) => {
+    const order: Record<string, number> = { red: 3, orange: 2, yellow: 1 }
+    return (order[b.priority] || 0) - (order[a.priority] || 0)
+  })
+  const focusItemStyle: React.CSSProperties = {
+    background: 'var(--canvas-card)',
+    borderRadius: 12,
+    padding: '12px 16px',
+    marginBottom: 8,
+    boxShadow: 'var(--sh-soft)',
+    border: '1px solid rgba(164, 99, 85, 0.04)',
+  }
   const headerPadTop = showProfileBanner
     ? 'calc(max(env(safe-area-inset-top), 0px) + 44px)'
     : 'max(env(safe-area-inset-top), 0px)'
@@ -1025,6 +1037,18 @@ export default function BasePage() {
           >
             {userDisplayName ? `${greetingLabel} · ${userDisplayName}` : greetingLabel}
           </div>
+          {mounted && greeting?.sub && (
+            <div
+              style={{
+                marginTop: 4,
+                fontSize: 13,
+                color: 'var(--text-secondary)',
+                lineHeight: 1.45,
+              }}
+            >
+              {greeting.sub}
+            </div>
+          )}
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', flexShrink: 0 }}>
@@ -1135,21 +1159,7 @@ export default function BasePage() {
           </button>
         )}
 
-        <section
-          style={{
-            flex: '1 1 auto',
-            minHeight: 'min(42vh, 360px)',
-            padding: 20,
-            borderRadius: 22,
-            background: 'var(--canvas-card)',
-            boxShadow: 'var(--sh-warm)',
-            border: '1px solid rgba(164, 99, 85, 0.06)',
-            display: 'flex',
-            flexDirection: 'column',
-            justifyContent: 'center',
-            gap: 12,
-          }}
-        >
+        <section style={{ flex: '1 1 auto', marginTop: 4 }}>
           <div
             style={{
               fontSize: 9,
@@ -1157,49 +1167,86 @@ export default function BasePage() {
               letterSpacing: '0.2em',
               textTransform: 'uppercase',
               color: 'var(--accent-clay)',
+              marginBottom: 10,
             }}
           >
             今天
           </div>
-          <div>
-            <h2
-              style={{
-                margin: 0,
-                fontSize: 22,
-                fontWeight: 600,
-                lineHeight: 1.35,
-                color: 'var(--text-primary)',
-              }}
-            >
-              {todayFocus.headline}
-            </h2>
-            <p
-              style={{
-                margin: '10px 0 0',
-                fontSize: 15,
-                lineHeight: 1.65,
-                color: 'var(--text-secondary)',
-              }}
-            >
-              {todayFocus.detail}
-            </p>
-          </div>
+          {todayFocusTodos.length > 0 ? (
+            todayFocusTodos.map((todo) => (
+              <button
+                key={todo.id}
+                type="button"
+                onClick={() => {
+                  setOneTapTodo(todo)
+                  openModal('oneTap')
+                }}
+                style={{
+                  ...focusItemStyle,
+                  width: '100%',
+                  border: '1px solid rgba(164, 99, 85, 0.04)',
+                  textAlign: 'left',
+                  cursor: 'pointer',
+                  fontFamily: 'inherit',
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: 15,
+                    fontWeight: 600,
+                    lineHeight: 1.45,
+                    color: 'var(--text-primary)',
+                  }}
+                >
+                  {todo.title?.replace(/^📅\s*/, '') || '待办'}
+                </div>
+                {todo.due_date && (
+                  <div style={{ marginTop: 4, fontSize: 12, color: 'var(--text-secondary)' }}>
+                    截止 {new Date(todo.due_date).toLocaleDateString('zh-CN', { month: 'numeric', day: 'numeric' })}
+                  </div>
+                )}
+              </button>
+            ))
+          ) : (
+            <div style={focusItemStyle}>
+              <h2
+                style={{
+                  margin: 0,
+                  fontSize: 18,
+                  fontWeight: 600,
+                  lineHeight: 1.35,
+                  color: 'var(--text-primary)',
+                }}
+              >
+                {todayFocus.headline}
+              </h2>
+              <p
+                style={{
+                  margin: '8px 0 0',
+                  fontSize: 14,
+                  lineHeight: 1.6,
+                  color: 'var(--text-secondary)',
+                }}
+              >
+                {todayFocus.detail}
+              </p>
+            </div>
+          )}
           {(currentHour >= 22 || currentHour < 6) && (
             <motion.button
               type="button"
               whileTap={{ scale: 0.98 }}
               onClick={() => router.push('/treehouse')}
               style={{
-                alignSelf: 'flex-start',
-                marginTop: 4,
-                padding: '10px 14px',
-                borderRadius: 'var(--r-sm)',
+                ...focusItemStyle,
+                width: '100%',
                 border: '1px solid var(--treehole-ink)',
                 background: 'var(--treehole-deep)',
                 color: '#f0ebe4',
                 fontSize: 13,
                 fontFamily: "'Noto Serif SC', serif",
                 cursor: 'pointer',
+                textAlign: 'left',
               }}
             >
               进入树洞 →
@@ -1213,37 +1260,20 @@ export default function BasePage() {
           onClick={handlePhotoCapture}
           style={{
             width: '100%',
-            minHeight: 56,
-            padding: '10px 16px',
+            height: 56,
             border: 'none',
             borderRadius: 16,
             background: 'var(--accent-clay)',
             color: '#fff',
+            fontSize: 16,
+            fontWeight: 600,
             fontFamily: 'PingFang SC, -apple-system, sans-serif',
             cursor: 'pointer',
             boxShadow: 'var(--sh-warm)',
             flexShrink: 0,
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: 3,
           }}
         >
-          <div
-            style={{
-              fontSize: 16,
-              fontWeight: 600,
-              lineHeight: 1.3,
-              textAlign: 'center',
-            }}
-          >
-            📷 拍给根处理
-            <span style={{ fontWeight: 500, opacity: 0.92 }}>  通知 · 病历 · 证件 · 账单</span>
-          </div>
-          <div style={{ fontSize: 11, fontWeight: 400, opacity: 0.82, lineHeight: 1.3 }}>
-            拍一张照片，根会读清内容并帮你归档
-          </div>
+          📷 拍给根处理
         </motion.button>
 
         <section
@@ -1316,11 +1346,9 @@ export default function BasePage() {
             state={childState}
             icon={<Heart size={18} />}
             label="孩子"
-            value={childValue}
-            subValue={childSubValue}
             badge={childUrgent}
             pulse={childUrgent > 0}
-            hideLabel
+            hideLabel={true}
             onClick={() => {
               void track({ event_type: 'droplet_click', meta: { type: 'child' } })
               openModal('child')
@@ -1333,11 +1361,9 @@ export default function BasePage() {
             state={todoEngine.state}
             icon={<Bell size={16} />}
             label="待办"
-            value={todoValue}
-            subValue={todoSubValue}
             badge={todoEngine.badge}
             pulse={todoEngine.badge > 0}
-            hideLabel
+            hideLabel={true}
             onClick={() => {
               void track({ event_type: 'droplet_click', meta: { type: 'todo' } })
               openModal('todo')
@@ -1350,11 +1376,9 @@ export default function BasePage() {
             state={hotspotEngine.state}
             icon={patrolling ? <Loader size={16} /> : <Zap size={16} />}
             label="热点"
-            value={hotspotValue}
-            subValue={hotspotSubValue}
             badge={hotspotEngine.badge}
             pulse={hotspotEngine.badge > 0}
-            hideLabel
+            hideLabel={true}
             onClick={() => {
               void track({ event_type: 'droplet_click', meta: { type: 'hotspot' } })
               openModal('hotspot')
