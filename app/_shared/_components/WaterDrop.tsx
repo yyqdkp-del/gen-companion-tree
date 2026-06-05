@@ -43,10 +43,11 @@ type Props = {
   delay?: number
   className?: string
   index?: number
+  hideLabel?: boolean
 }
 
 export default function WaterDrop({
-  state, icon, label, value, subValue, badge, pulse, onClick, size = 96, delay = 0, className, index = 0
+  state, icon, label, value, subValue, badge, pulse, onClick, size = 96, delay = 0, className, index = 0, hideLabel = false,
 }: Props) {
   const c = COLORS[state] || COLORS.calm
   const [reducedMotion, setReducedMotion] = useState(false)
@@ -138,10 +139,12 @@ export default function WaterDrop({
               {subValue}
             </div>
           )}
-          <span style={{ fontSize: 7.5, fontWeight: 700, color: c.text,
-            opacity: 0.32, letterSpacing: '0.12em', textTransform: 'uppercase' }}>
-            {label}
-          </span>
+          {!hideLabel && (
+            <span style={{ fontSize: 7.5, fontWeight: 700, color: c.text,
+              opacity: 0.32, letterSpacing: '0.12em', textTransform: 'uppercase' }}>
+              {label}
+            </span>
+          )}
           {(badge ?? 0) > 0 && (
             <motion.div animate={reducedMotion ? {} : badgeAnimate}
               transition={reducedMotion ? { duration: 0 } : badgeTransition}
@@ -152,10 +155,12 @@ export default function WaterDrop({
           )}
         </motion.div>
       </motion.div>
-      <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.2em',
-        color: THEME.text, opacity: 0.55 }}>
-        {label}
-      </span>
+      {!hideLabel && (
+        <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.2em',
+          color: THEME.text, opacity: 0.55 }}>
+          {label}
+        </span>
+      )}
     </div>
   )
 }

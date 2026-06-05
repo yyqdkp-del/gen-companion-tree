@@ -32,7 +32,6 @@ import { toast, toastRegisterPrompt } from '@/app/components/Toast'
 import { sanitizeFileName } from '@/lib/storage/sanitizeFileName'
 import { useRouter } from 'next/navigation'
 import HomeRefreshFromQuery from '@/app/components/HomeRefreshFromQuery'
-import SettingsButton from '@/app/components/SettingsButton'
 import { PAGE_BOTTOM_WITH_FLOAT } from '@/app/_shared/_constants/layout'
 
 type ScheduleItem = { time: string; title: string; location?: string; requires_action?: string }
@@ -895,6 +894,10 @@ export default function BasePage() {
   )
   const visaDaysLeft = visaTodo?.due_date ? daysUntilYmd(visaTodo.due_date) : null
   const showVisaWarning = visaDaysLeft != null && visaDaysLeft <= 30 && visaDaysLeft >= 0
+  const visaWarningText = showVisaWarning
+    ? `⚠️ ${activeKid?.name || '孩子'} 学生签证 · 还有${visaDaysLeft}天`
+    : ''
+  const userDisplayName = userId ? '妈妈' : ''
   const nextClassLine = todayClasses[0]
     ? `${todayClasses[0].time ? `${todayClasses[0].time} ` : ''}${todayClasses[0].title || '课程'}`.trim()
     : '暂无课程'
@@ -1020,24 +1023,11 @@ export default function BasePage() {
               lineHeight: 1.35,
             }}
           >
-            {greetingLabel}
-            {userId ? '，妈妈' : ''}
+            {userDisplayName ? `${greetingLabel} · ${userDisplayName}` : greetingLabel}
           </div>
-          {mounted && greeting?.sub && (
-            <div
-              style={{
-                marginTop: 2,
-                fontSize: 12,
-                color: 'var(--text-muted)',
-                lineHeight: 1.4,
-              }}
-            >
-              {greeting.sub}
-            </div>
-          )}
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', flexShrink: 0 }}>
           {!kids.length ? (
             <motion.button
               type="button"
@@ -1099,9 +1089,6 @@ export default function BasePage() {
               )}
             </motion.button>
           )}
-          <div style={{ position: 'relative', zIndex: 51 }}>
-            <SettingsButton />
-          </div>
         </div>
       </header>
 
@@ -1122,15 +1109,41 @@ export default function BasePage() {
           gap: 14,
         }}
       >
+        {showVisaWarning && (
+          <button
+            type="button"
+            onClick={() => router.push('/profile/cards')}
+            style={{
+              width: '100%',
+              marginTop: 4,
+              padding: '12px 14px 12px 16px',
+              border: 'none',
+              borderRadius: 'var(--r-md)',
+              background: 'rgba(164, 99, 85, 0.08)',
+              borderLeft: '3px solid var(--accent-clay)',
+              textAlign: 'left',
+              cursor: 'pointer',
+              fontFamily: "'Noto Serif SC', serif",
+              fontSize: 13,
+              fontWeight: 500,
+              color: 'var(--accent-clay)',
+              lineHeight: 1.45,
+              boxShadow: 'var(--sh-soft)',
+            }}
+          >
+            {visaWarningText}
+          </button>
+        )}
+
         <section
           style={{
             flex: '1 1 auto',
             minHeight: 'min(42vh, 360px)',
-            marginTop: 4,
             padding: 20,
-            borderRadius: 'var(--r-xl)',
+            borderRadius: 22,
             background: 'var(--canvas-card)',
             boxShadow: 'var(--sh-warm)',
+            border: '1px solid rgba(164, 99, 85, 0.06)',
             display: 'flex',
             flexDirection: 'column',
             justifyContent: 'center',
@@ -1171,21 +1184,6 @@ export default function BasePage() {
               {todayFocus.detail}
             </p>
           </div>
-          {showVisaWarning && (
-            <div
-              style={{
-                padding: '10px 12px',
-                borderRadius: 'var(--r-sm)',
-                background: 'var(--accent-clay-alpha)',
-                border: '1px solid var(--accent-clay)',
-                fontSize: 13,
-                color: 'var(--accent-clay)',
-                lineHeight: 1.5,
-              }}
-            >
-              ⚠️ 签证相关：约 {visaDaysLeft} 天内到期，请尽快处理
-            </div>
-          )}
           {(currentHour >= 22 || currentHour < 6) && (
             <motion.button
               type="button"
@@ -1214,21 +1212,38 @@ export default function BasePage() {
           whileTap={{ scale: 0.98 }}
           onClick={handlePhotoCapture}
           style={{
-            height: 56,
             width: '100%',
+            minHeight: 56,
+            padding: '10px 16px',
             border: 'none',
-            borderRadius: 'var(--r-md)',
+            borderRadius: 16,
             background: 'var(--accent-clay)',
             color: '#fff',
-            fontSize: 16,
-            fontWeight: 600,
             fontFamily: 'PingFang SC, -apple-system, sans-serif',
             cursor: 'pointer',
             boxShadow: 'var(--sh-warm)',
             flexShrink: 0,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 3,
           }}
         >
-          📷 拍给根处理
+          <div
+            style={{
+              fontSize: 16,
+              fontWeight: 600,
+              lineHeight: 1.3,
+              textAlign: 'center',
+            }}
+          >
+            📷 拍给根处理
+            <span style={{ fontWeight: 500, opacity: 0.92 }}>  通知 · 病历 · 证件 · 账单</span>
+          </div>
+          <div style={{ fontSize: 11, fontWeight: 400, opacity: 0.82, lineHeight: 1.3 }}>
+            拍一张照片，根会读清内容并帮你归档
+          </div>
         </motion.button>
 
         <section
@@ -1305,11 +1320,12 @@ export default function BasePage() {
             subValue={childSubValue}
             badge={childUrgent}
             pulse={childUrgent > 0}
+            hideLabel
             onClick={() => {
               void track({ event_type: 'droplet_click', meta: { type: 'child' } })
               openModal('child')
             }}
-            size={72}
+            size={64}
             delay={0}
             className="animate-droplet-1"
           />
@@ -1321,6 +1337,7 @@ export default function BasePage() {
             subValue={todoSubValue}
             badge={todoEngine.badge}
             pulse={todoEngine.badge > 0}
+            hideLabel
             onClick={() => {
               void track({ event_type: 'droplet_click', meta: { type: 'todo' } })
               openModal('todo')
@@ -1337,6 +1354,7 @@ export default function BasePage() {
             subValue={hotspotSubValue}
             badge={hotspotEngine.badge}
             pulse={hotspotEngine.badge > 0}
+            hideLabel
             onClick={() => {
               void track({ event_type: 'droplet_click', meta: { type: 'hotspot' } })
               openModal('hotspot')
