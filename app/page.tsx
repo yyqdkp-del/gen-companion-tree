@@ -17,7 +17,7 @@ import Onboarding from '@/app/components/Onboarding'
 import { useApp } from '@/app/context/AppContext'
 import TodoSheet from '@/app/rian/TodoSheet'
 import { THEME } from '@/app/_shared/_constants/theme'
-import { DesignWaterDrop, FocusCard, VisaCountdown } from '@/app/_shared/_components/design'
+import { DesignWaterDrop, FocusCard, VisaCountdown, type RootBriefing, type BriefingItem } from '@/app/_shared/_components/design'
 import type { TodoItem, HotspotItem } from '@/app/_shared/_types'
 import { useChildData } from '@/app/_shared/_hooks/useChildData'
 import { useTodoActions } from '@/app/_shared/_hooks/useTodoActions'
@@ -34,7 +34,7 @@ import { useRouter } from 'next/navigation'
 import HomeRefreshFromQuery from '@/app/components/HomeRefreshFromQuery'
 import { PAGE_BOTTOM_TAB_ONLY } from '@/app/_shared/_constants/layout'
 
-type ScheduleItem = { time: string; title: string; location?: string; requires_action?: string }
+type ScheduleItem = { time: string; title: string; location?: string; requires_action?: string; requires_items?: string[] }
 type UrgentItem = { title: string; level: 'red' | 'orange' | 'yellow' }
 type PackingAlert = { item: string; level: 1 | 2 | 3 | 'today'; days_left?: number; need_buy: boolean }
 type Greeting = { text: string; sub: string }
@@ -75,81 +75,295 @@ function daysUntilYmd(dateStr: string): number | null {
   return Math.ceil((d.getTime() - today.getTime()) / 86400000)
 }
 
-function buildTodayFocus(params: {
+const DAY_KEY_BY_NUM: Record<number, string> = {
+  0: 'sun', 1: 'mon', 2: 'tue', 3: 'wed', 4: 'thu', 5: 'fri', 6: 'sat',
+}
+
+function parseTimeMin(time?: string): number {
+  if (!time) return -1
+  const parts = time.split(':').map(Number)
+  if (parts.length < 2 || Number.isNaN(parts[0])) return -1
+  return parts[0] * 60 + (parts[1] || 0)
+}
+
+function collectPackItems(classes: ScheduleItem[]): string[] {
+  return [...new Set(
+    classes.flatMap((c) => (Array.isArray(c.requires_items) ? c.requires_items : []))
+      .map((s) => String(s).trim())
+      .filter(Boolean),
+  )]
+}
+
+function findPeClass(classes: ScheduleItem[]): ScheduleItem | undefined {
+  return classes.find((c) => /体育|游泳|PE|Sport|physical/i.test(String(c.title || '')))
+}
+
+function getTomorrowClasses(activeKid: any | null): ScheduleItem[] {
+  if (!activeKid?.class_schedule) return []
+  const tomorrowDow = (new Date().getDay() + 1) % 7
+  const key = DAY_KEY_BY_NUM[tomorrowDow]
+  const raw = activeKid.class_schedule[key]
+  if (!Array.isArray(raw)) return []
+  return raw.map((cls: unknown) => {
+    if (typeof cls === 'object' && cls !== null) {
+      const o = cls as { subject?: string; title?: string; time?: string; requires_items?: string[] }
+      return {
+        time: o.time || '',
+        title: String(o.subject || o.title || ''),
+        requires_items: o.requires_items,
+      }
+    }
+    return { time: '', title: String(cls) }
+  })
+}
+
+function getSchoolPeriodLabel(
+  hour: number,
+  minute: number,
+  schoolStart?: string,
+  schoolEnd?: string,
+): string {
+  const now = hour * 60 + minute
+  const start = parseTimeMin(schoolStart || '08:00')
+  const end = parseTimeMin(schoolEnd || '15:00')
+  if (start < 0) return '在校期间'
+  if (now < start - 45) return '还未上学'
+  if (now < start) return '准备上学'
+  if (now < start + 20) return '刚到校'
+  if (now < end - 30) return '上课中'
+  if (now < end) return '课间或临近放学'
+  if (now < end + 90) return '刚放学'
+  return '放学后'
+}
+
+function findWeatherHotspot(hotspots: HotspotItem[]): HotspotItem | undefined {
+  return hotspots.find((h) =>
+    h.category === 'weather' ||
+    /天气|AQI|降雨|台风|暴雨|高温/i.test(String(h.title || '')) ||
+    /天气|AQI|降雨/i.test(String(h.summary || '')),
+  )
+}
+
+function findSpecialTodayEvents(activeKid: any | null): { title: string; urgent?: boolean }[] {
+  const out: { title: string; urgent?: boolean }[] = []
+  const schedule = (activeKid?.today_schedule || []) as { title?: string; requires_action?: string }[]
+  for (const e of schedule) {
+    const title = String(e.title || '').trim()
+    if (!title) continue
+    if (e.requires_action) out.push({ title, urgent: true })
+  }
+  const urgent = (activeKid?.urgent_items || []) as UrgentItem[]
+  for (const u of urgent) {
+    if (u.level === 'red' || u.level === 'orange') {
+      out.push({ title: u.title, urgent: u.level === 'red' })
+    }
+  }
+  const seen = new Set<string>()
+  return out.filter((e) => {
+    if (seen.has(e.title)) return false
+    seen.add(e.title)
+    return true
+  })
+}
+
+type BriefingParams = {
   hour: number
+  minute: number
   activeKid: any | null
   todayClasses: ScheduleItem[]
   topTodo: TodoItem | undefined
-  todayTodoCount: number
+  todayTodos: TodoItem[]
   doneTodayCount: number
-}): { headline: string; detail: string } {
-  const { hour, activeKid, todayClasses, topTodo, todayTodoCount, doneTodayCount } = params
+  visaDaysLeft: number | null
+  hotspots: HotspotItem[]
+}
+
+function buildMorningBriefing(params: BriefingParams): RootBriefing {
+  const { activeKid, todayClasses, visaDaysLeft, hotspots } = params
   const kidName = activeKid?.name || '孩子'
+  const items: BriefingItem[] = []
+  const packItems = collectPackItems(todayClasses)
+  const peClass = findPeClass(todayClasses)
+  const specialEvents = findSpecialTodayEvents(activeKid)
 
-  if (hour >= 22 || hour < 6) {
-    return {
-      headline: '今晚好好休息',
-      detail: '树洞深夜开放，想说的话可以随时进去',
-    }
+  if (packItems.length) {
+    const text = packItems.length === 1
+      ? `带${packItems[0]}`
+      : `带${packItems.slice(0, 3).join('、')}${packItems.length > 3 ? '等' : ''}`
+    items.push({ icon: '🎒', text, urgent: true })
   }
 
-  if (hour >= 6 && hour < 9) {
-    const packItems = todayClasses.flatMap((c: ScheduleItem & { requires_items?: string[] }) => {
-      const items = (c as { requires_items?: string[] }).requires_items
-      return Array.isArray(items) ? items : []
+  if (visaDaysLeft != null && visaDaysLeft <= 30 && visaDaysLeft >= 0) {
+    items.push({
+      icon: '⚠️',
+      text: `签证还有 ${visaDaysLeft} 天`,
+      urgent: visaDaysLeft <= 7,
     })
-    const unique = [...new Set(packItems.map((s) => String(s).trim()).filter(Boolean))]
-    if (unique.length) {
-      return {
-        headline: `${kidName}今天要带`,
-        detail: unique.slice(0, 4).join('、') + (unique.length > 4 ? '…' : ''),
-      }
-    }
-    const firstClass = todayClasses[0]
-    if (firstClass) {
-      const wear = firstClass.requires_action || firstClass.title
-      return {
-        headline: `${kidName}今天要带`,
-        detail: wear || '看一下课表确认穿戴',
-      }
-    }
-    return {
-      headline: `${kidName}的早晨`,
-      detail: '暂无课表携带提醒，拍一张通知给根也可以',
+  }
+
+  for (const ev of specialEvents.slice(0, 2)) {
+    items.push({
+      icon: ev.urgent ? '📌' : '📋',
+      text: ev.title,
+      urgent: ev.urgent,
+    })
+  }
+
+  const weather = findWeatherHotspot(hotspots)
+  if (weather) {
+    const snippet = (weather.summary || weather.title || '').split(/[。！\n]/)[0].slice(0, 40)
+    items.push({
+      icon: '🌦',
+      text: snippet || '留意今日天气变化',
+      urgent: /台风|暴雨|停课|预警/i.test(`${weather.title} ${weather.summary}`),
+    })
+  }
+
+  let greeting = `早安，${kidName}的今天`
+  if (peClass) {
+    greeting = `今天${kidName}有${peClass.title || '体育课'}`
+  } else if (specialEvents[0]) {
+    greeting = `今天有${specialEvents[0].title}`
+  } else if (packItems.length) {
+    greeting = `${kidName}今天要带好几样东西`
+  }
+
+  return {
+    greeting,
+    items,
+    urgentTodoId: params.topTodo?.priority === 'red' ? params.topTodo.id : undefined,
+  }
+}
+
+function buildDaytimeFocus(params: BriefingParams): RootBriefing {
+  const { hour, minute, activeKid, todayClasses, topTodo } = params
+  const kidName = activeKid?.name || '孩子'
+  const items: BriefingItem[] = []
+
+  if (topTodo) {
+    items.push({
+      icon: topTodo.priority === 'red' ? '🔴' : '📋',
+      text: topTodo.title?.replace(/^📅\s*/, '') || '查看待办',
+      urgent: topTodo.priority === 'red' || topTodo.priority === 'orange',
+      todoId: topTodo.id,
+    })
+  }
+
+  const period = getSchoolPeriodLabel(
+    hour,
+    minute,
+    activeKid?.school_start_time,
+    activeKid?.school_end_time,
+  )
+  items.push({ icon: '🏫', text: `${kidName}${period}` })
+
+  const pickupTime = activeKid?.school_end_time
+  if (pickupTime && (period === '上课中' || period === '课间或临近放学' || period === '刚放学')) {
+    items.push({ icon: '🚗', text: `接送约 ${pickupTime}`, urgent: period === '刚放学' })
+  } else {
+    const nextClass = todayClasses.find((c) => {
+      const t = parseTimeMin(c.time)
+      return t >= 0 && t > hour * 60 + minute
+    }) || todayClasses[0]
+    if (nextClass?.time) {
+      items.push({ icon: '⏰', text: `下一节 ${nextClass.time} ${nextClass.title}` })
     }
   }
 
-  if (hour >= 9 && hour < 18) {
-    if (topTodo) {
-      return {
-        headline: '下一件要做的事',
-        detail: topTodo.title?.replace(/^📅\s*/, '') || '查看待办',
-      }
-    }
-    const nextClass = todayClasses[0]
-    if (nextClass) {
-      const time = nextClass.time ? `${nextClass.time} ` : ''
-      return {
-        headline: '下一节课',
-        detail: `${time}${nextClass.title || '课程'}`.trim(),
-      }
-    }
-    return {
-      headline: '白天过得怎样',
-      detail: todayTodoCount > 0 ? `还有 ${todayTodoCount} 件待办可以关注` : '今天暂无紧急待办',
-    }
+  const greeting = topTodo
+    ? `下一件：${topTodo.title?.replace(/^📅\s*/, '').slice(0, 16) || '待办'}`
+    : `${kidName}${period}`
+
+  return {
+    greeting,
+    items,
+    urgentTodoId: topTodo?.id,
   }
+}
+
+function buildEveningReview(params: BriefingParams): RootBriefing {
+  const { activeKid, doneTodayCount, todayTodos } = params
+  const kidName = activeKid?.name || '孩子'
+  const items: BriefingItem[] = []
 
   if (doneTodayCount > 0) {
-    return {
-      headline: '今天已经完成',
-      detail: `已处理 ${doneTodayCount} 件事${todayTodoCount > 0 ? `，还有 ${todayTodoCount} 件待办` : ''}`,
-    }
+    items.push({ icon: '✅', text: `今天已完成 ${doneTodayCount} 件事` })
+  } else if (todayTodos.length > 0) {
+    items.push({ icon: '📝', text: `还有 ${todayTodos.length} 件待办未处理`, urgent: true })
   }
+
+  const tomorrowClasses = getTomorrowClasses(activeKid)
+  const tomorrowPack = collectPackItems(tomorrowClasses)
+  if (tomorrowPack.length) {
+    items.push({
+      icon: '🎒',
+      text: `明天带：${tomorrowPack.slice(0, 3).join('、')}${tomorrowPack.length > 3 ? '…' : ''}`,
+      urgent: true,
+    })
+  }
+
+  const tomorrowPe = findPeClass(tomorrowClasses)
+  if (tomorrowPe) {
+    items.push({ icon: '🏊', text: `明天有${tomorrowPe.title}`, urgent: true })
+  }
+
+  const weekUrgent = ((activeKid?.urgent_items || []) as UrgentItem[])
+    .filter((u) => u.level === 'yellow')
+    .slice(0, 2)
+  for (const u of weekUrgent) {
+    items.push({ icon: '📅', text: u.title })
+  }
+
+  const greeting = doneTodayCount > 0
+    ? `今天辛苦了，已搞定 ${doneTodayCount} 件`
+    : `傍晚好，帮${kidName}看看明天`
+
   return {
-    headline: '今天辛苦了',
-    detail: todayTodoCount > 0 ? `还有 ${todayTodoCount} 件待办` : '暂无待办，可以放松一下',
+    greeting,
+    items,
+    urgentTodoId: params.topTodo?.id,
   }
+}
+
+function buildNightCare(params: BriefingParams): RootBriefing {
+  const { activeKid } = params
+  const kidName = activeKid?.name || '孩子'
+  const items: BriefingItem[] = []
+
+  const label = (activeKid as any)?.energy_label
+  const health = (activeKid as any)?.display_health || activeKid?.health_status
+  const mood = (activeKid as any)?.display_mood || activeKid?.mood_status
+  const statusParts: string[] = []
+  if (label && label !== '暂无数据') statusParts.push(label)
+  if (health === 'sick') statusParts.push('生病中')
+  else if (health === 'recovering') statusParts.push('恢复中')
+  if (mood === 'upset') statusParts.push('情绪偏低')
+  else if (mood === 'anxious') statusParts.push('有些焦虑')
+
+  if (statusParts.length) {
+    items.push({ icon: '💚', text: `${kidName}今天：${statusParts.join(' · ')}` })
+  } else {
+    items.push({ icon: '🌙', text: `${kidName}的状态还没记录，明天记得更新` })
+  }
+
+  items.push({
+    icon: '🌳',
+    text: '树洞深夜开放，想说的话可以随时进去',
+    href: '/treehouse',
+  })
+
+  return {
+    greeting: params.hour < 6 ? `晚安，${kidName}` : `夜深了，好好休息`,
+    items,
+  }
+}
+
+function buildRootBriefing(params: BriefingParams): RootBriefing {
+  const { hour } = params
+  if (hour >= 21 || hour < 6) return buildNightCare(params)
+  if (hour >= 6 && hour < 9) return buildMorningBriefing(params)
+  if (hour >= 9 && hour < 17) return buildDaytimeFocus(params)
+  return buildEveningReview(params)
 }
 
 function dropState(type: string, data: any) {
@@ -883,15 +1097,12 @@ export default function BasePage() {
   const showBootSkeleton = !sessionReady || (loading && kids.length === 0 && todos.length === 0)
 
   const currentHour = lastHourRef.current ?? new Date().getHours()
+  const currentMinute = new Date().getMinutes()
   const greetingLabel = mounted ? getTimeGreetingLabel(currentHour) : '你好'
-  const todayFocus = buildTodayFocus({
-    hour: currentHour,
-    activeKid,
-    todayClasses,
-    topTodo,
-    todayTodoCount: todoGroups?.today?.length ?? 0,
-    doneTodayCount: 0,
-  })
+  const doneTodayCount = useMemo(
+    () => todos.filter((t) => t.status === 'done').length,
+    [todos],
+  )
   const packItemCount = [
     ...new Set(
       todayClasses.flatMap((c: ScheduleItem & { requires_items?: string[] }) => {
@@ -914,12 +1125,30 @@ export default function BasePage() {
   const visaDescription = showVisaWarning && visaTodo
     ? `${activeKid?.name || '孩子'} 的学生签${visaTodo.due_date ? ` ${String(visaTodo.due_date).slice(0, 10)}` : ''} 到期。根已备好续签材料清单，建议本周内预约。`
     : undefined
-  const focusCardItems = todayFocusTodos.map((todo) => ({
-    id: todo.id,
-    title: todo.title?.replace(/^📅\s*/, '') || '待办',
-    subtitle: getTodoFocusSubtitle(todo),
-    priority: todo.priority,
-  }))
+  const rootBriefing = useMemo(
+    () => buildRootBriefing({
+      hour: currentHour,
+      minute: currentMinute,
+      activeKid,
+      todayClasses,
+      topTodo,
+      todayTodos: todayFocusTodos,
+      doneTodayCount,
+      visaDaysLeft,
+      hotspots: unreadHotspots,
+    }),
+    [
+      currentHour,
+      currentMinute,
+      activeKid,
+      todayClasses,
+      topTodo,
+      todayFocusTodos,
+      doneTodayCount,
+      visaDaysLeft,
+      unreadHotspots,
+    ],
+  )
 
   const handlePhotoCapture = () => {
     if (!userId) {
@@ -1120,14 +1349,29 @@ export default function BasePage() {
           )}
 
           <FocusCard
-            items={focusCardItems}
-            remainingCount={todayFocusTodos.length}
-            fallback={{ headline: todayFocus.headline, detail: todayFocus.detail }}
+            briefing={rootBriefing}
             onItemClick={(id) => {
               const todo = todayFocusTodos.find((t) => t.id === id)
+                || displayTodos.find((t) => t.id === id)
               if (!todo) return
               setOneTapTodo(todo)
               openModal('oneTap')
+            }}
+            onUrgentAction={() => {
+              const urgent = rootBriefing.urgentTodoId
+                ? todayFocusTodos.find((t) => t.id === rootBriefing.urgentTodoId)
+                  || displayTodos.find((t) => t.id === rootBriefing.urgentTodoId)
+                : todayFocusTodos.find((t) => t.priority === 'red' || t.priority === 'orange')
+                  || topTodo
+              if (!urgent) {
+                openModal('todo')
+                return
+              }
+              setOneTapTodo(urgent)
+              openModal('oneTap')
+            }}
+            onBriefingAction={(item) => {
+              if (item.href) router.push(item.href)
             }}
           />
         </div>
