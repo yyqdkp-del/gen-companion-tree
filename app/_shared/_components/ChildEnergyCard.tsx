@@ -1,25 +1,9 @@
 'use client'
+
 import React from 'react'
 import { motion } from 'framer-motion'
-import { THEME } from '../_constants/theme'
 import type { EnergyResult } from '../_engine/energy'
 import { useApp } from '@/app/context/AppContext'
-
-const LEVEL_COLOR = {
-  green:  { border: 'rgba(74,222,128,0.35)',  bg: 'rgba(74,222,128,0.06)',  text: '#16a34a' },
-  yellow: { border: 'rgba(250,204,21,0.45)',  bg: 'rgba(250,204,21,0.07)',  text: '#ca8a04' },
-  orange: { border: 'rgba(251,146,60,0.5)',   bg: 'rgba(251,146,60,0.08)',  text: '#ea580c' },
-  red:    { border: 'rgba(251,113,133,0.55)', bg: 'rgba(251,113,133,0.09)', text: '#dc2626' },
-  unknown: { border: 'rgba(156,163,175,0.4)', bg: 'rgba(156,163,175,0.08)', text: '#6b7280' },
-}
-
-const LEVEL_DOT = {
-  green:  '🟢',
-  yellow: '🟡',
-  orange: '🟠',
-  red:    '🔴',
-  unknown: '⚪',
-}
 
 type Props = {
   name: string
@@ -27,63 +11,122 @@ type Props = {
   onClick: () => void
 }
 
-export default function ChildEnergyCard({ name, energy, onClick }: Props) {
+const JADE = '#1d9e75'
+const FG2 = 'var(--fg2, rgba(45,50,47,0.72))'
+const FG3 = 'var(--fg3, rgba(45,50,47,0.45))'
+
+export default function ChildEnergyCard({ energy, onClick }: Props) {
   const { speak } = useApp()
-  const c = LEVEL_COLOR[energy.level]
-  const isAlert = energy.level === 'orange' || energy.level === 'red'
+  const score = energy.score
+  const pct = score != null ? Math.max(0, Math.min(100, score)) : 0
+  const scoreLabel = score != null ? `${score}/100` : '—'
 
   return (
-    <motion.div whileTap={{ scale: 0.98 }} onClick={onClick}
+    <motion.div
+      whileTap={{ scale: 0.98 }}
+      onClick={onClick}
       style={{
-        display: 'flex', flexDirection: 'column', gap: 6,
-        marginBottom: 12, padding: '10px 12px', borderRadius: 12,
-        background: c.bg,
-        border: `1px solid ${c.border}`,
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 8,
+        marginBottom: 6,
+        padding: '13px 15px',
+        borderRadius: 16,
+        background: '#fff',
+        boxShadow: '0 4px 18px rgba(45,50,47,0.03)',
         cursor: 'pointer',
-        transition: 'all 0.2s',
-      }}>
+      }}
+    >
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <span style={{ fontFamily: 'var(--font-serif)', fontSize: 13.5, color: FG2 }}>
+          今日状态 · {energy.label}
+        </span>
+        <span
+          style={{
+            fontFamily: 'var(--font-latin)',
+            fontSize: 11,
+            color: JADE,
+            fontWeight: 600,
+          }}
+        >
+          能量 {scoreLabel}
+        </span>
+      </div>
 
-      <motion.div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <motion.div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <span style={{ fontSize: 14 }}>{LEVEL_DOT[energy.level]}</span>
-          <span style={{ fontSize: 13, fontWeight: 600, color: THEME.text }}>{name}</span>
-          <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 8,
-            background: c.border, color: c.text, fontWeight: 600 }}>
-            {energy.label}
-          </span>
-        </motion.div>
+      <div style={{ height: 7, borderRadius: 4, background: '#f4f2ed', overflow: 'hidden' }}>
+        <div
+          style={{
+            width: `${pct}%`,
+            height: '100%',
+            borderRadius: 4,
+            background: 'linear-gradient(90deg, #8ca88d, #5c7a5e)',
+            transition: 'width 0.35s ease',
+          }}
+        />
+      </div>
 
-        {isAlert && (
-          <span style={{ fontSize: 10, padding: '2px 7px', borderRadius: 6,
-            background: `${c.text}15`, color: c.text, fontWeight: 600 }}>
-            ⚠ 需注意
-          </span>
-        )}
-      </motion.div>
+      {energy.focus ? (
+        <div
+          style={{
+            fontFamily: 'var(--font-body)',
+            fontSize: 12,
+            color: FG2,
+            fontWeight: 600,
+            lineHeight: 1.4,
+          }}
+        >
+          {energy.focus}
+        </div>
+      ) : null}
 
-      <motion.div style={{ fontSize: 11, color: c.text, fontWeight: 600, lineHeight: 1.4 }}>
-        {energy.focus}
-      </motion.div>
-
-      <motion.div style={{ display: 'flex', alignItems: 'flex-start', gap: 6 }}>
-        <motion.div style={{ flex: 1, fontSize: 12, color: THEME.gold, lineHeight: 1.5, fontWeight: 500 }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6 }}>
+        <div
+          style={{
+            flex: 1,
+            fontFamily: 'var(--font-body)',
+            fontSize: 12,
+            color: FG3,
+            lineHeight: 1.5,
+          }}
+        >
           {energy.advice}
-        </motion.div>
-        <button onClick={e => { e.stopPropagation(); speak(energy.advice) }}
-          style={{ background: 'none', border: 'none', cursor: 'pointer',
-            fontSize: 14, opacity: 0.5, padding: '2px', flexShrink: 0 }}
-          title="朗读">🔊</button>
-      </motion.div>
+        </div>
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation()
+            speak(energy.advice)
+          }}
+          style={{
+            background: 'none',
+            border: 'none',
+            cursor: 'pointer',
+            fontSize: 14,
+            opacity: 0.5,
+            padding: 2,
+            flexShrink: 0,
+          }}
+          title="朗读"
+        >
+          🔊
+        </button>
+      </div>
 
-      <motion.div style={{ display: 'flex', justifyContent: 'space-between',
-        alignItems: 'center', marginTop: 2 }}>
-        <span style={{ fontSize: 10, color: THEME.muted }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <span style={{ fontFamily: 'var(--font-body)', fontSize: 10, color: FG3 }}>
           本周疲劳 {energy.weeklyFatigue}/10
         </span>
-        <span style={{ fontSize: 10, color: THEME.gold, fontWeight: 500 }}>
+        <span
+          style={{
+            fontFamily: 'var(--font-body)',
+            fontSize: 10,
+            color: 'var(--clay, #a46355)',
+            fontWeight: 500,
+          }}
+        >
           点击更新状态 ›
         </span>
-      </motion.div>
+      </div>
     </motion.div>
   )
 }

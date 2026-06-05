@@ -1,11 +1,9 @@
 'use client'
 import { createClient } from '@/lib/supabase/client'
 const supabase = createClient()
-import React, { useState, useCallback, useEffect, useMemo } from 'react'
+import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, Plus, ChevronRight } from 'lucide-react'
-import VoiceBtn from '@/app/components/VoiceBtn'
-import PackCheckItem from '@/app/components/PackCheckItem'
+import { X, Plus } from 'lucide-react'
 import ChildActionSheet, { ChildEvent } from '@/app/rian/ChildActionSheet'
 import Accordion from '@/app/_shared/_components/Accordion'
 import { THEME, GREEN } from '@/app/_shared/_constants/theme'
@@ -14,7 +12,7 @@ import { EVENT_TYPE_EMOJI } from '@/app/_shared/_constants/categories'
 import { useChildSchedule } from '@/app/_shared/_hooks/useChildSchedule'
 import { useChildDailyLog } from '@/app/_shared/_hooks/useChildDailyLog'
 import { logOrAlertNetworkError } from '@/lib/errors/logOrAlertNetworkError'
-import { calculateEnergy, getEnergyColor } from '@/app/_shared/_engine/energy'
+import { calculateEnergy } from '@/app/_shared/_engine/energy'
 import ChildEnergyCard from '@/app/_shared/_components/ChildEnergyCard'
 import { TimelineSegment, buildTimelineSegments } from '@/app/_shared/_components/design'
 import { buildPackingRows, countPendingPackingRows } from '@/lib/packing/buildPackingRows'
@@ -24,7 +22,6 @@ import {
   packingSubjectKey,
   type PackingPreferencesMap,
 } from '@/lib/packing/packingPreferences'
-import { isPlaceholderSubject } from '@/lib/schedule/placeholderSubject'
 import {
   appendPackingListItem,
   savePackingPreferences,
@@ -32,6 +29,47 @@ import {
 import type { Child, TimelineItem, HealthStatus, MoodStatus } from '@/app/_shared/_types'
 import { addDaysStr, getTodayStr } from '@/lib/date/localDate'
 import { toast } from '@/app/components/Toast'
+
+const SHEET_EASE = [0.16, 1, 0.3, 1] as const
+const CLAY = '#a46355'
+const FG1 = '#2d322f'
+const FG3 = 'rgba(45,50,47,0.45)'
+
+function firstChineseChar(name: string): string {
+  const m = name.match(/[\u4e00-\u9fff]/)
+  return m ? m[0] : (name.trim().charAt(0) || '?')
+}
+
+function parseDisplayAge(child: Child): number | null {
+  if (child.birthdate) {
+    const birth = new Date(child.birthdate)
+    if (!Number.isNaN(birth.getTime())) {
+      const now = new Date()
+      let age = now.getFullYear() - birth.getFullYear()
+      if (now.getMonth() < birth.getMonth() || (now.getMonth() === birth.getMonth() && now.getDate() < birth.getDate())) {
+        age -= 1
+      }
+      return age > 0 ? age : null
+    }
+  }
+  if (child.grade) {
+    const m = String(child.grade).match(/(\d+)/)
+    if (m) {
+      const g = parseInt(m[1], 10)
+      if (g >= 1 && g <= 12) return g + 5
+    }
+  }
+  return null
+}
+
+function buildChildSubtitle(child: Child): string {
+  const parts: string[] = []
+  const age = parseDisplayAge(child)
+  if (age != null) parts.push(`${age} 岁`)
+  if (child.school_name) parts.push(child.school_name)
+  if (child.grade) parts.push(child.grade)
+  return parts.join(' · ')
+}
 
 const healthOptions = [
   { value: 'normal',     label: '健康',   color: GREEN.dark, bg: GREEN.bg },
@@ -49,7 +87,7 @@ function getTodayKey() { return getTodayStr() }
 function getTomorrow() { return addDaysStr(new Date(), 1) }
 function getIn7Days() { return addDaysStr(new Date(), 7) }
 function getIn30Days() { return addDaysStr(new Date(), 30) }
-// getEnergyColor 来自 _engine/energy
+
 function formatDate(d: string) {
   const date = new Date(d), today = new Date(), tmr = new Date(today)
   tmr.setDate(today.getDate() + 1)
@@ -183,13 +221,12 @@ function PackingSection({
   if (!rows.length && !showAdd) {
     return (
       <div>
-        <div style={{ fontSize: 12, color: THEME.muted, opacity: 0.6, textAlign: 'center', padding: '8px 0' }}>
+        <div style={{ fontFamily: 'var(--font-body)', fontSize: 12, color: FG3, opacity: 0.7, textAlign: 'center', padding: '8px 0' }}>
           今天没有需要携带的物品
         </div>
-        <motion.button whileTap={{ scale: 0.97 }} onClick={() => setShowAdd(true)}
-          style={{ width: '100%', marginTop: 8, padding: '8px 12px', borderRadius: 10,
-            border: `0.5px dashed ${GREEN.mid}`, background: 'transparent',
-            color: GREEN.dark, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+        <motion.button type="button" whileTap={{ scale: 0.97 }} onClick={() => setShowAdd(true)}
+          style={{ width: '100%', marginTop: 8, padding: '6px 0', border: 'none', background: 'transparent',
+            color: CLAY, fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
           + 手动添加
         </motion.button>
       </div>
@@ -199,33 +236,34 @@ function PackingSection({
   return (
     <div>
       {visibleRows.length === 0 && rows.length > 0 ? (
-        <div style={{ fontSize: 12, color: GREEN.dark, textAlign: 'center', padding: '8px 0', fontWeight: 600 }}>
+        <div style={{ fontFamily: 'var(--font-body)', fontSize: 12, color: '#5c7a5e', textAlign: 'center', padding: '8px 0', fontWeight: 600 }}>
           今日携带已全部确认 ✓
         </div>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 10 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 7, marginBottom: 8 }}>
           {visibleRows.map((row) => (
             <div key={row.id} style={{
-              display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px',
-              borderRadius: 10, background: 'rgba(255,255,255,0.75)',
-              border: '0.5px solid rgba(0,0,0,0.06)',
+              display: 'flex', alignItems: 'center', gap: 10, padding: '10px 13px',
+              borderRadius: 13, background: '#fff',
+              boxShadow: '0 3px 14px rgba(45,50,47,0.03)',
             }}>
+              <span style={{ width: 8, height: 8, borderRadius: '50%', background: CLAY, flexShrink: 0 }} />
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 13, fontWeight: 600, color: THEME.text }}>{row.item}</div>
-                <div style={{ fontSize: 10, color: THEME.muted, marginTop: 2 }}>{row.courseLabel}</div>
+                <div style={{ fontFamily: 'var(--font-serif)', fontSize: 14, fontWeight: 500, color: FG1 }}>{row.item}</div>
+                <div style={{ fontFamily: 'var(--font-body)', fontSize: 11, color: FG3, marginTop: 2 }}>{row.courseLabel}</div>
               </div>
-              <motion.button whileTap={{ scale: 0.92 }} disabled={busy}
+              <motion.button type="button" whileTap={{ scale: 0.92 }} disabled={busy}
                 onClick={() => markBrought(row.id)}
-                style={{ padding: '5px 10px', borderRadius: 8, border: 'none',
-                  background: GREEN.dark, color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer', flexShrink: 0 }}>
+                className="gc-btn gc-btn--ghost"
+                style={{ padding: '5px 10px', fontSize: 11, flexShrink: 0 }}>
                 ✓ 带了
               </motion.button>
-              <motion.button whileTap={{ scale: 0.92 }} disabled={busy}
+              <motion.button type="button" whileTap={{ scale: 0.92 }} disabled={busy}
                 onClick={() => dismissItem(row)}
-                style={{ padding: '5px 10px', borderRadius: 8,
-                  border: '0.5px solid rgba(0,0,0,0.12)', background: 'transparent',
-                  color: THEME.muted, fontSize: 11, cursor: 'pointer', flexShrink: 0 }}>
-                ✗ 不需要
+                aria-label="不需要"
+                style={{ padding: 4, border: 'none', background: 'transparent',
+                  color: FG3, cursor: 'pointer', flexShrink: 0, display: 'flex' }}>
+                <X size={16} />
               </motion.button>
             </div>
           ))}
@@ -238,26 +276,24 @@ function PackingSection({
             style={{ overflow: 'hidden', marginBottom: 8 }}>
             <input value={addName} onChange={(e) => setAddName(e.target.value)}
               placeholder="物品名称，如：泳衣"
-              style={{ width: '100%', padding: '8px 10px', borderRadius: 8, fontSize: 12,
-                border: '0.5px solid rgba(0,0,0,0.1)', background: 'rgba(255,255,255,0.85)',
-                color: THEME.text, outline: 'none', boxSizing: 'border-box', marginBottom: 6 }} />
+              style={{ width: '100%', padding: '10px 12px', borderRadius: 10, fontSize: 13,
+                border: '1px solid rgba(45,50,47,0.1)', background: '#fff',
+                color: FG1, outline: 'none', boxSizing: 'border-box', marginBottom: 6 }} />
             <select value={addCourse} onChange={(e) => setAddCourse(e.target.value)}
-              style={{ width: '100%', padding: '8px 10px', borderRadius: 8, fontSize: 12,
-                border: '0.5px solid rgba(0,0,0,0.1)', background: 'rgba(255,255,255,0.85)',
-                color: THEME.text, marginBottom: 8, boxSizing: 'border-box' }}>
+              style={{ width: '100%', padding: '10px 12px', borderRadius: 10, fontSize: 13,
+                border: '1px solid rgba(45,50,47,0.1)', background: '#fff',
+                color: FG1, marginBottom: 8, boxSizing: 'border-box' }}>
               {courseOptions.map((o) => (
                 <option key={o.key} value={o.key}>{o.label}</option>
               ))}
             </select>
-            <div style={{ display: 'flex', gap: 6 }}>
-              <motion.button whileTap={{ scale: 0.92 }} disabled={busy} onClick={submitManualAdd}
-                style={{ flex: 1, padding: '7px', borderRadius: 8, border: 'none',
-                  background: GREEN.dark, color: '#fff', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <motion.button type="button" whileTap={{ scale: 0.92 }} disabled={busy} onClick={submitManualAdd}
+                className="gc-btn" style={{ flex: 1, padding: '10px' }}>
                 保存
               </motion.button>
-              <motion.button whileTap={{ scale: 0.92 }} onClick={() => { setShowAdd(false); setAddName('') }}
-                style={{ padding: '7px 12px', borderRadius: 8, border: '0.5px solid rgba(0,0,0,0.1)',
-                  background: 'transparent', color: THEME.muted, fontSize: 12, cursor: 'pointer' }}>
+              <motion.button type="button" whileTap={{ scale: 0.92 }} onClick={() => { setShowAdd(false); setAddName('') }}
+                className="gc-btn gc-btn--ghost" style={{ padding: '10px 16px' }}>
                 取消
               </motion.button>
             </div>
@@ -266,10 +302,9 @@ function PackingSection({
       </AnimatePresence>
 
       {!showAdd && (
-        <motion.button whileTap={{ scale: 0.97 }} onClick={() => setShowAdd(true)}
-          style={{ width: '100%', padding: '8px 12px', borderRadius: 10,
-            border: `0.5px dashed ${GREEN.mid}`, background: 'transparent',
-            color: GREEN.dark, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+        <motion.button type="button" whileTap={{ scale: 0.97 }} onClick={() => setShowAdd(true)}
+          style={{ width: '100%', padding: '6px 0', border: 'none', background: 'transparent',
+            color: CLAY, fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
           + 手动添加
         </motion.button>
       )}
@@ -279,33 +314,108 @@ function PackingSection({
 
 function EventList({ events, onSelect }: { events: any[]; onSelect: (e: any) => void }) {
   if (!events.length) return (
-    <div style={{ fontSize: 12, color: THEME.muted, opacity: 0.6, textAlign: 'center', padding: '8px 0' }}>
+    <div style={{ fontFamily: 'var(--font-body)', fontSize: 12, color: FG3, opacity: 0.7, textAlign: 'center', padding: '8px 0' }}>
       暂无安排
     </div>
   )
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
       {events.map((event, i) => (
-        <motion.div key={i} whileTap={{ scale: 0.97 }} onClick={() => onSelect(event)}
-          style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px',
-            borderRadius: 10, background: 'rgba(255,255,255,0.7)',
-            border: '0.5px solid rgba(0,0,0,0.06)', cursor: 'pointer' }}>
-          <span style={{ fontSize: 16, flexShrink: 0 }}>{EVENT_TYPE_EMOJI[event.event_type] || '📌'}</span>
+        <motion.div key={i} whileTap={{ scale: 0.98 }} onClick={() => onSelect(event)}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 10, padding: '10px 13px',
+            borderRadius: 13, background: '#fff',
+            boxShadow: '0 3px 14px rgba(45,50,47,0.03)', cursor: 'pointer',
+          }}>
+          <span style={{ fontSize: 18, flexShrink: 0, lineHeight: 1 }}>{EVENT_TYPE_EMOJI[event.event_type] || '📌'}</span>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 12, fontWeight: 500, color: THEME.text,
-              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            <div style={{
+              fontFamily: 'var(--font-serif)', fontSize: 14, fontWeight: 500, color: FG1,
+              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+            }}>
               {event.title}
             </div>
-            <div style={{ fontSize: 10, color: THEME.muted, marginTop: 1 }}>
-              {event.date_start && formatDate(event.date_start)}
-              {event.requires_payment ? ` · 💰฿${event.requires_payment}` : ''}
-              {event.requires_action  ? ' · ⚠需行动' : ''}
-            </div>
+            {event.date_start && (
+              <div style={{ fontFamily: 'var(--font-body)', fontSize: 11, color: FG3, marginTop: 2 }}>
+                {formatDate(event.date_start)}
+              </div>
+            )}
           </div>
-          <ChevronRight size={13} color={THEME.muted} style={{ flexShrink: 0 }} />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-end', flexShrink: 0 }}>
+            {event.requires_payment ? (
+              <span style={{
+                fontFamily: 'var(--font-body)', fontSize: 10, fontWeight: 600,
+                padding: '3px 8px', borderRadius: 8,
+                background: 'rgba(164,99,85,0.1)', color: CLAY,
+              }}>
+                ฿{event.requires_payment}
+              </span>
+            ) : null}
+            {event.requires_action ? (
+              <span style={{
+                fontFamily: 'var(--font-body)', fontSize: 10, fontWeight: 600,
+                padding: '3px 8px', borderRadius: 8,
+                background: 'rgba(234,88,12,0.1)', color: '#ea580c',
+              }}>
+                需行动
+              </span>
+            ) : null}
+          </div>
         </motion.div>
       ))}
     </div>
+  )
+}
+
+function TomorrowPackRow({ item, storageKey, itemKey }: { item: string; storageKey: string; itemKey: string }) {
+  const [done, setDone] = useState(() => {
+    try {
+      const stored = JSON.parse(localStorage.getItem(storageKey) || '{}')
+      return !!stored[itemKey]
+    } catch { return false }
+  })
+
+  const toggle = () => {
+    setDone((prev) => {
+      const next = !prev
+      try {
+        const stored = JSON.parse(localStorage.getItem(storageKey) || '{}')
+        stored[itemKey] = next
+        localStorage.setItem(storageKey, JSON.stringify(stored))
+      } catch { /* ignore */ }
+      return next
+    })
+  }
+
+  return (
+    <motion.div whileTap={{ scale: 0.98 }} onClick={toggle}
+      style={{
+        display: 'flex', alignItems: 'center', gap: 10, padding: '10px 13px',
+        borderRadius: 13, background: done ? 'rgba(140,168,141,0.08)' : '#fff',
+        boxShadow: '0 3px 14px rgba(45,50,47,0.03)', cursor: 'pointer',
+        opacity: done ? 0.75 : 1,
+      }}>
+      <span style={{ fontSize: 18, flexShrink: 0 }}>🎒</span>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{
+          fontFamily: 'var(--font-serif)', fontSize: 14, fontWeight: 500, color: FG1,
+          textDecoration: done ? 'line-through' : 'none',
+        }}>
+          {item}
+        </div>
+        <div style={{ fontFamily: 'var(--font-body)', fontSize: 11, color: FG3, marginTop: 2 }}>
+          明天要带 · 今晚装好
+        </div>
+      </div>
+      <span style={{
+        width: 22, height: 22, borderRadius: '50%', flexShrink: 0,
+        border: done ? 'none' : '1.5px solid rgba(45,50,47,0.2)',
+        background: done ? '#8ca88d' : 'transparent',
+        color: '#fff', fontSize: 12, display: 'flex', alignItems: 'center', justifyContent: 'center',
+      }}>
+        {done ? '✓' : ''}
+      </span>
+    </motion.div>
   )
 }
 
@@ -337,9 +447,10 @@ function StatusEditor({ log, onSave, onClose }: {
       <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
         exit={{ scale: 0.9, opacity: 0 }} transition={{ type: 'spring', damping: 25, stiffness: 300 }}
         onClick={e => e.stopPropagation()}
-        style={{ width: '100%', maxWidth: 360, background: '#fff', borderRadius: 20, padding: '24px 20px' }}>
+        style={{ width: '100%', maxWidth: 360, background: '#fbf9f6', borderRadius: 20, padding: '24px 20px',
+          boxShadow: '0 10px 40px rgba(45,50,47,0.12)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
-          <div style={{ fontSize: 16, fontWeight: 600, color: THEME.text }}>今天状态</div>
+          <div style={{ fontFamily: 'var(--font-serif)', fontSize: 16, fontWeight: 600, color: FG1 }}>今天状态</div>
           <motion.div whileTap={{ scale: 0.86 }} onClick={onClose} style={{ cursor: 'pointer', opacity: 0.4 }}>
             <X size={18} />
           </motion.div>
@@ -462,8 +573,13 @@ export default function ChildSheet({ childList, sel, onSel, onClose, onAdd, user
       title:            t.title,
     })),
   })
-  const computedEnergy = energyResult.score
   const handleSel = useCallback((c: Child) => { onSel(c) }, [onSel])
+  const switcherRef = useRef<HTMLDivElement>(null)
+  const activeChipRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    activeChipRef.current?.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' })
+  }, [sel?.id])
   const handleSaveStatus = async (h: HealthStatus, m: MoodStatus) => {
     await saveStatus(h, m)
     setShowStatusEditor(false)
@@ -500,111 +616,166 @@ export default function ChildSheet({ childList, sel, onSel, onClose, onAdd, user
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
         style={{ position: 'fixed', inset: 0, zIndex: 200,
           display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
-          padding: '0 0 16px',
           paddingBottom: `max(${FLOAT_SHEET_BOTTOM}, max(env(safe-area-inset-bottom), 20px))`,
-          background: 'rgba(180,200,210,0.35)', backdropFilter: 'blur(6px)' }}
+          background: 'rgba(45,50,47,0.32)' }}
         onClick={onClose}>
-        <motion.div initial={{ y: 100, opacity: 0 }} animate={{ y: 0, opacity: 1 }}
-          exit={{ y: 100, opacity: 0 }} transition={{ type: 'spring', damping: 28, stiffness: 320 }}
+        <motion.div initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
+          transition={{ duration: 0.42, ease: SHEET_EASE }}
           onClick={e => e.stopPropagation()}
-          style={{ width: '100%', maxWidth: 430, margin: '0 10px',
-            background: 'rgba(255,255,255,0.95)', backdropFilter: 'blur(40px)',
-            borderRadius: '24px 24px 0 0', overflow: 'hidden',
-            maxHeight: '88vh', display: 'flex', flexDirection: 'column' }}>
+          style={{
+            width: '100%', maxWidth: 430,
+            background: '#fbf9f6',
+            borderRadius: '28px 28px 0 0',
+            boxShadow: '0 -10px 60px rgba(0,0,0,0.18)',
+            maxHeight: '90vh',
+            display: 'flex',
+            flexDirection: 'column',
+            overflow: 'hidden',
+          }}>
 
-          <div style={{ height: 4, background: 'linear-gradient(90deg,#cddce5,#e8e4dc)', flexShrink: 0 }} />
-          <div style={{ width: 32, height: 4, background: 'rgba(0,0,0,0.1)', borderRadius: 2, margin: '10px auto 0' }} />
+          <div style={{
+            width: 38, height: 4, borderRadius: 2,
+            background: 'rgba(45,50,47,0.16)', margin: '10px auto 12px', flexShrink: 0,
+          }} />
 
-          <div style={{ padding: '8px 14px 0', flexShrink: 0,
-            display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: 15, fontWeight: 600, color: THEME.text }}>孩子</span>
-            <motion.div whileTap={{ scale: 0.86 }} onClick={onClose} style={{ cursor: 'pointer', padding: 4 }}>
-              <X size={18} color={THEME.muted} />
-            </motion.div>
-          </div>
-
-          <div style={{ overflowY: 'auto', flex: 1, padding: '8px 12px 20px',
-            WebkitOverflowScrolling: 'touch' as any }}>
+          <div style={{
+            overflowY: 'auto', flex: 1, padding: '0 22px 28px',
+            WebkitOverflowScrolling: 'touch' as any,
+          }}>
             {childList.length === 0 ? (
               <div style={{ textAlign: 'center', padding: '36px 16px 28px' }}>
-                <div style={{ fontSize: 14, color: THEME.muted, marginBottom: 16, lineHeight: 1.6 }}>
+                <div style={{ fontFamily: 'var(--font-body)', fontSize: 14, color: FG3, marginBottom: 16, lineHeight: 1.6 }}>
                   暂无孩子档案，添加后即可查看日程与状态
                 </div>
-                <motion.button whileTap={{ scale: 0.97 }} onClick={onAdd}
-                  style={{
-                    padding: '12px 22px',
-                    borderRadius: 14,
-                    border: 'none',
-                    background: '#2d322f',
-                    color: '#fff',
-                    fontSize: 14,
-                    fontWeight: 600,
-                    cursor: 'pointer',
-                  }}>
+                <motion.button type="button" whileTap={{ scale: 0.97 }} onClick={onAdd} className="gc-btn">
                   添加孩子
                 </motion.button>
               </div>
             ) : (
             <>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12,
-              overflowX: 'auto', paddingBottom: 4, scrollbarWidth: 'none' }}>
-              {childList.map(c => (
-                <motion.div key={c.id} whileTap={{ scale: 0.88 }} onClick={() => handleSel(c)}
-                  style={{ display: 'flex', flexDirection: 'column', alignItems: 'center',
-                    gap: 3, cursor: 'pointer', flexShrink: 0 }}>
-                  <div style={{ width: c.id === sel?.id ? 52 : 40, height: c.id === sel?.id ? 52 : 40,
-                    borderRadius: '50%', background: 'rgba(164,99,85,0.08)',
-                    border: `2px solid ${c.id === sel?.id ? '#8a7355' : 'transparent'}`,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: c.id === sel?.id ? 28 : 22, transition: 'all 0.18s',
-                    boxShadow: c.id === sel?.id ? '0 0 0 3px rgba(164,99,85,0.18)' : 'none' }}>
-                    {c.emoji}
-                  </div>
-                  <span style={{ fontSize: 9, fontWeight: c.id === sel?.id ? 700 : 400,
-                    color: c.id === sel?.id ? '#8a7355' : THEME.muted }}>
-                    {c.name}
-                  </span>
-                </motion.div>
-              ))}
-              <motion.div whileTap={{ scale: 0.88 }} onClick={onAdd}
-                style={{ width: 40, height: 40, borderRadius: '50%', flexShrink: 0,
-                  border: '1.5px dashed rgba(0,0,0,0.14)',
+            <div ref={switcherRef} style={{
+              display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16,
+              overflowX: 'auto', paddingBottom: 4, scrollbarWidth: 'none',
+              scrollSnapType: 'x mandatory',
+            }}>
+              {childList.map(c => {
+                const active = c.id === sel?.id
+                return (
+                  <motion.div
+                    key={c.id}
+                    ref={active ? activeChipRef : undefined}
+                    whileTap={{ scale: 0.9 }}
+                    onClick={() => handleSel(c)}
+                    style={{
+                      display: 'flex', flexDirection: 'column', alignItems: 'center',
+                      gap: 4, cursor: 'pointer', flexShrink: 0, scrollSnapAlign: 'center',
+                    }}
+                  >
+                    <div style={{
+                      width: 48, height: 48, borderRadius: '50%',
+                      background: 'rgba(164,99,85,0.06)',
+                      border: `2px solid ${active ? CLAY : 'transparent'}`,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      fontSize: 24, transition: 'border-color 0.18s',
+                    }}>
+                      {c.emoji}
+                    </div>
+                    <span style={{
+                      fontFamily: 'var(--font-body)', fontSize: 10,
+                      fontWeight: active ? 600 : 400,
+                      color: active ? CLAY : FG3,
+                      maxWidth: 56, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                    }}>
+                      {c.name}
+                    </span>
+                  </motion.div>
+                )
+              })}
+              <motion.div whileTap={{ scale: 0.9 }} onClick={onAdd}
+                style={{
+                  width: 48, height: 48, borderRadius: '50%', flexShrink: 0,
+                  border: '1.5px dashed rgba(45,50,47,0.18)',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  cursor: 'pointer', color: THEME.muted }}>
-                <Plus size={14} />
+                  cursor: 'pointer', color: FG3, scrollSnapAlign: 'center',
+                }}>
+                <Plus size={16} />
               </motion.div>
             </div>
 
             {!sel ? (
-              <div style={{ textAlign: 'center', opacity: 0.35, padding: '30px 0',
-                fontSize: 14, color: THEME.text }}>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 8 }}>
+                <button type="button" onClick={onClose} aria-label="关闭"
+                  style={{
+                    border: 'none', background: 'rgba(45,50,47,0.05)', width: 34, height: 34,
+                    borderRadius: '50%', cursor: 'pointer', color: FG3,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  }}>
+                  <X size={17} />
+                </button>
+              </div>
+            ) : null}
+
+            {!sel ? (
+              <div style={{ textAlign: 'center', opacity: 0.45, padding: '24px 0',
+                fontFamily: 'var(--font-serif)', fontSize: 14, color: FG1 }}>
                 选择孩子查看状态
               </div>
             ) : (
               <>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 13, marginBottom: 4 }}>
+                  <div style={{
+                    width: 54, height: 54, borderRadius: 18, flexShrink: 0,
+                    background: 'linear-gradient(135deg, #d9e6da, #8ca88d)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontFamily: 'var(--font-serif)', fontSize: 22, color: '#2f4030',
+                  }}>
+                    {firstChineseChar(sel.name)}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{
+                      fontFamily: 'var(--font-serif)', fontWeight: 600, fontSize: 19, color: FG1,
+                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                    }}>
+                      {sel.name}
+                    </div>
+                    {buildChildSubtitle(sel) ? (
+                      <div style={{ fontFamily: 'var(--font-body)', fontSize: 12, color: FG3, marginTop: 2 }}>
+                        {buildChildSubtitle(sel)}
+                      </div>
+                    ) : null}
+                  </div>
+                  <button type="button" onClick={onClose} aria-label="关闭"
+                    style={{
+                      border: 'none', background: 'rgba(45,50,47,0.05)', width: 34, height: 34,
+                      borderRadius: '50%', cursor: 'pointer', color: FG3, flexShrink: 0,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    }}>
+                    <X size={17} />
+                  </button>
+                </div>
+
                 <ChildEnergyCard
                   name={sel.name}
                   energy={energyResult}
                   onClick={() => setShowStatusEditor(true)}
                 />
                 {!hasLoggedStatus && (
-                  <p style={{ fontSize: 11, color: 'rgba(45,50,47,0.4)', textAlign: 'center', margin: '-4px 0 10px' }}>
+                  <p style={{ fontFamily: 'var(--font-body)', fontSize: 11, color: FG3, textAlign: 'center', margin: '0 0 12px' }}>
                     今天未记录
                   </p>
                 )}
 
                 {loading ? (
-                  <div style={{ textAlign: 'center', padding: '20px 0',
-                    opacity: 0.4, fontSize: 12, color: THEME.muted }}>
+                  <div style={{ textAlign: 'center', padding: '20px 0', opacity: 0.45,
+                    fontFamily: 'var(--font-body)', fontSize: 12, color: FG3 }}>
                     加载中...
                   </div>
                 ) : (
                   <>
-                    <Accordion title="📅 今日时间线" count={timelineSegmentCount} defaultOpen={true}>
-                      <div className="gc-eyebrow" style={{ margin: '4px 2px 0' }}>今日时间线</div>
+                    <Accordion variant="gc" title="今日时间线" count={timelineSegmentCount} defaultOpen={true}>
                       <TimelineSegment segments={timelineSegments} />
                     </Accordion>
-                    <Accordion title="🎒 今日携带" count={todayPackCount}
+                    <Accordion variant="gc" title="今日携带" count={todayPackCount}
                       badge={todayPackCount > 0 ? '需确认' : undefined}
                       defaultOpen={todayPackCount > 0}>
                       <PackingSection
@@ -619,63 +790,57 @@ export default function ChildSheet({ childList, sel, onSel, onClose, onAdd, user
                         onReload={reloadSchedule}
                       />
                     </Accordion>
-                    <Accordion title="📋 今日安排" count={todayEvents.length}
+                    <Accordion variant="gc" title="今日安排" count={todayEvents.length}
                       defaultOpen={todayEvents.length > 0}>
                       <EventList events={todayEvents} onSelect={setSelectedEvent} />
                     </Accordion>
-                    <Accordion title="🌙 今晚准备"
+                    <Accordion variant="gc" title="今晚准备"
                       count={eveningEvents.length + tomorrowPack.length} defaultOpen={false}>
                       {eveningEvents.length > 0 && (
                         <div style={{ marginBottom: tomorrowPack.length > 0 ? 12 : 0 }}>
-                          <div style={{ fontSize: 10, color: THEME.muted, marginBottom: 6, fontWeight: 600 }}>
-                            明天的安排
-                          </div>
+                          <div className="gc-eyebrow" style={{ margin: '0 0 8px' }}>明天的安排</div>
                           <EventList events={eveningEvents} onSelect={setSelectedEvent} />
                         </div>
                       )}
                       {tomorrowPack.length > 0 && (
                         <div>
-                          <div style={{ fontSize: 10, color: THEME.muted, marginBottom: 6, fontWeight: 600 }}>
-                            明天要带（今晚装好）
-                          </div>
-                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                          <div className="gc-eyebrow" style={{ margin: '0 0 8px' }}>明天要带（今晚装好）</div>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
                             {tomorrowPack.map((item, i) => (
-                              <PackCheckItem key={i} item={item}
+                              <TomorrowPackRow key={i} item={item}
                                 storageKey={`packing_${sel.id}_${tomorrow}`}
-                                itemKey={`tomorrow-${item}`} size="md" />
+                                itemKey={`tomorrow-${item}`} />
                             ))}
                           </div>
                         </div>
                       )}
                       {eveningEvents.length === 0 && tomorrowPack.length === 0 && (
-                        <div style={{ fontSize: 12, color: THEME.muted, opacity: 0.6,
+                        <div style={{ fontFamily: 'var(--font-body)', fontSize: 12, color: FG3, opacity: 0.7,
                           textAlign: 'center', padding: '8px 0' }}>
                           明天没有特别安排
                         </div>
                       )}
                     </Accordion>
-                    <Accordion title="📆 本周安排" count={weekEvents.length} defaultOpen={false}>
+                    <Accordion variant="gc" title="本周安排" count={weekEvents.length} defaultOpen={false}>
                       <EventList events={weekEvents} onSelect={setSelectedEvent} />
                     </Accordion>
                     {monthEvents.length > 0 && (
-                      <Accordion title="🗓 本月安排" count={monthEvents.length} defaultOpen={false}>
+                      <Accordion variant="gc" title="本月安排" count={monthEvents.length} defaultOpen={false}>
                         <EventList events={monthEvents} onSelect={setSelectedEvent} />
                       </Accordion>
                     )}
                     {yearEvents.length > 0 && (
-                      <Accordion title="🎓 学年大事" count={yearEvents.length} defaultOpen={false}>
+                      <Accordion variant="gc" title="学年大事" count={yearEvents.length} defaultOpen={false}>
                         <EventList events={yearEvents} onSelect={setSelectedEvent} />
                       </Accordion>
                     )}
                     {timeline.length === 0 && calendar.length === 0 && (
                       <div style={{ textAlign: 'center', padding: '20px 0' }}>
-                        <div style={{ opacity: 0.32, fontSize: 13, color: THEME.text, marginBottom: 12 }}>
+                        <div style={{ opacity: 0.4, fontFamily: 'var(--font-serif)', fontSize: 13, color: FG1 }}>
                           还没有日程安排 🌸
                         </div>
-
                       </div>
                     )}
-
                   </>
                 )}
               </>
