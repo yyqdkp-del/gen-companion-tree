@@ -9,33 +9,60 @@ const AVATAR_SIZE = 48
 const CLAY = 'var(--clay, #a46355)'
 const NAME_COLOR = '#5B615E'
 
+type ChildFace = {
+  name?: string
+  emoji?: string
+  avatar_url?: string | null
+  energy_level?: string
+}
+
+const ENERGY_GLOW: Record<string, string> = {
+  red: 'rgba(213,128,116,0.5)',
+  orange: 'rgba(184,142,94,0.4)',
+  yellow: 'rgba(140,168,141,0.4)',
+  green: 'rgba(92,122,94,0.3)',
+}
+
 function firstChar(name?: string): string {
   const s = String(name || '').trim()
   if (!s) return '孩'
   return s[0]
 }
 
+function getEnergyGlow(level?: string): string {
+  if (level && ENERGY_GLOW[level]) return ENERGY_GLOW[level]
+  return ENERGY_GLOW.green
+}
+
 function ChildAvatarFace({
   child,
   active,
   size = AVATAR_SIZE,
+  barMode = false,
 }: {
-  child: { name?: string; avatar_url?: string | null }
+  child: ChildFace
   active: boolean
   size?: number
+  /** bar 模式（ChildSheet / 根·字）：emoji 用 clay 淡底 */
+  barMode?: boolean
 }) {
   const border = `2px solid ${active ? CLAY : 'transparent'}`
+  const shell: React.CSSProperties = {
+    width: size,
+    height: size,
+    borderRadius: '50%',
+    border,
+    flexShrink: 0,
+    transition: 'border-color 0.18s ease',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  }
+
   if (child.avatar_url) {
     return (
-      <div style={{
-        width: size,
-        height: size,
-        borderRadius: '50%',
-        border,
-        overflow: 'hidden',
-        flexShrink: 0,
-        transition: 'border-color 0.18s ease',
-      }}>
+      <div style={shell}>
         <img
           src={child.avatar_url}
           alt=""
@@ -44,24 +71,76 @@ function ChildAvatarFace({
       </div>
     )
   }
+
+  if (child.emoji) {
+    return (
+      <div style={{
+        ...shell,
+        background: barMode ? 'rgba(164,99,85,0.06)' : 'rgba(164,99,85,0.06)',
+      }}>
+        <span style={{ fontSize: Math.round(size * 0.5), lineHeight: 1 }}>{child.emoji}</span>
+      </div>
+    )
+  }
+
   return (
     <div style={{
-      width: size,
-      height: size,
-      borderRadius: '50%',
-      border,
+      ...shell,
       background: 'linear-gradient(135deg, #d9e6da, #8ca88d)',
+      fontFamily: 'var(--font-serif)',
+      fontSize: Math.round(size * 0.375),
+      fontWeight: 500,
+      color: '#2f4030',
+    }}>
+      {firstChar(child.name)}
+    </div>
+  )
+}
+
+function DropdownAvatarGlow({
+  child,
+  active,
+  size = AVATAR_SIZE,
+}: {
+  child: ChildFace
+  active: boolean
+  size?: number
+}) {
+  const glowColor = getEnergyGlow(child.energy_level)
+
+  return (
+    <motion.div
+      animate={{
+        boxShadow: [
+          `0 0 0 3px ${glowColor}, 0 0 12px ${glowColor}`,
+          `0 0 0 3px ${glowColor}, 0 0 22px ${glowColor}`,
+          `0 0 0 3px ${glowColor}, 0 0 12px ${glowColor}`,
+        ],
+      }}
+      transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
+      style={{ borderRadius: '50%', display: 'inline-flex', flexShrink: 0 }}
+    >
+      <ChildAvatarFace child={child} active={active} size={size} />
+    </motion.div>
+  )
+}
+
+function EmptyAvatarPlaceholder({ kid }: { kid?: ChildFace | null }) {
+  if (kid?.avatar_url || kid?.emoji || kid?.name) {
+    return <ChildAvatarFace child={kid} active={false} />
+  }
+  return (
+    <div style={{
+      width: AVATAR_SIZE,
+      height: AVATAR_SIZE,
+      borderRadius: '50%',
+      border: '2px dashed rgba(45,50,47,0.2)',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      fontFamily: 'var(--font-serif)',
-      fontSize: 18,
-      fontWeight: 500,
-      color: '#2f4030',
-      flexShrink: 0,
-      transition: 'border-color 0.18s ease',
+      fontSize: 24,
     }}>
-      {firstChar(child.name)}
+      👶
     </div>
   )
 }
@@ -82,6 +161,7 @@ export default function ChildSwitcher({ mode, onAdd, onAvatarClick, style }: Pro
   const menuRef = useRef<HTMLDivElement>(null)
 
   const activeId = activeKid?.id ?? null
+  const displayKid = activeKid ?? kids[0] ?? null
 
   useEffect(() => {
     if (mode !== 'bar') return
@@ -107,7 +187,7 @@ export default function ChildSwitcher({ mode, onAdd, onAvatarClick, style }: Pro
   }
 
   if (mode === 'dropdown') {
-    if (!activeKid && !kids.length) return null
+    if (!displayKid && !kids.length) return null
 
     const triggerClick = () => {
       if (onAvatarClick) {
@@ -133,23 +213,12 @@ export default function ChildSwitcher({ mode, onAdd, onAvatarClick, style }: Pro
             padding: 0,
           }}
         >
-          {activeKid ? (
-            <ChildAvatarFace child={activeKid} active />
+          {displayKid ? (
+            <DropdownAvatarGlow child={displayKid} active />
           ) : (
-            <div style={{
-              width: AVATAR_SIZE,
-              height: AVATAR_SIZE,
-              borderRadius: '50%',
-              border: '2px dashed rgba(45,50,47,0.2)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: 20,
-            }}>
-              👶
-            </div>
+            <EmptyAvatarPlaceholder kid={null} />
           )}
-          {activeKid?.name ? (
+          {displayKid?.name ? (
             <span style={{
               fontFamily: 'var(--font-body)',
               fontSize: 10,
@@ -159,7 +228,7 @@ export default function ChildSwitcher({ mode, onAdd, onAvatarClick, style }: Pro
               textOverflow: 'ellipsis',
               whiteSpace: 'nowrap',
             }}>
-              {activeKid.name}
+              {displayKid.name}
             </span>
           ) : null}
         </button>
@@ -258,7 +327,7 @@ export default function ChildSwitcher({ mode, onAdd, onAvatarClick, style }: Pro
                 padding: 0,
               }}
             >
-              <ChildAvatarFace child={c} active={active} />
+              <ChildAvatarFace child={c} active={active} barMode />
               <span style={{
                 fontFamily: 'var(--font-body)',
                 fontSize: 10,

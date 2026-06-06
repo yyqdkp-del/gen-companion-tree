@@ -142,7 +142,7 @@ function AfterSchoolBody({ data }: { data: MomentCardData }) {
           }}
         >
           ⏰ 下一节：{data.nextClass.name}
-          {data.nextClass.time ? ` ${data.nextClass.time}` : ''}
+          {data.nextClass.time ? ` ${data.nextClass.time.slice(0, 5)}` : ''}
         </p>
       ) : null}
       {data.showRainTip ? (
@@ -441,6 +441,8 @@ function getCardInteraction(data: MomentCardData): {
 } {
   switch (data.kind) {
     case 'after_school':
+    case 'at_school':
+    case 'weekend':
       return { clickable: true, cornerIcon: ChevronRight, tapScale: 0.98 }
     case 'pickup':
       return { clickable: true, cornerIcon: MapPin, tapScale: 0.97 }
@@ -475,6 +477,8 @@ export default function MomentCard({
   const handleCardClick = () => {
     switch (data.kind) {
       case 'after_school':
+      case 'at_school':
+      case 'weekend':
         onOpenChild()
         break
       case 'pickup': {

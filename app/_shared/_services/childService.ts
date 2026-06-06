@@ -555,6 +555,7 @@ export async function enrichOneChild(c: any, uid: string, today: string): Promis
     mood_status: log?.mood_status,
     school_name: c.school_name,
     grade: c.grade,
+    school_start_time: c.school_start_time ?? null,
     school_end_time: c.school_end_time ?? null,
     chinese_level: c.chinese_level,
     level: c.level,
@@ -563,6 +564,7 @@ export async function enrichOneChild(c: any, uid: string, today: string): Promis
     class_schedule: classSchedule,
     today_classes,
     urgent_items,
+    school_calendar: evts,
     today_schedule: todayEvts.map((e: any) => ({
       time: '',
       title: e.title,

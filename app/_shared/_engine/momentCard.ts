@@ -1,11 +1,14 @@
 import type { RootBriefing } from '@/app/_shared/_components/design'
 import type { HotspotItem, TodoItem } from '@/app/_shared/_types'
+import { getTodayStr } from '@/lib/date/localDate'
 
 export type MomentKind =
   | 'sick'
   | 'visa'
+  | 'weekend'
   | 'packing'
   | 'pickup'
+  | 'at_school'
   | 'after_school'
   | 'todo'
   | 'night'
@@ -40,6 +43,14 @@ export type ScheduleClass = {
 
 export type NextClassInfo = { name: string; time?: string }
 
+export type CalendarEvent = {
+  date_start?: string
+  event_type?: string
+  title?: string
+}
+
+export type ChildLocation = 'home' | 'commuting' | 'school' | 'pickup'
+
 export type MomentCardData = {
   kind: MomentKind
   tier: MomentTier
@@ -61,6 +72,12 @@ export type MomentCardData = {
 }
 
 const PICKUP_RE = /pick\s*up|pickup|drop\s*off|dropoff|接送/i
+
+/** 统一时间展示：只取 HH:MM，去掉秒数 */
+export function formatTime(t: string): string {
+  if (!t) return ''
+  return t.slice(0, 5)
+}
 
 function subjectCandidates(cls: ScheduleClass): string[] {
   return [cls?.subject, cls?.name, cls?.name_zh]
@@ -91,22 +108,64 @@ export function getClassName(cls: ScheduleClass | null | undefined): string {
   return name ? String(name).trim() : '课程'
 }
 
-function parseTimeMin(time?: string): number {
+export function timeToMinutes(time?: string): number {
   if (!time) return -1
-  const parts = time.split(':').map(Number)
+  const parts = formatTime(time).split(':').map(Number)
   if (parts.length < 2 || Number.isNaN(parts[0])) return -1
   return parts[0] * 60 + (parts[1] || 0)
 }
 
+/** @deprecated use timeToMinutes */
+export function parseTimeMin(time?: string): number {
+  return timeToMinutes(time)
+}
+
+export function isSchoolDay(date: Date, calendar: CalendarEvent[]): boolean {
+  const dow = date.getDay()
+  if (dow === 0 || dow === 6) return false
+
+  const today = getTodayStr(date)
+  const holiday = calendar.find((e) =>
+    e.date_start === today &&
+    (e.event_type === 'holiday' ||
+      e.event_type === 'no_school' ||
+      e.title?.includes('假') ||
+      e.title?.includes('Holiday') ||
+      e.title?.includes('No School')),
+  )
+  return !holiday
+}
+
+export function getChildLocation(
+  hour: number,
+  minute: number,
+  isSchoolDayToday: boolean,
+  schoolStart: string,
+  schoolEnd: string,
+): ChildLocation {
+  if (!isSchoolDayToday) return 'home'
+
+  const startMin = timeToMinutes(schoolStart)
+  const endMin = timeToMinutes(schoolEnd)
+  const nowMin = hour * 60 + minute
+
+  if (startMin < 0 || endMin < 0) return 'home'
+  if (nowMin < startMin - 30) return 'home'
+  if (nowMin < startMin) return 'commuting'
+  if (nowMin < endMin) return 'school'
+  if (nowMin < endMin + 60) return 'pickup'
+  return 'home'
+}
+
 export function isInPickupWindow(hour: number, minute: number, schoolEndTime?: string): boolean {
-  const endMin = parseTimeMin(schoolEndTime)
+  const endMin = timeToMinutes(schoolEndTime)
   if (endMin < 0) return false
   const nowMin = hour * 60 + minute
   return nowMin >= endMin - 30 && nowMin < endMin
 }
 
 export function isAfterSchool(hour: number, minute: number, schoolEndTime?: string): boolean {
-  const endMin = parseTimeMin(schoolEndTime)
+  const endMin = timeToMinutes(schoolEndTime)
   if (endMin < 0) return false
   const nowMin = hour * 60 + minute
   return nowMin >= endMin && nowMin < endMin + 90
@@ -114,15 +173,15 @@ export function isAfterSchool(hour: number, minute: number, schoolEndTime?: stri
 
 export function findNextClassToday(classes: ScheduleClass[], nowMin: number): NextClassInfo | null {
   const sorted = [...classes].sort(
-    (a, b) => parseTimeMin(a?.time) - parseTimeMin(b?.time),
+    (a, b) => timeToMinutes(a?.time) - timeToMinutes(b?.time),
   )
   for (const cls of sorted) {
     if (!isRealScheduleClass(cls)) continue
-    const t = parseTimeMin(cls?.time)
+    const t = timeToMinutes(cls?.time)
     if (t >= 0 && t > nowMin) {
       const name = getClassName(cls)
       if (name === '课程') continue
-      return { name, time: cls?.time }
+      return { name, time: formatTime(cls?.time || '') }
     }
   }
   return null
@@ -159,16 +218,180 @@ export type BuildMomentParams = {
     name?: string
     display_health?: string
     health_status?: string
+    display_mood?: string
+    mood_status?: string
+    energy_label?: string
+    school_start_time?: string
     school_end_time?: string
     school_name?: string
+    urgent_items?: { title: string; level: 'red' | 'orange' | 'yellow' }[]
   } | null
   todayClasses: ScheduleClass[]
+  tomorrowClasses?: ScheduleClass[]
+  calendar?: CalendarEvent[]
   visaDaysLeft: number | null
   todayTodos: TodoItem[]
   topTodo: TodoItem | undefined
+  doneTodayCount?: number
   packReadyDismissed: boolean
   overviewBriefing: RootBriefing
   hotspots?: HotspotItem[]
+}
+
+function cleanTodoTitle(todo?: TodoItem): string {
+  return todo?.title?.replace(/^📅\s*/, '').trim() || ''
+}
+
+function dayOffLabel(date: Date): string {
+  const dow = date.getDay()
+  if (dow === 6) return '周六'
+  if (dow === 0) return '周日'
+  return '放假'
+}
+
+function findNextWeekHighlight(p: BuildMomentParams): string | null {
+  const calendar = p.calendar || []
+  const today = getTodayStr(p.now)
+  const upcoming = calendar
+    .filter((e) => e.date_start && e.date_start > today)
+    .sort((a, b) => String(a.date_start).localeCompare(String(b.date_start)))
+  if (upcoming[0]?.title) return String(upcoming[0].title).trim()
+
+  const urgent = (p.activeKid?.urgent_items || []).find((u) => u.level === 'yellow')
+  return urgent?.title || null
+}
+
+function collectTomorrowPrep(tomorrowClasses: ScheduleClass[]): string | null {
+  const packItems = buildPackLines(tomorrowClasses).map((b) => b.item)
+  if (packItems.length) {
+    const preview = packItems.slice(0, 3).join('、')
+    return `明天记得带 ${preview}${packItems.length > 3 ? ' 等' : ''}`
+  }
+  const pe = tomorrowClasses.find(
+    (c) => isRealScheduleClass(c) && /体育|游泳|PE|Sport|physical/i.test(getClassName(c)),
+  )
+  if (pe) return `明天有${getClassName(pe)}`
+  return null
+}
+
+function getEveningMoodPhrase(activeKid: BuildMomentParams['activeKid']): string {
+  const mood = activeKid?.display_mood || activeKid?.mood_status
+  const label = activeKid?.energy_label
+  if (mood === 'happy' || mood === 'calm') return '在学校很开心'
+  if (label && /好|充足|不错|稳定/.test(label)) return '在学校很开心'
+  if (mood === 'upset' || mood === 'anxious' || mood === 'tired') return '状态一般'
+  if (label && /低|累|差|一般/.test(label)) return '状态一般'
+  return '今天结束了'
+}
+
+function buildWeekendCard(p: BuildMomentParams): MomentCardData {
+  const kidName = p.activeKid?.name || '孩子'
+  const label = dayOffLabel(p.now)
+  const topTodo = cleanTodoTitle(p.topTodo)
+  const lines: string[] = []
+
+  if (p.doneTodayCount && p.doneTodayCount > 0) {
+    lines.push(`这周你已处理 ${p.doneTodayCount} 件事`)
+  }
+
+  const energyLabel = p.activeKid?.energy_label
+  if (energyLabel && energyLabel !== '暂无数据') {
+    lines.push(`${kidName}这周：${energyLabel}`)
+  }
+
+  const nextWeek = findNextWeekHighlight(p)
+  if (nextWeek) lines.push(`下周要准备：${nextWeek}`)
+
+  if (topTodo) {
+    lines.push(`要紧的事：${topTodo.length > 22 ? `${topTodo.slice(0, 22)}…` : topTodo}`)
+  }
+
+  if (p.visaDaysLeft != null && p.visaDaysLeft <= 30 && p.visaDaysLeft >= 0) {
+    lines.push(
+      p.visaDaysLeft <= 7
+        ? `签证还有 ${p.visaDaysLeft} 天，趁周末赶紧处理`
+        : `签证还有 ${p.visaDaysLeft} 天，趁周末处理一下？`,
+    )
+  }
+
+  const card: MomentCardData = {
+    kind: 'weekend',
+    tier: 'normal',
+    theme: 'neutral',
+    eyebrow: '根对此刻的感知',
+    title: `今天${label}，好好休息`,
+    subtitle: lines.length ? lines.join('\n') : '难得歇一歇，根替你盯着下周的事',
+    kidName,
+  }
+
+  if (p.topTodo) {
+    card.todoId = p.topTodo.id
+    card.primaryAction = {
+      label: '处理最要紧的事',
+      action: { type: 'one_tap', todoId: p.topTodo.id },
+    }
+  } else if (p.visaDaysLeft != null && p.visaDaysLeft <= 30) {
+    card.primaryAction = { label: '查看证件事项', action: { type: 'visa' } }
+  }
+
+  return card
+}
+
+function buildAtSchoolCard(p: BuildMomentParams, schoolEnd: string): MomentCardData {
+  const kidName = p.activeKid?.name || '孩子'
+  const endDisplay = formatTime(schoolEnd)
+  const remaining = p.todayTodos.length
+
+  if (remaining > 0) {
+    return {
+      kind: 'at_school',
+      tier: 'normal',
+      theme: 'neutral',
+      eyebrow: '根对此刻的感知',
+      title: `今天还剩 ${remaining} 件待办`,
+      subtitle: '趁现在处理一下，接孩子前能轻松点',
+      todoId: p.topTodo?.id,
+      primaryAction: p.topTodo
+        ? { label: '先办这一件', action: { type: 'one_tap', todoId: p.topTodo.id } }
+        : { label: '查看待办', action: { type: 'todo_sheet' } },
+      secondaryAction: { label: '查看全部待办', action: { type: 'todo_sheet' } },
+    }
+  }
+
+  return {
+    kind: 'at_school',
+    tier: 'normal',
+    theme: 'neutral',
+    eyebrow: '根对此刻的感知',
+    title: `${kidName}在学校，下午 ${endDisplay} 放学`,
+    subtitle: '今天比较清闲，好好陪陪孩子',
+    kidName,
+    schoolEndTime: endDisplay,
+    primaryAction: { label: '查看孩子状态', action: { type: 'child' } },
+  }
+}
+
+function buildEveningHomeCard(p: BuildMomentParams): MomentCardData {
+  const kidName = p.activeKid?.name || '孩子'
+  const moodPhrase = getEveningMoodPhrase(p.activeKid)
+  const tomorrow = collectTomorrowPrep(p.tomorrowClasses || [])
+  const rainAlert = hasRainOrFloodAlert(p.hotspots || [])
+
+  const subtitleParts: string[] = []
+  if (tomorrow) subtitleParts.push(tomorrow)
+  if (rainAlert) subtitleParts.push('明天可能有雨，记得带伞')
+
+  return {
+    kind: 'after_school',
+    tier: 'important',
+    theme: 'neutral',
+    eyebrow: '傍晚',
+    kidName,
+    title: `${kidName}今天${moodPhrase}`,
+    subtitle: subtitleParts.join('\n') || undefined,
+    showRainTip: rainAlert,
+    primaryAction: { label: '查看孩子状态', action: { type: 'child' } },
+  }
 }
 
 export function buildMomentCard(p: BuildMomentParams): MomentCardData {
@@ -180,7 +403,13 @@ export function buildMomentCard(p: BuildMomentParams): MomentCardData {
   const hotspots = p.hotspots || []
   const rainAlert = hasRainOrFloodAlert(hotspots)
   const pickupLocation = p.activeKid?.school_name?.trim() || ''
+  const calendar = p.calendar || []
+  const schoolDay = isSchoolDay(p.now, calendar)
+  const schoolStart = p.activeKid?.school_start_time || '08:00'
+  const schoolEnd = p.activeKid?.school_end_time || '15:00'
+  const location = getChildLocation(hour, minute, schoolDay, schoolStart, schoolEnd)
 
+  // 优先级1：孩子生病
   if (health === 'sick') {
     return {
       kind: 'sick',
@@ -193,6 +422,7 @@ export function buildMomentCard(p: BuildMomentParams): MomentCardData {
     }
   }
 
+  // 优先级2：签证 ≤7天
   if (p.visaDaysLeft != null && p.visaDaysLeft <= 7 && p.visaDaysLeft >= 0) {
     return {
       kind: 'visa',
@@ -206,6 +436,12 @@ export function buildMomentCard(p: BuildMomentParams): MomentCardData {
     }
   }
 
+  // 优先级3：周末 / 假期
+  if (!schoolDay) {
+    return buildWeekendCard(p)
+  }
+
+  // 优先级4：早上携带物
   const packLines = buildPackLines(p.todayClasses)
   if (hour >= 6 && hour < 9 && packLines.length > 0 && !p.packReadyDismissed) {
     return {
@@ -220,8 +456,8 @@ export function buildMomentCard(p: BuildMomentParams): MomentCardData {
     }
   }
 
-  const schoolEnd = p.activeKid?.school_end_time
-  if (isInPickupWindow(hour, minute, schoolEnd)) {
+  // 优先级5：接送时间
+  if (location === 'pickup' || isInPickupWindow(hour, minute, schoolEnd)) {
     return {
       kind: 'pickup',
       tier: 'important',
@@ -229,41 +465,22 @@ export function buildMomentCard(p: BuildMomentParams): MomentCardData {
       eyebrow: '接孩子',
       kidName,
       title: `距接 ${kidName} 还有`,
-      schoolEndTime: schoolEnd,
+      schoolEndTime: formatTime(schoolEnd),
       pickupLocation,
     }
   }
 
-  if (isAfterSchool(hour, minute, schoolEnd)) {
-    const nextClass = findNextClassToday(p.todayClasses, nowMin)
-    return {
-      kind: 'after_school',
-      tier: 'important',
-      theme: 'neutral',
-      eyebrow: '放学后',
-      kidName,
-      title: `${kidName} 放学了`,
-      nextClass: nextClass ?? undefined,
-      showRainTip: rainAlert,
-    }
+  // 优先级6：孩子在学校
+  if (location === 'school') {
+    return buildAtSchoolCard(p, schoolEnd)
   }
 
-  if (p.todayTodos.length > 0) {
-    const top = p.topTodo || p.todayTodos[0]
-    const todoTitle = top.title?.replace(/^📅\s*/, '') || '待办'
-    return {
-      kind: 'todo',
-      tier: 'normal',
-      theme: 'neutral',
-      eyebrow: '根对此刻的感知',
-      title: '今日必须处理',
-      subtitle: todoTitle,
-      todoId: top.id,
-      primaryAction: { label: '一键办理', action: { type: 'one_tap', todoId: top.id } },
-      secondaryAction: { label: '查看全部待办', action: { type: 'todo_sheet' } },
-    }
+  // 优先级7：傍晚回家后
+  if (location === 'home' && hour >= 17 && hour < 21) {
+    return buildEveningHomeCard(p)
   }
 
+  // 优先级8：深夜
   if (hour >= 21 || hour < 6) {
     return {
       kind: 'night',
@@ -273,6 +490,23 @@ export function buildMomentCard(p: BuildMomentParams): MomentCardData {
       title: '今天辛苦了',
       subtitle: `${kidName} 睡了吗？根在这里陪你`,
       primaryAction: { label: '和根说说话', action: { type: 'treehouse' } },
+    }
+  }
+
+  // 优先级9：默认 — 最重要待办
+  if (p.todayTodos.length > 0) {
+    const top = p.topTodo || p.todayTodos[0]
+    const todoTitle = cleanTodoTitle(top) || '待办'
+    return {
+      kind: 'todo',
+      tier: 'normal',
+      theme: 'neutral',
+      eyebrow: '根对此刻的感知',
+      title: '下一件要紧的事',
+      subtitle: todoTitle,
+      todoId: top.id,
+      primaryAction: { label: '一键办理', action: { type: 'one_tap', todoId: top.id } },
+      secondaryAction: { label: '查看全部待办', action: { type: 'todo_sheet' } },
     }
   }
 
@@ -287,7 +521,7 @@ export function buildMomentCard(p: BuildMomentParams): MomentCardData {
 }
 
 export function minutesUntilSchoolEnd(now: Date, schoolEndTime?: string): number | null {
-  const endMin = parseTimeMin(schoolEndTime)
+  const endMin = timeToMinutes(schoolEndTime)
   if (endMin < 0) return null
   const nowMin = now.getHours() * 60 + now.getMinutes()
   const diff = endMin - nowMin
