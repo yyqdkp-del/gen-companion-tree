@@ -6,6 +6,7 @@ import { useApp } from '@/app/context/AppContext'
 import ChineseAccordion from './ChineseAccordion'
 import LearnSession from './LearnSession'
 import { WordPopup, FamilyPopup, type PopupItem } from './WordPopup'
+import { safeString } from '@/lib/ai/safeRender'
 
 const GLASS_CARD: React.CSSProperties = {
   background: 'rgba(255,255,255,0.8)',
@@ -33,10 +34,11 @@ type Props = {
 }
 
 function PartsDisplay({ parts, char, evolution }: {
-  parts: any[]; char: string; evolution?: string
+  parts: any[]; char: string; evolution?: unknown
 }) {
   const [openIdx, setOpenIdx] = useState<number | null>(null)
   const [showEvolution, setShowEvolution] = useState(false)
+  const evolutionText = safeString(evolution)
   if (!parts?.length) return null
 
   return (
@@ -49,7 +51,7 @@ function PartsDisplay({ parts, char, evolution }: {
       boxShadow: '0 4px 20px rgba(45,50,47,0.05)',
     }}>
       <div style={{ display: 'flex', alignItems: 'stretch', gap: 10,
-        marginBottom: evolution ? 12 : 0 }}>
+        marginBottom: evolutionText ? 12 : 0 }}>
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
           {parts.slice(0, Math.ceil(parts.length / 2)).map((p: any, i: number) => (
             <button key={i} onClick={() => setOpenIdx(openIdx === i ? null : i)}
@@ -58,9 +60,9 @@ function PartsDisplay({ parts, char, evolution }: {
                 borderRadius: 10, padding: '8px 10px', cursor: 'pointer',
                 textAlign: 'center', transition: 'all 0.2s' }}>
               <div style={{ fontSize: 26, fontFamily: "'Noto Serif SC', serif",
-                color: T.red, lineHeight: 1 }}>{p.char}</div>
+                color: T.red, lineHeight: 1 }}>{safeString(p.char)}</div>
               <div style={{ fontSize: 10, color: T.textDim, marginTop: 3,
-                fontFamily: 'sans-serif' }}>{p.name}</div>
+                fontFamily: 'sans-serif' }}>{safeString(p.name)}</div>
             </button>
           ))}
         </div>
@@ -85,9 +87,9 @@ function PartsDisplay({ parts, char, evolution }: {
                   borderRadius: 10, padding: '8px 10px', cursor: 'pointer',
                   textAlign: 'center', transition: 'all 0.2s' }}>
                 <div style={{ fontSize: 26, fontFamily: "'Noto Serif SC', serif",
-                  color: T.red, lineHeight: 1 }}>{p.char}</div>
+                  color: T.red, lineHeight: 1 }}>{safeString(p.char)}</div>
                 <div style={{ fontSize: 10, color: T.textDim, marginTop: 3,
-                  fontFamily: 'sans-serif' }}>{p.name}</div>
+                  fontFamily: 'sans-serif' }}>{safeString(p.name)}</div>
               </button>
             )
           })}
@@ -103,17 +105,17 @@ function PartsDisplay({ parts, char, evolution }: {
               padding: '10px 13px', marginTop: 8, borderLeft: '3px solid rgba(164,99,85,0.3)' }}>
               <div style={{ fontSize: 12, fontWeight: 700, color: T.red,
                 marginBottom: 4, fontFamily: 'sans-serif' }}>
-                {parts[openIdx].char} · {parts[openIdx].name}
+                {safeString(parts[openIdx].char)} · {safeString(parts[openIdx].name)}
               </div>
               <div style={{ fontSize: 12, color: T.textMid, lineHeight: 1.75, fontFamily: 'sans-serif' }}>
-                {parts[openIdx].image || parts[openIdx].meaning || '像古人观察自然所得的象形符号'}
+                {safeString(parts[openIdx].image || parts[openIdx].meaning, '像古人观察自然所得的象形符号')}
               </div>
             </div>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {evolution && (
+      {evolutionText && (
         <div style={{ marginTop: 10, borderRadius: 10,
           border: '1px solid rgba(164,99,85,0.2)', overflow: 'hidden' }}>
           <button onClick={() => setShowEvolution(o => !o)}
@@ -134,7 +136,7 @@ function PartsDisplay({ parts, char, evolution }: {
                 <div style={{ padding: '0 14px 12px',
                   borderTop: '1px solid rgba(164,99,85,0.15)', background: T.white }}>
                   <div style={{ fontSize: 12, color: T.text, lineHeight: 1.85,
-                    marginTop: 10, fontFamily: 'sans-serif' }}>{evolution}</div>
+                    marginTop: 10, fontFamily: 'sans-serif' }}>{evolutionText}</div>
                 </div>
               </motion.div>
             )}
@@ -267,18 +269,18 @@ export default function HanziResult({ data, char, onMomCopy, childLevel, childNa
           color: '#5a5a4a',
           fontFamily: 'sans-serif',
           letterSpacing: '0.05em',
-        }}>{data.pinyin}</span>
+        }}>{safeString(data.pinyin)}</span>
         <span style={{ padding: '4px 12px', borderRadius: 20, fontSize: 12,
           background: lvCfg.bg, border: `1px solid ${lvCfg.color}44`,
           color: lvCfg.color, fontFamily: 'sans-serif' }}>{lv} · {lvCfg.label}</span>
         {data.traditional && data.traditional !== char && (
           <span style={{ fontSize: 12, color: T.textDim, fontFamily: 'sans-serif' }}>
             繁 <span style={{ fontFamily: "'Noto Serif SC', serif", fontSize: 16,
-              color: T.textMid }}>{data.traditional}</span>
+              color: T.textMid }}>{safeString(data.traditional)}</span>
           </span>
         )}
         {/* 拼音朗读按钮 */}
-        <button onClick={() => speak(`${data.pinyin}，${data.meaning}`)}
+        <button onClick={() => speak(`${safeString(data.pinyin)}，${safeString(data.meaning)}`)}
           style={{ background: 'none', border: 'none', cursor: 'pointer',
             fontSize: 14, opacity: 0.5, padding: '2px' }} title="朗读">🔊</button>
         <div style={{
@@ -290,7 +292,7 @@ export default function HanziResult({ data, char, onMomCopy, childLevel, childNa
           marginTop: 6,
           lineHeight: 1.6,
           letterSpacing: '0.03em',
-        }}>{data.meaning}</div>
+        }}>{safeString(data.meaning)}</div>
       </div>
 
       {/* 视觉钩子 */}
@@ -305,12 +307,12 @@ export default function HanziResult({ data, char, onMomCopy, childLevel, childNa
           <div style={{ fontSize: 10, letterSpacing: 3, color: T.red,
             marginBottom: 6, fontFamily: 'sans-serif' }}>👁 看见这个字</div>
           <div style={{ fontSize: 14, color: T.text, lineHeight: 1.8,
-            fontFamily: "'Noto Serif SC', serif" }}>{data.visual_hook}</div>
+            fontFamily: "'Noto Serif SC', serif" }}>{safeString(data.visual_hook)}</div>
           {data.memory_trick && (
             <div style={{ marginTop: 8, padding: '8px 12px', borderRadius: 10,
               background: 'rgba(164,99,85,0.08)', fontSize: 13,
               color: T.gold, fontStyle: 'italic', fontFamily: 'sans-serif' }}>
-              🎵 {data.memory_trick}
+              🎵 {safeString(data.memory_trick)}
             </div>
           )}
         </div>
@@ -324,7 +326,7 @@ export default function HanziResult({ data, char, onMomCopy, childLevel, childNa
           display: 'flex', alignItems: 'center', gap: 10 }}>
           <span style={{ fontSize: 22 }}>🙋</span>
           <div style={{ fontSize: 13, color: T.green, lineHeight: 1.7,
-            fontFamily: 'sans-serif', fontWeight: 500 }}>{data.child_prompt}</div>
+            fontFamily: 'sans-serif', fontWeight: 500 }}>{safeString(data.child_prompt)}</div>
         </div>
       )}
 
@@ -339,7 +341,7 @@ export default function HanziResult({ data, char, onMomCopy, childLevel, childNa
           </div>
           <div style={{ fontSize: 13, color: T.textMid, lineHeight: 1.8,
             fontFamily: 'sans-serif', marginBottom: data.stroke_order?.length ? 10 : 0 }}>
-            {data.writing_guide}
+            {safeString(data.writing_guide)}
           </div>
           {data.stroke_order?.length > 0 && (
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
@@ -348,7 +350,7 @@ export default function HanziResult({ data, char, onMomCopy, childLevel, childNa
                   background: 'rgba(164,99,85,0.06)',
                   border: '1px solid rgba(164,99,85,0.15)',
                   fontSize: 12, color: T.textMid, fontFamily: 'sans-serif' }}>
-                  {i + 1}. {s}
+                  {i + 1}. {safeString(s)}
                 </span>
               ))}
             </div>
@@ -360,11 +362,11 @@ export default function HanziResult({ data, char, onMomCopy, childLevel, childNa
         <ChineseAccordion title="中英互通" emoji="🔗">
           <div style={{ paddingTop: 12 }}>
             {data.english_link && <div style={{ fontSize: 13, color: T.blue,
-              lineHeight: 1.85, fontStyle: 'italic', fontFamily: 'sans-serif' }}>{data.english_link}</div>}
+              lineHeight: 1.85, fontStyle: 'italic', fontFamily: 'sans-serif' }}>{safeString(data.english_link)}</div>}
             {data.phonics_bridge && (
               <div style={{ marginTop: 8, padding: '8px 12px', borderRadius: 10,
                 background: 'rgba(45,63,74,0.05)', fontSize: 12, color: T.textMid,
-                lineHeight: 1.7, fontFamily: 'sans-serif' }}>💡 {data.phonics_bridge}</div>
+                lineHeight: 1.7, fontFamily: 'sans-serif' }}>💡 {safeString(data.phonics_bridge)}</div>
             )}
           </div>
         </ChineseAccordion>
@@ -375,13 +377,13 @@ export default function HanziResult({ data, char, onMomCopy, childLevel, childNa
           <div style={{ paddingTop: 12 }}>
             <div style={{ ...MOM_SCRIPT_BOX, marginBottom: 10 }}>
               <div style={{ fontSize: 13, color: T.text, lineHeight: 1.9,
-                fontStyle: 'italic', fontFamily: 'sans-serif' }}>「{data.mom_script}」</div>
+                fontStyle: 'italic', fontFamily: 'sans-serif' }}>「{safeString(data.mom_script)}」</div>
             </div>
             {(data.mom_questions || []).length > 0 && (
               <>
                 <div style={{ fontSize: 10, color: T.gold, letterSpacing: 2,
                   marginBottom: 8, fontFamily: 'sans-serif' }}>自然聊天，不是考试</div>
-                {data.mom_questions.map((q: string, i: number) => (
+                {data.mom_questions.map((q: unknown, i: number) => (
                   <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 8,
                     alignItems: 'flex-start' }}>
                     <div style={{ width: 20, height: 20, borderRadius: '50%',
@@ -390,7 +392,7 @@ export default function HanziResult({ data, char, onMomCopy, childLevel, childNa
                       fontSize: 10, flexShrink: 0, marginTop: 2,
                       fontFamily: 'sans-serif' }}>{i + 1}</div>
                     <div style={{ fontSize: 12, color: T.text, lineHeight: 1.75,
-                      fontFamily: 'sans-serif' }}>{q}</div>
+                      fontFamily: 'sans-serif' }}>{safeString(q)}</div>
                   </div>
                 ))}
               </>
@@ -410,7 +412,7 @@ export default function HanziResult({ data, char, onMomCopy, childLevel, childNa
                   cursor: 'pointer', fontFamily: 'sans-serif' }}>
                 📋 复制台词
               </button>
-              <button onClick={() => speak(data.mom_script)}
+              <button onClick={() => speak(safeString(data.mom_script))}
                 style={{ padding: '9px 14px', borderRadius: 12,
                   border: '1px solid rgba(164,99,85,0.25)', background: 'rgba(255,255,255,0.6)',
                   fontSize: 12, color: T.gold, fontWeight: 600,
@@ -426,14 +428,14 @@ export default function HanziResult({ data, char, onMomCopy, childLevel, childNa
         <ChineseAccordion title="文化故事 · 生活场景" emoji="📖">
           <div style={{ paddingTop: 10 }}>
             {data.story && <div style={{ fontSize: 13, color: T.text, lineHeight: 1.85,
-              fontFamily: 'sans-serif', marginBottom: data.scene ? 10 : 0 }}>{data.story}</div>}
+              fontFamily: 'sans-serif', marginBottom: data.scene ? 10 : 0 }}>{safeString(data.story)}</div>}
             {data.scene && (
               <div style={{ background: 'rgba(164,99,85,0.08)', borderRadius: 10,
                 padding: '10px 13px', borderLeft: '3px solid #C8A060' }}>
                 <div style={{ fontSize: 11, letterSpacing: 2, color: T.gold,
                   marginBottom: 4, fontFamily: 'sans-serif' }}>🌍 生活场景</div>
                 <div style={{ fontSize: 12, color: T.textMid, lineHeight: 1.75,
-                  fontStyle: 'italic', fontFamily: 'sans-serif' }}>{data.scene}</div>
+                  fontStyle: 'italic', fontFamily: 'sans-serif' }}>{safeString(data.scene)}</div>
               </div>
             )}
           </div>

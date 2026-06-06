@@ -130,6 +130,23 @@ const LOAD_STEPS = [
   '生成本周专属行动',
 ]
 
+function renderContent(content: unknown): string {
+  if (!content) return ''
+  if (typeof content === 'string') return content
+  if (typeof content === 'object' && content !== null) {
+    const obj = content as Record<string, unknown>
+    if (obj.main || obj.game) {
+      const parts: string[] = []
+      if (obj.main) parts.push(String(obj.main))
+      if (obj.game) parts.push('游戏练习：' + String(obj.game))
+      if (obj.follow_up) parts.push('跟进：' + String(obj.follow_up))
+      return parts.join('\n')
+    }
+    return JSON.stringify(content)
+  }
+  return String(content)
+}
+
 export default function ChinesePage() {
   const router = useRouter()
   const [current,  setCurrent]  = useState(0)
@@ -479,7 +496,7 @@ export default function ChinesePage() {
             <motion.div key={i} initial={{ opacity:0, y:10 }} animate={{ opacity:1, y:0 }} transition={{ delay: i * 0.15 }}
               style={{ background: THEME.bg, borderRadius:'12px', padding:'16px', marginBottom:'12px' }}>
               <div style={{ fontSize:'11px', fontWeight:700, color: THEME.orange, letterSpacing:'2px', marginBottom:'8px', textTransform:'uppercase' }}>{s.title}</div>
-              <div style={{ fontSize:'14px', lineHeight:1.8, color: THEME.text }}>{s.content}</div>
+              <div style={{ fontSize:'14px', lineHeight:1.8, color: THEME.text, whiteSpace: 'pre-line' }}>{renderContent(s.content)}</div>
             </motion.div>
           ))}
 
