@@ -316,6 +316,12 @@ function parseStats(raw: unknown): ScheduleStats | null {
   return { timeDirection, dayDirection, days, timeSlots, orientation }
 }
 
+function cleanVisionBase64(imageBase64: string): string {
+  return imageBase64
+    .replace(/^data:image\/\w+;base64,/, '')
+    .replace(/\s/g, '')
+}
+
 async function callGeminiVision(
   imageBase64: string,
   mimeType: VisionMediaType,
@@ -325,17 +331,26 @@ async function callGeminiVision(
 ): Promise<string> {
   const key = process.env.GOOGLE_AI_API_KEY
   if (!key) {
-    console.error(`[parse-schedule] ${label}: GOOGLE_AI_API_KEY not configured`)
-    return ''
+    throw new Error('GOOGLE_AI_API_KEY not configured')
   }
 
-  const response = await fetch(`${GEMINI_URL}?key=${key}`, {
+  const cleanBase64 = cleanVisionBase64(imageBase64)
+  const requestUrl = `${GEMINI_URL}?key=${key}`
+
+  console.log(`[parse-schedule] ${label} Gemini request:`, {
+    url: GEMINI_URL,
+    hasApiKey: !!key,
+    imageSize: cleanBase64.length,
+    mimeType,
+  })
+
+  const response = await fetch(requestUrl, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       contents: [{
         parts: [
-          { inline_data: { mime_type: mimeType, data: imageBase64 } },
+          { inline_data: { mime_type: mimeType, data: cleanBase64 } },
           { text: prompt },
         ],
       }],
@@ -343,13 +358,14 @@ async function callGeminiVision(
     }),
   })
 
+  if (!response.ok) {
+    const errorText = await response.text()
+    console.error(`[parse-schedule] ${label} Gemini error:`, response.status, errorText)
+    throw new Error(`Gemini ${response.status}: ${errorText}`)
+  }
+
   const data = await response.json()
   console.error(`[parse-schedule] ${label} status:`, response.status)
-
-  if (!response.ok) {
-    console.error(`[parse-schedule] ${label} error:`, JSON.stringify(data).slice(0, 2000))
-    return ''
-  }
 
   return data.candidates?.[0]?.content?.parts?.[0]?.text || ''
 }
@@ -680,6 +696,13 @@ export async function POST(req: NextRequest) {
     }
 
     if (!image) return NextResponse.json({ error: '没有图片' }, { status: 400 })
+
+    if (!process.env.GOOGLE_AI_API_KEY) {
+      return NextResponse.json(
+        { error: 'GOOGLE_AI_API_KEY not configured' },
+        { status: 500 },
+      )
+    }
 
     const parsed = await runParsePipeline(image, mediaType)
     if (!parsed) {
