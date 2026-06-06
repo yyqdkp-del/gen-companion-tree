@@ -124,7 +124,7 @@ export default function GrowthTab({ child, userId }: Props) {
           <div>
             <p className="gc-eyebrow" style={{ margin: '0 0 8px', color: 'rgba(125,63,55,0.7)' }}>成长家书</p>
             <div style={{ fontFamily: 'var(--font-serif)', fontSize: 20, fontWeight: 500, color: '#7d3f37' }}>
-              本周成长故事
+              成长家书
             </div>
             <div style={{ fontFamily: 'var(--font-body)', fontSize: 13, color: 'rgba(125,63,55,0.8)', marginTop: 6, lineHeight: 1.55 }}>
               为国内家人生成温暖的周报

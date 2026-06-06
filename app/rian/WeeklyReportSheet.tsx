@@ -1,13 +1,12 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
-import { motion } from 'framer-motion'
-import { X, Copy, Check, Loader } from 'lucide-react'
-import { THEME } from '@/app/_shared/_constants/theme'
+import { motion, AnimatePresence } from 'framer-motion'
+import { X, Copy, Check, Loader, ChevronDown, ImageIcon } from 'lucide-react'
 import { FLOAT_SHEET_BOTTOM } from '@/app/_shared/_constants/layout'
 import { fetchWithAuth } from '@/lib/auth/fetchWithAuth'
 import { logOrAlertNetworkError } from '@/lib/errors/logOrAlertNetworkError'
+import { exportLetterShareImage, shareOrDownloadLetterImage } from '@/lib/growth/exportLetterImage'
 import { track } from '@/lib/analytics/track'
 import { toast } from '@/app/components/Toast'
 import { useApp } from '@/app/context/AppContext'
@@ -16,6 +15,7 @@ type ReportContent = {
   letter?: string
   achievements?: string[]
   week_summary?: string
+  week_label?: string
   child_name?: string
   no_data?: boolean
   family?: boolean
@@ -27,20 +27,24 @@ type Props = {
   onClose: () => void
 }
 
+const PAPER = '#F6F3EB'
+const CLAY = 'var(--clay, #a46355)'
+const INK = '#262A29'
+
 export default function WeeklyReportSheet({
   childId,
   childName,
   onClose,
 }: Props) {
-  const router = useRouter()
   const { kids } = useApp()
   const [loading, setLoading] = useState(true)
+  const [exporting, setExporting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [content, setContent] = useState<ReportContent | null>(null)
   const [shareUrl, setShareUrl] = useState('')
   const [copied, setCopied] = useState(false)
-  const [isProUser, setIsProUser] = useState(false)
   const [reportMode, setReportMode] = useState<'child' | 'family'>('child')
+  const [momentsOpen, setMomentsOpen] = useState(false)
 
   const handleGenerate = useCallback(async (opts?: { family?: boolean }) => {
     const family = opts?.family === true
@@ -53,12 +57,9 @@ export default function WeeklyReportSheet({
     setLoading(true)
     setError(null)
     setReportMode(family ? 'family' : 'child')
+    setMomentsOpen(false)
 
     try {
-      const limitRes = await fetchWithAuth('/api/pro/status')
-      const limitData = await limitRes.json().catch(() => ({}))
-      setIsProUser(!!limitData.is_pro)
-
       const res = await fetchWithAuth('/api/growth/weekly-report', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -80,7 +81,7 @@ export default function WeeklyReportSheet({
       setShareUrl(data.share_url || '')
       void track({
         event_type: 'weekly_report_generated',
-        page: '/rian',
+        page: '/growth',
         meta: { child_id: family ? undefined : childId, family },
       })
     } catch (e) {
@@ -95,6 +96,12 @@ export default function WeeklyReportSheet({
     else if (kids.length > 1) void handleGenerate({ family: true })
   }, [childId, kids.length, handleGenerate])
 
+  const displayName = reportMode === 'family'
+    ? (content?.child_name || '家人')
+    : childName
+
+  const weekLabel = content?.week_label || ''
+
   const handleCopy = async () => {
     if (!shareUrl) return
     try {
@@ -102,37 +109,38 @@ export default function WeeklyReportSheet({
       setCopied(true)
       void track({
         event_type: 'weekly_report_shared',
-        page: '/rian',
-        meta: { child_id: reportMode === 'family' ? undefined : childId, family: reportMode === 'family' },
+        page: '/growth',
+        meta: { child_id: reportMode === 'family' ? undefined : childId, family: reportMode === 'family', method: 'link' },
       })
       setTimeout(() => setCopied(false), 2000)
     } catch {
       toast('复制失败，请手动复制链接', 'error')
-      try {
-        const input = document.createElement('input')
-        input.value = shareUrl
-        document.body.appendChild(input)
-        input.select()
-        document.execCommand('copy')
-        document.body.removeChild(input)
-        setCopied(true)
-        void track({
-          event_type: 'weekly_report_shared',
-          page: '/rian',
-          meta: { child_id: reportMode === 'family' ? undefined : childId, family: reportMode === 'family' },
-        })
-        setTimeout(() => setCopied(false), 2000)
-      } catch {
-        // keep report visible
-      }
     }
   }
 
-  const sheetTitle = reportMode === 'family' ? '家庭成长周报' : '成长周报'
-  const summaryFallback =
-    reportMode === 'family'
-      ? '本周家庭成长记录'
-      : `${childName}本周的成长记录`
+  const handleExportImage = async () => {
+    if (!content?.letter?.trim()) return
+    setExporting(true)
+    try {
+      const blob = await exportLetterShareImage({
+        childName: displayName,
+        weekLabel,
+        letter: content.letter,
+      })
+      const filename = `成长家书-${displayName}-${Date.now()}.png`
+      await shareOrDownloadLetterImage(blob, filename)
+      void track({
+        event_type: 'weekly_report_shared',
+        page: '/growth',
+        meta: { child_id: reportMode === 'family' ? undefined : childId, family: reportMode === 'family', method: 'image' },
+      })
+      toast('分享图片已生成', 'success')
+    } catch (e) {
+      if (!logOrAlertNetworkError(e)) toast('图片生成失败，请重试', 'error')
+    } finally {
+      setExporting(false)
+    }
+  }
 
   return (
     <motion.div
@@ -147,7 +155,7 @@ export default function WeeklyReportSheet({
         alignItems: 'flex-end',
         justifyContent: 'center',
         paddingBottom: `max(${FLOAT_SHEET_BOTTOM}, max(env(safe-area-inset-bottom), 20px))`,
-        background: 'rgba(180,200,210,0.35)',
+        background: 'rgba(45,50,47,0.32)',
         backdropFilter: 'blur(6px)',
       }}
       onClick={(e) => {
@@ -159,57 +167,40 @@ export default function WeeklyReportSheet({
         animate={{ y: 0, opacity: 1 }}
         exit={{ y: 100, opacity: 0 }}
         transition={{ type: 'spring', damping: 28, stiffness: 320 }}
-        onClick={e => e.stopPropagation()}
+        onClick={(e) => e.stopPropagation()}
         style={{
           width: '100%',
           maxWidth: 430,
           margin: '0 10px',
-          background: 'rgba(255,255,255,0.94)',
-          backdropFilter: 'blur(40px)',
-          borderRadius: '24px 24px 0 0',
+          background: PAPER,
+          borderRadius: '28px 28px 0 0',
           overflow: 'hidden',
-          maxHeight: '82dvh',
+          maxHeight: '88dvh',
           display: 'flex',
           flexDirection: 'column',
         }}
       >
-        <div
-          style={{
-            height: 4,
-            flexShrink: 0,
-            background: 'linear-gradient(90deg, rgba(164,99,85,0.6), rgba(92,122,94,0.5))',
-          }}
-        />
-        <div
-          style={{
-            width: 32,
-            height: 4,
-            background: 'rgba(0,0,0,0.1)',
-            borderRadius: 2,
-            margin: '10px auto 0',
-          }}
-        />
+        <div style={{
+          height: 4,
+          flexShrink: 0,
+          background: 'linear-gradient(90deg, #e6a89e, #8ca88d)',
+        }} />
 
-        <div
-          style={{
-            padding: '12px 16px 0',
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            flexShrink: 0,
-            gap: 8,
-            flexWrap: 'wrap',
-          }}
-        >
-          <span
-            style={{
-              fontSize: 16,
-              fontWeight: 600,
-              color: THEME.text,
-              fontFamily: 'serif',
-            }}
-          >
-            {sheetTitle}
+        <div style={{
+          padding: '14px 18px 0',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          flexShrink: 0,
+        }}>
+          <span style={{
+            fontSize: 17,
+            fontWeight: 600,
+            color: INK,
+            fontFamily: 'var(--font-serif)',
+            letterSpacing: '0.04em',
+          }}>
+            成长家书
           </span>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             {kids.length > 1 && !loading && (
@@ -217,264 +208,222 @@ export default function WeeklyReportSheet({
                 type="button"
                 onClick={() => void handleGenerate({ family: true })}
                 style={{
-                  background: 'rgba(164,99,85,0.1)',
-                  color: '#a46355',
-                  border: '1px solid rgba(164,99,85,0.3)',
+                  background: 'rgba(164,99,85,0.08)',
+                  color: CLAY,
+                  border: '1px solid rgba(164,99,85,0.2)',
                   borderRadius: 12,
-                  padding: '10px 20px',
-                  fontSize: 14,
+                  padding: '6px 12px',
+                  fontSize: 12,
                   cursor: 'pointer',
-                  fontFamily: 'sans-serif',
+                  fontFamily: 'var(--font-body)',
                 }}
               >
-                生成家庭周报
+                全家版
               </button>
             )}
-            <motion.button
-              type="button"
-              whileTap={{ scale: 0.86 }}
-              onClick={onClose}
-              style={{
-                cursor: 'pointer',
-                padding: 4,
-                border: 'none',
-                background: 'transparent',
-              }}
-            >
-              <X size={18} color={THEME.muted} />
-            </motion.button>
-          </div>
-        </div>
-
-        {kids.length > 1 && !loading && reportMode === 'child' && (
-          <div style={{ padding: '0 16px 8px', flexShrink: 0 }}>
-            <button
-              type="button"
-              onClick={() => void handleGenerate({ family: false })}
-              style={{
-                background: 'rgba(92,122,94,0.08)',
-                color: '#5c7a5e',
-                border: '1px solid rgba(92,122,94,0.2)',
-                borderRadius: 12,
-                padding: '8px 16px',
-                fontSize: 13,
-                cursor: 'pointer',
-                fontFamily: 'sans-serif',
-              }}
-            >
-              重新生成{childName}的周报
+            <button type="button" onClick={onClose} aria-label="关闭" style={{ border: 'none', background: 'transparent', cursor: 'pointer', padding: 4 }}>
+              <X size={18} color="var(--fg3)" />
             </button>
           </div>
-        )}
+        </div>
 
         <div style={{
           flex: 1,
           overflowY: 'auto',
           minHeight: 0,
-          padding: '14px 16px 0',
-          display: 'flex',
-          flexDirection: 'column',
-          wordBreak: 'break-word',
-          overflowWrap: 'break-word',
-          whiteSpace: 'pre-wrap',
-        }}
-        >
+          padding: '16px 18px 0',
+        }}>
           {loading && (
-            <div style={{ textAlign: 'center', padding: '40px 0', color: THEME.muted }}>
-              <Loader
-                size={28}
-                style={{
-                  animation: 'spin 1s linear infinite',
-                  margin: '0 auto 12px',
-                }}
-              />
-              <div style={{ fontSize: 13 }}>
-                {reportMode === 'family' ? '根正在写家庭周报…' : '根正在写本周成长故事…'}
-              </div>
+            <div style={{ textAlign: 'center', padding: '48px 0', color: 'var(--fg3)' }}>
+              <Loader size={28} style={{ animation: 'spin 1s linear infinite', margin: '0 auto 12px' }} />
+              <div style={{ fontSize: 13, fontFamily: 'var(--font-body)' }}>根正在写成长家书…</div>
             </div>
           )}
 
           {!loading && error && (
             <div style={{ textAlign: 'center', padding: '24px 0' }}>
-              <p style={{ fontSize: 13, color: '#7d3f37', marginBottom: 12 }}>{error}</p>
-              <button
-                type="button"
-                onClick={() => void handleGenerate({ family: reportMode === 'family' })}
-                style={{
-                  padding: '8px 16px',
-                  borderRadius: 20,
-                  border: 'none',
-                  background: '#8a7355',
-                  color: '#fff',
-                  fontSize: 12,
-                  cursor: 'pointer',
-                }}
-              >
+              <p style={{ fontSize: 13, color: CLAY, marginBottom: 12 }}>{error}</p>
+              <button type="button" className="gc-btn" onClick={() => void handleGenerate({ family: reportMode === 'family' })}>
                 重试
               </button>
             </div>
           )}
 
           {!loading && !error && content?.no_data && (
-            <motion.div style={{ textAlign: 'center', padding: '32px 12px' }}>
-              <p style={{ fontSize: 14, color: THEME.text, marginBottom: 8, lineHeight: 1.6 }}>
+            <div style={{ textAlign: 'center', padding: '32px 12px' }}>
+              <p style={{ fontSize: 14, color: 'var(--fg2)', marginBottom: 8, lineHeight: 1.6, fontFamily: 'var(--font-body)' }}>
                 本周暂无记录，先去学一个汉字或完成一个待办吧
               </p>
-              <p style={{ fontSize: 12, color: THEME.muted }}>
-                记录孩子的学习和生活后，根会帮你写成长周报
+              <p style={{ fontSize: 12, color: 'var(--fg3)', fontFamily: 'var(--font-body)' }}>
+                记录孩子的学习和生活后，根会帮你写成长家书
               </p>
-            </motion.div>
+            </div>
           )}
 
           {!loading && !error && content && !content.no_data && (
             <>
-              <p style={{ fontSize: 12, color: THEME.muted, marginBottom: 10 }}>
-                {content.week_summary || summaryFallback}
-              </p>
-              <div
-                style={{
-                  background: 'rgba(164,99,85,0.06)',
-                  borderRadius: 14,
-                  padding: '14px 16px',
-                  marginBottom: 14,
-                  border: '1px solid rgba(164,99,85,0.12)',
-                }}
-              >
-                <div
-                  style={{
-                    fontSize: 11,
-                    color: '#a46355',
-                    marginBottom: 8,
-                    letterSpacing: '0.15em',
-                  }}
-                >
-                  💌 妈妈说
+              <div style={{
+                background: '#fff',
+                borderRadius: 16,
+                padding: 24,
+                boxShadow: 'var(--sh-soft)',
+                marginBottom: 14,
+              }}>
+                <div style={{
+                  textAlign: 'center',
+                  fontSize: 11,
+                  letterSpacing: '0.2em',
+                  color: CLAY,
+                  marginBottom: 6,
+                  fontFamily: 'var(--font-body)',
+                }}>
+                  根陪伴 · 成长家书
                 </div>
-                <p
-                  style={{
-                    fontSize: 15,
-                    lineHeight: 1.9,
-                    color: THEME.text,
-                    margin: 0,
-                    fontFamily: 'serif',
-                    wordBreak: 'break-word',
-                    overflowWrap: 'break-word',
-                    whiteSpace: 'pre-wrap',
-                  }}
-                >
-                  {content.letter?.trim() || '本周暂无信件内容'}
+                {weekLabel ? (
+                  <div style={{
+                    textAlign: 'center',
+                    fontFamily: 'var(--font-serif)',
+                    fontSize: 12,
+                    color: 'var(--fg3)',
+                    marginBottom: 20,
+                  }}>
+                    {weekLabel}
+                  </div>
+                ) : null}
+                <p style={{
+                  fontFamily: 'var(--font-serif)',
+                  fontSize: 16,
+                  fontWeight: 300,
+                  lineHeight: 2.0,
+                  color: INK,
+                  letterSpacing: '0.05em',
+                  margin: 0,
+                  whiteSpace: 'pre-wrap',
+                  wordBreak: 'break-word',
+                }}>
+                  {content.letter?.trim() || '本周暂无家书内容'}
                 </p>
               </div>
 
-              {content.achievements && content.achievements.length > 0 && (
-                <div style={{ marginBottom: 16 }}>
-                  <div
+              {content.achievements && content.achievements.length > 0 ? (
+                <div style={{ marginBottom: 8 }}>
+                  <button
+                    type="button"
+                    onClick={() => setMomentsOpen((v) => !v)}
                     style={{
-                      fontSize: 11,
-                      color: '#a46355',
-                      marginBottom: 8,
-                      letterSpacing: '0.15em',
+                      width: '100%',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      border: 'none',
+                      background: 'transparent',
+                      padding: '8px 4px',
+                      cursor: 'pointer',
                     }}
                   >
-                    这周的小高光
-                  </div>
-                  {content.achievements.map((a, i) => (
-                    <div
-                      key={i}
+                    <span className="gc-eyebrow" style={{ margin: 0, color: CLAY }}>这周的小瞬间</span>
+                    <ChevronDown
+                      size={16}
+                      color="var(--fg3)"
                       style={{
-                        fontSize: 14,
-                        color: THEME.text,
-                        marginBottom: 6,
-                        display: 'flex',
-                        gap: 8,
-                        minWidth: 0,
+                        transform: momentsOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+                        transition: 'transform 0.2s ease',
                       }}
-                    >
-                      <span style={{ flexShrink: 0, color: '#a46355' }}>·</span>
-                      <span style={{ wordBreak: 'break-word', overflowWrap: 'break-word', minWidth: 0 }}>{a}</span>
-                    </div>
-                  ))}
+                    />
+                  </button>
+                  <AnimatePresence initial={false}>
+                    {momentsOpen ? (
+                      <motion.div
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: 'auto', opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        style={{ overflow: 'hidden' }}
+                      >
+                        <div style={{ padding: '4px 4px 12px' }}>
+                          {content.achievements.map((a, i) => (
+                            <div key={i} style={{
+                              display: 'flex',
+                              gap: 10,
+                              alignItems: 'flex-start',
+                              marginBottom: 8,
+                              fontFamily: 'var(--font-body)',
+                              fontSize: 14,
+                              color: 'var(--fg2)',
+                              lineHeight: 1.55,
+                            }}>
+                              <span style={{
+                                width: 6,
+                                height: 6,
+                                borderRadius: '50%',
+                                background: CLAY,
+                                flexShrink: 0,
+                                marginTop: 8,
+                              }} />
+                              <span>{a}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </motion.div>
+                    ) : null}
+                  </AnimatePresence>
                 </div>
-              )}
-
+              ) : null}
             </>
           )}
         </div>
 
-        {shareUrl && !loading && !error && content && (
+        {shareUrl && !loading && !error && content && !content.no_data && (
           <div style={{
-            padding: '12px 16px',
+            padding: '12px 18px',
             paddingBottom: 'max(env(safe-area-inset-bottom), 16px)',
             borderTop: '1px solid rgba(45,50,47,0.06)',
-            background: '#fbf9f6',
             flexShrink: 0,
           }}>
-            {isProUser ? (
-              <>
-                <button
-                  type="button"
-                  onClick={handleCopy}
-                  style={{
-                    width: '100%',
-                    padding: '14px',
-                    borderRadius: 18,
-                    border: 'none',
-                    background: '#a46355',
-                    color: '#fff',
-                    fontSize: 15,
-                    fontWeight: 600,
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: 8,
-                    marginBottom: 10,
-                  }}
-                >
-                  {copied ? <Check size={18} /> : <Copy size={18} />}
-                  {copied ? '链接已复制' : '复制微信分享链接'}
-                </button>
-                <p
-                  style={{
-                    fontSize: 11,
-                    color: THEME.muted,
-                    textAlign: 'center',
-                    lineHeight: 1.6,
-                    margin: 0,
-                  }}
-                >
-                  复制后粘贴到微信发给爷爷奶奶，链接 7 天内有效
-                </p>
-              </>
-            ) : (
-              <div style={{
-                padding: '12px 16px',
-                background: 'rgba(164,99,85,0.06)',
-                borderRadius: 14,
-                border: '1px solid rgba(164,99,85,0.15)',
-                textAlign: 'center',
-              }}>
-                <div style={{ fontSize: 13, color: '#a46355', fontFamily: 'sans-serif', marginBottom: 8 }}>
-                  升级 Pro 解锁分享功能
-                </div>
-                <button
-                  type="button"
-                  onClick={() => router.push('/upgrade')}
-                  style={{
-                    padding: '8px 20px',
-                    background: '#a46355',
-                    color: '#fff',
-                    border: 'none',
-                    borderRadius: 12,
-                    fontSize: 13,
-                    cursor: 'pointer',
-                    fontFamily: "'Noto Serif SC', serif",
-                  }}
-                >
-                  免费试用30天 →
-                </button>
-              </div>
-            )}
+            <button
+              type="button"
+              disabled={exporting}
+              onClick={() => void handleExportImage()}
+              style={{
+                width: '100%',
+                padding: '14px',
+                borderRadius: 18,
+                border: 'none',
+                background: '#a46355',
+                color: '#fff',
+                fontSize: 15,
+                fontWeight: 600,
+                cursor: exporting ? 'wait' : 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 8,
+                marginBottom: 10,
+                fontFamily: 'var(--font-serif)',
+                opacity: exporting ? 0.75 : 1,
+              }}
+            >
+              {exporting ? <Loader size={18} style={{ animation: 'spin 1s linear infinite' }} /> : <ImageIcon size={18} />}
+              {exporting ? '生成中…' : '生成分享图片'}
+            </button>
+            <button
+              type="button"
+              className="gc-btn gc-btn--ghost"
+              onClick={() => void handleCopy()}
+              style={{ width: '100%', marginBottom: 8 }}
+            >
+              {copied ? <Check size={16} style={{ marginRight: 6 }} /> : <Copy size={16} style={{ marginRight: 6 }} />}
+              {copied ? '链接已复制' : '复制链接'}
+            </button>
+            <p style={{
+              fontSize: 11,
+              color: 'var(--fg3)',
+              textAlign: 'center',
+              lineHeight: 1.6,
+              margin: 0,
+              fontFamily: 'var(--font-body)',
+            }}>
+              链接7天有效，爷奶无需登录
+            </p>
           </div>
         )}
       </motion.div>

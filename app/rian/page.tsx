@@ -60,8 +60,8 @@ const RIAN_TOUR: TourStep[] = [
   },
   {
     id: 'report',
-    title: '每周成长周报',
-    desc: '生成「本周成长故事」，Pro 可复制链接发给国内家人。',
+    title: '成长家书',
+    desc: '为国内家人生成温暖的成长家书，可分享图片或链接。',
     emoji: '💌',
     position: 'bottom',
     targetHint: '试试底部右侧相机按钮',
@@ -400,7 +400,7 @@ export default function RianPage() {
           )}
         </section>
 
-        {/* 区块3：成长周报 */}
+        {/* 区块3：成长家书 */}
         {activeKid && (
           <div style={{ padding: '0 16px 24px' }}>
             <motion.div
@@ -433,7 +433,7 @@ export default function RianPage() {
                     marginBottom: 4,
                   }}
                 >
-                  本周成长故事
+                  成长家书
                 </div>
                 <div
                   style={{
@@ -443,7 +443,7 @@ export default function RianPage() {
                     lineHeight: 1.45,
                   }}
                 >
-                  为国内家人生成一份温暖的周报
+                  为国内家人生成温暖的周报
                 </div>
               </div>
               <span

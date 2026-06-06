@@ -67,7 +67,7 @@ export default function GrandparentClient({
           letterSpacing: '0.05em',
           marginBottom: 6,
         }}>
-          {childName}的成长周报
+          {childName}妈妈发来了
         </div>
         <div style={{
           fontSize: 13,
@@ -96,7 +96,7 @@ export default function GrandparentClient({
           fontFamily: 'sans-serif',
           textTransform: 'uppercase',
         }}>
-          🌸 {childName}写给您的悄悄话
+          🌸 妈妈的家书
         </div>
         <div style={{
           fontSize: 17,
@@ -124,7 +124,7 @@ export default function GrandparentClient({
             fontFamily: 'sans-serif',
             textTransform: 'uppercase',
           }}>
-            🏆 本周小成就
+            🏆 这周的小瞬间
           </div>
           {(content.achievements ?? []).map((achievement: string, i: number) => (
             <div key={i} style={{

@@ -5,6 +5,16 @@ import { getAuthUser } from '@/lib/auth/getAuthUser'
 import { createClient } from '@supabase/supabase-js'
 import Anthropic from '@anthropic-ai/sdk'
 import crypto from 'crypto'
+import {
+  buildLetterPrompt,
+  buildMoments,
+  childAgeFromBirthdate,
+  fetchActiveChildren,
+  gatherChildWeekData,
+  getWeekBounds,
+  getWeekLabel,
+  hasWeekData,
+} from '@/lib/growth/weeklyReportData'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -12,93 +22,7 @@ const supabase = createClient(
 )
 const anthropic = new Anthropic()
 
-function getWeekBounds(now = new Date()) {
-  const dayOfWeek = now.getDay()
-  const weekStart = new Date(now)
-  weekStart.setDate(now.getDate() - dayOfWeek)
-  weekStart.setHours(0, 0, 0, 0)
-  const weekEnd = new Date(weekStart)
-  weekEnd.setDate(weekStart.getDate() + 6)
-  weekEnd.setHours(23, 59, 59, 999)
-  return {
-    weekStart,
-    weekEnd,
-    weekStartStr: weekStart.toISOString().split('T')[0],
-    weekEndStr: weekEnd.toISOString().split('T')[0],
-  }
-}
-
-async function fetchWeekTodos(
-  userId: string,
-  weekStart: Date,
-  weekEnd: Date,
-  childId?: string,
-) {
-  let query = supabase
-    .from('todo_items')
-    .select('title, completed_at, priority, child_id')
-    .eq('user_id', userId)
-    .eq('status', 'done')
-    .gte('completed_at', weekStart.toISOString())
-    .lte('completed_at', weekEnd.toISOString())
-    .limit(20)
-
-  if (childId) {
-    query = query.or(`child_id.eq.${childId},child_id.is.null`)
-  }
-
-  const { data } = await query
-  return data || []
-}
-
-async function fetchWeekHanzi(
-  userId: string,
-  weekStart: Date,
-  weekEnd: Date,
-  childId: string,
-) {
-  const { data: hanziSessions } = await supabase
-    .from('chinese_sessions')
-    .select('input_text, input_type, result')
-    .eq('user_id', userId)
-    .eq('child_id', childId)
-    .gte('learned_at', weekStart.toISOString())
-    .lte('learned_at', weekEnd.toISOString())
-    .limit(10)
-
-  return (
-    hanziSessions
-      ?.filter((s) => s.input_type === 'hanzi')
-      .map((s) => s.input_text)
-      .filter(Boolean) as string[]
-  ) || []
-}
-
-async function fetchActiveChildren(userId: string) {
-  const { data } = await supabase
-    .from('children')
-    .select('id, name, grade, birthdate')
-    .eq('user_id', userId)
-    .or('status.eq.active,status.is.null')
-    .order('created_at', { ascending: true })
-  return data || []
-}
-
-function childAgeLabel(child: { birthdate?: string | null; grade?: string | null }) {
-  if (child.birthdate) {
-    const birth = new Date(child.birthdate as string)
-    if (!Number.isNaN(birth.getTime())) {
-      const age = Math.floor(
-        (Date.now() - birth.getTime()) / (365.25 * 24 * 60 * 60 * 1000),
-      )
-      if (age > 0 && age < 25) return String(age)
-    }
-  }
-  if (child.grade) return String(child.grade)
-  return ''
-}
-
-async function callClaudeLetter(prompt: string, maxTokens = 800) {
+async function callClaudeLetter(prompt: string, maxTokens = 1500) {
   const message = await anthropic.messages.create({
     model: 'claude-sonnet-4-20250514',
     max_tokens: maxTokens,
@@ -181,80 +105,88 @@ export async function POST(req: NextRequest) {
   const child_id = typeof body.child_id === 'string' ? body.child_id : ''
 
   const { weekStart, weekEnd, weekStartStr, weekEndStr } = getWeekBounds()
+  const weekLabel = getWeekLabel()
 
   if (family) {
     const children = await fetchActiveChildren(user.id)
-
     if (!children.length) {
       return NextResponse.json({ error: '暂无孩子档案' }, { status: 404 })
     }
 
-    const todos = await fetchWeekTodos(user.id, weekStart, weekEnd)
-    const todoList = todos.map((t) => t.title).filter(Boolean) as string[]
-
     const childrenData = await Promise.all(
       children.map(async (child) => {
-        const hanzi = await fetchWeekHanzi(user.id, weekStart, weekEnd, child.id)
+        const data = await gatherChildWeekData(
+          user.id,
+          child.id,
+          weekStart,
+          weekEnd,
+          weekStartStr,
+          weekEndStr,
+        )
         return {
           id: child.id,
           name: child.name as string,
-          grade: (child.grade as string) || childAgeLabel(child),
-          hanzi,
+          grade: (child.grade as string) || '',
+          age: childAgeFromBirthdate(child.birthdate as string | null),
+          data,
         }
       }),
     )
 
-    const totalHanzi = childrenData.reduce((n, c) => n + c.hanzi.length, 0)
-    const hasRealData = totalHanzi > 0 || todoList.length > 0
-
+    const hasRealData = childrenData.some((c) => hasWeekData(c.data))
     if (!hasRealData) {
       return NextResponse.json({
         error: 'no_data',
-        message: '本周暂无学习记录，请先记录孩子的学习和生活',
-        week_summary: '本周暂无记录',
+        message: '本周暂无记录，先去学一个汉字或完成一个待办吧',
+        week_summary: '成长家书 · 本周暂无记录',
         content: {
           letter: '',
           no_data: true,
           family: true,
+          week_label: weekLabel,
         },
       })
     }
 
-    const familyPrompt = `请用妈妈的口吻给爷爷奶奶写一封家庭周报。
+    const familyPrompt = `你是一位在泰国陪读的华人妈妈，正在给国内的爷爷奶奶/外公外婆写一封家庭成长家书。
 
-${childrenData.map((c) =>
-  `${c.name}（${c.grade || '—'}）本周学了：${c.hanzi.length > 0 ? c.hanzi.join('、') : '暂无汉字记录'}`,
-).join('\n')}
+${childrenData.map((c) => {
+  const ageLine = c.age != null ? `${c.age}岁` : '年龄未填'
+  return `
+【${c.name}】${ageLine}，${c.grade || '年级未填'}
+- 学校活动：${c.data.events.join('；') || '暂无'}
+- 学了汉字：${c.data.hanzi.join('、') || '暂无'}
+- 这周状态：${c.data.moodTrend}
+- 课外活动：${c.data.activities.join('、') || '暂无'}`
+}).join('\n')}
 
-本周家庭完成的事：
-${todoList.slice(0, 5).map((t) => `- ${t}`).join('\n') || '暂无'}
+本周家庭完成的事：${childrenData.flatMap((c) => c.data.todos).slice(0, 6).join('、') || '暂无'}
 
-要求：温暖亲切，分别提到每个孩子，200字左右，结尾表达思念。不要标题，直接输出信件正文。`
+请写一封200-250字的家书：
+- 语气温柔真实，分别提到每个孩子
+- 必须有一个具体生活细节和妈妈自己的感受
+- 结尾表达对家人的思念
+- 不要冰冷清单式表述
+- 要让爷爷奶奶读完想视频通话
 
-    const letter = await callClaudeLetter(familyPrompt, 1000)
+请直接输出家书正文，不要标题。`
 
-    const achievements: string[] = []
-    childrenData.forEach((c) => {
-      if (c.hanzi.length > 0) {
-        achievements.push(
-          `${c.name}学了 ${c.hanzi.length} 个汉字：${c.hanzi.slice(0, 5).join('、')}${c.hanzi.length > 5 ? ' 等' : ''}`,
-        )
-      }
-    })
-    todoList.slice(0, 4).forEach((title) => achievements.push(title))
-
+    const letter = await callClaudeLetter(familyPrompt, 1500)
+    const achievements = childrenData.flatMap((c) => buildMoments(c.data))
     const childNames = childrenData.map((c) => c.name).join('、')
+
     const content: Record<string, unknown> = {
       letter: letter || '',
       achievements,
-      week_summary: `本周${childNames}共学了 ${totalHanzi} 个字，完成了 ${todoList.length} 件事`,
+      week_summary: `成长家书 · ${childNames}的本周`,
+      week_label: weekLabel,
       child_name: childNames,
       family: true,
       children: childrenData.map((c) => ({
         id: c.id,
         name: c.name,
-        hanzi_count: c.hanzi.length,
-        hanzi: c.hanzi,
+        hanzi_count: c.data.hanzi.length,
+        hanzi: c.data.hanzi,
       })),
     }
 
@@ -292,66 +224,47 @@ ${todoList.slice(0, 5).map((t) => `- ${t}`).join('\n') || '暂无'}
     return NextResponse.json({ error: '孩子不存在' }, { status: 404 })
   }
 
-  const todos = await fetchWeekTodos(user.id, weekStart, weekEnd, child_id)
-  const hanziList = await fetchWeekHanzi(user.id, weekStart, weekEnd, child_id)
-  const todoList = todos.map((t) => t.title).filter(Boolean) as string[]
-  const hasRealData = hanziList.length > 0 || todoList.length > 0
-
   const childName = child.name as string
-  const childAge = childAgeLabel(child)
+  const childAge = childAgeFromBirthdate(child.birthdate as string | null)
+  const grade = (child.grade as string) || ''
+  const weekData = await gatherChildWeekData(
+    user.id,
+    child_id,
+    weekStart,
+    weekEnd,
+    weekStartStr,
+    weekEndStr,
+  )
 
-  if (!hasRealData) {
+  if (!hasWeekData(weekData)) {
     return NextResponse.json({
       error: 'no_data',
-      message: '本周暂无学习记录，请先记录孩子的学习和生活',
-      week_summary: '本周暂无记录',
+      message: '本周暂无记录，先去学一个汉字或完成一个待办吧',
+      week_summary: `成长家书 · ${childName}的本周暂无记录`,
       content: {
         letter: '',
         no_data: true,
         child_name: childName,
+        week_label: weekLabel,
       },
     })
   }
 
-  const prompt = `你是一位海外华人妈妈，正在给国内的爷爷奶奶写本周孩子的成长记录。
+  const prompt = buildLetterPrompt({
+    name: childName,
+    age: childAge,
+    grade,
+    data: weekData,
+  })
 
-孩子信息：${childName}，${childAge || ''}岁
-本周学习的汉字：${hanziList.join('、') || '暂无记录'}
-本周完成的事情：${todoList.join('、') || '暂无记录'}
-
-请用妈妈的口吻写，不要假装是孩子写信。
-要求：
-1. 开头是妈妈对爷奶说话，不是「亲爱的爷爷奶奶，我是XXX」
-2. 描述1-2个具体的真实学习瞬间，要有画面感
-3. 说一件让妈妈感动或惊喜的小事
-4. 结尾表达孩子对爷奶的想念（简短，不煽情）
-5. 整体不超过150字，像一条微信消息
-6. 语气自然、口语化，像真实的妈妈在说话
-
-示例风格：
-「爸妈，这周Noah学了「飞」字，学完自己张开手臂跑了一圈，说自己是飞鸟。我当时差点笑出声。他现在每天主动要学一个字，说想给你们写信。这周一共学了10个，「鱼」字写得最好看，因为想起跟爷爷钓鱼。他说等见到你们要亲自念给你们听。」
-
-请直接输出信件内容，不要任何标题或格式。`
-
-  const letter = await callClaudeLetter(prompt)
-
-  const achievements: string[] = []
-  if (hanziList.length > 0) {
-    achievements.push(
-      hanziList.length <= 5
-        ? `学了 ${hanziList.length} 个汉字：${hanziList.join('、')}`
-        : `学了 ${hanziList.length} 个汉字，包括 ${hanziList.slice(0, 5).join('、')} 等`,
-    )
-  }
-  todoList.slice(0, 4).forEach((title) => achievements.push(title))
+  const letter = await callClaudeLetter(prompt, 1500)
+  const achievements = buildMoments(weekData)
 
   const content: Record<string, unknown> = {
     letter: letter || '',
     achievements,
-    week_summary:
-      hanziList.length > 0 || todoList.length > 0
-        ? `${childName}这周学了 ${hanziList.length} 个字，完成了 ${todoList.length} 件事`
-        : `${childName}本周的成长记录`,
+    week_summary: `成长家书 · ${childName}的本周`,
+    week_label: weekLabel,
     child_name: childName,
     family: false,
   }
