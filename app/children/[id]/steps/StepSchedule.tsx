@@ -6,7 +6,8 @@ import { useParams } from 'next/navigation'
 import { THEME } from '@/app/_shared/_constants/theme'
 import { fetchWithAuth } from '@/lib/auth/fetchWithAuth'
 import { toast } from '@/app/components/Toast'
-import { prepareSchedulePhotoForUpload } from '@/lib/image/prepareSchedulePhoto'
+import { prepareSchedulePhotoVariants, type SchedulePhotoVariant, type SchedulePhotoVariantsResult } from '@/lib/image/prepareSchedulePhoto'
+import { validateScheduleStructure, type ScheduleValidationWarning } from '@/lib/schedule/validateScheduleStructure'
 import { formatSubjectDisplay } from '@/app/_shared/_services/childService'
 
 const DAYS = [
@@ -27,11 +28,12 @@ type ScheduleEntry = {
 
 type ScheduleByDay = Record<string, ScheduleEntry[]>
 
-type ParsePhase = 'idle' | 'parsing' | 'parsed' | 'confirmed'
+type ParsePhase = 'idle' | 'choose_variant' | 'parsing' | 'parsed' | 'confirmed'
 
 type ParsedResult = {
   schedule: ScheduleByDay
   parse_warnings: { day: string; time: string; subject: string; reason: string }[]
+  validation_warnings: ScheduleValidationWarning[]
   school_start_time?: string | null
   school_end_time?: string | null
 }
@@ -158,6 +160,8 @@ function StepSchedule({ data, onChange }: { data: any; onChange: (d: any) => voi
   const [parseError, setParseError] = useState('')
   const [parsedResult, setParsedResult] = useState<ParsedResult | null>(null)
   const [pendingSchedule, setPendingSchedule] = useState<ScheduleByDay>({})
+  const [photoVariants, setPhotoVariants] = useState<SchedulePhotoVariantsResult | null>(null)
+  const [selectedVariant, setSelectedVariant] = useState<'original' | 'rotated'>('rotated')
   const [editDay, setEditDay] = useState<string | null>(null)
   const [editText, setEditText] = useState('')
   const [editingKey, setEditingKey] = useState<string | null>(null)
@@ -174,36 +178,28 @@ function StepSchedule({ data, onChange }: { data: any; onChange: (d: any) => voi
     setParsePhase('idle')
     setParsedResult(null)
     setPendingSchedule({})
+    setPhotoVariants(null)
+    setSelectedVariant('rotated')
     setParseError('')
     setEditingKey(null)
     if (fileRef.current) fileRef.current.value = ''
     if (cameraRef.current) cameraRef.current.value = ''
   }
 
-  const handlePhoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
+  const runParseWithVariant = async (variant: SchedulePhotoVariant) => {
     setParsing(true)
     setParsePhase('parsing')
     setParseError('')
     try {
-      const prepared = await prepareSchedulePhotoForUpload(file)
-      if (prepared.isPortraitTall) {
-        toast('建议横向拍摄课表，效果更好', 'info')
-      }
-      const base64 = prepared.base64
-      if (!base64 || base64.length < 100) {
-        toast('图片读取失败，请重试', 'error')
-        setParsePhase('idle')
-        setParsing(false)
-        return
+      if (!variant.base64 || variant.base64.length < 100) {
+        throw new Error('图片读取失败')
       }
       const resp = await fetchWithAuth('/api/children/parse-schedule', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          image: base64,
-          mediaType: prepared.mediaType,
+          image: variant.base64,
+          mediaType: variant.mediaType,
           childId,
           save: false,
         }),
@@ -216,19 +212,57 @@ function StepSchedule({ data, onChange }: { data: any; onChange: (d: any) => voi
         throw new Error('未识别到有效课程')
       }
 
+      const validation_warnings = (result.validation_warnings as ScheduleValidationWarning[] | undefined)
+        ?? validateScheduleStructure(nextSchedule)
+
       setParsedResult({
         schedule: nextSchedule,
         parse_warnings: result.parse_warnings || [],
+        validation_warnings,
         school_start_time: result.school_start_time,
         school_end_time: result.school_end_time,
       })
       setPendingSchedule(nextSchedule)
       setParsePhase('parsed')
+      setPhotoVariants(null)
     } catch {
       setParseError('解析失败，请手动填写或重试')
-      setParsePhase('idle')
+      setParsePhase(photoVariants?.needsRotationChoice ? 'choose_variant' : 'idle')
     }
     setParsing(false)
+  }
+
+  const handlePhoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setParsing(true)
+    setParseError('')
+    try {
+      const variants = await prepareSchedulePhotoVariants(file)
+      setPhotoVariants(variants)
+      if (variants.isPortraitTall && !variants.needsRotationChoice) {
+        toast('建议横向拍摄课表，效果更好', 'info')
+      }
+      if (variants.needsRotationChoice && variants.rotated) {
+        setSelectedVariant('rotated')
+        setParsePhase('choose_variant')
+        setParsing(false)
+        return
+      }
+      await runParseWithVariant(variants.original)
+    } catch {
+      setParseError('图片处理失败，请重试')
+      setParsePhase('idle')
+      setParsing(false)
+    }
+  }
+
+  const handleStartParse = () => {
+    if (!photoVariants) return
+    const variant = selectedVariant === 'rotated' && photoVariants.rotated
+      ? photoVariants.rotated
+      : photoVariants.original
+    void runParseWithVariant(variant)
   }
 
   const handleConfirmSave = async () => {
@@ -336,18 +370,23 @@ function StepSchedule({ data, onChange }: { data: any; onChange: (d: any) => voi
   const getDayCount = (day: string) => (schedule[day] || []).length
   const totalPending = countEntries(pendingSchedule)
   const showConfirm = parsePhase === 'parsed'
+  const showVariantChoice = parsePhase === 'choose_variant' && photoVariants?.needsRotationChoice
 
   return (
     <div>
       <div style={{ fontSize: 15, fontWeight: 600, color: THEME.navy, marginBottom: 4 }}>课程表 📚</div>
       <div style={{ fontSize: 12, color: THEME.muted, marginBottom: 16, lineHeight: 1.6 }}>
-        {showConfirm ? '请确认识别结果，无误后再保存' : '拍照识别课表（清晰照片效果更好，可手动修改）'}
+        {showConfirm
+          ? '请确认识别结果，无误后再保存'
+          : showVariantChoice
+            ? '检测到竖向课表，请选择识别用的图片方向'
+            : '拍照识别课表（清晰照片效果更好，可手动修改）'}
       </div>
 
       <input ref={fileRef} type="file" accept="image/*" onChange={handlePhoto} style={{ display: 'none' }} />
       <input ref={cameraRef} type="file" accept="image/*" capture="environment" onChange={handlePhoto} style={{ display: 'none' }} />
 
-      {!showConfirm ? (
+      {!showConfirm && !showVariantChoice ? (
         <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
           <motion.button whileTap={{ scale: 0.97 }} onClick={() => cameraRef.current?.click()}
             disabled={parsing}
@@ -361,6 +400,93 @@ function StepSchedule({ data, onChange }: { data: any; onChange: (d: any) => voi
             <Plus size={16} />
             从相册上传
           </motion.button>
+        </div>
+      ) : null}
+
+      {showVariantChoice && photoVariants ? (
+        <div style={{ marginBottom: 16 }}>
+          <div style={{ display: 'flex', gap: 10, marginBottom: 12 }}>
+            {[photoVariants.original, photoVariants.rotated].filter(Boolean).map((v) => {
+              const variant = v as SchedulePhotoVariant
+              const active = selectedVariant === variant.id
+              return (
+                <button
+                  key={variant.id}
+                  type="button"
+                  onClick={() => setSelectedVariant(variant.id)}
+                  style={{
+                    flex: 1,
+                    padding: 10,
+                    borderRadius: 12,
+                    border: active ? `2px solid ${THEME.gold}` : '1px solid rgba(0,0,0,0.1)',
+                    background: active ? 'rgba(164,99,85,0.08)' : 'rgba(255,255,255,0.65)',
+                    cursor: 'pointer',
+                    fontFamily: 'inherit',
+                  }}
+                >
+                  <img
+                    src={variant.previewUrl}
+                    alt={variant.label}
+                    style={{
+                      width: '100%',
+                      maxHeight: 120,
+                      objectFit: 'contain',
+                      borderRadius: 8,
+                      marginBottom: 8,
+                    }}
+                  />
+                  <div style={{ fontSize: 13, fontWeight: active ? 600 : 400, color: THEME.text }}>
+                    {variant.label}
+                  </div>
+                </button>
+              )
+            })}
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <motion.button
+              type="button"
+              whileTap={{ scale: 0.97 }}
+              onClick={resetParse}
+              disabled={parsing}
+              style={{
+                flex: 1,
+                padding: '12px',
+                borderRadius: 12,
+                border: '1.5px solid rgba(0,0,0,0.12)',
+                background: 'rgba(255,255,255,0.7)',
+                color: THEME.text,
+                fontSize: 13,
+                fontWeight: 600,
+                cursor: 'pointer',
+              }}
+            >
+              重新上传
+            </motion.button>
+            <motion.button
+              type="button"
+              whileTap={{ scale: 0.97 }}
+              onClick={handleStartParse}
+              disabled={parsing}
+              style={{
+                flex: 1.4,
+                padding: '12px',
+                borderRadius: 12,
+                border: 'none',
+                background: THEME.navy,
+                color: '#fff',
+                fontSize: 13,
+                fontWeight: 600,
+                cursor: parsing ? 'wait' : 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 8,
+              }}
+            >
+              {parsing ? <Loader size={16} /> : null}
+              开始识别
+            </motion.button>
+          </div>
         </div>
       ) : null}
 
@@ -387,6 +513,24 @@ function StepSchedule({ data, onChange }: { data: any; onChange: (d: any) => voi
               border: '1px solid rgba(180,142,94,0.25)',
             }}>
               ⚠️ {parsedResult!.parse_warnings.length} 个时间无法识别，已跳过
+            </div>
+          ) : null}
+
+          {(parsedResult?.validation_warnings?.length || 0) > 0 ? (
+            <div style={{
+              color: '#7a5a35',
+              fontSize: 12,
+              marginBottom: 12,
+              padding: '10px 12px',
+              borderRadius: 10,
+              background: '#fcf7ed',
+              border: '1px solid rgba(180,142,94,0.25)',
+            }}>
+              {(parsedResult!.validation_warnings).map((w) => (
+                <div key={w.code + w.message} style={{ marginBottom: 4 }}>
+                  ⚠️ {w.message}
+                </div>
+              ))}
             </div>
           ) : null}
 

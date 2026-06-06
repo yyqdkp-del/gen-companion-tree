@@ -123,6 +123,58 @@ function drawImageWithOrientation(
   return canvas
 }
 
+/** 提高对比度与亮度，便于 Vision 识别 */
+export function enhanceCanvas(source: HTMLCanvasElement): HTMLCanvasElement {
+  const out = document.createElement('canvas')
+  out.width = source.width
+  out.height = source.height
+  const ctx = out.getContext('2d')
+  if (!ctx) throw new Error('canvas unsupported')
+  ctx.filter = 'contrast(1.2) brightness(1.05)'
+  ctx.drawImage(source, 0, 0)
+  return out
+}
+
+/** 顺时针旋转 90°（不重复增强） */
+export function rotateCanvas90CW(source: HTMLCanvasElement): HTMLCanvasElement {
+  const out = document.createElement('canvas')
+  out.width = source.height
+  out.height = source.width
+  const ctx = out.getContext('2d')
+  if (!ctx) throw new Error('canvas unsupported')
+  ctx.translate(out.width, 0)
+  ctx.rotate(Math.PI / 2)
+  ctx.drawImage(source, 0, 0)
+  return out
+}
+
+function canvasToJpegVariant(
+  canvas: HTMLCanvasElement,
+  id: 'original' | 'rotated',
+  label: string,
+): SchedulePhotoVariant {
+  const dataUrl = canvas.toDataURL('image/jpeg', 0.9)
+  return {
+    id,
+    label,
+    base64: dataUrl.split(',')[1] || '',
+    mediaType: 'image/jpeg',
+    width: canvas.width,
+    height: canvas.height,
+    previewUrl: dataUrl,
+  }
+}
+
+export type SchedulePhotoVariant = {
+  id: 'original' | 'rotated'
+  label: string
+  base64: string
+  mediaType: 'image/jpeg'
+  width: number
+  height: number
+  previewUrl: string
+}
+
 export type PrepareSchedulePhotoResult = {
   base64: string
   mediaType: 'image/jpeg'
@@ -133,31 +185,47 @@ export type PrepareSchedulePhotoResult = {
   exifOrientation: number | null
 }
 
+export type SchedulePhotoVariantsResult = {
+  original: SchedulePhotoVariant
+  rotated?: SchedulePhotoVariant
+  /** height > width * 1.3，需用户选择原图或旋转后 */
+  needsRotationChoice: boolean
+  isPortraitTall: boolean
+  exifOrientation: number | null
+}
+
+async function fileToOrientedCanvas(file: File): Promise<{
+  canvas: HTMLCanvasElement
+  exifOrientation: number | null
+}> {
+  const exifOrientation = await getJpegExifOrientation(file)
+  const img = await loadImageFromFile(file)
+
+  if (exifOrientation != null && exifOrientation !== 1) {
+    return { canvas: drawImageWithOrientation(img, exifOrientation), exifOrientation }
+  }
+
+  const canvas = document.createElement('canvas')
+  canvas.width = img.naturalWidth || img.width
+  canvas.height = img.naturalHeight || img.height
+  const ctx = canvas.getContext('2d')
+  if (!ctx) throw new Error('canvas unsupported')
+  ctx.drawImage(img, 0, 0)
+  return { canvas, exifOrientation }
+}
+
 /**
- * 读取 EXIF、纠正方向并导出 JPEG base64；无法读取 EXIF 时按原图绘制。
+ * 读取 EXIF、纠正方向、增强对比度并导出 JPEG base64。
  */
 export async function prepareSchedulePhotoForUpload(
   file: File,
 ): Promise<PrepareSchedulePhotoResult> {
-  const exifOrientation = await getJpegExifOrientation(file)
-  const img = await loadImageFromFile(file)
-
-  let canvas: HTMLCanvasElement
-  if (exifOrientation != null && exifOrientation !== 1) {
-    canvas = drawImageWithOrientation(img, exifOrientation)
-  } else {
-    canvas = document.createElement('canvas')
-    canvas.width = img.naturalWidth || img.width
-    canvas.height = img.naturalHeight || img.height
-    const ctx = canvas.getContext('2d')
-    if (!ctx) throw new Error('canvas unsupported')
-    ctx.drawImage(img, 0, 0)
-  }
-
-  const width = canvas.width
-  const height = canvas.height
+  const { canvas, exifOrientation } = await fileToOrientedCanvas(file)
+  const enhanced = enhanceCanvas(canvas)
+  const width = enhanced.width
+  const height = enhanced.height
   const isPortraitTall = height > width * 1.5
-  const dataUrl = canvas.toDataURL('image/jpeg', 0.9)
+  const dataUrl = enhanced.toDataURL('image/jpeg', 0.9)
   const base64 = dataUrl.split(',')[1] || ''
 
   return {
@@ -166,6 +234,30 @@ export async function prepareSchedulePhotoForUpload(
     width,
     height,
     isPortraitTall,
+    exifOrientation,
+  }
+}
+
+/**
+ * 课表识别专用：EXIF 纠正 + 增强 + 可选 90° 旋转版本。
+ */
+export async function prepareSchedulePhotoVariants(
+  file: File,
+): Promise<SchedulePhotoVariantsResult> {
+  const { canvas, exifOrientation } = await fileToOrientedCanvas(file)
+  const enhanced = enhanceCanvas(canvas)
+  const needsRotationChoice = enhanced.height > enhanced.width * 1.3
+
+  const original = canvasToJpegVariant(enhanced, 'original', '原图')
+  const rotated = needsRotationChoice
+    ? canvasToJpegVariant(enhanceCanvas(rotateCanvas90CW(enhanced)), 'rotated', '旋转后')
+    : undefined
+
+  return {
+    original,
+    rotated,
+    needsRotationChoice,
+    isPortraitTall: enhanced.height > enhanced.width * 1.5,
     exifOrientation,
   }
 }

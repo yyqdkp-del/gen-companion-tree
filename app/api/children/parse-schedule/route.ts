@@ -5,6 +5,7 @@ import { normalizeRequiresItems } from '@/lib/packing/packingPreferences'
 import { dedupeScheduleEntries } from '@/lib/schedule/dedupeScheduleEntries'
 import { isPlaceholderSubject } from '@/lib/schedule/placeholderSubject'
 import { applyScheduleTimeValidation, type ParseWarning } from '@/lib/schedule/validateScheduleTime'
+import { validateScheduleStructure, type ScheduleValidationWarning } from '@/lib/schedule/validateScheduleStructure'
 import { createClient } from '@supabase/supabase-js'
 
 const DAYS = ['mon', 'tue', 'wed', 'thu', 'fri'] as const
@@ -23,10 +24,15 @@ const CLAUDE_MODEL = 'claude-haiku-4-5-20251001'
 type VisionMediaType = 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp'
 const VISION_MEDIA_TYPES = new Set<VisionMediaType>(['image/jpeg', 'image/png', 'image/gif', 'image/webp'])
 
+type TimeDirection = 'left' | 'top' | 'right' | 'bottom'
+type DayDirection = 'top' | 'left' | 'bottom' | 'right'
+
 type ScheduleStats = {
+  timeDirection: TimeDirection
+  dayDirection: DayDirection
   days: number
-  lessonsPerDay: number
-  orientation: 'horizontal' | 'vertical'
+  timeSlots: number
+  orientation: 'landscape' | 'portrait'
 }
 
 type ScheduleEntry = {
@@ -283,38 +289,136 @@ function buildVisionImageContent(imageData: string, media_type: VisionMediaType,
 }
 
 function defaultStats(): ScheduleStats {
-  return { days: 5, lessonsPerDay: 8, orientation: 'horizontal' }
+  return {
+    timeDirection: 'left',
+    dayDirection: 'top',
+    days: 5,
+    timeSlots: 14,
+    orientation: 'landscape',
+  }
 }
+
+const TIME_DIRECTIONS = new Set<TimeDirection>(['left', 'top', 'right', 'bottom'])
+const DAY_DIRECTIONS = new Set<DayDirection>(['top', 'left', 'bottom', 'right'])
 
 function parseStats(raw: unknown): ScheduleStats | null {
   if (!raw || typeof raw !== 'object') return null
   const obj = raw as Record<string, unknown>
   const days = parseInt(String(obj.days ?? ''), 10)
-  const lessonsPerDay = parseInt(String(obj.lessonsPerDay ?? obj.lessons_per_day ?? ''), 10)
+  const timeSlots = parseInt(String(obj.timeSlots ?? obj.time_slots ?? obj.lessonsPerDay ?? ''), 10)
   const orientationRaw = String(obj.orientation || '').trim().toLowerCase()
-  const orientation = orientationRaw === 'vertical' ? 'vertical' : 'horizontal'
+  const orientation = orientationRaw === 'portrait' ? 'portrait' : 'landscape'
+  const timeDir = String(obj.timeDirection ?? obj.time_direction ?? 'left').trim().toLowerCase()
+  const dayDir = String(obj.dayDirection ?? obj.day_direction ?? 'top').trim().toLowerCase()
 
   if (!Number.isFinite(days) || days < 1 || days > 7) return null
-  if (!Number.isFinite(lessonsPerDay) || lessonsPerDay < 1 || lessonsPerDay > 20) return null
+  if (!Number.isFinite(timeSlots) || timeSlots < 1 || timeSlots > 30) return null
 
-  return { days, lessonsPerDay, orientation }
+  const timeDirection = TIME_DIRECTIONS.has(timeDir as TimeDirection)
+    ? (timeDir as TimeDirection)
+    : 'left'
+  const dayDirection = DAY_DIRECTIONS.has(dayDir as DayDirection)
+    ? (dayDir as DayDirection)
+    : 'top'
+
+  return { timeDirection, dayDirection, days, timeSlots, orientation }
 }
 
-/** Pass 1：轻量统计课表结构 */
+function buildVisionExtractPrompt(stats: ScheduleStats): string {
+  const dayNames = 'Monday 到 Friday（mon/tue/wed/thu/fri）'
+  const commonRules = `
+重要：
+- 只输出图片中实际显示的时间，不做任何换算
+- 时间格式 HH:MM，只取开始时间
+- 按 mon/tue/wed/thu/fri 分组（工作日，共 ${stats.days} 天）
+- 时间段共 ${stats.timeSlots} 个，请全部提取，不要遗漏早上的课程
+
+只返回 JSON：
+{"mon":[{"time":"07:50","subject":"课程名"}],...}`
+
+  if (stats.timeDirection === 'left') {
+    return `这是一张学校课表图片。
+
+Pass 1 分析结果：
+- 时间列在左边（timeDirection: left）
+- 星期在${stats.dayDirection === 'top' ? '顶行' : stats.dayDirection}（dayDirection: ${stats.dayDirection}）
+- 共 ${stats.days} 天，${stats.timeSlots} 个时间段
+- 图片方向：${stats.orientation}
+
+这张课表时间列在左边，星期在顶行。
+请从左边时间列读取每个时间段（如 7:50-8:00），
+然后从顶行读取星期（${dayNames}），
+填入对应课程。
+
+时间段共 ${stats.timeSlots} 个，从上到下依次提取，不要遗漏早上的课程。
+${commonRules}`
+  }
+
+  if (stats.timeDirection === 'top') {
+    return `这是一张学校课表图片。
+
+Pass 1 分析结果：
+- 时间在顶行（timeDirection: top）
+- 星期在${stats.dayDirection === 'left' ? '左列' : stats.dayDirection}（dayDirection: ${stats.dayDirection}）
+- 共 ${stats.days} 天，${stats.timeSlots} 个时间段
+
+时间在顶行，星期在左列。
+请从顶行读取每个时间段，从左列读取星期（${dayNames}），填入对应课程。
+${commonRules}`
+  }
+
+  if (stats.timeDirection === 'right') {
+    return `这是一张学校课表图片。
+
+Pass 1 分析结果：
+- 时间列在右边（timeDirection: right）
+- 星期在${stats.dayDirection}（dayDirection: ${stats.dayDirection}）
+- 共 ${stats.days} 天，${stats.timeSlots} 个时间段
+
+时间列在右边，请从右列读取时间段，从${stats.dayDirection}读取星期（${dayNames}）。
+${commonRules}`
+  }
+
+  return `这是一张学校课表图片。
+
+Pass 1 分析结果：
+- 时间在底行（timeDirection: bottom）
+- 星期在${stats.dayDirection}（dayDirection: ${stats.dayDirection}）
+- 共 ${stats.days} 天，${stats.timeSlots} 个时间段
+
+时间在底行，请从底行读取时间段，从${stats.dayDirection}读取星期（${dayNames}）。
+${commonRules}`
+}
+
+/** Pass 1：分析课表结构与方向 */
 async function visionAnalyzeStats(imageData: string, media_type: VisionMediaType): Promise<ScheduleStats> {
   const result = await callClaude({
     model: CLAUDE_MODEL,
-    max_tokens: 256,
+    max_tokens: 384,
     messages: [{
       role: 'user',
       content: buildVisionImageContent(
         imageData,
         media_type,
-        `请分析这张课表图片，只回答：
-1. 这是几天的课表？（几列）
-2. 每天大约有几节课？（几行）
-3. 课表是横向还是纵向排列？
-只返回JSON: { "days": number, "lessonsPerDay": number, "orientation": "horizontal"|"vertical" }`,
+        `请仔细分析这张课表图片：
+
+1. 图片方向：
+   - 时间数字（如7:50、8:00）在哪个方向？左列/顶行/右列/底行
+   - 星期（Monday/Tuesday等）在哪个方向？
+
+2. 表格统计：
+   - 一共几天的课表？
+   - 时间段总共几个？（从最早到最晚）
+   - 每个时间段课程名在哪里？
+
+只返回JSON：
+{
+  "timeDirection": "left"|"top"|"right"|"bottom",
+  "dayDirection": "top"|"left"|"bottom"|"right",
+  "days": 5,
+  "timeSlots": 14,
+  "orientation": "landscape"|"portrait"
+}`,
       ),
     }],
   }, 'stats')
@@ -341,34 +445,14 @@ async function visionExtractSchedule(
   media_type: VisionMediaType,
   stats: ScheduleStats,
 ): Promise<ScheduleByDay | null> {
-  const expectedTotal = stats.days * stats.lessonsPerDay
-  const orientationLabel = stats.orientation === 'vertical' ? '纵向' : '横向'
+  const extractPrompt = buildVisionExtractPrompt(stats)
 
   const result = await callClaude({
     model: CLAUDE_MODEL,
     max_tokens: 2000,
     messages: [{
       role: 'user',
-      content: buildVisionImageContent(
-        imageData,
-        media_type,
-        `这是一张学校课表图片。
-
-Pass 1 统计结果（请严格遵守）：
-- 这张课表共 ${stats.days} 天，每天约 ${stats.lessonsPerDay} 节课
-- 课表方向：${orientationLabel}（${stats.orientation}）
-- 请提取所有 ${expectedTotal} 节课程，不能遗漏
-
-请先判断表格方向，再正确提取每天的课程安排。
-
-重要：
-- 只输出图片中实际显示的时间，不做任何换算
-- 时间格式 HH:MM，只取开始时间
-- 按 mon/tue/wed/thu/fri 分组（仅提取工作日，最多 ${stats.days} 天）
-
-只返回 JSON：
-{"mon":[{"time":"07:50","subject":"课程名"}],...}`,
-      ),
+      content: buildVisionImageContent(imageData, media_type, extractPrompt),
     }],
   }, 'vision')
 
@@ -523,6 +607,7 @@ async function persistSchedule(
 async function runParsePipeline(image: string, mediaTypeHint?: string): Promise<{
   schedule: ScheduleByDay
   parse_warnings: ParseWarning[]
+  validation_warnings: ScheduleValidationWarning[]
   school_start_time: string | null
   school_end_time: string | null
   stats: ScheduleStats
@@ -559,7 +644,8 @@ async function runParsePipeline(image: string, mediaTypeHint?: string): Promise<
   }
 
   const finalized = finalizeSchedule(enriched)
-  return { ...finalized, stats }
+  const validation_warnings = validateScheduleStructure(finalized.schedule)
+  return { ...finalized, validation_warnings, stats }
 }
 
 export async function POST(req: NextRequest) {
@@ -596,12 +682,14 @@ export async function POST(req: NextRequest) {
       if (countScheduleEntries(finalized.schedule) === 0) {
         return NextResponse.json({ error: '课表为空，无法保存' }, { status: 400 })
       }
+      const validation_warnings = validateScheduleStructure(finalized.schedule)
       await persistSchedule(req, user.id, childId, finalized.schedule, finalized.school_start_time, finalized.school_end_time)
       return NextResponse.json({
         schedule: finalized.schedule,
         school_start_time: finalized.school_start_time,
         school_end_time: finalized.school_end_time,
         parse_warnings: finalized.parse_warnings,
+        validation_warnings,
         saved: true,
       })
     }
@@ -626,6 +714,7 @@ export async function POST(req: NextRequest) {
       school_start_time: parsed.school_start_time,
       school_end_time: parsed.school_end_time,
       parse_warnings: parsed.parse_warnings,
+      validation_warnings: parsed.validation_warnings,
       stats: parsed.stats,
       saved: save,
     })
