@@ -1,6 +1,13 @@
 import { createClient } from '@supabase/supabase-js'
 import { getUserLocation } from '@/lib/geofence'
 import { getTodayStr, getTodayStrInTimeZone } from '@/lib/date/localDate'
+import {
+  buildRootVisionContext,
+  fetchImageForVision,
+  processDocument,
+  type RootVisionAction,
+  type RootVisionResult,
+} from '@/lib/ai/rootVision'
 
 const MAKE_WEBHOOK_URL = process.env.NEXT_PUBLIC_MAKE_WEBHOOK_URL || ''
 
@@ -657,6 +664,103 @@ async function recordSchoolParsingHistory(userId: string, jobId: string, inputTy
   }
 }
 
+/** 根的眼睛 → 写入建议动作 */
+async function executeRootVisionActions(
+  actions: RootVisionAction[],
+  userId: string,
+  jobId: string,
+  childrenData: any[],
+  today: string,
+  city: string,
+): Promise<string[]> {
+  const todoIds: string[] = []
+  const childId = childrenData?.[0]?.id
+
+  for (const action of actions) {
+    try {
+      switch (action.type) {
+        case 'save_schedule': {
+          if (!childId || !action.data) break
+          await supabase.from('child_profiles').upsert(
+            { user_id: userId, child_id: childId, class_schedule: action.data },
+            { onConflict: 'child_id' },
+          )
+          break
+        }
+
+        case 'add_todo': {
+          const t = action.data as { action?: string; deadline?: string; required?: string }
+          const id = await executeTool('add_todo', {
+            title: t?.action || action.label,
+            dimension: 'education',
+            priority: 2,
+            due_date: t?.deadline || undefined,
+            notes: t?.required || undefined,
+            claude_advice: action.label,
+          }, userId, jobId, childrenData, today, city)
+          if (id) todoIds.push(id)
+          break
+        }
+
+        case 'save_medical': {
+          const med = action.data as {
+            diagnosis?: Record<string, unknown>
+            medications?: unknown[]
+            followup?: Record<string, unknown>
+          }
+          const d = med?.diagnosis || {}
+          const follow = med?.followup || {}
+          await executeTool('add_health', {
+            type: 'visit',
+            description: String(d.diagnosis || action.label),
+            doctor_name: d.doctor ? String(d.doctor) : undefined,
+            hospital: d.hospital ? String(d.hospital) : undefined,
+            date: d.date ? String(d.date) : today,
+            follow_up_date: follow.followupDate ? String(follow.followupDate) : undefined,
+            notes: [
+              med.medications?.length ? `药物 ${med.medications.length} 种` : '',
+              follow.instructions ? String(follow.instructions) : '',
+            ].filter(Boolean).join('；') || undefined,
+          }, userId, jobId, childrenData, today, city)
+          break
+        }
+
+        case 'save_document': {
+          const doc = action.data as Record<string, unknown>
+          await executeTool('add_document', {
+            doc_type: String(doc.type || 'passport'),
+            title: String(doc.name || action.label),
+            member_name: doc.name ? String(doc.name) : undefined,
+            expiry_date: doc.expiryDate ? String(doc.expiryDate) : undefined,
+            notes: doc.passportNumber ? `证件号 ${doc.passportNumber}` : undefined,
+          }, userId, jobId, childrenData, today, city)
+          break
+        }
+
+        case 'add_reminder':
+        case 'add_payment_reminder': {
+          const payload = action.data as Record<string, unknown>
+          const triggerDate =
+            String(payload.followupDate || payload.expiryDate || payload.date || today).slice(0, 10)
+          await executeTool('add_reminder', {
+            title: action.label,
+            trigger_date: triggerDate,
+            message: String(payload.instructions || payload.total || action.label),
+          }, userId, jobId, childrenData, today, city)
+          break
+        }
+
+        default:
+          console.warn('[rootVision] unknown action type:', action.type)
+      }
+    } catch (e) {
+      console.error('[rootVision] action failed:', action.type, e)
+    }
+  }
+
+  return todoIds
+}
+
 // ══ 处理单个 job ══
 export async function processJob(job: any) {
   const { id: jobId, user_id: userId, input_type, raw_content, file_url } = job
@@ -680,17 +784,46 @@ export async function processJob(job: any) {
       }
     }
 
+    let rootVisionResult: RootVisionResult | null = null
+    let rootVisionTodoIds: string[] = []
+
+    if ((input_type === 'image' || input_type === 'document') && file_url && process.env.GOOGLE_AI_API_KEY) {
+      try {
+        const { base64, mimeType } = await fetchImageForVision(file_url)
+        rootVisionResult = await processDocument(base64, mimeType)
+        rootVisionTodoIds = await executeRootVisionActions(
+          rootVisionResult.actions,
+          userId,
+          jobId,
+          childrenData,
+          today,
+          city,
+        )
+        console.log('[rootVision] processed:', rootVisionResult.docType, rootVisionResult.summary)
+      } catch (e) {
+        console.error('[rootVision] processDocument failed:', e)
+      }
+    }
+
+    const visionContext = rootVisionResult ? `\n\n${buildRootVisionContext(rootVisionResult)}` : ''
+
     const messages: any[] = []
     if (input_type === 'image' && file_url) {
       messages.push({
         role: 'user',
         content: [
           { type: 'image', source: { type: 'url', url: file_url } },
-          { type: 'text', text: processedContent || '提取事件/日程/健康，逐条调工具' },
+          {
+            type: 'text',
+            text: `${rootVisionResult?.summary || processedContent || '提取事件/日程/健康，逐条调工具'}${visionContext}\n\n请根据根的眼睛结构化结果补充或确认待办/校历/健康记录，逐条调工具。`,
+          },
         ],
       })
     } else {
-      messages.push({ role: 'user', content: processedContent })
+      messages.push({
+        role: 'user',
+        content: `${processedContent || ''}${visionContext}`.trim() || processedContent,
+      })
     }
 
     const response = await fetch('https://api.anthropic.com/v1/messages', {
@@ -726,7 +859,10 @@ export async function processJob(job: any) {
         executeTool(toolUse.name, toolUse.input, userId, jobId, childrenData, today, city),
       ),
     )
-    const todoIds = todoIdResults.filter((id): id is string => Boolean(id))
+    const todoIds = [
+      ...rootVisionTodoIds,
+      ...todoIdResults.filter((id): id is string => Boolean(id)),
+    ]
 
     void recordSchoolParsingHistory(userId, jobId, input_type, processedContent || '', toolUses, todoIds.length)
     void preheatGrok(todoIds, toolUses, city).catch((e) => console.error('预热失败:', e))
@@ -735,7 +871,10 @@ export async function processJob(job: any) {
       processed: true,
       status: 'done',
       completed_at: new Date().toISOString(),
-      extracted_events: toolUses.map((t: any) => ({ tool: t.name, input: t.input })),
+      extracted_events: [
+        ...(rootVisionResult ? [{ tool: 'root_vision', input: rootVisionResult }] : []),
+        ...toolUses.map((t: any) => ({ tool: t.name, input: t.input })),
+      ],
     }).eq('id', jobId)
 
   } catch (e: any) {

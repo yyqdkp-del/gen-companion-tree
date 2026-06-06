@@ -6,6 +6,7 @@ import { dedupeScheduleEntries } from '@/lib/schedule/dedupeScheduleEntries'
 import { isPlaceholderSubject } from '@/lib/schedule/placeholderSubject'
 import { applyScheduleTimeValidation, type ParseWarning } from '@/lib/schedule/validateScheduleTime'
 import { validateScheduleStructure, type ScheduleValidationWarning } from '@/lib/schedule/validateScheduleStructure'
+import { processDocument } from '@/lib/ai/rootVision'
 import { createClient } from '@supabase/supabase-js'
 
 const DAYS = ['mon', 'tue', 'wed', 'thu', 'fri'] as const
@@ -20,8 +21,6 @@ const CATEGORY_SET = new Set(['class', 'life', 'break', 'transition', 'activity'
 type ScheduleCategory = 'class' | 'life' | 'break' | 'transition' | 'activity'
 
 const CLAUDE_MODEL = 'claude-haiku-4-5-20251001'
-const GEMINI_URL =
-  'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent'
 
 type VisionMediaType = 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp'
 const VISION_MEDIA_TYPES = new Set<VisionMediaType>(['image/jpeg', 'image/png', 'image/gif', 'image/webp'])
@@ -316,179 +315,6 @@ function parseStats(raw: unknown): ScheduleStats | null {
   return { timeDirection, dayDirection, days, timeSlots, orientation }
 }
 
-function cleanVisionBase64(imageBase64: string): string {
-  return imageBase64
-    .replace(/^data:image\/\w+;base64,/, '')
-    .replace(/\s/g, '')
-}
-
-async function callGeminiVision(
-  imageBase64: string,
-  mimeType: VisionMediaType,
-  prompt: string,
-  generationConfig: { temperature: number; maxOutputTokens: number },
-  label: string,
-): Promise<string> {
-  const key = process.env.GOOGLE_AI_API_KEY
-  if (!key) {
-    throw new Error('GOOGLE_AI_API_KEY not configured')
-  }
-
-  const cleanBase64 = cleanVisionBase64(imageBase64)
-  const requestUrl = `${GEMINI_URL}?key=${key}`
-
-  console.log(`[parse-schedule] ${label} Gemini request:`, {
-    url: GEMINI_URL,
-    hasApiKey: !!key,
-    imageSize: cleanBase64.length,
-    mimeType,
-  })
-
-  const response = await fetch(requestUrl, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      contents: [{
-        parts: [
-          { inline_data: { mime_type: mimeType, data: cleanBase64 } },
-          { text: prompt },
-        ],
-      }],
-      generationConfig,
-    }),
-  })
-
-  if (!response.ok) {
-    const errorText = await response.text()
-    console.error(`[parse-schedule] ${label} Gemini error:`, response.status, errorText)
-    throw new Error(`Gemini ${response.status}: ${errorText}`)
-  }
-
-  const data = await response.json()
-  console.error(`[parse-schedule] ${label} status:`, response.status)
-
-  return data.candidates?.[0]?.content?.parts?.[0]?.text || ''
-}
-
-function parseGeminiJson(text: string): unknown | null {
-  const clean = text.replace(/```json|```/g, '').trim()
-  try {
-    return JSON.parse(clean)
-  } catch {
-    const m = clean.match(/\{[\s\S]*\}/)
-    if (!m) return null
-    try {
-      return JSON.parse(m[0])
-    } catch {
-      return null
-    }
-  }
-}
-
-/** Pass 1：Gemini 分析课表结构与方向 */
-async function visionAnalyzeStats(imageBase64: string, mimeType: VisionMediaType = 'image/jpeg'): Promise<ScheduleStats> {
-  const prompt = `请分析这张课表图片的表格结构，只返回JSON：
-{
-  "timeDirection": "left",（时间在哪列：left/top/right/bottom）
-  "dayDirection": "top",（星期在哪行：top/left/bottom/right）
-  "days": 5,（几天）
-  "timeSlots": 14,（几个时间段）
-  "orientation": "portrait"（图片方向：portrait/landscape）
-}
-只返回JSON不要其他文字。`
-
-  const text = await callGeminiVision(imageBase64, mimeType, prompt, { temperature: 0, maxOutputTokens: 200 }, 'gemini-stats')
-  const parsed = parseGeminiJson(text)
-  const stats = parseStats(parsed)
-  if (stats) {
-    console.error('[parse-schedule] stats:', stats)
-    return stats
-  }
-
-  console.error('[parse-schedule] gemini stats parse failed, using defaults')
-  return defaultStats()
-}
-
-/** Pass 2：Gemini 提取 time + subject（带 Pass 1 约束） */
-async function visionExtractSchedule(
-  imageBase64: string,
-  mimeType: VisionMediaType = 'image/jpeg',
-  stats?: ScheduleStats,
-): Promise<ScheduleByDay | null> {
-  const orientation = stats?.timeDirection || 'unknown'
-  const days = stats?.days || 5
-  const slots = stats?.timeSlots || 10
-
-  const prompt = `这是一张学校周课表图片。
-
-表格说明：
-- 时间列方向：${orientation === 'left' ? '时间在左列，从上到下' : '请自行判断'}
-- 预计天数：${days}天
-- 预计时间段：${slots}个
-
-请仔细分析表格结构，提取每天的课程：
-
-重要规则：
-1. 每个时间段每天只有一节课，绝对不要重复
-2. 相同课程名在同一天只出现一次
-3. 时间只取开始时间，格式 HH:MM
-4. 课程名拼写错误请纠正（如 Reddling→Reading）
-5. 以下是日常安排不是课程：
-   Breakfast、Morning Routine、Snack、Lunch、
-   Rest Time、Pick up、Outdoor Play
-   这些设 category: "break" 或 "transition"
-6. 真实课程设 category: "class" 或 "activity"
-
-只返回JSON，格式：
-{
-  "mon": [{"time":"07:50","subject":"Breakfast","category":"break"},...],
-  "tue": [...],
-  "wed": [...],
-  "thu": [...],
-  "fri": [...]
-}
-
-不要返回其他任何文字。`
-
-  const text = await callGeminiVision(
-    imageBase64,
-    mimeType,
-    prompt,
-    { temperature: 0.1, maxOutputTokens: 3000 },
-    'gemini-vision',
-  )
-
-  console.error('[parse-schedule] gemini vision raw FULL:', text?.slice(0, 2000))
-
-  if (!text) return null
-
-  const parsed = parseGeminiJson(text)
-  if (!parsed) {
-    console.error('[parse-schedule] Gemini 课表识别解析失败:', text.slice(0, 200))
-    return null
-  }
-
-  const schedule = normalizeSchedule(parsed, false)
-  const total = countScheduleEntries(schedule)
-  if (total === 0) {
-    if (Array.isArray(parsed)) {
-      console.error('[parse-schedule] vision parsed as root array, length:', parsed.length)
-    } else {
-      const root = parsed as Record<string, unknown>
-      const daysObj =
-        root.days && typeof root.days === 'object' && !Array.isArray(root.days)
-          ? (root.days as Record<string, unknown>)
-          : root
-      console.error('[parse-schedule] vision parsed top-level keys:', Object.keys(parsed as object))
-      console.error('[parse-schedule] vision raw per-key lengths (before filter):', countRawDayEntries(daysObj))
-    }
-    console.error('[parse-schedule] vision cleaned per-day counts:', Object.fromEntries(DAYS.map((d) => [d, schedule[d].length])))
-    console.error('[parse-schedule] vision: no entries extracted')
-    return null
-  }
-  return schedule
-}
-
 /** 语义理解，补充 name_zh + category（enrichSchedule） */
 async function enrichSchedule(step1: ScheduleByDay): Promise<ScheduleByDay | null> {
   const totalEntries = countScheduleEntries(step1)
@@ -612,6 +438,7 @@ async function runParsePipeline(image: string, mediaTypeHint?: string): Promise<
   school_start_time: string | null
   school_end_time: string | null
   stats: ScheduleStats
+  rootVision?: { docType: string; confidence: number; summary: string }
 } | null> {
   const { data: imageData, media_type, hasDataUrlPrefix } = prepareVisionImageInput(image, mediaTypeHint)
 
@@ -632,9 +459,23 @@ async function runParsePipeline(image: string, mediaTypeHint?: string): Promise<
     base64Prefix: imageData.slice(0, 32),
   })
 
-  const stats = await visionAnalyzeStats(imageData, media_type)
-  const step1 = await visionExtractSchedule(imageData, media_type, stats)
-  if (!step1) return null
+  const vision = await processDocument(imageData, media_type)
+  console.error('[parse-schedule] rootVision:', {
+    docType: vision.docType,
+    confidence: vision.confidence,
+    summary: vision.summary,
+  })
+
+  if (vision.docType !== 'schedule' && vision.confidence >= 0.55) {
+    console.error('[parse-schedule] not a schedule image:', vision.docType)
+    return null
+  }
+
+  const step1 = normalizeSchedule(vision.data, false)
+  if (countScheduleEntries(step1) === 0) {
+    console.error('[parse-schedule] rootVision schedule empty after normalize')
+    return null
+  }
 
   console.error('[parse-schedule] step1 entries:', countScheduleEntries(step1))
 
@@ -646,7 +487,16 @@ async function runParsePipeline(image: string, mediaTypeHint?: string): Promise<
 
   const finalized = finalizeSchedule(enriched)
   const validation_warnings = validateScheduleStructure(finalized.schedule)
-  return { ...finalized, validation_warnings, stats }
+  return {
+    ...finalized,
+    validation_warnings,
+    stats: defaultStats(),
+    rootVision: {
+      docType: vision.docType,
+      confidence: vision.confidence,
+      summary: vision.summary,
+    },
+  }
 }
 
 export async function POST(req: NextRequest) {
@@ -724,6 +574,7 @@ export async function POST(req: NextRequest) {
       parse_warnings: parsed.parse_warnings,
       validation_warnings: parsed.validation_warnings,
       stats: parsed.stats,
+      rootVision: parsed.rootVision,
       saved: save,
     })
 
