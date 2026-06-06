@@ -12,8 +12,7 @@ import { useChildDailyLog } from '@/app/_shared/_hooks/useChildDailyLog'
 import { calculateEnergy } from '@/app/_shared/_engine/energy'
 import ChildEnergyCard from '@/app/_shared/_components/ChildEnergyCard'
 import { TimelineSegment, buildTimelineSegments } from '@/app/_shared/_components/design'
-import { buildPackingRows, countPendingPackingRows } from '@/lib/packing/buildPackingRows'
-import type { PackingPreferencesMap } from '@/lib/packing/packingPreferences'
+import { countPendingSmartItems, type SmartPackingItem } from '@/lib/packing/packingMemory'
 import type { HealthStatus, MoodStatus } from '@/app/_shared/_types'
 import type { WeeklyScheduleIntelligence } from '@/lib/ai/scheduleIntelligence'
 import { isRealScheduleClass, type ScheduleClass } from '@/app/_shared/_engine/momentCard'
@@ -22,7 +21,6 @@ import {
   dedupeCalendarEvents,
   FG3,
   getTodayKey,
-  loadBroughtMap,
   PackingSection,
   StatusEditor,
 } from '@/app/_shared/_components/child/childScheduleShared'
@@ -45,9 +43,17 @@ type Props = {
   onClose: () => void
   onAdd: () => void
   onStatusSaved?: () => void | Promise<void>
+  smartPacking: SmartPackingItem[]
+  onPackingRefresh: () => void | Promise<void>
 }
 
-export default function ChildSheet({ onClose, onAdd, onStatusSaved }: Props) {
+export default function ChildSheet({
+  onClose,
+  onAdd,
+  onStatusSaved,
+  smartPacking,
+  onPackingRefresh,
+}: Props) {
   const router = useRouter()
   const { userId, kids, activeKid } = useApp()
   const sel = activeKid
@@ -56,16 +62,8 @@ export default function ChildSheet({ onClose, onAdd, onStatusSaved }: Props) {
   const {
     timeline,
     calendar,
-    packingItems,
-    packingPreferences,
     loading,
-    reload: reloadSchedule,
   } = useChildSchedule(sel?.id, userId, today)
-
-  const [packPrefs, setPackPrefs] = useState<PackingPreferencesMap>({})
-  useEffect(() => {
-    setPackPrefs(packingPreferences)
-  }, [packingPreferences, sel?.id])
 
   const { dailyLog, saveStatus } = useChildDailyLog(sel?.id, userId, today)
   const [showStatusEditor, setShowStatusEditor] = useState(false)
@@ -98,17 +96,10 @@ export default function ChildSheet({ onClose, onAdd, onStatusSaved }: Props) {
   const isNonEmptyTitle = (e: { title?: string }) => typeof e?.title === 'string' && e.title.trim().length > 0
   const todayEvents = dedupeCalendarEvents(calendar.filter((e) => e.date_start === today).filter(isNonEmptyTitle))
 
-  const broughtStorageKey = sel ? `packing_brought_${sel.id}_${today}` : ''
-  const packingRows = useMemo(() => {
-    if (!sel) return []
-    return buildPackingRows(timeline, todayEvents, packingItems, packPrefs)
-  }, [sel, timeline, todayEvents, packingItems, packPrefs])
-
-  const todayPackCount = useMemo(() => {
-    if (!sel) return 0
-    const brought = loadBroughtMap(broughtStorageKey)
-    return countPendingPackingRows(packingRows, brought)
-  }, [sel, packingRows, broughtStorageKey])
+  const todayPackCount = useMemo(
+    () => countPendingSmartItems(smartPacking),
+    [smartPacking],
+  )
 
   const timelineSegments = useMemo(
     () => buildTimelineSegments(timeline, todayEvents, sel?.school_start_time),
@@ -296,7 +287,7 @@ export default function ChildSheet({ onClose, onAdd, onStatusSaved }: Props) {
                     )}
 
                     {!isWeekend && (
-                      packingRows.length === 0 ? (
+                      smartPacking.length === 0 ? (
                         <div style={{
                           fontFamily: 'var(--font-body)',
                           fontSize: 13,
@@ -313,13 +304,9 @@ export default function ChildSheet({ onClose, onAdd, onStatusSaved }: Props) {
                           <PackingSection
                             childId={sel.id}
                             userId={userId}
-                            today={today}
+                            smartItems={smartPacking}
                             timeline={timeline}
-                            calendarToday={todayEvents}
-                            packingItems={packingItems}
-                            packingPreferences={packPrefs}
-                            onPrefsChange={setPackPrefs}
-                            onReload={reloadSchedule}
+                            onRefresh={onPackingRefresh}
                           />
                         </Accordion>
                       )

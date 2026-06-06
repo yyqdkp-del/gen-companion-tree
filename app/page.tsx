@@ -42,6 +42,8 @@ import { sanitizeFileName } from '@/lib/storage/sanitizeFileName'
 import { useRouter } from 'next/navigation'
 import HomeRefreshFromQuery from '@/app/components/HomeRefreshFromQuery'
 import { PAGE_BOTTOM_TAB_ONLY } from '@/app/_shared/_constants/layout'
+import { useSmartPacking } from '@/lib/packing/useSmartPacking'
+import { recordAllPackingConfirmed } from '@/lib/packing/packingMemory'
 
 type ScheduleItem = ScheduleClass & { location?: string; requires_action?: string }
 type UrgentItem = { title: string; level: 'red' | 'orange' | 'yellow' }
@@ -1053,6 +1055,13 @@ export default function BasePage() {
 
   const todayClasses = (activeKid as any)?.today_classes || []
 
+  const { smartPacking, tomorrowSmartPacking, reloadSmartPacking } = useSmartPacking(
+    activeKid?.id,
+    userId ?? undefined,
+    todayClasses,
+    (activeKid as { class_schedule?: Record<string, unknown[]> })?.class_schedule,
+  )
+
   const childValue = !activeKid ? '—'
     : (activeKid as any).energy_label || (activeKid as any).energy_focus?.slice(0, 10) || '—'
 
@@ -1175,6 +1184,8 @@ export default function BasePage() {
       overviewBriefing: rootBriefing,
       hotspots: unreadHotspots,
       scheduleIntelligence: (activeKid as { schedule_intelligence?: import('@/lib/ai/scheduleIntelligence').WeeklyScheduleIntelligence | null })?.schedule_intelligence ?? null,
+      smartPacking,
+      tomorrowSmartPacking,
     }),
     [
       now,
@@ -1187,6 +1198,8 @@ export default function BasePage() {
       packReadyDismissed,
       rootBriefing,
       unreadHotspots,
+      smartPacking,
+      tomorrowSmartPacking,
     ],
   )
 
@@ -1199,6 +1212,11 @@ export default function BasePage() {
         router.push('/profile/cards')
         break
       case 'pack_ready':
+        if (activeKid?.id && userId) {
+          void recordAllPackingConfirmed(activeKid.id, userId, smartPacking).then(() => {
+            void reloadSmartPacking()
+          })
+        }
         if (packReadyKey) {
           try {
             localStorage.setItem(packReadyKey, '1')
@@ -1245,6 +1263,10 @@ export default function BasePage() {
     }
   }, [
     packReadyKey,
+    activeKid?.id,
+    userId,
+    smartPacking,
+    reloadSmartPacking,
     todayFocusTodos,
     displayTodos,
     rootBriefing.urgentTodoId,
@@ -1525,7 +1547,10 @@ export default function BasePage() {
             onStatusSaved={async () => {
               if (!activeKid?.id) return
               await selectChild(activeKid.id, { force: true })
-            }} />
+            }}
+            smartPacking={smartPacking}
+            onPackingRefresh={reloadSmartPacking}
+          />
         )}
         {modal === 'todo' && (
           <TodoSheet key="todo" todos={displayTodos} onClose={() => closeModal()}

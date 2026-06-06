@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useMemo, useState } from 'react'
 import { AnimatePresence } from 'framer-motion'
 import Accordion from '@/app/_shared/_components/Accordion'
 import ChildEnergyCard from '@/app/_shared/_components/ChildEnergyCard'
@@ -8,7 +8,6 @@ import {
   dedupeCalendarEvents,
   FG3,
   getTodayKey,
-  loadBroughtMap,
   PackingSection,
   StatusEditor,
 } from '@/app/_shared/_components/child/childScheduleShared'
@@ -17,8 +16,8 @@ import { calculateEnergy } from '@/app/_shared/_engine/energy'
 import { useChildDailyLog } from '@/app/_shared/_hooks/useChildDailyLog'
 import { useChildSchedule } from '@/app/_shared/_hooks/useChildSchedule'
 import { useApp } from '@/app/context/AppContext'
-import { buildPackingRows, countPendingPackingRows } from '@/lib/packing/buildPackingRows'
-import type { PackingPreferencesMap } from '@/lib/packing/packingPreferences'
+import { countPendingSmartItems } from '@/lib/packing/packingMemory'
+import { useSmartPacking } from '@/lib/packing/useSmartPacking'
 import type { HealthStatus, MoodStatus } from '@/app/_shared/_types'
 
 type Props = {
@@ -28,22 +27,16 @@ type Props = {
 export default function ChildTab({ onStatusSaved }: Props) {
   const { userId, activeKid } = useApp()
   const sel = activeKid
-
   const today = getTodayKey()
+  const todayClasses = (sel as { today_classes?: unknown[] })?.today_classes ?? []
 
-  const {
-    timeline,
-    calendar,
-    packingItems,
-    packingPreferences,
-    loading,
-    reload: reloadSchedule,
-  } = useChildSchedule(sel?.id, userId ?? undefined, today)
-
-  const [packPrefs, setPackPrefs] = useState<PackingPreferencesMap>({})
-  useEffect(() => {
-    setPackPrefs(packingPreferences)
-  }, [packingPreferences, sel?.id])
+  const { timeline, calendar, loading } = useChildSchedule(sel?.id, userId ?? undefined, today)
+  const { smartPacking, reloadSmartPacking } = useSmartPacking(
+    sel?.id,
+    userId ?? undefined,
+    todayClasses,
+    sel?.class_schedule as Record<string, unknown[]> | undefined,
+  )
 
   const { dailyLog, saveStatus } = useChildDailyLog(sel?.id, userId ?? undefined, today)
   const [showStatusEditor, setShowStatusEditor] = useState(false)
@@ -73,13 +66,10 @@ export default function ChildTab({ onStatusSaved }: Props) {
   const isNonEmptyTitle = (e: { title?: string }) => typeof e?.title === 'string' && e.title.trim().length > 0
   const todayEvents = dedupeCalendarEvents(calendar.filter((e) => e.date_start === today).filter(isNonEmptyTitle))
 
-  const broughtStorageKey = sel ? `packing_brought_${sel.id}_${today}` : ''
-  const todayPackCount = useMemo(() => {
-    if (!sel) return 0
-    const brought = loadBroughtMap(broughtStorageKey)
-    const rows = buildPackingRows(timeline, todayEvents, packingItems, packPrefs)
-    return countPendingPackingRows(rows, brought)
-  }, [sel, timeline, todayEvents, packingItems, packPrefs, broughtStorageKey])
+  const todayPackCount = useMemo(
+    () => countPendingSmartItems(smartPacking),
+    [smartPacking],
+  )
 
   const timelineSegments = useMemo(
     () => buildTimelineSegments(timeline, todayEvents, sel?.school_start_time),
@@ -149,13 +139,9 @@ export default function ChildTab({ onStatusSaved }: Props) {
         <PackingSection
           childId={sel.id}
           userId={userId!}
-          today={today}
+          smartItems={smartPacking}
           timeline={timeline}
-          calendarToday={todayEvents}
-          packingItems={packingItems}
-          packingPreferences={packPrefs}
-          onPrefsChange={setPackPrefs}
-          onReload={reloadSchedule}
+          onRefresh={reloadSmartPacking}
         />
       </Accordion>
 

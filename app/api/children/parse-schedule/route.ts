@@ -8,6 +8,7 @@ import { applyScheduleTimeValidation, type ParseWarning } from '@/lib/schedule/v
 import { validateScheduleStructure, type ScheduleValidationWarning } from '@/lib/schedule/validateScheduleStructure'
 import { processSchedule } from '@/lib/ai/rootVision'
 import { refreshScheduleIntelligence } from '@/lib/ai/scheduleIntelligence'
+import { initPackingMemoryFromSchedule } from '@/lib/packing/packingMemory'
 import { createClient } from '@supabase/supabase-js'
 
 const DAYS = ['mon', 'tue', 'wed', 'thu', 'fri'] as const
@@ -426,6 +427,10 @@ async function persistSchedule(
     supabase: serviceSupabase,
   }).catch((err) => {
     console.error('[parse-schedule] schedule intelligence failed:', err)
+  })
+
+  void initPackingMemoryFromSchedule(childId, userId, schedule, serviceSupabase).catch((err) => {
+    console.error('[parse-schedule] packing memory init failed:', err)
   })
 
   if (school_start_time || school_end_time) {

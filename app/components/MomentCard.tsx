@@ -249,7 +249,7 @@ function PackingBody({
                       style={{
                         fontFamily: 'var(--font-serif)',
                         fontSize: 15,
-                        color: done ? 'var(--fg3)' : '#2d322f',
+                        color: done ? 'var(--fg3)' : b.isHighRisk ? '#EA580C' : '#2d322f',
                         lineHeight: 1.45,
                         textDecoration: done ? 'line-through' : 'none',
                         transition: 'color 200ms ease',
@@ -257,7 +257,18 @@ function PackingBody({
                     >
                       {b.item}
                     </div>
-                    {b.context ? (
+                    {b.isHighRisk ? (
+                      <div
+                        style={{
+                          fontFamily: 'var(--font-body)',
+                          fontSize: 11,
+                          color: '#EA580C',
+                          marginTop: 2,
+                        }}
+                      >
+                        ⚠️ 上次忘带过
+                      </div>
+                    ) : b.context ? (
                       <div
                         style={{
                           fontFamily: 'var(--font-body)',

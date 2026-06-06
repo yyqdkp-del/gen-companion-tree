@@ -5,17 +5,13 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { X } from 'lucide-react'
 import { THEME, GREEN } from '@/app/_shared/_constants/theme'
 import { EVENT_TYPE_EMOJI } from '@/app/_shared/_constants/categories'
-import { buildPackingRows } from '@/lib/packing/buildPackingRows'
+import { packingSubjectKey } from '@/lib/packing/packingPreferences'
 import {
-  mergeDismissedItem,
-  mergeManualItem,
-  packingSubjectKey,
-  type PackingPreferencesMap,
-} from '@/lib/packing/packingPreferences'
-import {
-  appendPackingListItem,
-  savePackingPreferences,
-} from '@/app/_shared/_services/childService'
+  addManualPackingMemory,
+  recordAllPackingConfirmed,
+  recordPackingAction,
+  type SmartPackingItem,
+} from '@/lib/packing/packingMemory'
 import type { Child, TimelineItem, HealthStatus, MoodStatus } from '@/app/_shared/_types'
 import { addDaysStr, getTodayStr } from '@/lib/date/localDate'
 import { logOrAlertNetworkError } from '@/lib/errors/logOrAlertNetworkError'
@@ -104,42 +100,23 @@ const moodOptions = [
 export function PackingSection({
   childId,
   userId,
-  today,
+  smartItems,
   timeline,
-  calendarToday,
-  packingItems,
-  packingPreferences,
-  onPrefsChange,
-  onReload,
+  onRefresh,
 }: {
   childId: string
   userId: string
-  today: string
+  smartItems: SmartPackingItem[]
   timeline: TimelineItem[]
-  calendarToday: { title?: string; requires_items?: unknown }[]
-  packingItems: string[]
-  packingPreferences: PackingPreferencesMap
-  onPrefsChange: (p: PackingPreferencesMap) => void
-  onReload: () => void
+  onRefresh: () => void | Promise<void>
 }) {
-  const broughtKey = `packing_brought_${childId}_${today}`
-  const [brought, setBrought] = useState<Record<string, boolean>>(() => loadBroughtMap(broughtKey))
   const [showAdd, setShowAdd] = useState(false)
   const [addName, setAddName] = useState('')
   const [addCourse, setAddCourse] = useState('__once__')
   const [busy, setBusy] = useState(false)
 
-  useEffect(() => {
-    setBrought(loadBroughtMap(broughtKey))
-  }, [broughtKey, childId, today])
-
-  const rows = useMemo(
-    () => buildPackingRows(timeline, calendarToday, packingItems, packingPreferences),
-    [timeline, calendarToday, packingItems, packingPreferences],
-  )
-
   const courseOptions = useMemo(() => {
-    const opts: { key: string; label: string }[] = [{ key: '__once__', label: '今天一次性' }]
+    const opts: { key: string; label: string }[] = [{ key: '__once__', label: '不关联课程' }]
     const seen = new Set<string>()
     for (const t of timeline.filter((x) => x.source === 'schedule')) {
       const ev = (t.event || {}) as { subject?: string }
@@ -151,29 +128,42 @@ export function PackingSection({
     return opts
   }, [timeline])
 
-  const markBrought = (rowId: string) => {
-    setBrought((prev) => {
-      const next = { ...prev, [rowId]: true }
-      try {
-        localStorage.setItem(broughtKey, JSON.stringify(next))
-      } catch { /* ignore */ }
-      return next
-    })
-  }
+  const pendingItems = smartItems.filter((i) => !i.isConfirmed)
+  const allConfirmed = smartItems.length > 0 && pendingItems.length === 0
 
-  const dismissItem = async (row: { id: string; item: string; courseLabel: string; subjectKey: string | null }) => {
-    if (!row.subjectKey) {
-      if (!window.confirm(`今天不再提示「${row.item}」吗？`)) return
-      markBrought(row.id)
-      return
-    }
-    if (!window.confirm(`不再为「${row.courseLabel}」提示「${row.item}」吗？`)) return
+  const handleConfirm = async (item: SmartPackingItem) => {
     setBusy(true)
     try {
-      const next = mergeDismissedItem(packingPreferences, row.subjectKey, row.item)
-      await savePackingPreferences(childId, userId, next)
-      onPrefsChange(next)
+      await recordPackingAction(childId, userId, item.itemName, item.course, 'confirmed')
+      await onRefresh()
+    } catch (e) {
+      logOrAlertNetworkError(e)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const handleDismiss = async (item: SmartPackingItem) => {
+    const label = item.course || item.itemName
+    if (!window.confirm(`不再提醒「${item.itemName}」${item.course ? `（${label}）` : ''}吗？`)) return
+    setBusy(true)
+    try {
+      await recordPackingAction(childId, userId, item.itemName, item.course, 'dismissed')
       toast('已设为不再提示', 'info')
+      await onRefresh()
+    } catch (e) {
+      logOrAlertNetworkError(e)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const handleAllConfirmed = async () => {
+    setBusy(true)
+    try {
+      await recordAllPackingConfirmed(childId, userId, smartItems)
+      toast('太棒了，全部带好了 ✓', 'success')
+      await onRefresh()
     } catch (e) {
       logOrAlertNetworkError(e)
     } finally {
@@ -186,17 +176,12 @@ export function PackingSection({
     if (!name) return
     setBusy(true)
     try {
-      if (addCourse === '__once__') {
-        await appendPackingListItem(childId, userId, today, name)
-        onReload()
-      } else {
-        const next = mergeManualItem(packingPreferences, addCourse, name)
-        await savePackingPreferences(childId, userId, next)
-        onPrefsChange(next)
-      }
+      const course = addCourse === '__once__' ? null : addCourse
+      await addManualPackingMemory(childId, userId, name, course)
       setAddName('')
       setShowAdd(false)
       toast('已添加', 'info')
+      await onRefresh()
     } catch (e) {
       logOrAlertNetworkError(e)
     } finally {
@@ -204,9 +189,7 @@ export function PackingSection({
     }
   }
 
-  const visibleRows = rows.filter((r) => !brought[r.id])
-
-  if (!rows.length && !showAdd) {
+  if (!smartItems.length && !showAdd) {
     return (
       <div>
         <div style={{ fontFamily: 'var(--font-body)', fontSize: 12, color: FG3, opacity: 0.7, textAlign: 'center', padding: '8px 0' }}>
@@ -223,40 +206,74 @@ export function PackingSection({
 
   return (
     <div>
-      {visibleRows.length === 0 && rows.length > 0 ? (
+      {allConfirmed ? (
         <div style={{ fontFamily: 'var(--font-body)', fontSize: 12, color: 'var(--accent-jade, #5c7a5e)', textAlign: 'center', padding: '8px 0', fontWeight: 600 }}>
           今日携带已全部确认 ✓
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 7, marginBottom: 8 }}>
-          {visibleRows.map((row) => (
-            <div key={row.id} style={{
-              display: 'flex', alignItems: 'center', gap: 10, padding: '10px 13px',
-              borderRadius: 13, background: '#fff',
-              boxShadow: 'var(--sh-soft)',
-            }}>
-              <span style={{ width: 8, height: 8, borderRadius: '50%', background: CLAY, flexShrink: 0 }} />
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontFamily: 'var(--font-serif)', fontSize: 14, fontWeight: 500, color: FG1 }}>{row.item}</div>
-                <div style={{ fontFamily: 'var(--font-body)', fontSize: 11, color: FG3, marginTop: 2 }}>{row.courseLabel}</div>
+          {smartItems.map((item) => {
+            const confirmed = item.isConfirmed
+            const dotColor = confirmed ? '#8ca88d' : item.isHighRisk ? '#EA580C' : CLAY
+            return (
+              <div key={item.id} style={{
+                display: 'flex', alignItems: 'center', gap: 10, padding: '10px 13px',
+                borderRadius: 13, background: '#fff',
+                boxShadow: 'var(--sh-soft)',
+                opacity: confirmed ? 0.72 : 1,
+              }}>
+                <span style={{
+                  width: 8, height: 8, borderRadius: '50%',
+                  background: dotColor, flexShrink: 0,
+                }} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{
+                    fontFamily: 'var(--font-serif)', fontSize: 14, fontWeight: 500,
+                    color: confirmed ? FG3 : FG1,
+                    textDecoration: confirmed ? 'line-through' : 'none',
+                  }}>
+                    {confirmed ? '✓ ' : ''}{item.itemName}
+                  </div>
+                  <div style={{ fontFamily: 'var(--font-body)', fontSize: 11, color: FG3, marginTop: 2 }}>
+                    {item.isHighRisk ? (
+                      <span style={{ color: '#EA580C' }}>⚠️ 上次忘带过</span>
+                    ) : item.course ? (
+                      item.course
+                    ) : (
+                      '今天额外'
+                    )}
+                  </div>
+                </div>
+                {!confirmed ? (
+                  <>
+                    <motion.button type="button" whileTap={{ scale: 0.92 }} disabled={busy}
+                      onClick={() => { void handleConfirm(item) }}
+                      className="gc-btn gc-btn--ghost"
+                      style={{ padding: '5px 10px', fontSize: 11, flexShrink: 0 }}>
+                      ✓ 带了
+                    </motion.button>
+                    <motion.button type="button" whileTap={{ scale: 0.92 }} disabled={busy}
+                      onClick={() => { void handleDismiss(item) }}
+                      className="gc-btn gc-btn--ghost"
+                      style={{ padding: '5px 8px', fontSize: 11, flexShrink: 0, color: FG3 }}>
+                      ✗ 不需要
+                    </motion.button>
+                  </>
+                ) : null}
               </div>
-              <motion.button type="button" whileTap={{ scale: 0.92 }} disabled={busy}
-                onClick={() => markBrought(row.id)}
-                className="gc-btn gc-btn--ghost"
-                style={{ padding: '5px 10px', fontSize: 11, flexShrink: 0 }}>
-                ✓ 带了
-              </motion.button>
-              <motion.button type="button" whileTap={{ scale: 0.92 }} disabled={busy}
-                onClick={() => dismissItem(row)}
-                aria-label="不需要"
-                style={{ padding: 4, border: 'none', background: 'transparent',
-                  color: FG3, cursor: 'pointer', flexShrink: 0, display: 'flex' }}>
-                <X size={16} />
-              </motion.button>
-            </div>
-          ))}
+            )
+          })}
         </div>
       )}
+
+      {pendingItems.length > 0 ? (
+        <motion.button type="button" whileTap={{ scale: 0.97 }} disabled={busy}
+          onClick={() => { void handleAllConfirmed() }}
+          className="gc-btn"
+          style={{ width: '100%', marginBottom: 8, padding: '10px' }}>
+          全部带好了
+        </motion.button>
+      ) : null}
 
       <AnimatePresence>
         {showAdd ? (
@@ -276,7 +293,7 @@ export function PackingSection({
               ))}
             </select>
             <div style={{ display: 'flex', gap: 8 }}>
-              <motion.button type="button" whileTap={{ scale: 0.92 }} disabled={busy} onClick={submitManualAdd}
+              <motion.button type="button" whileTap={{ scale: 0.92 }} disabled={busy} onClick={() => { void submitManualAdd() }}
                 className="gc-btn" style={{ flex: 1, padding: '10px' }}>
                 保存
               </motion.button>

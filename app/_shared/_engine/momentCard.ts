@@ -2,6 +2,7 @@ import type { RootBriefing } from '@/app/_shared/_components/design'
 import type { HotspotItem, TodoItem } from '@/app/_shared/_types'
 import type { WeeklyScheduleIntelligence } from '@/lib/ai/scheduleIntelligence'
 import { getPickupMomentSubtitle } from '@/lib/ai/scheduleIntelligence'
+import { formatEveningPrepFromSmartItems, type SmartPackingItem } from '@/lib/packing/packingMemory'
 import { getTodayStr } from '@/lib/date/localDate'
 
 export type MomentKind =
@@ -31,7 +32,7 @@ export type MomentAction =
   | { type: 'briefing_urgent' }
   | { type: 'briefing_link'; href: string }
 
-export type PackLine = { item: string; context?: string }
+export type PackLine = { item: string; context?: string; isHighRisk?: boolean }
 
 export type ScheduleClass = {
   name_zh?: string
@@ -239,6 +240,8 @@ export type BuildMomentParams = {
   overviewBriefing: RootBriefing
   hotspots?: HotspotItem[]
   scheduleIntelligence?: WeeklyScheduleIntelligence | null
+  smartPacking?: SmartPackingItem[]
+  tomorrowSmartPacking?: SmartPackingItem[]
 }
 
 function cleanTodoTitle(todo?: TodoItem): string {
@@ -377,7 +380,10 @@ function buildAtSchoolCard(p: BuildMomentParams, schoolEnd: string): MomentCardD
 function buildEveningHomeCard(p: BuildMomentParams): MomentCardData {
   const kidName = p.activeKid?.name || '孩子'
   const moodPhrase = getEveningMoodPhrase(p.activeKid)
-  const tomorrow = collectTomorrowPrep(p.tomorrowClasses || [])
+  const smartEvening = p.tomorrowSmartPacking?.length
+    ? formatEveningPrepFromSmartItems(p.tomorrowSmartPacking)
+    : null
+  const tomorrow = smartEvening || collectTomorrowPrep(p.tomorrowClasses || [])
   const rainAlert = hasRainOrFloodAlert(p.hotspots || [])
 
   const subtitleParts: string[] = []
@@ -445,6 +451,25 @@ export function buildMomentCard(p: BuildMomentParams): MomentCardData {
   }
 
   // 优先级4：早上携带物
+  const pendingSmartPack = (p.smartPacking || []).filter((i) => !i.isConfirmed)
+  if (hour >= 6 && hour < 9 && pendingSmartPack.length > 0 && !p.packReadyDismissed) {
+    const bullets: PackLine[] = pendingSmartPack.map((i) => ({
+      item: i.itemName,
+      context: i.isHighRisk ? '上次忘带过' : (i.course || undefined),
+      isHighRisk: i.isHighRisk,
+    }))
+    return {
+      kind: 'packing',
+      tier: 'important',
+      theme: 'neutral',
+      eyebrow: '今天要带',
+      kidName,
+      title: `${kidName} 的装备清单`,
+      bullets,
+      primaryAction: { label: '✓ 都准备好了', action: { type: 'pack_ready' } },
+    }
+  }
+
   const packLines = buildPackLines(p.todayClasses)
   if (hour >= 6 && hour < 9 && packLines.length > 0 && !p.packReadyDismissed) {
     return {
