@@ -6,18 +6,21 @@ import { PAGE_BOTTOM_TAB_ONLY, PAGE_TOP_PADDING } from '@/app/_shared/_constants
 import { useApp } from '@/app/context/AppContext'
 import { useChildData } from '@/app/_shared/_hooks/useChildData'
 import ChildSwitcher from './components/ChildSwitcher'
-import TodayTab from './components/TodayTab'
+import ChildTab from './components/ChildTab'
+import SchoolTab from './components/SchoolTab'
 import GrowthTab from './components/GrowthTab'
-import SchoolContent from './components/SchoolContent'
+import HanziTab from './components/HanziTab'
+import type { EnrichedChild } from './components/growthShared'
 
-const TABS = ['今日', '成长', '学校'] as const
+const TABS = ['孩子', '学校', '成长', '汉字'] as const
 type Tab = typeof TABS[number]
 
 function parseTab(raw: string | null): Tab {
-  if (raw === '今日' || raw === 'today') return '今日'
-  if (raw === '成长' || raw === '学业' || raw === '汉字' || raw === 'academic' || raw === 'hanzi' || raw === 'learn') return '成长'
+  if (raw === '孩子' || raw === 'today' || raw === '今日') return '孩子'
   if (raw === '学校' || raw === 'school') return '学校'
-  return '今日'
+  if (raw === '成长' || raw === 'academic' || raw === '学业') return '成长'
+  if (raw === '汉字' || raw === 'hanzi' || raw === 'learn') return '汉字'
+  return '孩子'
 }
 
 function GrowthContent() {
@@ -67,7 +70,7 @@ function GrowthContent() {
     void refresh()
   }, [activeKid?.id, ensureEnriched, setActiveKid, refresh])
 
-  const sel = activeKid
+  const sel = activeKid as EnrichedChild | null
 
   return (
     <main
@@ -150,13 +153,18 @@ function GrowthContent() {
           </div>
         ) : (
           <>
-            {activeTab === '今日' && userId ? (
-              <TodayTab child={sel} userId={userId} onStatusSaved={handleStatusSaved} />
+            {activeTab === '孩子' && userId ? (
+              <ChildTab child={sel} userId={userId} onStatusSaved={handleStatusSaved} />
+            ) : null}
+            {activeTab === '学校' ? (
+              <SchoolTab child={sel} />
             ) : null}
             {activeTab === '成长' && userId ? (
               <GrowthTab child={sel} userId={userId} />
             ) : null}
-            {activeTab === '学校' ? <SchoolContent /> : null}
+            {activeTab === '汉字' && userId ? (
+              <HanziTab child={sel} userId={userId} />
+            ) : null}
           </>
         )}
       </div>

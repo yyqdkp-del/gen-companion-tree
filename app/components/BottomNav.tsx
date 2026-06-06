@@ -67,7 +67,7 @@ const icons = {
 const TABS = [
   { path: '/', label: '根', iconKey: 'home' as const },
   { path: '/rian', label: '根·安', iconKey: 'calendar' as const },
-  { path: '/growth', label: '根·字', iconKey: 'book' as const },
+  { path: '/growth?tab=孩子', label: '根·字', iconKey: 'book' as const },
   { path: '/treehouse', label: '根·栖', iconKey: 'tree' as const },
 ]
 
@@ -84,8 +84,11 @@ export default function BottomNav() {
 
   if (HIDE_ON.some((p) => pathname.startsWith(p))) return null
 
-  const isActive = (path: string) =>
-    path === '/' ? pathname === '/' : pathname.startsWith(path)
+  const isActive = (path: string) => {
+    const base = path.split('?')[0]
+    if (base === '/') return pathname === '/'
+    return pathname.startsWith(base)
+  }
 
   return (
     <nav

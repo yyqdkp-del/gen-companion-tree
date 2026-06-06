@@ -3,11 +3,10 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { AnimatePresence } from 'framer-motion'
 import Accordion from '@/app/_shared/_components/Accordion'
-import ChildEnergyCard from '@/app/_shared/_components/ChildEnergyCard'
 import {
+  buildChildSubtitle,
   dedupeCalendarEvents,
   EventList,
-  getIn30Days,
   getIn7Days,
   getTodayKey,
   loadBroughtMap,
@@ -22,28 +21,13 @@ import ChildActionSheet, { ChildEvent } from '@/app/rian/ChildActionSheet'
 import { buildPackingRows, countPendingPackingRows } from '@/lib/packing/buildPackingRows'
 import type { PackingPreferencesMap } from '@/lib/packing/packingPreferences'
 import type { Child, HealthStatus, MoodStatus } from '@/app/_shared/_types'
-
-const CARD: React.CSSProperties = {
-  background: '#fff',
-  borderRadius: 18,
-  boxShadow: 'var(--sh-warm)',
-  padding: 20,
-  marginBottom: 16,
-}
-
-function SectionTitle({ children }: { children: React.ReactNode }) {
-  return (
-    <h3 style={{
-      margin: '0 0 14px',
-      fontFamily: 'var(--font-serif)',
-      fontSize: 16,
-      fontWeight: 600,
-      color: 'var(--fg1)',
-    }}>
-      {children}
-    </h3>
-  )
-}
+import {
+  CARD,
+  ENERGY_DOT,
+  SectionTitle,
+  childAvatarStyle,
+  firstChar,
+} from './growthShared'
 
 type Props = {
   child: Child
@@ -51,10 +35,9 @@ type Props = {
   onStatusSaved?: () => void | Promise<void>
 }
 
-export default function TodayTab({ child, userId, onStatusSaved }: Props) {
+export default function ChildTab({ child, userId, onStatusSaved }: Props) {
   const today = getTodayKey()
   const in7days = getIn7Days()
-  const in30days = getIn30Days()
 
   const {
     timeline,
@@ -99,8 +82,6 @@ export default function TodayTab({ child, userId, onStatusSaved }: Props) {
   const isNonEmptyTitle = (e: { title?: string }) => typeof e?.title === 'string' && e.title.trim().length > 0
   const todayEvents = dedupeCalendarEvents(calendar.filter((e) => e.date_start === today).filter(isNonEmptyTitle))
   const weekEvents = dedupeCalendarEvents(calendar.filter((e) => e.date_start > today && e.date_start <= in7days).filter(isNonEmptyTitle))
-  const monthEvents = dedupeCalendarEvents(calendar.filter((e) => e.date_start > in7days && e.date_start <= in30days).filter(isNonEmptyTitle))
-  const yearEvents = dedupeCalendarEvents(calendar.filter((e) => e.date_start > in30days).filter(isNonEmptyTitle))
 
   const broughtStorageKey = `packing_brought_${child.id}_${today}`
   const todayPackCount = useMemo(() => {
@@ -109,12 +90,15 @@ export default function TodayTab({ child, userId, onStatusSaved }: Props) {
     return countPendingPackingRows(rows, brought)
   }, [child.id, timeline, todayEvents, packingItems, packPrefs, broughtStorageKey])
 
+  const hasPackingItems = useMemo(() => {
+    const rows = buildPackingRows(timeline, todayEvents, packingItems, packPrefs)
+    return rows.length > 0
+  }, [timeline, todayEvents, packingItems, packPrefs])
+
   const timelineSegments = useMemo(
     () => buildTimelineSegments(timeline, todayEvents, child.school_start_time),
     [timeline, todayEvents, child.school_start_time],
   )
-
-  const hasLoggedStatus = dailyLog.health_status != null && dailyLog.mood_status != null
 
   if (loading) {
     return (
@@ -127,16 +111,60 @@ export default function TodayTab({ child, userId, onStatusSaved }: Props) {
   return (
     <>
       <section style={CARD}>
-        <ChildEnergyCard
-          name={child.name}
-          energy={energyResult}
-          onClick={() => setShowStatusEditor(true)}
-        />
-        {!hasLoggedStatus ? (
-          <p style={{ fontFamily: 'var(--font-body)', fontSize: 11, color: 'var(--fg3)', textAlign: 'center', margin: '8px 0 0' }}>
-            今天未记录
-          </p>
-        ) : null}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+          <div style={childAvatarStyle(54)}>{firstChar(child.name)}</div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{
+              fontFamily: 'var(--font-serif)',
+              fontSize: 20,
+              fontWeight: 500,
+              color: 'var(--fg1)',
+              lineHeight: 1.3,
+            }}>
+              {child.name}
+            </div>
+            <div style={{
+              fontFamily: 'var(--font-body)',
+              fontSize: 13,
+              color: 'var(--fg3)',
+              marginTop: 4,
+              lineHeight: 1.4,
+            }}>
+              {buildChildSubtitle(child) || '完善档案后显示更多信息'}
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setShowStatusEditor(true)}
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'flex-end',
+              gap: 6,
+              border: 'none',
+              background: 'transparent',
+              cursor: 'pointer',
+              padding: '4px 0 4px 8px',
+              flexShrink: 0,
+            }}
+          >
+            <span style={{
+              fontFamily: 'var(--font-body)',
+              fontSize: 12,
+              fontWeight: 600,
+              color: 'var(--fg2)',
+            }}>
+              {energyResult.label}
+            </span>
+            <span style={{
+              width: 10,
+              height: 10,
+              borderRadius: '50%',
+              background: ENERGY_DOT[energyResult.level],
+              boxShadow: `0 0 0 2px ${ENERGY_DOT[energyResult.level]}33`,
+            }} />
+          </button>
+        </div>
       </section>
 
       <section style={CARD}>
@@ -147,8 +175,18 @@ export default function TodayTab({ child, userId, onStatusSaved }: Props) {
       <section style={CARD}>
         <SectionTitle>
           今日携带
-          {todayPackCount > 0 ? (
-            <span style={{ marginLeft: 8, fontSize: 11, color: 'var(--clay)', fontWeight: 600 }}>需确认 {todayPackCount}</span>
+          {(hasPackingItems && todayPackCount > 0) ? (
+            <span style={{
+              marginLeft: 8,
+              fontSize: 11,
+              fontWeight: 600,
+              color: 'var(--clay)',
+              padding: '2px 8px',
+              borderRadius: 999,
+              background: 'rgba(164,99,85,0.08)',
+            }}>
+              需确认
+            </span>
           ) : null}
         </SectionTitle>
         <PackingSection
@@ -171,24 +209,10 @@ export default function TodayTab({ child, userId, onStatusSaved }: Props) {
         </section>
       ) : null}
 
-      <section style={CARD}>
-        <SectionTitle>本周安排</SectionTitle>
-        <EventList events={weekEvents} onSelect={setSelectedEvent} />
-      </section>
-
-      {(monthEvents.length > 0 || yearEvents.length > 0) ? (
-        <div style={{ marginBottom: 16 }}>
-          {monthEvents.length > 0 ? (
-            <Accordion variant="gc" title="本月安排" count={monthEvents.length} defaultOpen={false}>
-              <EventList events={monthEvents} onSelect={setSelectedEvent} />
-            </Accordion>
-          ) : null}
-          {yearEvents.length > 0 ? (
-            <Accordion variant="gc" title="学年大事" count={yearEvents.length} defaultOpen={false}>
-              <EventList events={yearEvents} onSelect={setSelectedEvent} />
-            </Accordion>
-          ) : null}
-        </div>
+      {weekEvents.length > 0 ? (
+        <Accordion variant="gc" title="本周大事" count={weekEvents.length} defaultOpen={false}>
+          <EventList events={weekEvents} onSelect={setSelectedEvent} />
+        </Accordion>
       ) : null}
 
       {timeline.length === 0 && calendar.length === 0 ? (

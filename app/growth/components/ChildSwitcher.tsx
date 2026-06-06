@@ -4,7 +4,7 @@ import React, { useEffect, useRef } from 'react'
 import { motion } from 'framer-motion'
 import { Plus } from 'lucide-react'
 import type { Child } from '@/app/_shared/_types'
-import { buildChildSubtitle } from '@/app/_shared/_components/child/childScheduleShared'
+import { childAvatarStyle, firstChar } from './growthShared'
 
 type Props = {
   kids: Child[]
@@ -54,18 +54,11 @@ export default function ChildSwitcher({ kids, activeId, onSelect, onAdd }: Props
               }}
             >
               <div style={{
-                width: 48,
-                height: 48,
-                borderRadius: '50%',
-                background: 'rgba(164,99,85,0.06)',
+                ...childAvatarStyle(48),
                 border: `2px solid ${active ? 'var(--clay)' : 'transparent'}`,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: 24,
                 transition: 'border-color 0.18s ease',
               }}>
-                {c.emoji || '👶'}
+                {firstChar(c.name)}
               </div>
               <span style={{
                 fontFamily: 'var(--font-body)',
@@ -105,15 +98,6 @@ export default function ChildSwitcher({ kids, activeId, onSelect, onAdd }: Props
           </motion.button>
         ) : null}
       </div>
-      {activeId ? (() => {
-        const active = kids.find((k) => k.id === activeId)
-        const sub = active ? buildChildSubtitle(active) : ''
-        return sub ? (
-          <p style={{ margin: '8px 0 0', fontFamily: 'var(--font-body)', fontSize: 12, color: 'var(--fg3)' }}>
-            {sub}
-          </p>
-        ) : null
-      })() : null}
     </div>
   )
 }

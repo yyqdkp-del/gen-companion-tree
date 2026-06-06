@@ -7,7 +7,7 @@ export default function SchoolRedirectPage() {
   const router = useRouter()
 
   useEffect(() => {
-    router.replace('/growth?tab=学校')
+    router.replace('/growth?tab=%E5%AD%A6%E6%A0%A1')
   }, [router])
 
   return null
