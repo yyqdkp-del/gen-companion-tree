@@ -1,7 +1,7 @@
 'use client'
 import React, { useState, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Loader, Check, X, Plus, Camera } from 'lucide-react'
+import { Loader, X, Plus, Camera } from 'lucide-react'
 import { useParams } from 'next/navigation'
 import { THEME } from '@/app/_shared/_constants/theme'
 import { fetchWithAuth } from '@/lib/auth/fetchWithAuth'
@@ -16,6 +16,25 @@ const DAYS = [
   { key: 'thu', label: '周四' },
   { key: 'fri', label: '周五' },
 ]
+
+type ScheduleEntry = {
+  time: string
+  subject: string
+  name_zh?: string
+  category?: string
+  requires_items?: string[]
+}
+
+type ScheduleByDay = Record<string, ScheduleEntry[]>
+
+type ParsePhase = 'idle' | 'parsing' | 'parsed' | 'confirmed'
+
+type ParsedResult = {
+  schedule: ScheduleByDay
+  parse_warnings: { day: string; time: string; subject: string; reason: string }[]
+  school_start_time?: string | null
+  school_end_time?: string | null
+}
 
 const ACTIVITY_TYPES = [
   { value: 'tutor', label: '补习课' },
@@ -133,22 +152,40 @@ function MultiSelect({ label, options, selected, onChange }: {
 function StepSchedule({ data, onChange }: { data: any; onChange: (d: any) => void }) {
   const params = useParams()
   const childId = params.id as string
+  const [parsePhase, setParsePhase] = useState<ParsePhase>('idle')
   const [parsing, setParsing] = useState(false)
-  const [parseSuccess, setParseSuccess] = useState(false)
+  const [savingConfirm, setSavingConfirm] = useState(false)
   const [parseError, setParseError] = useState('')
+  const [parsedResult, setParsedResult] = useState<ParsedResult | null>(null)
+  const [pendingSchedule, setPendingSchedule] = useState<ScheduleByDay>({})
   const [editDay, setEditDay] = useState<string | null>(null)
   const [editText, setEditText] = useState('')
+  const [editingKey, setEditingKey] = useState<string | null>(null)
+  const [editingSubject, setEditingSubject] = useState('')
   const fileRef = useRef<HTMLInputElement>(null)
   const cameraRef = useRef<HTMLInputElement>(null)
 
   const schedule = data.class_schedule || {}
 
+  const countEntries = (sch: ScheduleByDay) =>
+    DAYS.reduce((n, d) => n + (sch[d.key]?.length || 0), 0)
+
+  const resetParse = () => {
+    setParsePhase('idle')
+    setParsedResult(null)
+    setPendingSchedule({})
+    setParseError('')
+    setEditingKey(null)
+    if (fileRef.current) fileRef.current.value = ''
+    if (cameraRef.current) cameraRef.current.value = ''
+  }
+
   const handlePhoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
     setParsing(true)
+    setParsePhase('parsing')
     setParseError('')
-    setParseSuccess(false)
     try {
       const prepared = await prepareSchedulePhotoForUpload(file)
       if (prepared.isPortraitTall) {
@@ -157,6 +194,7 @@ function StepSchedule({ data, onChange }: { data: any; onChange: (d: any) => voi
       const base64 = prepared.base64
       if (!base64 || base64.length < 100) {
         toast('图片读取失败，请重试', 'error')
+        setParsePhase('idle')
         setParsing(false)
         return
       }
@@ -167,23 +205,94 @@ function StepSchedule({ data, onChange }: { data: any; onChange: (d: any) => voi
           image: base64,
           mediaType: prepared.mediaType,
           childId,
+          save: false,
         }),
       })
       const result = await resp.json()
       if (result.error) throw new Error(result.error)
+
+      const nextSchedule = result.schedule as ScheduleByDay
+      if (countEntries(nextSchedule) === 0) {
+        throw new Error('未识别到有效课程')
+      }
+
+      setParsedResult({
+        schedule: nextSchedule,
+        parse_warnings: result.parse_warnings || [],
+        school_start_time: result.school_start_time,
+        school_end_time: result.school_end_time,
+      })
+      setPendingSchedule(nextSchedule)
+      setParsePhase('parsed')
+    } catch {
+      setParseError('解析失败，请手动填写或重试')
+      setParsePhase('idle')
+    }
+    setParsing(false)
+  }
+
+  const handleConfirmSave = async () => {
+    if (!pendingSchedule || countEntries(pendingSchedule) === 0) return
+    setSavingConfirm(true)
+    setParseError('')
+    try {
+      const resp = await fetchWithAuth('/api/children/parse-schedule', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          childId,
+          schedule: pendingSchedule,
+          save: true,
+        }),
+      })
+      const result = await resp.json()
+      if (result.error) throw new Error(result.error)
+
       onChange({
         ...data,
         class_schedule: result.schedule,
         ...(result.school_start_time ? { school_start_time: result.school_start_time } : {}),
         ...(result.school_end_time ? { school_end_time: result.school_end_time } : {}),
-        ...(result.schedule_summary ? { schedule_summary: result.schedule_summary } : {}),
       })
-      setParseSuccess(true)
-      setTimeout(() => setParseSuccess(false), 3000)
-    } catch (err: any) {
-      setParseError('解析失败，请手动填写或重试')
+      setParsePhase('confirmed')
+      toast(`已保存 ${countEntries(result.schedule)} 节课`, 'success')
+      resetParse()
+    } catch {
+      setParseError('保存失败，请重试')
     }
-    setParsing(false)
+    setSavingConfirm(false)
+  }
+
+  const updateLessonSubject = (dayKey: string, index: number, subject: string) => {
+    setPendingSchedule((prev) => {
+      const next = { ...prev }
+      const day = [...(next[dayKey] || [])]
+      if (!day[index]) return prev
+      day[index] = { ...day[index], subject: subject.trim() }
+      next[dayKey] = day
+      return next
+    })
+  }
+
+  const removeLesson = (dayKey: string, index: number) => {
+    setPendingSchedule((prev) => {
+      const next = { ...prev }
+      next[dayKey] = (next[dayKey] || []).filter((_, i) => i !== index)
+      return next
+    })
+  }
+
+  const startEditSubject = (dayKey: string, index: number, subject: string) => {
+    setEditingKey(`${dayKey}-${index}`)
+    setEditingSubject(subject)
+  }
+
+  const commitEditSubject = (dayKey: string, index: number) => {
+    if (editingSubject.trim()) {
+      updateLessonSubject(dayKey, index, editingSubject)
+    }
+    setEditingKey(null)
+    setEditingSubject('')
   }
 
   const openEdit = (day: string) => {
@@ -225,38 +334,214 @@ function StepSchedule({ data, onChange }: { data: any; onChange: (d: any) => voi
   }
 
   const getDayCount = (day: string) => (schedule[day] || []).length
+  const totalPending = countEntries(pendingSchedule)
+  const showConfirm = parsePhase === 'parsed'
 
   return (
     <div>
       <div style={{ fontSize: 15, fontWeight: 600, color: THEME.navy, marginBottom: 4 }}>课程表 📚</div>
-      <div style={{ fontSize: 12, color: THEME.muted, marginBottom: 16, lineHeight: 1.6 }}>拍照识别课表（清晰照片效果更好，可手动修改）</div>
+      <div style={{ fontSize: 12, color: THEME.muted, marginBottom: 16, lineHeight: 1.6 }}>
+        {showConfirm ? '请确认识别结果，无误后再保存' : '拍照识别课表（清晰照片效果更好，可手动修改）'}
+      </div>
 
-      {/* 上传按钮 */}
       <input ref={fileRef} type="file" accept="image/*" onChange={handlePhoto} style={{ display: 'none' }} />
       <input ref={cameraRef} type="file" accept="image/*" capture="environment" onChange={handlePhoto} style={{ display: 'none' }} />
 
-      <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
-        <motion.button whileTap={{ scale: 0.97 }} onClick={() => cameraRef.current?.click()}
-          disabled={parsing}
-          style={{ flex: 1, padding: '12px', borderRadius: 12, border: `1.5px dashed ${parseSuccess ? '#16a34a' : THEME.gold}`, background: parseSuccess ? 'rgba(34,197,94,0.08)' : 'rgba(164,99,85,0.06)', color: parseSuccess ? '#16a34a' : THEME.gold, fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-          {parsing ? <Loader size={16} /> : parseSuccess ? <Check size={16} /> : <Camera size={16} />}
-          {parsing ? '识别中…' : parseSuccess ? '识别成功 ✓' : '拍照识别'}
-        </motion.button>
-        <motion.button whileTap={{ scale: 0.97 }} onClick={() => fileRef.current?.click()}
-          disabled={parsing}
-          style={{ flex: 1, padding: '12px', borderRadius: 12, border: `1.5px dashed ${THEME.gold}`, background: 'rgba(164,99,85,0.06)', color: THEME.gold, fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-          <Plus size={16} />
-          从相册上传
-        </motion.button>
-      </div>
+      {!showConfirm ? (
+        <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+          <motion.button whileTap={{ scale: 0.97 }} onClick={() => cameraRef.current?.click()}
+            disabled={parsing}
+            style={{ flex: 1, padding: '12px', borderRadius: 12, border: `1.5px dashed ${THEME.gold}`, background: 'rgba(164,99,85,0.06)', color: THEME.gold, fontSize: 13, fontWeight: 600, cursor: parsing ? 'wait' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, opacity: parsing ? 0.7 : 1 }}>
+            {parsing ? <Loader size={16} /> : <Camera size={16} />}
+            {parsing ? '识别中…' : '拍照识别'}
+          </motion.button>
+          <motion.button whileTap={{ scale: 0.97 }} onClick={() => fileRef.current?.click()}
+            disabled={parsing}
+            style={{ flex: 1, padding: '12px', borderRadius: 12, border: `1.5px dashed ${THEME.gold}`, background: 'rgba(164,99,85,0.06)', color: THEME.gold, fontSize: 13, fontWeight: 600, cursor: parsing ? 'wait' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, opacity: parsing ? 0.7 : 1 }}>
+            <Plus size={16} />
+            从相册上传
+          </motion.button>
+        </div>
+      ) : null}
 
-      {parseError && (
+      {parseError ? (
         <div style={{ color: '#7a5a35', fontSize: 12, marginBottom: 12, padding: '8px 12px', borderRadius: 10, background: '#fcf7ed' }}>
           ⚠️ {parseError}
         </div>
-      )}
+      ) : null}
 
-      {/* 星期卡片，点击进入弹窗编辑 */}
+      {showConfirm ? (
+        <div>
+          <div style={{ fontSize: 14, fontWeight: 600, color: THEME.navy, marginBottom: 12 }}>
+            根识别到以下课程，请确认
+          </div>
+
+          {(parsedResult?.parse_warnings?.length || 0) > 0 ? (
+            <div style={{
+              color: '#7a5a35',
+              fontSize: 12,
+              marginBottom: 12,
+              padding: '10px 12px',
+              borderRadius: 10,
+              background: '#fcf7ed',
+              border: '1px solid rgba(180,142,94,0.25)',
+            }}>
+              ⚠️ {parsedResult!.parse_warnings.length} 个时间无法识别，已跳过
+            </div>
+          ) : null}
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16, marginBottom: 16 }}>
+            {DAYS.map((d) => {
+              const lessons = pendingSchedule[d.key] || []
+              if (!lessons.length) return null
+              return (
+                <div key={d.key}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: THEME.muted, marginBottom: 8, letterSpacing: '0.06em' }}>
+                    {d.label}
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    {lessons.map((lesson, index) => {
+                      const editKey = `${d.key}-${index}`
+                      const isEditing = editingKey === editKey
+                      return (
+                        <div
+                          key={editKey}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 8,
+                            padding: '10px 12px',
+                            borderRadius: 10,
+                            background: 'rgba(255,255,255,0.75)',
+                            border: '1px solid rgba(0,0,0,0.06)',
+                          }}
+                        >
+                          <span style={{
+                            fontSize: 13,
+                            fontWeight: 600,
+                            color: THEME.gold,
+                            fontFamily: 'monospace',
+                            flexShrink: 0,
+                            width: 48,
+                          }}>
+                            {lesson.time}
+                          </span>
+                          {isEditing ? (
+                            <input
+                              autoFocus
+                              value={editingSubject}
+                              onChange={(e) => setEditingSubject(e.target.value)}
+                              onBlur={() => commitEditSubject(d.key, index)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') commitEditSubject(d.key, index)
+                              }}
+                              style={{
+                                flex: 1,
+                                border: 'none',
+                                background: 'transparent',
+                                fontSize: 13,
+                                color: THEME.text,
+                                outline: 'none',
+                                fontFamily: 'inherit',
+                              }}
+                            />
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => startEditSubject(d.key, index, lesson.subject)}
+                              style={{
+                                flex: 1,
+                                border: 'none',
+                                background: 'transparent',
+                                textAlign: 'left',
+                                fontSize: 13,
+                                color: THEME.text,
+                                cursor: 'pointer',
+                                padding: 0,
+                                fontFamily: 'inherit',
+                              }}
+                            >
+                              {formatSubjectDisplay(lesson.subject)}
+                            </button>
+                          )}
+                          <motion.button
+                            type="button"
+                            whileTap={{ scale: 0.85 }}
+                            onClick={() => removeLesson(d.key, index)}
+                            aria-label="删除"
+                            style={{
+                              border: 'none',
+                              background: 'rgba(0,0,0,0.04)',
+                              borderRadius: '50%',
+                              width: 28,
+                              height: 28,
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              cursor: 'pointer',
+                              color: THEME.muted,
+                              flexShrink: 0,
+                            }}
+                          >
+                            <X size={14} />
+                          </motion.button>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+
+          <div style={{ display: 'flex', gap: 8 }}>
+            <motion.button
+              type="button"
+              whileTap={{ scale: 0.97 }}
+              onClick={resetParse}
+              disabled={savingConfirm}
+              style={{
+                flex: 1,
+                padding: '13px',
+                borderRadius: 12,
+                border: '1.5px solid rgba(0,0,0,0.12)',
+                background: 'rgba(255,255,255,0.7)',
+                color: THEME.text,
+                fontSize: 14,
+                fontWeight: 600,
+                cursor: 'pointer',
+              }}
+            >
+              重新识别
+            </motion.button>
+            <motion.button
+              type="button"
+              whileTap={{ scale: 0.97 }}
+              onClick={() => { void handleConfirmSave() }}
+              disabled={savingConfirm || totalPending === 0}
+              style={{
+                flex: 1.4,
+                padding: '13px',
+                borderRadius: 12,
+                border: 'none',
+                background: THEME.navy,
+                color: '#fff',
+                fontSize: 14,
+                fontWeight: 600,
+                cursor: totalPending === 0 ? 'not-allowed' : 'pointer',
+                opacity: totalPending === 0 ? 0.5 : 1,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 8,
+              }}
+            >
+              {savingConfirm ? <Loader size={16} /> : null}
+              确认保存 ({totalPending}节课)
+            </motion.button>
+          </div>
+        </div>
+      ) : (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         {DAYS.map(d => {
           const count = getDayCount(d.key)
@@ -291,6 +576,7 @@ function StepSchedule({ data, onChange }: { data: any; onChange: (d: any) => voi
           )
         })}
       </div>
+      )}
 
       {/* 弹窗编辑 */}
       <AnimatePresence>

@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { PAGE_BOTTOM_TAB_ONLY, PAGE_TOP_PADDING } from '@/app/_shared/_constants/layout'
 import { useApp } from '@/app/context/AppContext'
 import { useChildData } from '@/app/_shared/_hooks/useChildData'
-import ChildSwitcher from './components/ChildSwitcher'
+import ChildSwitcher from '@/app/_shared/_components/child/ChildSwitcher'
 import ChildTab from './components/ChildTab'
 import SchoolTab from './components/SchoolTab'
 import GrowthTab from './components/GrowthTab'
@@ -26,49 +26,28 @@ function parseTab(raw: string | null): Tab {
 function GrowthContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const { userId, kids, activeKid, setActiveKid } = useApp()
+  const { userId, kids, activeKid, selectChild } = useApp()
   const [activeTab, setActiveTab] = useState<Tab>(() => parseTab(searchParams.get('tab')))
 
-  const { enrichedKids, refresh, ensureEnriched } = useChildData(userId, {
+  const { refresh } = useChildData(userId, {
     deferMs: 0,
     activeChildId: activeKid?.id ?? null,
   })
 
-  const childList = enrichedKids.length ? enrichedKids : kids
-
   useEffect(() => {
     setActiveTab(parseTab(searchParams.get('tab')))
   }, [searchParams])
-
-  useEffect(() => {
-    if (kids.length > 0 && !activeKid) {
-      const storedId = typeof window !== 'undefined' ? localStorage.getItem('active_child_id') : null
-      const current = kids.find((k) => k.id === storedId) || kids[0]
-      setActiveKid(current)
-    }
-  }, [kids, activeKid, setActiveKid])
 
   const selectTab = useCallback((tab: Tab) => {
     setActiveTab(tab)
     router.replace(`/growth?tab=${encodeURIComponent(tab)}`, { scroll: false })
   }, [router])
 
-  const handleSelectChild = useCallback(async (child: typeof activeKid) => {
-    if (!child) return
-    setActiveKid(child)
-    try {
-      localStorage.setItem('active_child_id', child.id)
-    } catch { /* ignore */ }
-    const full = await ensureEnriched(child.id)
-    if (full) setActiveKid(full)
-  }, [setActiveKid, ensureEnriched])
-
   const handleStatusSaved = useCallback(async () => {
     if (!activeKid?.id) return
-    const next = await ensureEnriched(activeKid.id, true)
-    if (next) setActiveKid(next)
+    await selectChild(activeKid.id, { force: true })
     void refresh()
-  }, [activeKid?.id, ensureEnriched, setActiveKid, refresh])
+  }, [activeKid?.id, selectChild, refresh])
 
   const sel = activeKid as EnrichedChild | null
 
@@ -107,12 +86,8 @@ function GrowthContent() {
         </div>
 
         <div style={{ padding: '0 20px 12px' }}>
-          {childList.length > 0 ? (
-            <ChildSwitcher
-              kids={childList}
-              activeId={sel?.id ?? null}
-              onSelect={(c) => { void handleSelectChild(c) }}
-            />
+          {kids.length > 0 ? (
+            <ChildSwitcher mode="bar" />
           ) : null}
         </div>
 

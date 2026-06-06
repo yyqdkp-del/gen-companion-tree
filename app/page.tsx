@@ -27,7 +27,7 @@ import {
   type ScheduleClass,
 } from '@/app/_shared/_engine/momentCard'
 import type { TodoItem, HotspotItem } from '@/app/_shared/_types'
-import { useChildData } from '@/app/_shared/_hooks/useChildData'
+import ChildSwitcher from '@/app/_shared/_components/child/ChildSwitcher'
 import { useTodoActions } from '@/app/_shared/_hooks/useTodoActions'
 import { useTodoEngine } from '@/app/_shared/_hooks/useTodoEngine'
 import { useHotspotEngine } from '@/app/_shared/_hooks/useHotspotEngine'
@@ -795,7 +795,7 @@ function HomeDropletGuide() {
 export default function BasePage() {
   const router = useRouter()
   const { userId, kids, todos, hotspots, loading, sessionReady, sync: ctxSync,
-    processStatus, setProcessStatus, activeKid, setActiveKid,
+    processStatus, setProcessStatus, activeKid, selectChild,
     modalOpen, setModalOpen, showOnboarding, setShowOnboarding } = useApp()
   const [clockTime, setClockTime] = useState('')
   const [dateLabel, setDateLabel] = useState('')
@@ -817,10 +817,6 @@ export default function BasePage() {
   const [keyboardOpen, setKeyboardOpen] = useState(false)
   const [showProfileBanner, setShowProfileBanner] = useState(false)
 
-  const { enrichedKids, refresh: refreshKids, ensureEnriched } = useChildData(userId, {
-    deferMs: 0,
-    activeChildId: activeKid?.id ?? null,
-  })
   const [optimisticDoneIds, setOptimisticDoneIds] = useState<Set<string>>(() => new Set())
 
   const optimisticRemove = useCallback((id: string) => {
@@ -855,35 +851,6 @@ export default function BasePage() {
   const todoEngine = useTodoEngine(displayTodos)
   const { groups: todoGroups } = todoEngine
   const hotspotEngine = useHotspotEngine(hotspots)
-
-  // sync 完成后先用基础 kids 展示头像/姓名，不必等 enrich
-  useEffect(() => {
-    if (kids.length > 0 && !activeKid) {
-      const storedId = localStorage.getItem('active_child_id')
-      const current = kids.find((k: any) => k.id === storedId) || kids[0]
-      setActiveKid(current)
-    }
-  }, [kids, activeKid, setActiveKid])
-
-  // enrich 完成后升级 activeKid（精力、紧急项等）
-  useEffect(() => {
-    if (!activeKid?.id || !enrichedKids.length) return
-    const match = enrichedKids.find((c: any) => c.id === activeKid.id)
-    if (!match?._enriched) return
-    // 关键字段没变化就不更新，避免触发 Context 重渲染
-    if (
-      match.id === activeKid.id &&
-      match.updated_at === activeKid.updated_at &&
-      match._enriched === activeKid._enriched
-    ) return
-    setActiveKid(match)
-  }, [enrichedKids, activeKid?.id, activeKid?.updated_at, activeKid?._enriched, setActiveKid])
-
-  const handleSwitchKid = useCallback(async (kid: any) => {
-    setActiveKid(kid)
-    const full = await ensureEnriched(kid.id)
-    if (full) setActiveKid(full)
-  }, [setActiveKid, ensureEnriched])
 
   useEffect(() => {
     const skipped = localStorage.getItem('onboarding_skipped')
@@ -1344,7 +1311,10 @@ export default function BasePage() {
       }}
     >
       <Suspense fallback={null}>
-        <HomeRefreshFromQuery onRefresh={() => { void refreshKids(); void ctxSync() }} />
+        <HomeRefreshFromQuery onRefresh={() => {
+          void ctxSync()
+          if (activeKid?.id) void selectChild(activeKid.id, { force: true })
+        }} />
       </Suspense>
 
       {showOnboarding && (
@@ -1402,18 +1372,28 @@ export default function BasePage() {
           {mounted && dateLabel && (
             <div className="gc-eyebrow">{dateLabel}</div>
           )}
-          <h1
-            style={{
-              fontFamily: 'var(--font-serif)',
-              fontWeight: 500,
-              fontSize: 25,
-              color: 'var(--fg1)',
-              letterSpacing: '0.04em',
-              margin: '10px 0 3px',
-            }}
-          >
-            {userDisplayName ? `${greetingLabel}，${userDisplayName}` : greetingLabel}
-          </h1>
+          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
+            <h1
+              style={{
+                fontFamily: 'var(--font-serif)',
+                fontWeight: 500,
+                fontSize: 25,
+                color: 'var(--fg1)',
+                letterSpacing: '0.04em',
+                margin: '10px 0 3px',
+                flex: 1,
+              }}
+            >
+              {userDisplayName ? `${greetingLabel}，${userDisplayName}` : greetingLabel}
+            </h1>
+            {kids.length > 0 ? (
+              <ChildSwitcher
+                mode="dropdown"
+                onAvatarClick={() => openModal('child')}
+                style={{ marginTop: 6, flexShrink: 0 }}
+              />
+            ) : null}
+          </div>
           <p
             style={{
               fontFamily: 'var(--font-serif)',
@@ -1528,9 +1508,6 @@ export default function BasePage() {
       <AnimatePresence>
         {modal === 'child' && (
           <ChildSheet key="child"
-            childList={enrichedKids.length ? enrichedKids : kids}
-            sel={activeKid}
-            onSel={(c: any) => { void handleSwitchKid(c) }}
             onClose={() => closeModal()}
             onAdd={() => {
               if (!userId) {
@@ -1539,12 +1516,9 @@ export default function BasePage() {
               }
               openModal('addChild')
             }}
-            userId={userId}
             onStatusSaved={async () => {
-              const id = activeKid?.id || localStorage.getItem('active_child_id')
-              if (!id) return
-              const next = await ensureEnriched(id, true)
-              if (next) setActiveKid(next)
+              if (!activeKid?.id) return
+              await selectChild(activeKid.id, { force: true })
             }} />
         )}
         {modal === 'todo' && (

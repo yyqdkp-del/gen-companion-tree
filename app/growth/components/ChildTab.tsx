@@ -15,7 +15,6 @@ import {
 import { TimelineSegment, buildTimelineSegments } from '@/app/_shared/_components/design'
 import { calculateEnergy } from '@/app/_shared/_engine/energy'
 import { useChildDailyLog } from '@/app/_shared/_hooks/useChildDailyLog'
-import { useChildData } from '@/app/_shared/_hooks/useChildData'
 import { useChildSchedule } from '@/app/_shared/_hooks/useChildSchedule'
 import { useApp } from '@/app/context/AppContext'
 import { buildPackingRows, countPendingPackingRows } from '@/lib/packing/buildPackingRows'
@@ -27,17 +26,8 @@ type Props = {
 }
 
 export default function ChildTab({ onStatusSaved }: Props) {
-  const { userId, kids, activeKid } = useApp()
-  const { enrichedKids } = useChildData(userId, {
-    deferMs: 0,
-    activeChildId: activeKid?.id ?? null,
-  })
-
-  const childList = enrichedKids.length ? enrichedKids : kids
-  const sel = useMemo(() => {
-    if (!activeKid?.id) return null
-    return childList.find((k) => k.id === activeKid.id) ?? activeKid
-  }, [activeKid, childList])
+  const { userId, activeKid } = useApp()
+  const sel = activeKid
 
   const today = getTodayKey()
 

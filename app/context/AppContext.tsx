@@ -4,6 +4,8 @@ const supabase = createClient()
 import { createContext, useContext, useState, useEffect, useRef, useCallback, useMemo, ReactNode } from 'react'
 import useSWR, { useSWRConfig } from 'swr'
 import { fetchAppData, readAppCoreCache, writeAppCoreCache } from '@/app/_shared/_services/syncService'
+import { enrichOneChild } from '@/app/_shared/_services/childService'
+import { getTodayStr } from '@/lib/date/localDate'
 import { useSpeech } from '@/app/_shared/_hooks/useSpeech'
 import type { Session } from '@supabase/supabase-js'
 import { subscribePushIfPermitted } from '@/lib/push/subscribePushClient'
@@ -36,6 +38,7 @@ type AppContextType = {
   setProcessStatus: (status: { status: 'processing' | 'done' | 'failed' | null; message: string; tools?: any[] } | null) => void
   activeKid: any | null
   setActiveKid: (kid: any) => void
+  selectChild: (childId: string, opts?: { force?: boolean }) => Promise<void>
   modalOpen: boolean
   setModalOpen: (open: boolean) => void
   speak: (text: string) => void
@@ -113,6 +116,39 @@ export function AppProvider({ children }: { children: ReactNode }) {
       }))
     }
   }, [])
+
+  const ensureEnriched = useCallback(async (childId: string, force = false) => {
+    if (!userId || !childId) return null
+    const base = kids.find((k: any) => k.id === childId)
+    if (!base) return null
+
+    const today = getTodayStr()
+    const cacheKey = ['child-enriched', userId, childId, today] as const
+
+    if (!force) {
+      const cached = await globalMutate(
+        cacheKey,
+        undefined,
+        { revalidate: false, populateCache: true },
+      ).catch(() => undefined)
+      if (cached && (cached as any)._enriched) return cached as any
+    }
+
+    const full = await globalMutate(
+      cacheKey,
+      () => enrichOneChild(base, userId, today),
+      { revalidate: true },
+    )
+    return (full as any) ?? null
+  }, [userId, kids, globalMutate])
+
+  const selectChild = useCallback(async (childId: string, opts?: { force?: boolean }) => {
+    const raw = kids.find((k: any) => k.id === childId)
+    if (!raw) return
+    setActiveKid(raw)
+    const enriched = await ensureEnriched(childId, opts?.force ?? false)
+    if (enriched) setActiveKid(enriched)
+  }, [kids, setActiveKid, ensureEnriched])
 
   const setUserIdSafe = useCallback((id: string) => {
     userIdRef.current = id
@@ -236,6 +272,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [userId, globalMutate])
 
   useEffect(() => {
+    if (!kids.length || typeof window === 'undefined') return
+
+    const validActive = activeKid && kids.some((k: any) => k.id === activeKid.id)
+    if (validActive) return
+
+    const storedId = localStorage.getItem('active_child_id')
+    const target = kids.find((k: any) => k.id === storedId) || kids[0]
+    if (target) void selectChild(target.id)
+  }, [kids, activeKid, selectChild])
+
+  useEffect(() => {
     if (!userId) return
     const handleVisibility = () => {
       if (document.visibilityState === 'visible') void globalMutate(['app-core', userId])
@@ -308,6 +355,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setProcessStatus,
       activeKid,
       setActiveKid,
+      selectChild,
       modalOpen,
       setModalOpen,
       speak,
@@ -332,6 +380,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       processStatus,
       activeKid,
       setActiveKid,
+      selectChild,
       modalOpen,
       speak,
       stop,

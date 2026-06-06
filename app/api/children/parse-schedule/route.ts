@@ -4,6 +4,7 @@ import { getAuthUser } from '@/lib/auth/getAuthUser'
 import { normalizeRequiresItems } from '@/lib/packing/packingPreferences'
 import { dedupeScheduleEntries } from '@/lib/schedule/dedupeScheduleEntries'
 import { isPlaceholderSubject } from '@/lib/schedule/placeholderSubject'
+import { applyScheduleTimeValidation, type ParseWarning } from '@/lib/schedule/validateScheduleTime'
 import { createClient } from '@supabase/supabase-js'
 
 const DAYS = ['mon', 'tue', 'wed', 'thu', 'fri'] as const
@@ -22,7 +23,22 @@ const CLAUDE_MODEL = 'claude-haiku-4-5-20251001'
 type VisionMediaType = 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp'
 const VISION_MEDIA_TYPES = new Set<VisionMediaType>(['image/jpeg', 'image/png', 'image/gif', 'image/webp'])
 
-/** 剥离 data URL 前缀、空白，并校正 media_type（与 Anthropic Vision 要求一致） */
+type ScheduleStats = {
+  days: number
+  lessonsPerDay: number
+  orientation: 'horizontal' | 'vertical'
+}
+
+type ScheduleEntry = {
+  time: string
+  subject: string
+  name_zh?: string
+  category?: ScheduleCategory
+  requires_items?: string[]
+}
+
+type ScheduleByDay = Record<(typeof DAYS)[number], ScheduleEntry[]>
+
 function prepareVisionImageInput(image: string, mediaTypeHint?: string): {
   data: string
   media_type: VisionMediaType
@@ -53,16 +69,6 @@ function prepareVisionImageInput(image: string, mediaTypeHint?: string): {
 
   return { data, media_type, hasDataUrlPrefix }
 }
-
-type ScheduleEntry = {
-  time: string
-  subject: string
-  name_zh?: string
-  category?: ScheduleCategory
-  requires_items?: string[]
-}
-
-type ScheduleByDay = Record<(typeof DAYS)[number], ScheduleEntry[]>
 
 function emptySchedule(): ScheduleByDay {
   return { mon: [], tue: [], wed: [], thu: [], fri: [] }
@@ -126,12 +132,10 @@ function resolveDayKey(key: string): (typeof DAYS)[number] | null {
   return DAY_KEY_ALIASES[key.trim().toLowerCase()] ?? null
 }
 
-/** 解析 Claude 返回：支持 {"mon":[...]}、{"days":{...}}、根级数组、Monday 等 key */
 function normalizeSchedule(raw: unknown, withSemantic = false): ScheduleByDay {
   const out = emptySchedule()
   if (!raw) return out
 
-  // Claude 有时直接返回单日数组 [{time,subject},...]
   if (Array.isArray(raw)) {
     out.mon = dedupeScheduleEntries(cleanDayEntries(raw, withSemantic))
     return out
@@ -185,6 +189,10 @@ function inferSchoolTimes(schedule: ScheduleByDay): {
   return { school_start_time: schoolStart, school_end_time: schoolEnd }
 }
 
+function countScheduleEntries(schedule: ScheduleByDay): number {
+  return DAYS.reduce((n, d) => n + schedule[d].length, 0)
+}
+
 function createAuthedSupabase(req: NextRequest) {
   const authHeader = req.headers.get('Authorization') ?? req.headers.get('authorization')
   const token = authHeader?.replace(/^Bearer\s+/i, '') || ''
@@ -225,16 +233,14 @@ async function callClaude(body: object, label: string): Promise<ClaudeCallResult
 function parseClaudeJson(raw: string, label: string): unknown | null {
   const trimmed = raw.trim()
 
-  // 整段即为 JSON（无 markdown 包裹时）
   if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
     try {
       return JSON.parse(trimmed)
     } catch {
-      // 继续尝试从文本中提取
+      // continue
     }
   }
 
-  // markdown ```json ... ```
   const fenced = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/i)
   if (fenced?.[1]) {
     try {
@@ -244,7 +250,6 @@ function parseClaudeJson(raw: string, label: string): unknown | null {
     }
   }
 
-  // 贪婪匹配第一个 { ... } 块（旧逻辑）
   const m = raw.match(/\{[\s\S]*\}/)
   if (!m) {
     const arr = raw.match(/\[[\s\S]*\]/)
@@ -267,56 +272,103 @@ function parseClaudeJson(raw: string, label: string): unknown | null {
   }
 }
 
-/** 第一步：Vision 只识别 time + subject（visionExtractSchedule） */
-async function visionExtractSchedule(image: string, mediaTypeHint?: string): Promise<ScheduleByDay | null> {
-  const { data: imageData, media_type, hasDataUrlPrefix } = prepareVisionImageInput(image, mediaTypeHint)
+function buildVisionImageContent(imageData: string, media_type: VisionMediaType, text: string) {
+  return [
+    {
+      type: 'image',
+      source: { type: 'base64', media_type, data: imageData },
+    },
+    { type: 'text', text },
+  ]
+}
 
-  if (!imageData || imageData.length < 100) {
-    console.error('[parse-schedule] vision image invalid:', {
-      base64Len: imageData?.length ?? 0,
-      media_type,
-      hasDataUrlPrefix,
-    })
-    return null
+function defaultStats(): ScheduleStats {
+  return { days: 5, lessonsPerDay: 8, orientation: 'horizontal' }
+}
+
+function parseStats(raw: unknown): ScheduleStats | null {
+  if (!raw || typeof raw !== 'object') return null
+  const obj = raw as Record<string, unknown>
+  const days = parseInt(String(obj.days ?? ''), 10)
+  const lessonsPerDay = parseInt(String(obj.lessonsPerDay ?? obj.lessons_per_day ?? ''), 10)
+  const orientationRaw = String(obj.orientation || '').trim().toLowerCase()
+  const orientation = orientationRaw === 'vertical' ? 'vertical' : 'horizontal'
+
+  if (!Number.isFinite(days) || days < 1 || days > 7) return null
+  if (!Number.isFinite(lessonsPerDay) || lessonsPerDay < 1 || lessonsPerDay > 20) return null
+
+  return { days, lessonsPerDay, orientation }
+}
+
+/** Pass 1：轻量统计课表结构 */
+async function visionAnalyzeStats(imageData: string, media_type: VisionMediaType): Promise<ScheduleStats> {
+  const result = await callClaude({
+    model: CLAUDE_MODEL,
+    max_tokens: 256,
+    messages: [{
+      role: 'user',
+      content: buildVisionImageContent(
+        imageData,
+        media_type,
+        `请分析这张课表图片，只回答：
+1. 这是几天的课表？（几列）
+2. 每天大约有几节课？（几行）
+3. 课表是横向还是纵向排列？
+只返回JSON: { "days": number, "lessonsPerDay": number, "orientation": "horizontal"|"vertical" }`,
+      ),
+    }],
+  }, 'stats')
+
+  if (!result.ok) {
+    console.error('[parse-schedule] stats pass failed, using defaults')
+    return defaultStats()
   }
 
-  console.error('[parse-schedule] vision image payload:', {
-    media_type,
-    base64Len: imageData.length,
-    hasDataUrlPrefix,
-    mediaTypeHint: mediaTypeHint ?? null,
-    base64Prefix: imageData.slice(0, 32),
-  })
+  const parsed = parseClaudeJson(result.text, 'stats')
+  const stats = parseStats(parsed)
+  if (!stats) {
+    console.error('[parse-schedule] stats parse failed, using defaults')
+    return defaultStats()
+  }
+
+  console.error('[parse-schedule] stats:', stats)
+  return stats
+}
+
+/** Pass 2：Vision 提取 time + subject（带 Pass 1 约束） */
+async function visionExtractSchedule(
+  imageData: string,
+  media_type: VisionMediaType,
+  stats: ScheduleStats,
+): Promise<ScheduleByDay | null> {
+  const expectedTotal = stats.days * stats.lessonsPerDay
+  const orientationLabel = stats.orientation === 'vertical' ? '纵向' : '横向'
 
   const result = await callClaude({
     model: CLAUDE_MODEL,
     max_tokens: 2000,
     messages: [{
       role: 'user',
-      content: [
-        {
-          type: 'image',
-          source: { type: 'base64', media_type, data: imageData },
-        },
-        {
-          type: 'text',
-          text: `这是一张学校课表图片，可能横向或竖向拍摄。
+      content: buildVisionImageContent(
+        imageData,
+        media_type,
+        `这是一张学校课表图片。
 
-请先判断表格方向：
-- 时间数字（如 7:50、8:00）在图片哪个位置？
-- 星期（Monday-Friday）在哪个位置？
+Pass 1 统计结果（请严格遵守）：
+- 这张课表共 ${stats.days} 天，每天约 ${stats.lessonsPerDay} 节课
+- 课表方向：${orientationLabel}（${stats.orientation}）
+- 请提取所有 ${expectedTotal} 节课程，不能遗漏
 
-然后正确提取每天的课程安排。
+请先判断表格方向，再正确提取每天的课程安排。
 
 重要：
 - 只输出图片中实际显示的时间，不做任何换算
 - 时间格式 HH:MM，只取开始时间
-- 按 mon/tue/wed/thu/fri 分组
+- 按 mon/tue/wed/thu/fri 分组（仅提取工作日，最多 ${stats.days} 天）
 
 只返回 JSON：
 {"mon":[{"time":"07:50","subject":"课程名"}],...}`,
-        },
-      ],
+      ),
     }],
   }, 'vision')
 
@@ -332,7 +384,7 @@ async function visionExtractSchedule(image: string, mediaTypeHint?: string): Pro
   if (!parsed) return null
 
   const schedule = normalizeSchedule(parsed, false)
-  const total = DAYS.reduce((n, d) => n + schedule[d].length, 0)
+  const total = countScheduleEntries(schedule)
   if (total === 0) {
     if (Array.isArray(parsed)) {
       console.error('[parse-schedule] vision parsed as root array, length:', parsed.length)
@@ -346,15 +398,15 @@ async function visionExtractSchedule(image: string, mediaTypeHint?: string): Pro
       console.error('[parse-schedule] vision raw per-key lengths (before filter):', countRawDayEntries(daysObj))
     }
     console.error('[parse-schedule] vision cleaned per-day counts:', Object.fromEntries(DAYS.map((d) => [d, schedule[d].length])))
-    console.error('[parse-schedule] vision: no entries extracted (check: day keys mon-fri? time HH:MM? subject not "—"?)')
+    console.error('[parse-schedule] vision: no entries extracted')
     return null
   }
   return schedule
 }
 
-/** 第二步：语义理解，补充 name_zh + category（enrichSchedule） */
+/** 语义理解，补充 name_zh + category（enrichSchedule） */
 async function enrichSchedule(step1: ScheduleByDay): Promise<ScheduleByDay | null> {
-  const totalEntries = DAYS.reduce((n, d) => n + step1[d].length, 0)
+  const totalEntries = countScheduleEntries(step1)
   console.error('[parse-schedule] enrich start, entries:', totalEntries)
 
   const inputJson = JSON.stringify(step1)
@@ -403,18 +455,111 @@ ${inputJson}`,
     console.error('[parse-schedule] enrich WARNING: truncated at max_tokens')
   }
 
-  let parsed: unknown
-  try {
-    parsed = parseClaudeJson(enrichRaw, 'semantic')
-    if (!parsed) throw new Error('no valid JSON in enrich response')
-  } catch (e) {
-    console.error('[parse-schedule] enrich parse failed:', e)
+  const parsed = parseClaudeJson(enrichRaw, 'semantic')
+  if (!parsed) {
+    console.error('[parse-schedule] enrich parse failed')
     return null
   }
 
   const enriched = normalizeSchedule(parsed, true)
   console.error('[parse-schedule] enrich success, sample:', JSON.stringify(enriched.mon?.slice(0, 2)))
   return enriched
+}
+
+function finalizeSchedule(raw: ScheduleByDay): {
+  schedule: ScheduleByDay
+  parse_warnings: ParseWarning[]
+  school_start_time: string | null
+  school_end_time: string | null
+} {
+  const { schedule, parse_warnings } = applyScheduleTimeValidation(raw, DAYS)
+  const deduped = {} as ScheduleByDay
+  for (const d of DAYS) {
+    deduped[d] = dedupeScheduleEntries(schedule[d] || [])
+  }
+  const { school_start_time, school_end_time } = inferSchoolTimes(deduped)
+  return { schedule: deduped, parse_warnings, school_start_time, school_end_time }
+}
+
+async function persistSchedule(
+  req: NextRequest,
+  userId: string,
+  childId: string,
+  schedule: ScheduleByDay,
+  school_start_time: string | null,
+  school_end_time: string | null,
+) {
+  const supabase = createAuthedSupabase(req)
+
+  const { error: profileError } = await supabase
+    .from('child_profiles')
+    .upsert(
+      { user_id: userId, child_id: childId, class_schedule: schedule },
+      { onConflict: 'child_id' },
+    )
+
+  if (profileError) {
+    console.error('[parse-schedule] child_profiles upsert failed:', profileError.message)
+    throw new Error(profileError.message)
+  }
+
+  if (school_start_time || school_end_time) {
+    const childUpdate: { school_start_time?: string; school_end_time?: string } = {}
+    if (school_start_time) childUpdate.school_start_time = school_start_time
+    if (school_end_time) childUpdate.school_end_time = school_end_time
+
+    const { error: childError } = await supabase
+      .from('children')
+      .update(childUpdate)
+      .eq('id', childId)
+      .eq('user_id', userId)
+
+    if (childError) {
+      console.error('[parse-schedule] children update failed:', childError.message)
+    }
+  }
+}
+
+async function runParsePipeline(image: string, mediaTypeHint?: string): Promise<{
+  schedule: ScheduleByDay
+  parse_warnings: ParseWarning[]
+  school_start_time: string | null
+  school_end_time: string | null
+  stats: ScheduleStats
+} | null> {
+  const { data: imageData, media_type, hasDataUrlPrefix } = prepareVisionImageInput(image, mediaTypeHint)
+
+  if (!imageData || imageData.length < 100) {
+    console.error('[parse-schedule] vision image invalid:', {
+      base64Len: imageData?.length ?? 0,
+      media_type,
+      hasDataUrlPrefix,
+    })
+    return null
+  }
+
+  console.error('[parse-schedule] vision image payload:', {
+    media_type,
+    base64Len: imageData.length,
+    hasDataUrlPrefix,
+    mediaTypeHint: mediaTypeHint ?? null,
+    base64Prefix: imageData.slice(0, 32),
+  })
+
+  const stats = await visionAnalyzeStats(imageData, media_type)
+  const step1 = await visionExtractSchedule(imageData, media_type, stats)
+  if (!step1) return null
+
+  console.error('[parse-schedule] step1 entries:', countScheduleEntries(step1))
+
+  const step2 = await enrichSchedule(step1)
+  const enriched = step2 ?? step1
+  if (!step2) {
+    console.error('[parse-schedule] enrich failed, using step1 only')
+  }
+
+  const finalized = finalizeSchedule(enriched)
+  return { ...finalized, stats }
 }
 
 export async function POST(req: NextRequest) {
@@ -426,68 +571,64 @@ export async function POST(req: NextRequest) {
   let image: string | undefined
   let childId: string | undefined
   let mediaType: string | undefined
+  let save = false
+  let scheduleInput: unknown
   try {
     const body = await req.json()
     image = body.image
     childId = body.childId
     mediaType = body.mediaType
+    save = body.save === true
+    scheduleInput = body.schedule
   } catch (parseBodyErr) {
     console.error('[parse-schedule] req.json failed:', parseBodyErr)
     return NextResponse.json({ error: '请求体解析失败' }, { status: 400 })
   }
 
-  if (!image) return NextResponse.json({ error: '没有图片' }, { status: 400 })
   if (!childId) return NextResponse.json({ error: '缺少 childId' }, { status: 400 })
 
-  console.error('[parse-schedule] start', { userId: user.id, childId, imageLen: image.length })
+  console.error('[parse-schedule] start', { userId: user.id, childId, save, hasImage: !!image, hasSchedule: !!scheduleInput })
 
   try {
-    const step1 = await visionExtractSchedule(image, mediaType)
-    if (!step1) {
+    if (scheduleInput && save) {
+      const normalized = normalizeSchedule(scheduleInput, true)
+      const finalized = finalizeSchedule(normalized)
+      if (countScheduleEntries(finalized.schedule) === 0) {
+        return NextResponse.json({ error: '课表为空，无法保存' }, { status: 400 })
+      }
+      await persistSchedule(req, user.id, childId, finalized.schedule, finalized.school_start_time, finalized.school_end_time)
+      return NextResponse.json({
+        schedule: finalized.schedule,
+        school_start_time: finalized.school_start_time,
+        school_end_time: finalized.school_end_time,
+        parse_warnings: finalized.parse_warnings,
+        saved: true,
+      })
+    }
+
+    if (!image) return NextResponse.json({ error: '没有图片' }, { status: 400 })
+
+    const parsed = await runParsePipeline(image, mediaType)
+    if (!parsed) {
       return NextResponse.json({ error: '识别失败，请重试' }, { status: 400 })
     }
 
-    console.error('[parse-schedule] step1 entries:', DAYS.reduce((n, d) => n + step1[d].length, 0))
-
-    const step2 = await enrichSchedule(step1)
-    const schedule = step2 ?? step1
-
-    if (!step2) {
-      console.error('[parse-schedule] step2 failed, using step1 only')
+    if (countScheduleEntries(parsed.schedule) === 0) {
+      return NextResponse.json({ error: '未识别到有效课程' }, { status: 400 })
     }
 
-    const { school_start_time, school_end_time } = inferSchoolTimes(schedule)
-
-    const supabase = createAuthedSupabase(req)
-
-    const { error: profileError } = await supabase
-      .from('child_profiles')
-      .upsert(
-        { user_id: user.id, child_id: childId, class_schedule: schedule },
-        { onConflict: 'child_id' },
-      )
-
-    if (profileError) {
-      console.error('[parse-schedule] child_profiles upsert failed:', profileError.message)
+    if (save) {
+      await persistSchedule(req, user.id, childId, parsed.schedule, parsed.school_start_time, parsed.school_end_time)
     }
 
-    if (school_start_time || school_end_time) {
-      const childUpdate: { school_start_time?: string; school_end_time?: string } = {}
-      if (school_start_time) childUpdate.school_start_time = school_start_time
-      if (school_end_time) childUpdate.school_end_time = school_end_time
-
-      const { error: childError } = await supabase
-        .from('children')
-        .update(childUpdate)
-        .eq('id', childId)
-        .eq('user_id', user.id)
-
-      if (childError) {
-        console.error('[parse-schedule] children update failed:', childError.message)
-      }
-    }
-
-    return NextResponse.json({ schedule, school_start_time, school_end_time })
+    return NextResponse.json({
+      schedule: parsed.schedule,
+      school_start_time: parsed.school_start_time,
+      school_end_time: parsed.school_end_time,
+      parse_warnings: parsed.parse_warnings,
+      stats: parsed.stats,
+      saved: save,
+    })
 
   } catch (e: unknown) {
     console.error('[parse-schedule] unhandled error:', e)

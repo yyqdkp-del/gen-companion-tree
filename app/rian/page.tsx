@@ -2,7 +2,6 @@
 
 import React, { useEffect, useState, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { X } from 'lucide-react'
 import nextDynamic from 'next/dynamic'
 import { THEME } from '@/app/_shared/_constants/theme'
 import { PAGE_BOTTOM_WITH_FLOAT, SAFE_AREA_TOP } from '@/app/_shared/_constants/layout'
@@ -13,6 +12,7 @@ const WeeklyReportSheet = nextDynamic(() => import('./WeeklyReportSheet'), { ssr
 import RootDiscoveries from '@/app/rian/RootDiscoveries'
 import TodoGroupCard from '@/app/_shared/_components/TodoGroupCard'
 import { useApp } from '@/app/context/AppContext'
+import ChildSwitcher from '@/app/_shared/_components/child/ChildSwitcher'
 import { useTodoEngine } from '@/app/_shared/_hooks/useTodoEngine'
 import type { TodoItem } from '@/app/_shared/_types'
 import TourGuide, { type TourStep } from '@/app/components/TourGuide'
@@ -32,15 +32,6 @@ type Reminder = {
     brain_instruction?: unknown
     prepared_at?: string
   }
-}
-
-type Child = {
-  id: string
-  name: string
-  emoji: string
-  energy: number | null
-  progress: number
-  avatar_url?: string
 }
 
 const RIAN_TOUR: TourStep[] = [
@@ -69,31 +60,14 @@ const RIAN_TOUR: TourStep[] = [
 ]
 
 const getEnergyColor = (v: number) => (v > 70 ? '#8ca88d' : v > 40 ? '#b88e5e' : '#d58074')
-const getChildGlow = (energy: number | null | undefined) =>
-  energy == null ? 'rgba(255,255,255,0.45)' : getEnergyColor(energy)
 
 export default function RianPage() {
   const [time, setTime] = useState(new Date())
-  const [showFamilyMenu, setShowFamilyMenu] = useState(false)
   const [selectedReminder, setSelectedReminder] = useState<Reminder | null>(null)
   const [mounted, setMounted] = useState(false)
   const [showWeeklyReport, setShowWeeklyReport] = useState(false)
 
-  const { userId, kids: ctxKids, todos: ctxTodos, sync: ctxSync, activeKid, setActiveKid } = useApp()
-
-  useEffect(() => {
-    if (ctxKids.length === 0 || activeKid) return
-    const storedId = typeof window !== 'undefined' ? localStorage.getItem('active_child_id') : null
-    const kid = (storedId ? ctxKids.find((k: Child) => k.id === storedId) : null) || ctxKids[0]
-    if (kid) setActiveKid(kid)
-  }, [ctxKids, activeKid, setActiveKid])
-
-  const handleSwitchChild = (nextKid: Child) => {
-    setActiveKid(nextKid)
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('active_child_id', nextKid.id)
-    }
-  }
+  const { userId, kids: ctxKids, todos: ctxTodos, sync: ctxSync, activeKid } = useApp()
 
   const todosTyped = ctxTodos as TodoItem[]
   const { groups, advice } = useTodoEngine(todosTyped)
@@ -145,7 +119,6 @@ export default function RianPage() {
     return () => clearInterval(ticker)
   }, [])
 
-  const children = ctxKids
   const childEnergy = activeKid?.energy != null ? activeKid.energy : null
   const showChildEnergy = childEnergy != null
 
@@ -195,56 +168,16 @@ export default function RianPage() {
         根·陪伴
       </div>
 
-      {/* 左上角：孩子头像 */}
+      {/* 左上角：孩子切换 */}
       <div style={{ position: 'absolute', top: `calc(${SAFE_AREA_TOP} + 5%)`, left: '5%', zIndex: 100 }}>
-        <motion.div
-          onClick={() => setShowFamilyMenu(!showFamilyMenu)}
-          animate={{
-            boxShadow: [
-              `0 0 15px ${getChildGlow(childEnergy)}40`,
-              `0 0 35px ${getChildGlow(childEnergy)}80`,
-              `0 0 15px ${getChildGlow(childEnergy)}40`,
-            ],
-          }}
-          transition={{ duration: 4, repeat: Infinity }}
-          style={{
-            width: 64,
-            height: 64,
-            borderRadius: '50%',
-            background: 'rgba(255,255,255,0.8)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            border: '2px solid white',
-            cursor: 'pointer',
-            overflow: 'hidden',
-          }}
-        >
-          {activeKid?.avatar_url ? (
-            <img src={activeKid.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-          ) : (
-            <span style={{ fontSize: 30 }}>{activeKid?.emoji || '🌱'}</span>
-          )}
-        </motion.div>
-        <p
-          style={{
-            marginTop: 8,
-            fontSize: 10,
-            color: THEME.text,
-            fontWeight: 'bold',
-            letterSpacing: '0.2em',
-            textAlign: 'center',
-          }}
-        >
-          {activeKid?.name || ''}
-        </p>
+        <ChildSwitcher mode="dropdown" />
         <div
           style={{
             width: 56,
             height: 3,
             background: 'rgba(255,255,255,0.3)',
             borderRadius: 2,
-            margin: '3px auto',
+            margin: '8px auto 0',
             overflow: 'hidden',
           }}
         >
@@ -261,59 +194,6 @@ export default function RianPage() {
           <p style={{ marginTop: 4, fontSize: 10, color: THEME.muted, textAlign: 'center' }}>—</p>
         )}
       </div>
-
-      <AnimatePresence>
-        {showFamilyMenu && (
-          <motion.div
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.9 }}
-            style={{
-              position: 'absolute',
-              top: '17%',
-              left: '5%',
-              zIndex: 120,
-              background: 'rgba(255,255,255,0.4)',
-              backdropFilter: 'blur(30px)',
-              borderRadius: 20,
-              padding: 12,
-              border: '1px solid rgba(255,255,255,0.5)',
-              display: 'flex',
-              gap: 12,
-              alignItems: 'center',
-            }}
-          >
-            {children.map((c) => (
-              <div
-                key={c.id}
-                onClick={() => {
-                  handleSwitchChild(c as Child)
-                  setShowFamilyMenu(false)
-                }}
-                style={{
-                  cursor: 'pointer',
-                  opacity: activeKid?.id === c.id ? 1 : 0.3,
-                  width: 36,
-                  height: 36,
-                  borderRadius: '50%',
-                  overflow: 'hidden',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  background: 'rgba(255,255,255,0.5)',
-                }}
-              >
-                {c.avatar_url ? (
-                  <img src={c.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                ) : (
-                  <span style={{ fontSize: 20 }}>{c.emoji}</span>
-                )}
-              </div>
-            ))}
-            <X size={14} onClick={() => setShowFamilyMenu(false)} style={{ cursor: 'pointer', opacity: 0.4 }} />
-          </motion.div>
-        )}
-      </AnimatePresence>
 
       <header
         style={{
@@ -472,7 +352,7 @@ export default function RianPage() {
       />
 
       <AnimatePresence>
-        {showWeeklyReport && (activeKid?.id || children.length > 1) && (
+        {showWeeklyReport && (activeKid?.id || ctxKids.length > 1) && (
           <WeeklyReportSheet
             childId={activeKid?.id || ''}
             childName={activeKid?.name || '宝宝'}

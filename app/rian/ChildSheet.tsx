@@ -1,10 +1,11 @@
 'use client'
 
-import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, Plus } from 'lucide-react'
+import { X } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import Accordion from '@/app/_shared/_components/Accordion'
+import ChildSwitcher from '@/app/_shared/_components/child/ChildSwitcher'
 import { FLOAT_SHEET_BOTTOM } from '@/app/_shared/_constants/layout'
 import { useChildSchedule } from '@/app/_shared/_hooks/useChildSchedule'
 import { useChildDailyLog } from '@/app/_shared/_hooks/useChildDailyLog'
@@ -13,7 +14,8 @@ import ChildEnergyCard from '@/app/_shared/_components/ChildEnergyCard'
 import { TimelineSegment, buildTimelineSegments } from '@/app/_shared/_components/design'
 import { buildPackingRows, countPendingPackingRows } from '@/lib/packing/buildPackingRows'
 import type { PackingPreferencesMap } from '@/lib/packing/packingPreferences'
-import type { Child, HealthStatus, MoodStatus } from '@/app/_shared/_types'
+import type { HealthStatus, MoodStatus } from '@/app/_shared/_types'
+import { useApp } from '@/app/context/AppContext'
 import {
   dedupeCalendarEvents,
   FG3,
@@ -24,20 +26,17 @@ import {
 } from '@/app/_shared/_components/child/childScheduleShared'
 
 const SHEET_EASE = [0.16, 1, 0.3, 1] as const
-const CLAY = 'var(--clay, #a46355)'
 
 type Props = {
-  childList: Child[]
-  sel: Child | null
-  onSel: (c: Child) => void
   onClose: () => void
   onAdd: () => void
-  userId: string
   onStatusSaved?: () => void | Promise<void>
 }
 
-export default function ChildSheet({ childList, sel, onSel, onClose, onAdd, userId, onStatusSaved }: Props) {
+export default function ChildSheet({ onClose, onAdd, onStatusSaved }: Props) {
   const router = useRouter()
+  const { userId, kids, activeKid } = useApp()
+  const sel = activeKid
   const today = getTodayKey()
 
   const {
@@ -72,14 +71,6 @@ export default function ChildSheet({ childList, sel, onSel, onClose, onAdd, user
       title: t.title,
     })),
   })
-
-  const handleSel = useCallback((c: Child) => { onSel(c) }, [onSel])
-  const switcherRef = useRef<HTMLDivElement>(null)
-  const activeChipRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    activeChipRef.current?.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' })
-  }, [sel?.id])
 
   const handleSaveStatus = async (h: HealthStatus, m: MoodStatus) => {
     await saveStatus(h, m)
@@ -154,7 +145,7 @@ export default function ChildSheet({ childList, sel, onSel, onClose, onAdd, user
             overflowY: 'auto', flex: 1, padding: '0 22px 28px',
             WebkitOverflowScrolling: 'touch' as React.CSSProperties['WebkitOverflowScrolling'],
           }}>
-            {childList.length === 0 ? (
+            {kids.length === 0 ? (
               <div style={{ textAlign: 'center', padding: '36px 16px 28px' }}>
                 <div style={{ fontFamily: 'var(--font-body)', fontSize: 14, color: FG3, marginBottom: 16, lineHeight: 1.6 }}>
                   暂无孩子档案，添加后即可查看日程与状态
@@ -180,54 +171,7 @@ export default function ChildSheet({ childList, sel, onSel, onClose, onAdd, user
                   </button>
                 </div>
 
-                <div ref={switcherRef} style={{
-                  display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16,
-                  overflowX: 'auto', paddingBottom: 4, scrollbarWidth: 'none',
-                  scrollSnapType: 'x mandatory',
-                }}>
-                  {childList.map((c) => {
-                    const active = c.id === sel?.id
-                    return (
-                      <motion.div
-                        key={c.id}
-                        ref={active ? activeChipRef : undefined}
-                        whileTap={{ scale: 0.9 }}
-                        onClick={() => handleSel(c)}
-                        style={{
-                          display: 'flex', flexDirection: 'column', alignItems: 'center',
-                          gap: 4, cursor: 'pointer', flexShrink: 0, scrollSnapAlign: 'center',
-                        }}
-                      >
-                        <div style={{
-                          width: 48, height: 48, borderRadius: '50%',
-                          background: 'rgba(164,99,85,0.06)',
-                          border: `2px solid ${active ? CLAY : 'transparent'}`,
-                          display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          fontSize: 24, transition: 'border-color 0.18s',
-                        }}>
-                          {c.emoji}
-                        </div>
-                        <span style={{
-                          fontFamily: 'var(--font-body)', fontSize: 10,
-                          fontWeight: active ? 600 : 400,
-                          color: active ? CLAY : FG3,
-                          maxWidth: 56, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                        }}>
-                          {c.name}
-                        </span>
-                      </motion.div>
-                    )
-                  })}
-                  <motion.div whileTap={{ scale: 0.9 }} onClick={onAdd}
-                    style={{
-                      width: 48, height: 48, borderRadius: '50%', flexShrink: 0,
-                      border: '1.5px dashed rgba(45,50,47,0.18)',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      cursor: 'pointer', color: FG3, scrollSnapAlign: 'center',
-                    }}>
-                    <Plus size={16} />
-                  </motion.div>
-                </div>
+                <ChildSwitcher mode="bar" onAdd={onAdd} />
 
                 {!sel ? (
                   <div style={{ textAlign: 'center', opacity: 0.45, padding: '24px 0',

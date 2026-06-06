@@ -144,6 +144,7 @@ export default function SchoolTab({ child }: Props) {
           image: base64,
           mediaType: prepared.mediaType,
           childId: child.id,
+          save: true,
         }),
       })
       const result = await resp.json()
