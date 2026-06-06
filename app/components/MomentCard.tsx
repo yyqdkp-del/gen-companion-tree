@@ -58,7 +58,7 @@ function CornerHint({ icon: Icon }: { icon: LucideIcon }) {
   )
 }
 
-function MomentEyebrow({ children }: { children: string }) {
+function MomentEyebrow({ children, night }: { children: string; night?: boolean }) {
   return (
     <p
       style={{
@@ -68,7 +68,7 @@ function MomentEyebrow({ children }: { children: string }) {
         fontWeight: 600,
         letterSpacing: '0.14em',
         textTransform: 'uppercase',
-        color: 'var(--clay)',
+        color: night ? 'rgba(230,168,158,0.85)' : 'var(--clay)',
       }}
     >
       {children}
@@ -394,7 +394,8 @@ function BriefingBody({
 
 function DefaultBody({ data }: { data: MomentCardData }) {
   const titleSize = TITLE_SIZE[data.tier]
-  const color = THEME_COLOR[data.theme]
+  const isNight = data.kind === 'night'
+  const color = isNight ? '#E8DDD0' : THEME_COLOR[data.theme]
 
   return (
     <>
@@ -417,7 +418,7 @@ function DefaultBody({ data }: { data: MomentCardData }) {
           style={{
             fontFamily: 'var(--font-body)',
             fontSize: data.tier === 'urgent' ? 15 : 14,
-            color: 'rgba(45,50,47,0.62)',
+            color: isNight ? 'rgba(230,221,208,0.72)' : 'rgba(45,50,47,0.62)',
             margin: '10px 0 0',
             lineHeight: 1.55,
             whiteSpace: 'pre-line',
@@ -464,6 +465,7 @@ export default function MomentCard({
 }: Props) {
   const [hovered, setHovered] = useState(false)
   const eyebrow = data.eyebrow || '根对此刻的感知'
+  const isNightCard = data.kind === 'night'
   const isPacking = data.kind === 'packing'
   const isPickup = data.kind === 'pickup'
   const isAfterSchool = data.kind === 'after_school'
@@ -520,14 +522,17 @@ export default function MomentCard({
       className={[
         pulse ? 'moment-card-pulse' : '',
         interaction.breathe ? 'moment-card-breathe' : '',
+        isNightCard ? 'moment-card-night' : '',
       ].filter(Boolean).join(' ') || undefined}
       style={{
         position: 'relative',
-        background: '#fff',
+        background: isNightCard
+          ? 'linear-gradient(145deg, #1A1F35 0%, #101326 48%, #121a29 100%)'
+          : '#fff',
         borderRadius: 22,
         boxShadow: hovered && interaction.clickable ? 'var(--sh-lift)' : 'var(--sh-warm)',
         margin: '0 0 16px',
-        border: 'none',
+        border: isNightCard ? '1px solid rgba(230,168,158,0.14)' : 'none',
         minHeight: TIER_MIN_H[data.tier],
         padding: 20,
         display: 'flex',
@@ -539,7 +544,7 @@ export default function MomentCard({
     >
       {interaction.cornerIcon ? <CornerHint icon={interaction.cornerIcon} /> : null}
 
-      <MomentEyebrow>{eyebrow}</MomentEyebrow>
+      <MomentEyebrow night={isNightCard}>{isNightCard ? '深夜 · 根在此刻' : eyebrow}</MomentEyebrow>
 
       {isAfterSchool ? (
         <AfterSchoolBody data={data} />
@@ -634,6 +639,17 @@ export default function MomentCard({
         }
         .moment-card-breathe {
           animation: momentBreathe 3.2s ease-in-out infinite;
+        }
+        @keyframes momentNightBreathe {
+          0%, 100% {
+            box-shadow: 0 8px 32px rgba(0,0,0,0.35), 0 0 0 rgba(230,168,158,0);
+          }
+          50% {
+            box-shadow: 0 14px 48px rgba(0,0,0,0.42), 0 0 36px rgba(230,168,158,0.18);
+          }
+        }
+        .moment-card-night.moment-card-breathe {
+          animation: momentNightBreathe 3.2s ease-in-out infinite;
         }
       `}</style>
     </motion.section>

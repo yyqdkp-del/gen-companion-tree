@@ -328,6 +328,50 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+body.transition-ink-wash {
+  transition:
+    background-color var(--dur-ink) cubic-bezier(0.16, 1, 0.3, 1),
+    color var(--dur-ink) cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+body.transition-ink-wash .canvas-texture,
+body.transition-ink-wash .paper-bg {
+  transition:
+    background-color var(--dur-ink) cubic-bezier(0.16, 1, 0.3, 1),
+    color var(--dur-ink) cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* 深夜模式（21:00–06:00 自动切换，树洞页不叠加） */
+body.night-mode {
+  --canvas-light: #101326;
+  --canvas-warm: #1A1F35;
+  --canvas-card: #1E2440;
+  --text-primary: #E8DDD0;
+  --text-secondary: #9EA4B0;
+  --text-muted: rgba(230, 221, 208, 0.45);
+  --sh-warm: 0 12px 40px rgba(0, 0, 0, 0.3);
+  --sh-soft: 0 8px 32px rgba(0, 0, 0, 0.2);
+  --canvas: var(--canvas-light);
+  --paper: var(--canvas-card);
+  --line: rgba(230, 221, 208, 0.08);
+}
+
+body.night-mode .canvas-texture {
+  background-color: var(--canvas-light);
+  background-image:
+    radial-gradient(at 100% 0%, rgba(230, 168, 158, 0.07) 0px, transparent 60%),
+    radial-gradient(at 0% 100%, rgba(26, 74, 58, 0.1) 0px, transparent 60%),
+    url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.025'/%3E%3C/svg%3E");
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body.transition-ink-wash,
+  body.transition-ink-wash .canvas-texture,
+  body.transition-ink-wash .paper-bg {
+    transition: none !important;
+  }
+}
+
 input,
 button,
 textarea,

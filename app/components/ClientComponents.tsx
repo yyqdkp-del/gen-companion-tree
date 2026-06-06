@@ -7,6 +7,33 @@ import BottomInput from '@/app/components/BottomInput'
 import BottomNav from '@/app/components/BottomNav'
 
 const HIDE_CHROME = ['/auth', '/grandparent', '/admin', '/upgrade', '/privacy', '/terms', '/refund']
+const TREEHOUSE_PREFIX = '/treehouse'
+
+function isNightHour(date: Date): boolean {
+  const h = date.getHours()
+  return h >= 21 || h < 6
+}
+
+function syncNightMode(pathname: string) {
+  const body = document.body
+  if (pathname.startsWith(TREEHOUSE_PREFIX)) {
+    body.classList.remove('night-mode')
+    return
+  }
+  body.classList.toggle('night-mode', isNightHour(new Date()))
+}
+
+function NightModeSync() {
+  const pathname = usePathname()
+
+  useEffect(() => {
+    syncNightMode(pathname)
+    const id = window.setInterval(() => syncNightMode(pathname), 60_000)
+    return () => window.clearInterval(id)
+  }, [pathname])
+
+  return null
+}
 
 export default function ClientComponents() {
   const pathname = usePathname()
@@ -33,6 +60,7 @@ export default function ClientComponents() {
 
   return (
     <>
+      <NightModeSync />
       {showChrome && (
         <div
           style={{

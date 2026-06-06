@@ -61,7 +61,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             不再在这里重复声明，避免 statusBarStyle 冲突。 */}
         <HotjarScript />
       </head>
-      <body>
+      <body className="transition-ink-wash">
         <AppProvider>
           {children}
           <PostHogInit />
