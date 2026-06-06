@@ -20,6 +20,8 @@ const CATEGORY_SET = new Set(['class', 'life', 'break', 'transition', 'activity'
 type ScheduleCategory = 'class' | 'life' | 'break' | 'transition' | 'activity'
 
 const CLAUDE_MODEL = 'claude-haiku-4-5-20251001'
+const GEMINI_URL =
+  'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent'
 
 type VisionMediaType = 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp'
 const VISION_MEDIA_TYPES = new Set<VisionMediaType>(['image/jpeg', 'image/png', 'image/gif', 'image/webp'])
@@ -278,16 +280,6 @@ function parseClaudeJson(raw: string, label: string): unknown | null {
   }
 }
 
-function buildVisionImageContent(imageData: string, media_type: VisionMediaType, text: string) {
-  return [
-    {
-      type: 'image',
-      source: { type: 'base64', media_type, data: imageData },
-    },
-    { type: 'text', text },
-  ]
-}
-
 function defaultStats(): ScheduleStats {
   return {
     timeDirection: 'left',
@@ -324,148 +316,141 @@ function parseStats(raw: unknown): ScheduleStats | null {
   return { timeDirection, dayDirection, days, timeSlots, orientation }
 }
 
-function buildVisionExtractPrompt(stats: ScheduleStats): string {
-  const dayNames = 'Monday 到 Friday（mon/tue/wed/thu/fri）'
-  const commonRules = `
-重要：
-- 只输出图片中实际显示的时间，不做任何换算
-- 时间格式 HH:MM，只取开始时间
-- 按 mon/tue/wed/thu/fri 分组（工作日，共 ${stats.days} 天）
-- 时间段共 ${stats.timeSlots} 个，请全部提取，不要遗漏早上的课程
-
-只返回 JSON：
-{"mon":[{"time":"07:50","subject":"课程名"}],...}`
-
-  if (stats.timeDirection === 'left') {
-    return `这是一张学校课表图片。
-
-Pass 1 分析结果：
-- 时间列在左边（timeDirection: left）
-- 星期在${stats.dayDirection === 'top' ? '顶行' : stats.dayDirection}（dayDirection: ${stats.dayDirection}）
-- 共 ${stats.days} 天，${stats.timeSlots} 个时间段
-- 图片方向：${stats.orientation}
-
-这张课表时间列在左边，星期在顶行。
-请从左边时间列读取每个时间段（如 7:50-8:00），
-然后从顶行读取星期（${dayNames}），
-填入对应课程。
-
-时间段共 ${stats.timeSlots} 个，从上到下依次提取，不要遗漏早上的课程。
-${commonRules}`
+async function callGeminiVision(
+  imageBase64: string,
+  mimeType: VisionMediaType,
+  prompt: string,
+  generationConfig: { temperature: number; maxOutputTokens: number },
+  label: string,
+): Promise<string> {
+  const key = process.env.GOOGLE_AI_API_KEY
+  if (!key) {
+    console.error(`[parse-schedule] ${label}: GOOGLE_AI_API_KEY not configured`)
+    return ''
   }
 
-  if (stats.timeDirection === 'top') {
-    return `这是一张学校课表图片。
+  const response = await fetch(`${GEMINI_URL}?key=${key}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      contents: [{
+        parts: [
+          { inline_data: { mime_type: mimeType, data: imageBase64 } },
+          { text: prompt },
+        ],
+      }],
+      generationConfig,
+    }),
+  })
 
-Pass 1 分析结果：
-- 时间在顶行（timeDirection: top）
-- 星期在${stats.dayDirection === 'left' ? '左列' : stats.dayDirection}（dayDirection: ${stats.dayDirection}）
-- 共 ${stats.days} 天，${stats.timeSlots} 个时间段
+  const data = await response.json()
+  console.error(`[parse-schedule] ${label} status:`, response.status)
 
-时间在顶行，星期在左列。
-请从顶行读取每个时间段，从左列读取星期（${dayNames}），填入对应课程。
-${commonRules}`
+  if (!response.ok) {
+    console.error(`[parse-schedule] ${label} error:`, JSON.stringify(data).slice(0, 2000))
+    return ''
   }
 
-  if (stats.timeDirection === 'right') {
-    return `这是一张学校课表图片。
-
-Pass 1 分析结果：
-- 时间列在右边（timeDirection: right）
-- 星期在${stats.dayDirection}（dayDirection: ${stats.dayDirection}）
-- 共 ${stats.days} 天，${stats.timeSlots} 个时间段
-
-时间列在右边，请从右列读取时间段，从${stats.dayDirection}读取星期（${dayNames}）。
-${commonRules}`
-  }
-
-  return `这是一张学校课表图片。
-
-Pass 1 分析结果：
-- 时间在底行（timeDirection: bottom）
-- 星期在${stats.dayDirection}（dayDirection: ${stats.dayDirection}）
-- 共 ${stats.days} 天，${stats.timeSlots} 个时间段
-
-时间在底行，请从底行读取时间段，从${stats.dayDirection}读取星期（${dayNames}）。
-${commonRules}`
+  return data.candidates?.[0]?.content?.parts?.[0]?.text || ''
 }
 
-/** Pass 1：分析课表结构与方向 */
-async function visionAnalyzeStats(imageData: string, media_type: VisionMediaType): Promise<ScheduleStats> {
-  const result = await callClaude({
-    model: CLAUDE_MODEL,
-    max_tokens: 384,
-    messages: [{
-      role: 'user',
-      content: buildVisionImageContent(
-        imageData,
-        media_type,
-        `请仔细分析这张课表图片：
+function parseGeminiJson(text: string): unknown | null {
+  const clean = text.replace(/```json|```/g, '').trim()
+  try {
+    return JSON.parse(clean)
+  } catch {
+    const m = clean.match(/\{[\s\S]*\}/)
+    if (!m) return null
+    try {
+      return JSON.parse(m[0])
+    } catch {
+      return null
+    }
+  }
+}
 
-1. 图片方向：
-   - 时间数字（如7:50、8:00）在哪个方向？左列/顶行/右列/底行
-   - 星期（Monday/Tuesday等）在哪个方向？
-
-2. 表格统计：
-   - 一共几天的课表？
-   - 时间段总共几个？（从最早到最晚）
-   - 每个时间段课程名在哪里？
-
-只返回JSON：
+/** Pass 1：Gemini 分析课表结构与方向 */
+async function visionAnalyzeStats(imageBase64: string, mimeType: VisionMediaType = 'image/jpeg'): Promise<ScheduleStats> {
+  const prompt = `请分析这张课表图片的表格结构，只返回JSON：
 {
-  "timeDirection": "left"|"top"|"right"|"bottom",
-  "dayDirection": "top"|"left"|"bottom"|"right",
-  "days": 5,
-  "timeSlots": 14,
-  "orientation": "landscape"|"portrait"
-}`,
-      ),
-    }],
-  }, 'stats')
+  "timeDirection": "left",（时间在哪列：left/top/right/bottom）
+  "dayDirection": "top",（星期在哪行：top/left/bottom/right）
+  "days": 5,（几天）
+  "timeSlots": 14,（几个时间段）
+  "orientation": "portrait"（图片方向：portrait/landscape）
+}
+只返回JSON不要其他文字。`
 
-  if (!result.ok) {
-    console.error('[parse-schedule] stats pass failed, using defaults')
-    return defaultStats()
-  }
-
-  const parsed = parseClaudeJson(result.text, 'stats')
+  const text = await callGeminiVision(imageBase64, mimeType, prompt, { temperature: 0, maxOutputTokens: 200 }, 'gemini-stats')
+  const parsed = parseGeminiJson(text)
   const stats = parseStats(parsed)
-  if (!stats) {
-    console.error('[parse-schedule] stats parse failed, using defaults')
-    return defaultStats()
+  if (stats) {
+    console.error('[parse-schedule] stats:', stats)
+    return stats
   }
 
-  console.error('[parse-schedule] stats:', stats)
-  return stats
+  console.error('[parse-schedule] gemini stats parse failed, using defaults')
+  return defaultStats()
 }
 
-/** Pass 2：Vision 提取 time + subject（带 Pass 1 约束） */
+/** Pass 2：Gemini 提取 time + subject（带 Pass 1 约束） */
 async function visionExtractSchedule(
-  imageData: string,
-  media_type: VisionMediaType,
-  stats: ScheduleStats,
+  imageBase64: string,
+  mimeType: VisionMediaType = 'image/jpeg',
+  stats?: ScheduleStats,
 ): Promise<ScheduleByDay | null> {
-  const extractPrompt = buildVisionExtractPrompt(stats)
+  const orientation = stats?.timeDirection || 'unknown'
+  const days = stats?.days || 5
+  const slots = stats?.timeSlots || 10
 
-  const result = await callClaude({
-    model: CLAUDE_MODEL,
-    max_tokens: 2000,
-    messages: [{
-      role: 'user',
-      content: buildVisionImageContent(imageData, media_type, extractPrompt),
-    }],
-  }, 'vision')
+  const prompt = `这是一张学校周课表图片。
 
-  const visionRaw = result.text
-  console.error('[parse-schedule] vision raw FULL:', visionRaw?.slice(0, 2000))
+表格说明：
+- 时间列方向：${orientation === 'left' ? '时间在左列，从上到下' : '请自行判断'}
+- 预计天数：${days}天
+- 预计时间段：${slots}个
 
-  if (!result.ok) return null
-  if (result.stop_reason === 'max_tokens') {
-    console.error('[parse-schedule] vision WARNING: truncated at max_tokens')
+请仔细分析表格结构，提取每天的课程：
+
+重要规则：
+1. 每个时间段每天只有一节课，绝对不要重复
+2. 相同课程名在同一天只出现一次
+3. 时间只取开始时间，格式 HH:MM
+4. 课程名拼写错误请纠正（如 Reddling→Reading）
+5. 以下是日常安排不是课程：
+   Breakfast、Morning Routine、Snack、Lunch、
+   Rest Time、Pick up、Outdoor Play
+   这些设 category: "break" 或 "transition"
+6. 真实课程设 category: "class" 或 "activity"
+
+只返回JSON，格式：
+{
+  "mon": [{"time":"07:50","subject":"Breakfast","category":"break"},...],
+  "tue": [...],
+  "wed": [...],
+  "thu": [...],
+  "fri": [...]
+}
+
+不要返回其他任何文字。`
+
+  const text = await callGeminiVision(
+    imageBase64,
+    mimeType,
+    prompt,
+    { temperature: 0.1, maxOutputTokens: 3000 },
+    'gemini-vision',
+  )
+
+  console.error('[parse-schedule] gemini vision raw FULL:', text?.slice(0, 2000))
+
+  if (!text) return null
+
+  const parsed = parseGeminiJson(text)
+  if (!parsed) {
+    console.error('[parse-schedule] Gemini 课表识别解析失败:', text.slice(0, 200))
+    return null
   }
-
-  const parsed = parseClaudeJson(visionRaw, 'vision')
-  if (!parsed) return null
 
   const schedule = normalizeSchedule(parsed, false)
   const total = countScheduleEntries(schedule)
