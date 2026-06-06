@@ -1,11 +1,16 @@
 'use client'
 
-import React, { useMemo } from 'react'
+import React, { useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { ChevronRight } from 'lucide-react'
+import { Camera, ChevronRight } from 'lucide-react'
+import nextDynamic from 'next/dynamic'
 import { formatSubjectDisplay } from '@/app/_shared/_services/childService'
 import { isRealScheduleClass } from '@/app/_shared/_engine/momentCard'
 import type { ScheduleClass } from '@/app/_shared/_engine/momentCard'
+import { fetchWithAuth } from '@/lib/auth/fetchWithAuth'
+import { prepareSchedulePhotoForUpload } from '@/lib/image/prepareSchedulePhoto'
+import { toast } from '@/app/components/Toast'
+import { useApp } from '@/app/context/AppContext'
 import { CARD, SectionTitle, type EnrichedChild } from './growthShared'
 import SchoolNotificationHistory from './SchoolNotificationHistory'
 
@@ -38,12 +43,44 @@ function classTime(cls: ScheduleClass): string | null {
   return t || null
 }
 
+function classSubjectKey(cls: ScheduleClass): string {
+  return String(cls.subject ?? cls.title ?? cls.name ?? '').trim()
+}
+
+function parseTimeMin(time?: string | null): number {
+  if (!time) return -1
+  const parts = time.split(':').map(Number)
+  if (parts.length < 2 || Number.isNaN(parts[0])) return -1
+  return parts[0] * 60 + (parts[1] || 0)
+}
+
+function dedupeClasses(classes: ScheduleClass[]): ScheduleClass[] {
+  const seen = new Set<string>()
+  return classes.filter((cls) => {
+    const key = `${classTime(cls) ?? ''}-${classSubjectKey(cls)}`
+    if (seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
+}
+
+function sortClassesByTime(classes: ScheduleClass[]): ScheduleClass[] {
+  return [...classes].sort((a, b) => {
+    const ta = parseTimeMin(classTime(a))
+    const tb = parseTimeMin(classTime(b))
+    if (ta < 0 && tb < 0) return 0
+    if (ta < 0) return 1
+    if (tb < 0) return -1
+    return ta - tb
+  })
+}
+
 function getDayClasses(schedule: Record<string, unknown[]>, dayKey: string): ScheduleClass[] {
   const raw = schedule[dayKey] || []
-  return raw
+  const filtered = raw
     .map(normalizeClass)
     .filter((c): c is ScheduleClass => c != null && isRealScheduleClass(c))
-    .slice(0, 4)
+  return sortClassesByTime(dedupeClasses(filtered))
 }
 
 function formatSchoolTime(start?: string, end?: string): string {
@@ -55,13 +92,20 @@ function formatSchoolTime(start?: string, end?: string): string {
   return '未设置'
 }
 
+function openCamera(detail: { source: string }) {
+  window.dispatchEvent(new CustomEvent('openCamera', { detail }))
+}
+
 type Props = {
   child: EnrichedChild
 }
 
 export default function SchoolTab({ child }: Props) {
   const router = useRouter()
+  const { activeKid, setActiveKid } = useApp()
   const schedule = (child.class_schedule || {}) as Record<string, unknown[]>
+  const fileRef = useRef<HTMLInputElement>(null)
+  const [uploading, setUploading] = useState(false)
 
   const weekRows = useMemo(
     () => WEEKDAYS.map((d) => ({ ...d, classes: getDayClasses(schedule, d.key) })),
@@ -69,10 +113,68 @@ export default function SchoolTab({ child }: Props) {
   )
 
   const hasSchedule = weekRows.some((d) => d.classes.length > 0)
+  const scheduleIncomplete = weekRows.some((d) => d.classes.length < 3)
   const homeroom = child.homeroom_teacher || '—'
+
+  const handleOpenScheduleCamera = () => {
+    openCamera({ source: 'schedule' })
+    fileRef.current?.click()
+  }
+
+  const handleSchedulePhoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+
+    setUploading(true)
+    try {
+      const prepared = await prepareSchedulePhotoForUpload(file)
+      if (prepared.isPortraitTall) {
+        toast('建议横向拍摄课表，效果更好', 'info')
+      }
+      const base64 = prepared.base64
+      if (!base64 || base64.length < 100) {
+        toast('图片读取失败，请重试', 'error')
+        return
+      }
+      const resp = await fetchWithAuth('/api/children/parse-schedule', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          image: base64,
+          mediaType: prepared.mediaType,
+          childId: child.id,
+        }),
+      })
+      const result = await resp.json()
+      if (result.error) throw new Error(result.error)
+      toast('课表已更新', 'success')
+      if (activeKid?.id === child.id) {
+        setActiveKid({
+          ...activeKid,
+          class_schedule: result.schedule ?? activeKid.class_schedule,
+          ...(result.school_start_time ? { school_start_time: result.school_start_time } : {}),
+          ...(result.school_end_time ? { school_end_time: result.school_end_time } : {}),
+        })
+      }
+    } catch {
+      toast('课表解析失败，请重试或手动填写', 'error')
+    } finally {
+      setUploading(false)
+    }
+  }
 
   return (
     <>
+      <input
+        ref={fileRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        style={{ display: 'none' }}
+        onChange={(e) => { void handleSchedulePhoto(e) }}
+      />
+
       <section style={CARD}>
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
           <div style={{ flex: 1, minWidth: 0 }}>
@@ -129,7 +231,7 @@ export default function SchoolTab({ child }: Props) {
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                     {day.classes.map((cls, i) => (
                       <div
-                        key={`${day.key}-${i}`}
+                        key={`${day.key}-${classTime(cls) ?? ''}-${classSubjectKey(cls)}-${i}`}
                         style={{
                           display: 'flex',
                           alignItems: 'center',
@@ -140,14 +242,20 @@ export default function SchoolTab({ child }: Props) {
                           background: 'var(--canvas-light)',
                         }}
                       >
-                        <span style={{ fontFamily: 'var(--font-serif)', fontSize: 14, color: 'var(--fg1)' }}>
-                          {classLabel(cls)}
-                        </span>
                         {classTime(cls) ? (
-                          <span style={{ fontFamily: 'var(--font-body)', fontSize: 12, color: 'var(--fg3)', flexShrink: 0 }}>
+                          <span style={{ fontFamily: 'var(--font-body)', fontSize: 12, color: 'var(--fg3)', flexShrink: 0, minWidth: 44 }}>
                             {classTime(cls)}
                           </span>
                         ) : null}
+                        <span style={{
+                          fontFamily: 'var(--font-serif)',
+                          fontSize: 14,
+                          color: 'var(--fg1)',
+                          flex: 1,
+                          textAlign: classTime(cls) ? 'left' : 'center',
+                        }}>
+                          {classLabel(cls)}
+                        </span>
                       </div>
                     ))}
                   </div>
@@ -162,6 +270,48 @@ export default function SchoolTab({ child }: Props) {
             还没有课表，可在孩子档案中上传或手动填写
           </p>
         )}
+
+        {(scheduleIncomplete || !hasSchedule) ? (
+          <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid rgba(45,50,47,0.08)' }}>
+            {scheduleIncomplete && hasSchedule ? (
+              <p style={{
+                margin: '0 0 12px',
+                fontFamily: 'var(--font-body)',
+                fontSize: 13,
+                color: 'var(--fg2)',
+                lineHeight: 1.6,
+              }}>
+                课表可能不完整，重新上传可获得更准确的展示
+              </p>
+            ) : null}
+            <button
+              type="button"
+              disabled={uploading}
+              onClick={handleOpenScheduleCamera}
+              style={{
+                width: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 8,
+                padding: '13px 16px',
+                borderRadius: 14,
+                border: 'none',
+                background: 'var(--clay)',
+                color: '#fff',
+                fontFamily: 'var(--font-serif)',
+                fontSize: 15,
+                fontWeight: 500,
+                cursor: uploading ? 'wait' : 'pointer',
+                opacity: uploading ? 0.7 : 1,
+                boxShadow: '0 4px 16px rgba(164,99,85,0.25)',
+              }}
+            >
+              <Camera size={18} />
+              {uploading ? '解析中…' : '重新上传课表'}
+            </button>
+          </div>
+        ) : null}
       </section>
 
       <SchoolNotificationHistory />

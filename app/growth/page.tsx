@@ -154,7 +154,7 @@ function GrowthContent() {
         ) : (
           <>
             {activeTab === '孩子' && userId ? (
-              <ChildTab child={sel} userId={userId} onStatusSaved={handleStatusSaved} />
+              <ChildTab onStatusSaved={handleStatusSaved} />
             ) : null}
             {activeTab === '学校' ? (
               <SchoolTab child={sel} />

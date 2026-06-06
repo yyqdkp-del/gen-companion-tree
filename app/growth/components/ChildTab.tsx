@@ -3,11 +3,10 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { AnimatePresence } from 'framer-motion'
 import Accordion from '@/app/_shared/_components/Accordion'
+import ChildEnergyCard from '@/app/_shared/_components/ChildEnergyCard'
 import {
-  buildChildSubtitle,
   dedupeCalendarEvents,
-  EventList,
-  getIn7Days,
+  FG3,
   getTodayKey,
   loadBroughtMap,
   PackingSection,
@@ -16,28 +15,31 @@ import {
 import { TimelineSegment, buildTimelineSegments } from '@/app/_shared/_components/design'
 import { calculateEnergy } from '@/app/_shared/_engine/energy'
 import { useChildDailyLog } from '@/app/_shared/_hooks/useChildDailyLog'
+import { useChildData } from '@/app/_shared/_hooks/useChildData'
 import { useChildSchedule } from '@/app/_shared/_hooks/useChildSchedule'
-import ChildActionSheet, { ChildEvent } from '@/app/rian/ChildActionSheet'
+import { useApp } from '@/app/context/AppContext'
 import { buildPackingRows, countPendingPackingRows } from '@/lib/packing/buildPackingRows'
 import type { PackingPreferencesMap } from '@/lib/packing/packingPreferences'
-import type { Child, HealthStatus, MoodStatus } from '@/app/_shared/_types'
-import {
-  CARD,
-  ENERGY_DOT,
-  SectionTitle,
-  childAvatarStyle,
-  firstChar,
-} from './growthShared'
+import type { HealthStatus, MoodStatus } from '@/app/_shared/_types'
 
 type Props = {
-  child: Child
-  userId: string
   onStatusSaved?: () => void | Promise<void>
 }
 
-export default function ChildTab({ child, userId, onStatusSaved }: Props) {
+export default function ChildTab({ onStatusSaved }: Props) {
+  const { userId, kids, activeKid } = useApp()
+  const { enrichedKids } = useChildData(userId, {
+    deferMs: 0,
+    activeChildId: activeKid?.id ?? null,
+  })
+
+  const childList = enrichedKids.length ? enrichedKids : kids
+  const sel = useMemo(() => {
+    if (!activeKid?.id) return null
+    return childList.find((k) => k.id === activeKid.id) ?? activeKid
+  }, [activeKid, childList])
+
   const today = getTodayKey()
-  const in7days = getIn7Days()
 
   const {
     timeline,
@@ -46,24 +48,23 @@ export default function ChildTab({ child, userId, onStatusSaved }: Props) {
     packingPreferences,
     loading,
     reload: reloadSchedule,
-  } = useChildSchedule(child.id, userId, today)
+  } = useChildSchedule(sel?.id, userId ?? undefined, today)
 
   const [packPrefs, setPackPrefs] = useState<PackingPreferencesMap>({})
   useEffect(() => {
     setPackPrefs(packingPreferences)
-  }, [packingPreferences, child.id])
+  }, [packingPreferences, sel?.id])
 
-  const { dailyLog, saveStatus } = useChildDailyLog(child.id, userId, today)
+  const { dailyLog, saveStatus } = useChildDailyLog(sel?.id, userId ?? undefined, today)
   const [showStatusEditor, setShowStatusEditor] = useState(false)
-  const [selectedEvent, setSelectedEvent] = useState<ChildEvent | null>(null)
 
   const isWeekend = [0, 6].includes(new Date().getDay())
   const energyResult = calculateEnergy({
     healthStatus: dailyLog.health_status,
     moodStatus: dailyLog.mood_status,
-    usualBedtime: child.usual_bedtime,
-    weekendBedtime: child.weekend_bedtime,
-    schoolStartTime: child.school_start_time,
+    usualBedtime: sel?.usual_bedtime,
+    weekendBedtime: sel?.weekend_bedtime,
+    schoolStartTime: sel?.school_start_time,
     isWeekend,
     todayEvents: timeline.map((t) => ({
       event_type: t.type,
@@ -81,117 +82,83 @@ export default function ChildTab({ child, userId, onStatusSaved }: Props) {
 
   const isNonEmptyTitle = (e: { title?: string }) => typeof e?.title === 'string' && e.title.trim().length > 0
   const todayEvents = dedupeCalendarEvents(calendar.filter((e) => e.date_start === today).filter(isNonEmptyTitle))
-  const weekEvents = dedupeCalendarEvents(calendar.filter((e) => e.date_start > today && e.date_start <= in7days).filter(isNonEmptyTitle))
 
-  const broughtStorageKey = `packing_brought_${child.id}_${today}`
+  const broughtStorageKey = sel ? `packing_brought_${sel.id}_${today}` : ''
   const todayPackCount = useMemo(() => {
+    if (!sel) return 0
     const brought = loadBroughtMap(broughtStorageKey)
     const rows = buildPackingRows(timeline, todayEvents, packingItems, packPrefs)
     return countPendingPackingRows(rows, brought)
-  }, [child.id, timeline, todayEvents, packingItems, packPrefs, broughtStorageKey])
-
-  const hasPackingItems = useMemo(() => {
-    const rows = buildPackingRows(timeline, todayEvents, packingItems, packPrefs)
-    return rows.length > 0
-  }, [timeline, todayEvents, packingItems, packPrefs])
+  }, [sel, timeline, todayEvents, packingItems, packPrefs, broughtStorageKey])
 
   const timelineSegments = useMemo(
-    () => buildTimelineSegments(timeline, todayEvents, child.school_start_time),
-    [timeline, todayEvents, child.school_start_time],
+    () => buildTimelineSegments(timeline, todayEvents, sel?.school_start_time),
+    [timeline, todayEvents, sel?.school_start_time],
   )
+  const timelineSegmentCount = useMemo(
+    () => timelineSegments.reduce((n, seg) => n + seg.items.length, 0),
+    [timelineSegments],
+  )
+
+  const hasLoggedStatus = dailyLog.health_status != null && dailyLog.mood_status != null
+
+  if (!sel) {
+    return (
+      <div style={{
+        textAlign: 'center',
+        opacity: 0.45,
+        padding: '24px 0',
+        fontFamily: 'var(--font-serif)',
+        fontSize: 14,
+        color: 'var(--fg1)',
+      }}>
+        选择孩子查看状态
+      </div>
+    )
+  }
 
   if (loading) {
     return (
-      <div style={{ textAlign: 'center', padding: '32px 0', fontFamily: 'var(--font-body)', fontSize: 13, color: 'var(--fg3)' }}>
-        加载中…
+      <div style={{
+        textAlign: 'center',
+        padding: '20px 0',
+        opacity: 0.45,
+        fontFamily: 'var(--font-body)',
+        fontSize: 12,
+        color: FG3,
+      }}>
+        加载中...
       </div>
     )
   }
 
   return (
     <>
-      <section style={CARD}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-          <div style={childAvatarStyle(54)}>{firstChar(child.name)}</div>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{
-              fontFamily: 'var(--font-serif)',
-              fontSize: 20,
-              fontWeight: 500,
-              color: 'var(--fg1)',
-              lineHeight: 1.3,
-            }}>
-              {child.name}
-            </div>
-            <div style={{
-              fontFamily: 'var(--font-body)',
-              fontSize: 13,
-              color: 'var(--fg3)',
-              marginTop: 4,
-              lineHeight: 1.4,
-            }}>
-              {buildChildSubtitle(child) || '完善档案后显示更多信息'}
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={() => setShowStatusEditor(true)}
-            style={{
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'flex-end',
-              gap: 6,
-              border: 'none',
-              background: 'transparent',
-              cursor: 'pointer',
-              padding: '4px 0 4px 8px',
-              flexShrink: 0,
-            }}
-          >
-            <span style={{
-              fontFamily: 'var(--font-body)',
-              fontSize: 12,
-              fontWeight: 600,
-              color: 'var(--fg2)',
-            }}>
-              {energyResult.label}
-            </span>
-            <span style={{
-              width: 10,
-              height: 10,
-              borderRadius: '50%',
-              background: ENERGY_DOT[energyResult.level],
-              boxShadow: `0 0 0 2px ${ENERGY_DOT[energyResult.level]}33`,
-            }} />
-          </button>
-        </div>
-      </section>
+      <ChildEnergyCard
+        name={sel.name}
+        energy={energyResult}
+        onClick={() => setShowStatusEditor(true)}
+      />
+      {!hasLoggedStatus ? (
+        <p style={{ fontFamily: 'var(--font-body)', fontSize: 11, color: FG3, textAlign: 'center', margin: '0 0 12px' }}>
+          今天未记录
+        </p>
+      ) : null}
 
-      <section style={CARD}>
-        <SectionTitle>今日时间线</SectionTitle>
+      <Accordion variant="gc" title="今日时间线" count={timelineSegmentCount} defaultOpen>
         <TimelineSegment segments={timelineSegments} />
-      </section>
+      </Accordion>
 
-      <section style={CARD}>
-        <SectionTitle>
-          今日携带
-          {(hasPackingItems && todayPackCount > 0) ? (
-            <span style={{
-              marginLeft: 8,
-              fontSize: 11,
-              fontWeight: 600,
-              color: 'var(--clay)',
-              padding: '2px 8px',
-              borderRadius: 999,
-              background: 'rgba(164,99,85,0.08)',
-            }}>
-              需确认
-            </span>
-          ) : null}
-        </SectionTitle>
+      <Accordion
+        variant="gc"
+        title="今日携带"
+        count={todayPackCount}
+        badge={todayPackCount > 0 ? '需确认' : undefined}
+        defaultOpen={todayPackCount > 0}
+      >
         <PackingSection
-          childId={child.id}
-          userId={userId}
+          childId={sel.id}
+          userId={userId!}
           today={today}
           timeline={timeline}
           calendarToday={todayEvents}
@@ -200,41 +167,11 @@ export default function ChildTab({ child, userId, onStatusSaved }: Props) {
           onPrefsChange={setPackPrefs}
           onReload={reloadSchedule}
         />
-      </section>
-
-      {todayEvents.length > 0 ? (
-        <section style={CARD}>
-          <SectionTitle>今日安排</SectionTitle>
-          <EventList events={todayEvents} onSelect={setSelectedEvent} />
-        </section>
-      ) : null}
-
-      {weekEvents.length > 0 ? (
-        <Accordion variant="gc" title="本周大事" count={weekEvents.length} defaultOpen={false}>
-          <EventList events={weekEvents} onSelect={setSelectedEvent} />
-        </Accordion>
-      ) : null}
-
-      {timeline.length === 0 && calendar.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '12px 0', fontFamily: 'var(--font-serif)', fontSize: 13, color: 'var(--fg3)' }}>
-          还没有日程安排 🌸
-        </div>
-      ) : null}
+      </Accordion>
 
       <AnimatePresence>
         {showStatusEditor ? (
           <StatusEditor log={dailyLog} onSave={handleSaveStatus} onClose={() => setShowStatusEditor(false)} />
-        ) : null}
-      </AnimatePresence>
-
-      <AnimatePresence>
-        {selectedEvent ? (
-          <ChildActionSheet
-            event={selectedEvent}
-            childName={child.name}
-            userId={userId}
-            onClose={() => setSelectedEvent(null)}
-          />
         ) : null}
       </AnimatePresence>
     </>
