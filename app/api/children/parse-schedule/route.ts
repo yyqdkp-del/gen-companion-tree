@@ -6,7 +6,7 @@ import { dedupeScheduleEntries } from '@/lib/schedule/dedupeScheduleEntries'
 import { isPlaceholderSubject } from '@/lib/schedule/placeholderSubject'
 import { applyScheduleTimeValidation, type ParseWarning } from '@/lib/schedule/validateScheduleTime'
 import { validateScheduleStructure, type ScheduleValidationWarning } from '@/lib/schedule/validateScheduleStructure'
-import { processDocument } from '@/lib/ai/rootVision'
+import { processSchedule } from '@/lib/ai/rootVision'
 import { createClient } from '@supabase/supabase-js'
 
 const DAYS = ['mon', 'tue', 'wed', 'thu', 'fri'] as const
@@ -459,19 +459,12 @@ async function runParsePipeline(image: string, mediaTypeHint?: string): Promise<
     base64Prefix: imageData.slice(0, 32),
   })
 
-  const vision = await processDocument(imageData, media_type)
-  console.error('[parse-schedule] rootVision:', {
-    docType: vision.docType,
-    confidence: vision.confidence,
-    summary: vision.summary,
-  })
+  const scheduleData = await processSchedule(imageData, media_type)
+  console.error('[parse-schedule] rootVision schedule days:', Object.fromEntries(
+    DAYS.map((d) => [d, Array.isArray(scheduleData[d]) ? scheduleData[d].length : 0]),
+  ))
 
-  if (vision.docType !== 'schedule' && vision.confidence >= 0.55) {
-    console.error('[parse-schedule] not a schedule image:', vision.docType)
-    return null
-  }
-
-  const step1 = normalizeSchedule(vision.data, false)
+  const step1 = normalizeSchedule(scheduleData, false)
   if (countScheduleEntries(step1) === 0) {
     console.error('[parse-schedule] rootVision schedule empty after normalize')
     return null
@@ -492,9 +485,9 @@ async function runParsePipeline(image: string, mediaTypeHint?: string): Promise<
     validation_warnings,
     stats: defaultStats(),
     rootVision: {
-      docType: vision.docType,
-      confidence: vision.confidence,
-      summary: vision.summary,
+      docType: 'schedule',
+      confidence: 1,
+      summary: '我看到了一张课表，已帮你整理好每天的课程',
     },
   }
 }

@@ -158,26 +158,32 @@ export async function detectDocumentType(
   imageBase64: string,
   mimeType: string,
 ): Promise<{ docType: DocumentType; confidence: number; reason?: string }> {
-  const prompt = `请看这张图片，判断它是什么类型的文件。
+  const prompt = `请仔细看这张图片。
 
-只返回JSON：
+判断它最像哪种文件：
+- schedule：任何课程表、时间表、Weekly Schedule
+  特征：有时间格式（7:50/8:00等数字）
+  有星期（Monday/Tuesday/周一/周二等）
+  有课程名称（Math/ELA/Science等）
+- notice：学校通知、活动通知、信件
+- medical：病历、处方、医疗文件
+- passport：护照（有照片+证件号）
+- visa：签证、居留证
+- invoice：账单、收据、学费
+- photo：普通生活照片
+- unknown：完全无法判断
+
+重要：如果图片里有任何时间数字和星期信息，
+优先判断为 schedule。
+
+只返回JSON，不要其他文字：
 {
-  "docType": "schedule|notice|medical|passport|visa|invoice|photo|unknown",
-  "confidence": 0.95,
-  "reason": "这是一张学校周课表，包含时间列和星期列"
-}
+  "docType": "schedule",
+  "confidence": 0.9,
+  "reason": "图片包含时间列和星期列"
+}`
 
-类型说明：
-- schedule：学校课表（有时间列和星期列）
-- notice：学校通知/活动通知
-- medical：病历/处方/医疗文件
-- passport：护照
-- visa：签证/居留证
-- invoice：账单/收据/学费通知
-- photo：普通照片（不是文件）
-- unknown：无法判断`
-
-  const response = await callGeminiVision(
+  const rawText = await callGeminiVision(
     imageBase64,
     mimeType,
     prompt,
@@ -185,7 +191,9 @@ export async function detectDocumentType(
     'detect-type',
   )
 
-  const result = parseGeminiJson(response) as { docType?: unknown; confidence?: unknown; reason?: string } | null
+  console.log('[rootVision] detect raw:', rawText)
+
+  const result = parseGeminiJson(rawText) as { docType?: unknown; confidence?: unknown; reason?: string } | null
   if (!result) {
     return { docType: 'unknown', confidence: 0, reason: 'parse failed' }
   }

@@ -39,6 +39,10 @@ function GrowthContent() {
   }, [searchParams])
 
   const selectTab = useCallback((tab: Tab) => {
+    if (tab === '汉字') {
+      router.push('/learn')
+      return
+    }
     setActiveTab(tab)
     router.replace(`/growth?tab=${encodeURIComponent(tab)}`, { scroll: false })
   }, [router])
@@ -137,8 +141,8 @@ function GrowthContent() {
             {activeTab === '成长' && userId ? (
               <GrowthTab child={sel} userId={userId} />
             ) : null}
-            {activeTab === '汉字' && userId ? (
-              <HanziTab child={sel} userId={userId} />
+            {activeTab === '汉字' ? (
+              <HanziTab />
             ) : null}
           </>
         )}
