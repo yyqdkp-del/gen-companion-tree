@@ -6,7 +6,7 @@ import { useParams } from 'next/navigation'
 import { THEME } from '@/app/_shared/_constants/theme'
 import { fetchWithAuth } from '@/lib/auth/fetchWithAuth'
 import { toast } from '@/app/components/Toast'
-import { prepareSchedulePhotoVariants, type SchedulePhotoVariant, type SchedulePhotoVariantsResult } from '@/lib/image/prepareSchedulePhoto'
+import { prepareSchedulePhotoVariants, type SchedulePhotoVariant } from '@/lib/image/prepareSchedulePhoto'
 import { validateScheduleStructure, type ScheduleValidationWarning } from '@/lib/schedule/validateScheduleStructure'
 import { formatSubjectDisplay } from '@/app/_shared/_services/childService'
 
@@ -28,7 +28,7 @@ type ScheduleEntry = {
 
 type ScheduleByDay = Record<string, ScheduleEntry[]>
 
-type ParsePhase = 'idle' | 'choose_variant' | 'parsing' | 'parsed' | 'confirmed'
+type ParsePhase = 'idle' | 'parsing' | 'parsed' | 'confirmed'
 
 type ParsedResult = {
   schedule: ScheduleByDay
@@ -160,8 +160,7 @@ function StepSchedule({ data, onChange }: { data: any; onChange: (d: any) => voi
   const [parseError, setParseError] = useState('')
   const [parsedResult, setParsedResult] = useState<ParsedResult | null>(null)
   const [pendingSchedule, setPendingSchedule] = useState<ScheduleByDay>({})
-  const [photoVariants, setPhotoVariants] = useState<SchedulePhotoVariantsResult | null>(null)
-  const [selectedVariant, setSelectedVariant] = useState<'original' | 'rotated'>('rotated')
+  const [processedPreview, setProcessedPreview] = useState<string | null>(null)
   const [editDay, setEditDay] = useState<string | null>(null)
   const [editText, setEditText] = useState('')
   const [editingKey, setEditingKey] = useState<string | null>(null)
@@ -178,12 +177,18 @@ function StepSchedule({ data, onChange }: { data: any; onChange: (d: any) => voi
     setParsePhase('idle')
     setParsedResult(null)
     setPendingSchedule({})
-    setPhotoVariants(null)
-    setSelectedVariant('rotated')
+    setProcessedPreview(null)
     setParseError('')
     setEditingKey(null)
     if (fileRef.current) fileRef.current.value = ''
     if (cameraRef.current) cameraRef.current.value = ''
+  }
+
+  const pickPhotoVariant = (variants: Awaited<ReturnType<typeof prepareSchedulePhotoVariants>>): SchedulePhotoVariant => {
+    if (variants.needsRotationChoice && variants.rotated) {
+      return variants.rotated
+    }
+    return variants.original
   }
 
   const runParseWithVariant = async (variant: SchedulePhotoVariant) => {
@@ -224,10 +229,11 @@ function StepSchedule({ data, onChange }: { data: any; onChange: (d: any) => voi
       })
       setPendingSchedule(nextSchedule)
       setParsePhase('parsed')
-      setPhotoVariants(null)
+      setProcessedPreview(null)
     } catch {
       setParseError('解析失败，请手动填写或重试')
-      setParsePhase(photoVariants?.needsRotationChoice ? 'choose_variant' : 'idle')
+      setParsePhase('idle')
+      setProcessedPreview(null)
     }
     setParsing(false)
   }
@@ -237,32 +243,21 @@ function StepSchedule({ data, onChange }: { data: any; onChange: (d: any) => voi
     if (!file) return
     setParsing(true)
     setParseError('')
+    setParsePhase('parsing')
     try {
       const variants = await prepareSchedulePhotoVariants(file)
-      setPhotoVariants(variants)
+      const variant = pickPhotoVariant(variants)
+      setProcessedPreview(variant.previewUrl)
       if (variants.isPortraitTall && !variants.needsRotationChoice) {
         toast('建议横向拍摄课表，效果更好', 'info')
       }
-      if (variants.needsRotationChoice && variants.rotated) {
-        setSelectedVariant('rotated')
-        setParsePhase('choose_variant')
-        setParsing(false)
-        return
-      }
-      await runParseWithVariant(variants.original)
+      await runParseWithVariant(variant)
     } catch {
       setParseError('图片处理失败，请重试')
       setParsePhase('idle')
+      setProcessedPreview(null)
       setParsing(false)
     }
-  }
-
-  const handleStartParse = () => {
-    if (!photoVariants) return
-    const variant = selectedVariant === 'rotated' && photoVariants.rotated
-      ? photoVariants.rotated
-      : photoVariants.original
-    void runParseWithVariant(variant)
   }
 
   const handleConfirmSave = async () => {
@@ -370,7 +365,7 @@ function StepSchedule({ data, onChange }: { data: any; onChange: (d: any) => voi
   const getDayCount = (day: string) => (schedule[day] || []).length
   const totalPending = countEntries(pendingSchedule)
   const showConfirm = parsePhase === 'parsed'
-  const showVariantChoice = parsePhase === 'choose_variant' && photoVariants?.needsRotationChoice
+  const showParsingPreview = parsePhase === 'parsing' && !!processedPreview
 
   return (
     <div>
@@ -378,21 +373,21 @@ function StepSchedule({ data, onChange }: { data: any; onChange: (d: any) => voi
       <div style={{ fontSize: 12, color: THEME.muted, marginBottom: 16, lineHeight: 1.6 }}>
         {showConfirm
           ? '请确认识别结果，无误后再保存'
-          : showVariantChoice
-            ? '检测到竖向课表，请选择识别用的图片方向'
+          : showParsingPreview
+            ? '正在识别课表，请稍候…'
             : '拍照识别课表（清晰照片效果更好，可手动修改）'}
       </div>
 
       <input ref={fileRef} type="file" accept="image/*" onChange={handlePhoto} style={{ display: 'none' }} />
       <input ref={cameraRef} type="file" accept="image/*" capture="environment" onChange={handlePhoto} style={{ display: 'none' }} />
 
-      {!showConfirm && !showVariantChoice ? (
+      {parsePhase === 'idle' && !showConfirm ? (
         <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
           <motion.button whileTap={{ scale: 0.97 }} onClick={() => cameraRef.current?.click()}
             disabled={parsing}
             style={{ flex: 1, padding: '12px', borderRadius: 12, border: `1.5px dashed ${THEME.gold}`, background: 'rgba(164,99,85,0.06)', color: THEME.gold, fontSize: 13, fontWeight: 600, cursor: parsing ? 'wait' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, opacity: parsing ? 0.7 : 1 }}>
-            {parsing ? <Loader size={16} /> : <Camera size={16} />}
-            {parsing ? '识别中…' : '拍照识别'}
+            <Camera size={16} />
+            拍照识别
           </motion.button>
           <motion.button whileTap={{ scale: 0.97 }} onClick={() => fileRef.current?.click()}
             disabled={parsing}
@@ -403,89 +398,48 @@ function StepSchedule({ data, onChange }: { data: any; onChange: (d: any) => voi
         </div>
       ) : null}
 
-      {showVariantChoice && photoVariants ? (
+      {showParsingPreview ? (
         <div style={{ marginBottom: 16 }}>
-          <div style={{ display: 'flex', gap: 10, marginBottom: 12 }}>
-            {[photoVariants.original, photoVariants.rotated].filter(Boolean).map((v) => {
-              const variant = v as SchedulePhotoVariant
-              const active = selectedVariant === variant.id
-              return (
-                <button
-                  key={variant.id}
-                  type="button"
-                  onClick={() => setSelectedVariant(variant.id)}
-                  style={{
-                    flex: 1,
-                    padding: 10,
-                    borderRadius: 12,
-                    border: active ? `2px solid ${THEME.gold}` : '1px solid rgba(0,0,0,0.1)',
-                    background: active ? 'rgba(164,99,85,0.08)' : 'rgba(255,255,255,0.65)',
-                    cursor: 'pointer',
-                    fontFamily: 'inherit',
-                  }}
-                >
-                  <img
-                    src={variant.previewUrl}
-                    alt={variant.label}
-                    style={{
-                      width: '100%',
-                      maxHeight: 120,
-                      objectFit: 'contain',
-                      borderRadius: 8,
-                      marginBottom: 8,
-                    }}
-                  />
-                  <div style={{ fontSize: 13, fontWeight: active ? 600 : 400, color: THEME.text }}>
-                    {variant.label}
-                  </div>
-                </button>
-              )
-            })}
-          </div>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <motion.button
-              type="button"
-              whileTap={{ scale: 0.97 }}
-              onClick={resetParse}
-              disabled={parsing}
+          <div style={{
+            position: 'relative',
+            borderRadius: 12,
+            overflow: 'hidden',
+            border: '1px solid rgba(0,0,0,0.08)',
+            background: 'rgba(255,255,255,0.65)',
+          }}>
+            <img
+              src={processedPreview!}
+              alt="处理后的课表"
               style={{
-                flex: 1,
-                padding: '12px',
-                borderRadius: 12,
-                border: '1.5px solid rgba(0,0,0,0.12)',
-                background: 'rgba(255,255,255,0.7)',
-                color: THEME.text,
-                fontSize: 13,
-                fontWeight: 600,
-                cursor: 'pointer',
+                width: '100%',
+                maxHeight: 220,
+                objectFit: 'contain',
+                display: 'block',
               }}
-            >
-              重新上传
-            </motion.button>
-            <motion.button
-              type="button"
-              whileTap={{ scale: 0.97 }}
-              onClick={handleStartParse}
-              disabled={parsing}
-              style={{
-                flex: 1.4,
-                padding: '12px',
-                borderRadius: 12,
-                border: 'none',
-                background: THEME.navy,
-                color: '#fff',
-                fontSize: 13,
-                fontWeight: 600,
-                cursor: parsing ? 'wait' : 'pointer',
+            />
+            <div style={{
+              position: 'absolute',
+              inset: 0,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              background: 'rgba(255,255,255,0.55)',
+            }}>
+              <div style={{
                 display: 'flex',
                 alignItems: 'center',
-                justifyContent: 'center',
                 gap: 8,
-              }}
-            >
-              {parsing ? <Loader size={16} /> : null}
-              开始识别
-            </motion.button>
+                padding: '10px 14px',
+                borderRadius: 999,
+                background: 'rgba(255,255,255,0.92)',
+                color: THEME.navy,
+                fontSize: 13,
+                fontWeight: 600,
+              }}>
+                <Loader size={16} />
+                识别中…
+              </div>
+            </div>
           </div>
         </div>
       ) : null}

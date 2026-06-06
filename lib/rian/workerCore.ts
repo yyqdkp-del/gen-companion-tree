@@ -3,11 +3,14 @@ import { getUserLocation } from '@/lib/geofence'
 import { getTodayStr, getTodayStrInTimeZone } from '@/lib/date/localDate'
 import {
   buildRootVisionContext,
+  detectDocumentType,
   fetchImageForVision,
   processDocument,
   type RootVisionAction,
   type RootVisionResult,
 } from '@/lib/ai/rootVision'
+import { autoArchive, type AutoArchiveResult } from '@/lib/ai/autoArchive'
+import { executeArchive } from '@/lib/ai/executeArchive'
 
 const MAKE_WEBHOOK_URL = process.env.NEXT_PUBLIC_MAKE_WEBHOOK_URL || ''
 
@@ -786,11 +789,52 @@ export async function processJob(job: any) {
 
     let rootVisionResult: RootVisionResult | null = null
     let rootVisionTodoIds: string[] = []
+    let archivePending: AutoArchiveResult | null = null
+    let autoArchived = false
 
     if ((input_type === 'image' || input_type === 'document') && file_url && process.env.GOOGLE_AI_API_KEY) {
       try {
         const { base64, mimeType } = await fetchImageForVision(file_url)
-        rootVisionResult = await processDocument(base64, mimeType)
+        const activeChildId = childrenData?.[0]?.id
+
+        const detection = await detectDocumentType(base64, mimeType)
+        rootVisionResult = await processDocument(base64, mimeType, detection)
+
+        const archiveResult = await autoArchive(
+          detection,
+          rootVisionResult.data,
+          userId,
+          activeChildId,
+        )
+
+        if (archiveResult.requiresConfirm) {
+          archivePending = archiveResult
+          rootVisionResult = {
+            ...rootVisionResult,
+            summary: archiveResult.summary,
+          }
+          console.log('[rootVision] pending confirm:', archiveResult.archiveType, archiveResult.summary)
+        } else {
+          await executeArchive(archiveResult, userId)
+          autoArchived = true
+          rootVisionResult = {
+            ...rootVisionResult,
+            summary: archiveResult.summary,
+          }
+          console.log('[rootVision] auto archived:', archiveResult.archiveType, archiveResult.summary)
+        }
+      } catch (e) {
+        console.error('[rootVision] auto archive failed:', e)
+      }
+    }
+
+    if (
+      rootVisionResult &&
+      !archivePending &&
+      !autoArchived &&
+      rootVisionResult.actions.length > 0
+    ) {
+      try {
         rootVisionTodoIds = await executeRootVisionActions(
           rootVisionResult.actions,
           userId,
@@ -799,13 +843,17 @@ export async function processJob(job: any) {
           today,
           city,
         )
-        console.log('[rootVision] processed:', rootVisionResult.docType, rootVisionResult.summary)
       } catch (e) {
-        console.error('[rootVision] processDocument failed:', e)
+        console.error('[rootVision] executeRootVisionActions failed:', e)
       }
     }
 
     const visionContext = rootVisionResult ? `\n\n${buildRootVisionContext(rootVisionResult)}` : ''
+    const archiveContext = archivePending
+      ? `\n\n【待确认归档】${archivePending.summary}。请告知用户确认保存或选择孩子，不要重复写入数据库。`
+      : autoArchived && rootVisionResult
+        ? `\n\n【已自动归档】${rootVisionResult.summary}`
+        : ''
 
     const messages: any[] = []
     if (input_type === 'image' && file_url) {
@@ -815,14 +863,14 @@ export async function processJob(job: any) {
           { type: 'image', source: { type: 'url', url: file_url } },
           {
             type: 'text',
-            text: `${rootVisionResult?.summary || processedContent || '提取事件/日程/健康，逐条调工具'}${visionContext}\n\n请根据根的眼睛结构化结果补充或确认待办/校历/健康记录，逐条调工具。`,
+            text: `${rootVisionResult?.summary || processedContent || '提取事件/日程/健康，逐条调工具'}${visionContext}${archiveContext}\n\n请根据根的眼睛结构化结果补充或确认待办/校历/健康记录，逐条调工具。`,
           },
         ],
       })
     } else {
       messages.push({
         role: 'user',
-        content: `${processedContent || ''}${visionContext}`.trim() || processedContent,
+        content: `${processedContent || ''}${visionContext}${archiveContext}`.trim() || processedContent,
       })
     }
 
@@ -872,7 +920,22 @@ export async function processJob(job: any) {
       status: 'done',
       completed_at: new Date().toISOString(),
       extracted_events: [
-        ...(rootVisionResult ? [{ tool: 'root_vision', input: rootVisionResult }] : []),
+        ...(archivePending
+          ? [{
+              tool: 'confirm_archive',
+              input: archivePending,
+              actions: [
+                { label: '确认保存', type: 'confirm' },
+                { label: '选择孩子', type: 'select_child' },
+              ],
+            }]
+          : []),
+        ...(autoArchived && rootVisionResult
+          ? [{ tool: 'archived', input: { summary: rootVisionResult.summary, docType: rootVisionResult.docType } }]
+          : []),
+        ...(rootVisionResult && !archivePending && !autoArchived
+          ? [{ tool: 'root_vision', input: rootVisionResult }]
+          : []),
         ...toolUses.map((t: any) => ({ tool: t.name, input: t.input })),
       ],
     }).eq('id', jobId)

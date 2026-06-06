@@ -37,18 +37,21 @@ export interface RootVisionResult {
   data: unknown
   summary: string
   actions: RootVisionAction[]
+  detection?: DocumentDetection
+}
+
+export interface DocumentDetection {
+  docType: DocumentType
+  confidence: number
+  childName?: string
+  schoolName?: string
+  grade?: string
+  reason: string
 }
 
 type GeminiGenConfig = { temperature: number; maxOutputTokens: number }
 
 const SCHEDULE_DAYS = ['mon', 'tue', 'wed', 'thu', 'fri'] as const
-const DAY_NAMES: Record<(typeof SCHEDULE_DAYS)[number], string> = {
-  mon: 'Monday周一',
-  tue: 'Tuesday周二',
-  wed: 'Wednesday周三',
-  thu: 'Thursday周四',
-  fri: 'Friday周五',
-}
 
 export function cleanVisionBase64(imageBase64: string): string {
   return imageBase64
@@ -153,47 +156,62 @@ function clampConfidence(v: unknown): number {
   return Math.min(1, Math.max(0, n))
 }
 
-/** 第一步：文档类型识别 */
+/** 第一步：文档类型识别（含孩子/学校/年级） */
 export async function detectDocumentType(
   imageBase64: string,
   mimeType: string,
-): Promise<{ docType: DocumentType; confidence: number; reason?: string }> {
-  const prompt = `请仔细看这张图片。
+): Promise<DocumentDetection> {
+  const prompt = `请分析这张图片：
 
-判断它最像哪种文件：
-- schedule：任何课程表、时间表、Weekly Schedule
-  特征：有时间格式（7:50/8:00等数字）
-  有星期（Monday/Tuesday/周一/周二等）
-  有课程名称（Math/ELA/Science等）
-- notice：学校通知、活动通知、信件
-- medical：病历、处方、医疗文件
-- passport：护照（有照片+证件号）
-- visa：签证、居留证
-- invoice：账单、收据、学费
+1. 判断文件类型：
+   schedule/notice/medical/passport/visa/invoice/photo/unknown
+
+2. 如果图片里有人名，提取出来
+   （英文名如 William、中文名如 王梓睿）
+
+3. 如果有学校名称，提取出来
+
+4. 如果有年级信息，提取出来（如 K3、Grade 3）
+
+类型说明：
+- schedule：课表（有时间+星期）
+- notice：学校通知、活动通知
+- medical：病历/处方
+- passport：护照
+- visa：签证/居留证
+- invoice：账单/收据
 - photo：普通生活照片
-- unknown：完全无法判断
+- unknown：无法判断
 
-重要：如果图片里有任何时间数字和星期信息，
-优先判断为 schedule。
-
-只返回JSON，不要其他文字：
+只返回JSON：
 {
   "docType": "schedule",
-  "confidence": 0.9,
-  "reason": "图片包含时间列和星期列"
+  "confidence": 0.95,
+  "childName": "William",
+  "schoolName": "Lanna International School",
+  "grade": "K3",
+  "reason": "这是一张K3班级的周课表"
 }`
 
   const rawText = await callGeminiVision(
     imageBase64,
     mimeType,
     prompt,
-    { maxOutputTokens: 200, temperature: 0 },
+    { maxOutputTokens: 400, temperature: 0 },
     'detect-type',
   )
 
   console.log('[rootVision] detect raw:', rawText)
 
-  const result = parseGeminiJson(rawText) as { docType?: unknown; confidence?: unknown; reason?: string } | null
+  const result = parseGeminiJson(rawText) as {
+    docType?: unknown
+    confidence?: unknown
+    childName?: unknown
+    schoolName?: unknown
+    grade?: unknown
+    reason?: unknown
+  } | null
+
   if (!result) {
     return { docType: 'unknown', confidence: 0, reason: 'parse failed' }
   }
@@ -201,36 +219,67 @@ export async function detectDocumentType(
   return {
     docType: normalizeDocType(result.docType),
     confidence: clampConfidence(result.confidence),
-    reason: result.reason,
+    childName: result.childName ? String(result.childName).trim() : undefined,
+    schoolName: result.schoolName ? String(result.schoolName).trim() : undefined,
+    grade: result.grade ? String(result.grade).trim() : undefined,
+    reason: result.reason ? String(result.reason) : '',
   }
 }
 
-/** 课表：5 路并发，每天一段 */
+/** 课表：单次全表识别 */
 export async function processSchedule(imageBase64: string, mimeType: string): Promise<Record<string, unknown[]>> {
-  const results = await Promise.all(
-    SCHEDULE_DAYS.map(async (day) => {
-      try {
-        const raw = await callGeminiVision(
-          imageBase64,
-          mimeType,
-          `只提取${DAY_NAMES[day]}这一天的课程。
-每个时间段只有一节课，时间格式HH:MM。
-Breakfast/Morning Routine/Snack/Lunch/Rest Time/Pick up/Outdoor Play 设 category: break 或 transition。
-真实课程设 category: class 或 activity。
-只返回JSON数组：
-[{"time":"07:50","subject":"Breakfast","category":"break"}]`,
-          { maxOutputTokens: 1000, temperature: 0.1 },
-          `schedule-${day}`,
-        )
-        return { day, classes: parseGeminiJsonArray(raw) }
-      } catch (e) {
-        console.error(`[rootVision] schedule-${day} failed:`, e)
-        return { day, classes: [] as unknown[] }
-      }
-    }),
-  )
+  const prompt = `这是一张学校周课表图片。
 
-  return Object.fromEntries(results.map((r) => [r.day, r.classes]))
+请仔细分析表格结构，提取周一到周五（mon/tue/wed/thu/fri）每天的课程。
+
+重要规则：
+1. 每个时间段每天只有一节课，绝对不要重复
+2. 相同课程名在同一天只出现一次
+3. 时间只取开始时间，格式 HH:MM
+4. 课程名拼写错误请纠正（如 Reddling→Reading）
+5. 以下是日常安排不是课程：
+   Breakfast、Morning Routine、Snack、Lunch、
+   Rest Time、Pick up、Outdoor Play
+   这些设 category: "break" 或 "transition"
+6. 真实课程设 category: "class" 或 "activity"
+
+只返回JSON，格式：
+{
+  "mon": [{"time":"07:50","subject":"Breakfast","category":"break"},...],
+  "tue": [...],
+  "wed": [...],
+  "thu": [...],
+  "fri": [...]
+}
+
+不要返回其他任何文字。`
+
+  try {
+    const raw = await callGeminiVision(
+      imageBase64,
+      mimeType,
+      prompt,
+      { maxOutputTokens: 8192, temperature: 0.1 },
+      'schedule-full',
+    )
+
+    console.log('[rootVision] schedule-full raw:', raw.slice(0, 2000))
+
+    const parsed = parseGeminiJson(raw) as Record<string, unknown> | null
+    if (!parsed || typeof parsed !== 'object') {
+      return Object.fromEntries(SCHEDULE_DAYS.map((d) => [d, []]))
+    }
+
+    return Object.fromEntries(
+      SCHEDULE_DAYS.map((day) => {
+        const dayData = parsed[day]
+        return [day, Array.isArray(dayData) ? dayData : []]
+      }),
+    )
+  } catch (e) {
+    console.error('[rootVision] schedule-full failed:', e)
+    return Object.fromEntries(SCHEDULE_DAYS.map((d) => [d, []]))
+  }
 }
 
 async function processNotice(imageBase64: string, mimeType: string) {
@@ -350,12 +399,14 @@ function safeArr(v: unknown): unknown[] {
   return Array.isArray(v) ? v : []
 }
 
-/** 第三步：统一入口 */
+/** 第三步：统一入口（可传入已识别的 detection，避免重复调用） */
 export async function processDocument(
   imageBase64: string,
   mimeType: string,
+  knownDetection?: DocumentDetection,
 ): Promise<RootVisionResult> {
-  const { docType, confidence } = await detectDocumentType(imageBase64, mimeType)
+  const detection = knownDetection ?? await detectDocumentType(imageBase64, mimeType)
+  const { docType, confidence } = detection
 
   let data: unknown
   let summary: string
@@ -430,7 +481,7 @@ export async function processDocument(
       actions = []
   }
 
-  return { docType, confidence, data, summary, actions }
+  return { docType, confidence, data, summary, actions, detection }
 }
 
 /** 供 Claude worker 使用的上下文摘要 */
