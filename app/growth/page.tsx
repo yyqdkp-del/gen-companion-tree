@@ -3,78 +3,119 @@
 import React, { Suspense, useCallback, useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { PAGE_BOTTOM_TAB_ONLY, PAGE_TOP_PADDING } from '@/app/_shared/_constants/layout'
+import { useApp } from '@/app/context/AppContext'
+import { useChildData } from '@/app/_shared/_hooks/useChildData'
+import ChildSwitcher from './components/ChildSwitcher'
+import TodayTab from './components/TodayTab'
+import GrowthTab from './components/GrowthTab'
 import SchoolContent from './components/SchoolContent'
-import AcademicContent from './components/AcademicContent'
-import HanziContent from './components/HanziContent'
 
-const TABS = ['学校', '学业', '汉字'] as const
+const TABS = ['今日', '成长', '学校'] as const
 type Tab = typeof TABS[number]
 
 function parseTab(raw: string | null): Tab {
-  if (raw === '学校' || raw === '学业' || raw === '汉字') return raw
-  if (raw === 'school') return '学校'
-  if (raw === 'academic') return '学业'
-  if (raw === 'hanzi' || raw === 'learn') return '汉字'
-  return '学校'
+  if (raw === '今日' || raw === 'today') return '今日'
+  if (raw === '成长' || raw === '学业' || raw === '汉字' || raw === 'academic' || raw === 'hanzi' || raw === 'learn') return '成长'
+  if (raw === '学校' || raw === 'school') return '学校'
+  return '今日'
 }
 
 function GrowthContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
+  const { userId, kids, activeKid, setActiveKid } = useApp()
   const [activeTab, setActiveTab] = useState<Tab>(() => parseTab(searchParams.get('tab')))
+
+  const { enrichedKids, refresh, ensureEnriched } = useChildData(userId, {
+    deferMs: 0,
+    activeChildId: activeKid?.id ?? null,
+  })
+
+  const childList = enrichedKids.length ? enrichedKids : kids
 
   useEffect(() => {
     setActiveTab(parseTab(searchParams.get('tab')))
   }, [searchParams])
+
+  useEffect(() => {
+    if (kids.length > 0 && !activeKid) {
+      const storedId = typeof window !== 'undefined' ? localStorage.getItem('active_child_id') : null
+      const current = kids.find((k) => k.id === storedId) || kids[0]
+      setActiveKid(current)
+    }
+  }, [kids, activeKid, setActiveKid])
 
   const selectTab = useCallback((tab: Tab) => {
     setActiveTab(tab)
     router.replace(`/growth?tab=${encodeURIComponent(tab)}`, { scroll: false })
   }, [router])
 
+  const handleSelectChild = useCallback(async (child: typeof activeKid) => {
+    if (!child) return
+    setActiveKid(child)
+    try {
+      localStorage.setItem('active_child_id', child.id)
+    } catch { /* ignore */ }
+    const full = await ensureEnriched(child.id)
+    if (full) setActiveKid(full)
+  }, [setActiveKid, ensureEnriched])
+
+  const handleStatusSaved = useCallback(async () => {
+    if (!activeKid?.id) return
+    const next = await ensureEnriched(activeKid.id, true)
+    if (next) setActiveKid(next)
+    void refresh()
+  }, [activeKid?.id, ensureEnriched, setActiveKid, refresh])
+
+  const sel = activeKid
+
   return (
-    <main style={{
-      minHeight: '100dvh',
-      padding: `${PAGE_TOP_PADDING} 0 ${PAGE_BOTTOM_TAB_ONLY}`,
-      backgroundColor: '#fbf9f6',
-      backgroundImage: `
-        radial-gradient(at 80% 10%, rgba(228,237,228,0.35) 0px, transparent 50%),
-        radial-gradient(at 15% 85%, rgba(245,214,209,0.25) 0px, transparent 50%)
-      `,
-      fontFamily: "'Noto Serif SC', Georgia, serif",
-      color: '#2d322f',
-    }}>
+    <main
+      className="canvas-texture"
+      style={{
+        minHeight: '100dvh',
+        padding: `${PAGE_TOP_PADDING} 0 ${PAGE_BOTTOM_TAB_ONLY}`,
+        backgroundColor: 'var(--canvas-light)',
+        color: 'var(--fg1)',
+        fontFamily: 'var(--font-serif)',
+      }}
+    >
       <div style={{
         position: 'sticky',
         top: 0,
         zIndex: 40,
-        background: 'rgba(251,249,246,0.92)',
+        background: 'rgba(247,244,239,0.92)',
         backdropFilter: 'blur(16px)',
         WebkitBackdropFilter: 'blur(16px)',
         paddingTop: 'max(env(safe-area-inset-top, 0px), 0px)',
       }}>
         <div style={{ padding: '12px 20px 0' }}>
-          <div style={{
-            fontSize: 9,
-            letterSpacing: 4,
-            color: '#a46355',
-            textTransform: 'uppercase',
-            marginBottom: 4,
-            fontFamily: "'Montserrat', sans-serif",
-          }}>根·中文</div>
+          <p className="gc-eyebrow" style={{ margin: '0 0 6px' }}>根·字</p>
           <h1 style={{
             margin: '0 0 12px',
+            fontFamily: 'var(--font-serif)',
             fontSize: 22,
             fontWeight: 500,
-            letterSpacing: '0.06em',
-          }}>学校 · 学业 · 汉字</h1>
+            letterSpacing: '0.04em',
+            color: 'var(--fg1)',
+          }}>
+            {sel?.name ? `${sel.name}的档案` : '孩子档案'}
+          </h1>
+        </div>
+
+        <div style={{ padding: '0 20px 12px' }}>
+          {childList.length > 0 ? (
+            <ChildSwitcher
+              kids={childList}
+              activeId={sel?.id ?? null}
+              onSelect={(c) => { void handleSelectChild(c) }}
+            />
+          ) : null}
         </div>
 
         <div style={{
           display: 'flex',
-          gap: 0,
           padding: '0 20px',
-          marginBottom: 0,
           borderBottom: '1px solid rgba(45,50,47,0.08)',
         }}>
           {TABS.map((tab) => (
@@ -87,12 +128,13 @@ function GrowthContent() {
                 padding: '12px 0',
                 background: 'none',
                 border: 'none',
-                borderBottom: activeTab === tab ? '2px solid #a46355' : '2px solid transparent',
-                color: activeTab === tab ? '#a46355' : 'rgba(45,50,47,0.4)',
+                borderBottom: activeTab === tab ? '2px solid var(--clay)' : '2px solid transparent',
+                color: activeTab === tab ? 'var(--clay)' : 'var(--fg3)',
                 fontSize: 15,
-                fontFamily: "'Noto Serif SC', serif",
+                fontFamily: 'var(--font-serif)',
                 fontWeight: activeTab === tab ? 600 : 400,
                 cursor: 'pointer',
+                transition: 'color 200ms ease, border-color 200ms ease',
               }}
             >
               {tab}
@@ -101,10 +143,22 @@ function GrowthContent() {
         </div>
       </div>
 
-      <div style={{ padding: '20px 20px 32px' }}>
-        {activeTab === '学校' && <SchoolContent />}
-        {activeTab === '学业' && <AcademicContent />}
-        {activeTab === '汉字' && <HanziContent />}
+      <div style={{ padding: '16px 20px 32px', maxWidth: 560, margin: '0 auto', width: '100%' }}>
+        {!sel ? (
+          <div style={{ textAlign: 'center', padding: '40px 16px', fontFamily: 'var(--font-body)', fontSize: 14, color: 'var(--fg3)' }}>
+            请先添加孩子档案
+          </div>
+        ) : (
+          <>
+            {activeTab === '今日' && userId ? (
+              <TodayTab child={sel} userId={userId} onStatusSaved={handleStatusSaved} />
+            ) : null}
+            {activeTab === '成长' && userId ? (
+              <GrowthTab child={sel} userId={userId} />
+            ) : null}
+            {activeTab === '学校' ? <SchoolContent /> : null}
+          </>
+        )}
       </div>
     </main>
   )
@@ -115,7 +169,7 @@ export default function GrowthPage() {
     <Suspense fallback={
       <main style={{
         minHeight: '100dvh',
-        backgroundColor: '#fbf9f6',
+        backgroundColor: 'var(--canvas-light)',
         padding: `${PAGE_TOP_PADDING} 20px ${PAGE_BOTTOM_TAB_ONLY}`,
       }} />
     }>
