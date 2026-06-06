@@ -7,6 +7,7 @@ import { isPlaceholderSubject } from '@/lib/schedule/placeholderSubject'
 import { applyScheduleTimeValidation, type ParseWarning } from '@/lib/schedule/validateScheduleTime'
 import { validateScheduleStructure, type ScheduleValidationWarning } from '@/lib/schedule/validateScheduleStructure'
 import { processSchedule } from '@/lib/ai/rootVision'
+import { refreshScheduleIntelligence } from '@/lib/ai/scheduleIntelligence'
 import { createClient } from '@supabase/supabase-js'
 
 const DAYS = ['mon', 'tue', 'wed', 'thu', 'fri'] as const
@@ -413,6 +414,19 @@ async function persistSchedule(
     console.error('[parse-schedule] child_profiles upsert failed:', profileError.message)
     throw new Error(profileError.message)
   }
+
+  const serviceSupabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+  )
+  void refreshScheduleIntelligence({
+    userId,
+    childId,
+    classSchedule: schedule,
+    supabase: serviceSupabase,
+  }).catch((err) => {
+    console.error('[parse-schedule] schedule intelligence failed:', err)
+  })
 
   if (school_start_time || school_end_time) {
     const childUpdate: { school_start_time?: string; school_end_time?: string } = {}

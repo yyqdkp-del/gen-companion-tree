@@ -6,6 +6,7 @@ import { Plus } from 'lucide-react'
 import { useApp } from '@/app/context/AppContext'
 
 const AVATAR_SIZE = 48
+const LONG_PRESS_MS = 500
 const CLAY = 'var(--clay, #a46355)'
 const NAME_COLOR = '#5B615E'
 
@@ -159,6 +160,8 @@ export default function ChildSwitcher({ mode, onAdd, onAvatarClick, style }: Pro
   const [open, setOpen] = useState(false)
   const activeRef = useRef<HTMLButtonElement>(null)
   const menuRef = useRef<HTMLDivElement>(null)
+  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const longPressTriggered = useRef(false)
 
   const activeId = activeKid?.id ?? null
   const displayKid = activeKid ?? kids[0] ?? null
@@ -181,15 +184,38 @@ export default function ChildSwitcher({ mode, onAdd, onAvatarClick, style }: Pro
 
   if (!kids.length && !onAdd) return null
 
+  const clearLongPressTimer = () => {
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current)
+      longPressTimer.current = null
+    }
+  }
+
   const handlePick = (childId: string) => {
     void selectChild(childId)
     setOpen(false)
   }
 
+  const handlePickAndOpenSheet = (childId: string) => {
+    void selectChild(childId)
+    setOpen(false)
+    onAvatarClick?.()
+  }
+
   if (mode === 'dropdown') {
     if (!displayKid && !kids.length) return null
 
+    const homeAvatarMode = Boolean(onAvatarClick)
+    const switchableKids = kids.filter((c) => c.id !== activeId)
+    const showSwitchMenu = homeAvatarMode
+      ? open && switchableKids.length > 0
+      : open && kids.length > 1
+
     const triggerClick = () => {
+      if (longPressTriggered.current) {
+        longPressTriggered.current = false
+        return
+      }
       if (onAvatarClick) {
         onAvatarClick()
         return
@@ -197,11 +223,32 @@ export default function ChildSwitcher({ mode, onAdd, onAvatarClick, style }: Pro
       if (kids.length > 1) setOpen((v) => !v)
     }
 
+    const handlePointerDown = () => {
+      if (!homeAvatarMode || kids.length <= 1) return
+      longPressTriggered.current = false
+      clearLongPressTimer()
+      longPressTimer.current = setTimeout(() => {
+        longPressTriggered.current = true
+        setOpen(true)
+      }, LONG_PRESS_MS)
+    }
+
+    const handlePointerUp = () => {
+      clearLongPressTimer()
+    }
+
     return (
       <div ref={menuRef} style={{ position: 'relative', ...style }}>
         <button
           type="button"
           onClick={triggerClick}
+          onPointerDown={handlePointerDown}
+          onPointerUp={handlePointerUp}
+          onPointerLeave={handlePointerUp}
+          onPointerCancel={handlePointerUp}
+          onContextMenu={(e) => {
+            if (homeAvatarMode && kids.length > 1) e.preventDefault()
+          }}
           style={{
             display: 'flex',
             flexDirection: 'column',
@@ -211,10 +258,35 @@ export default function ChildSwitcher({ mode, onAdd, onAvatarClick, style }: Pro
             background: 'transparent',
             cursor: 'pointer',
             padding: 0,
+            touchAction: 'manipulation',
           }}
         >
           {displayKid ? (
-            <DropdownAvatarGlow child={displayKid} active />
+            <div style={{ position: 'relative', display: 'inline-flex' }}>
+              <DropdownAvatarGlow child={displayKid} active />
+              {homeAvatarMode && kids.length > 1 ? (
+                <span style={{
+                  position: 'absolute',
+                  right: -2,
+                  bottom: -2,
+                  minWidth: 18,
+                  height: 18,
+                  padding: '0 5px',
+                  borderRadius: 9,
+                  background: CLAY,
+                  color: '#fff',
+                  fontFamily: 'var(--font-body)',
+                  fontSize: 10,
+                  fontWeight: 600,
+                  lineHeight: '18px',
+                  textAlign: 'center',
+                  boxShadow: '0 1px 4px rgba(0,0,0,0.12)',
+                  pointerEvents: 'none',
+                }}>
+                  {kids.length}
+                </span>
+              ) : null}
+            </div>
           ) : (
             <EmptyAvatarPlaceholder kid={null} />
           )}
@@ -234,7 +306,7 @@ export default function ChildSwitcher({ mode, onAdd, onAvatarClick, style }: Pro
         </button>
 
         <AnimatePresence>
-          {open && kids.length > 1 ? (
+          {showSwitchMenu ? (
             <motion.div
               initial={{ opacity: 0, scale: 0.92, y: -4 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -242,7 +314,7 @@ export default function ChildSwitcher({ mode, onAdd, onAvatarClick, style }: Pro
               style={{
                 position: 'absolute',
                 top: 'calc(100% + 8px)',
-                left: 0,
+                right: 0,
                 zIndex: 120,
                 background: 'rgba(255,255,255,0.96)',
                 backdropFilter: 'blur(16px)',
@@ -256,11 +328,11 @@ export default function ChildSwitcher({ mode, onAdd, onAvatarClick, style }: Pro
                 alignItems: 'flex-start',
               }}
             >
-              {kids.map((c) => (
+              {(homeAvatarMode ? switchableKids : kids).map((c) => (
                 <button
                   key={c.id}
                   type="button"
-                  onClick={() => handlePick(c.id)}
+                  onClick={() => (homeAvatarMode ? handlePickAndOpenSheet(c.id) : handlePick(c.id))}
                   style={{
                     border: 'none',
                     background: 'transparent',

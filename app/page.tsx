@@ -1174,6 +1174,7 @@ export default function BasePage() {
       packReadyDismissed,
       overviewBriefing: rootBriefing,
       hotspots: unreadHotspots,
+      scheduleIntelligence: (activeKid as { schedule_intelligence?: import('@/lib/ai/scheduleIntelligence').WeeklyScheduleIntelligence | null })?.schedule_intelligence ?? null,
     }),
     [
       now,

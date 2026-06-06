@@ -8,6 +8,7 @@ import {
 } from '@/lib/packing/packingPreferences'
 import { dedupeRawScheduleItems } from '@/lib/schedule/dedupeScheduleEntries'
 import { isPlaceholderSubject } from '@/lib/schedule/placeholderSubject'
+import type { WeeklyScheduleIntelligence } from '@/lib/ai/scheduleIntelligence'
 
 const supabase = createClient()
 
@@ -431,7 +432,7 @@ export async function enrichOneChild(c: any, uid: string, today: string): Promis
       .lte('date_start', addDaysStr(new Date(), 7))
       .order('date_start'),
     supabase.from('child_profiles')
-      .select('activities, class_schedule').eq('child_id', c.id).maybeSingle(),
+      .select('activities, class_schedule, schedule_intelligence').eq('child_id', c.id).maybeSingle(),
     supabase.from('child_activities')
       .select('name, days, is_active').eq('child_id', c.id).eq('user_id', uid),
     supabase.from('child_daily_log')
@@ -448,6 +449,7 @@ export async function enrichOneChild(c: any, uid: string, today: string): Promis
   const profileActsRaw = profile?.activities ?? []
   const profileActivities = Array.isArray(profileActsRaw) ? profileActsRaw : []
   const classSchedule = (profile?.class_schedule as Record<string, unknown>) || {}
+  const scheduleIntelligence = (profile?.schedule_intelligence as WeeklyScheduleIntelligence | null) ?? null
   const todayDow = new Date(`${today}T12:00:00`).getDay()
   const todayKey = DOW_KEY_BY_NUM[todayDow]
   const todayClassesRaw = classSchedule[todayKey]
@@ -511,6 +513,9 @@ export async function enrichOneChild(c: any, uid: string, today: string): Promis
 
   const classEvents = today_classes.map((cls: any) => ({
     event_type: 'class' as const,
+    subject: typeof cls === 'object' && cls !== null
+      ? String(cls.subject || cls.title || '').trim()
+      : String(cls).trim(),
     title: typeof cls === 'object' && cls !== null
       ? formatSubjectDisplay(String(cls.subject || cls.title || '课程'), cls.name_zh)
       : formatSubjectDisplay(String(cls)),
@@ -536,6 +541,7 @@ export async function enrichOneChild(c: any, uid: string, today: string): Promis
     schoolStartTime: c.school_start_time,
     isWeekend,
     weeklyLogs: weeklyLogs || [],
+    intelligence: scheduleIntelligence || undefined,
   })
 
   return {
@@ -562,6 +568,7 @@ export async function enrichOneChild(c: any, uid: string, today: string): Promis
     total_hanzi: c.total_hanzi,
     activities,
     class_schedule: classSchedule,
+    schedule_intelligence: scheduleIntelligence,
     today_classes,
     urgent_items,
     school_calendar: evts,

@@ -15,6 +15,8 @@ import { TimelineSegment, buildTimelineSegments } from '@/app/_shared/_component
 import { buildPackingRows, countPendingPackingRows } from '@/lib/packing/buildPackingRows'
 import type { PackingPreferencesMap } from '@/lib/packing/packingPreferences'
 import type { HealthStatus, MoodStatus } from '@/app/_shared/_types'
+import type { WeeklyScheduleIntelligence } from '@/lib/ai/scheduleIntelligence'
+import { isRealScheduleClass, type ScheduleClass } from '@/app/_shared/_engine/momentCard'
 import { useApp } from '@/app/context/AppContext'
 import {
   dedupeCalendarEvents,
@@ -26,6 +28,18 @@ import {
 } from '@/app/_shared/_components/child/childScheduleShared'
 
 const SHEET_EASE = [0.16, 1, 0.3, 1] as const
+const FG2 = '#5B615E'
+
+function countMondayClasses(classSchedule: Record<string, unknown> | undefined): number {
+  const raw = classSchedule?.mon
+  if (!Array.isArray(raw)) return 0
+  return raw.filter((item) => {
+    if (typeof item === 'object' && item !== null) {
+      return isRealScheduleClass(item as ScheduleClass)
+    }
+    return String(item).trim().length > 0
+  }).length
+}
 
 type Props = {
   onClose: () => void
@@ -57,6 +71,7 @@ export default function ChildSheet({ onClose, onAdd, onStatusSaved }: Props) {
   const [showStatusEditor, setShowStatusEditor] = useState(false)
 
   const isWeekend = [0, 6].includes(new Date().getDay())
+  const scheduleIntelligence = (sel?.schedule_intelligence as WeeklyScheduleIntelligence | null | undefined) ?? undefined
   const energyResult = calculateEnergy({
     healthStatus: dailyLog.health_status,
     moodStatus: dailyLog.mood_status,
@@ -64,8 +79,10 @@ export default function ChildSheet({ onClose, onAdd, onStatusSaved }: Props) {
     weekendBedtime: sel?.weekend_bedtime,
     schoolStartTime: sel?.school_start_time,
     isWeekend,
+    intelligence: scheduleIntelligence,
     todayEvents: timeline.map((t) => ({
       event_type: t.type,
+      subject: t.event?.subject || t.title,
       requires_action: t.event?.requires_action,
       requires_payment: t.event?.requires_payment,
       title: t.title,
@@ -82,12 +99,16 @@ export default function ChildSheet({ onClose, onAdd, onStatusSaved }: Props) {
   const todayEvents = dedupeCalendarEvents(calendar.filter((e) => e.date_start === today).filter(isNonEmptyTitle))
 
   const broughtStorageKey = sel ? `packing_brought_${sel.id}_${today}` : ''
+  const packingRows = useMemo(() => {
+    if (!sel) return []
+    return buildPackingRows(timeline, todayEvents, packingItems, packPrefs)
+  }, [sel, timeline, todayEvents, packingItems, packPrefs])
+
   const todayPackCount = useMemo(() => {
     if (!sel) return 0
     const brought = loadBroughtMap(broughtStorageKey)
-    const rows = buildPackingRows(timeline, todayEvents, packingItems, packPrefs)
-    return countPendingPackingRows(rows, brought)
-  }, [sel, timeline, todayEvents, packingItems, packPrefs, broughtStorageKey])
+    return countPendingPackingRows(packingRows, brought)
+  }, [sel, packingRows, broughtStorageKey])
 
   const timelineSegments = useMemo(
     () => buildTimelineSegments(timeline, todayEvents, sel?.school_start_time),
@@ -99,10 +120,22 @@ export default function ChildSheet({ onClose, onAdd, onStatusSaved }: Props) {
   )
 
   const hasLoggedStatus = dailyLog.health_status != null && dailyLog.mood_status != null
+  const profileIncomplete = Boolean(sel && !sel.usual_bedtime && !sel.school_start_time)
+  const mondayClassCount = useMemo(
+    () => countMondayClasses(sel?.class_schedule as Record<string, unknown> | undefined),
+    [sel?.class_schedule],
+  )
+  const nextSchoolDay = mondayClassCount > 0
 
   const openFullProfile = () => {
     onClose()
     router.push('/growth')
+  }
+
+  const openProfileSetup = () => {
+    if (!sel) return
+    onClose()
+    router.push(`/children/${sel.id}/profile`)
   }
 
   return (
@@ -142,7 +175,7 @@ export default function ChildSheet({ onClose, onAdd, onStatusSaved }: Props) {
           }} />
 
           <div style={{
-            overflowY: 'auto', flex: 1, padding: '0 22px 28px',
+            overflowY: 'auto', flex: 1, padding: '0 22px 20px',
             WebkitOverflowScrolling: 'touch' as React.CSSProperties['WebkitOverflowScrolling'],
           }}>
             {kids.length === 0 ? (
@@ -185,51 +218,149 @@ export default function ChildSheet({ onClose, onAdd, onStatusSaved }: Props) {
                   </div>
                 ) : (
                   <>
-                    <ChildEnergyCard
-                      name={sel.name}
-                      energy={energyResult}
-                      onClick={() => setShowStatusEditor(true)}
-                    />
-                    {!hasLoggedStatus ? (
-                      <p style={{ fontFamily: 'var(--font-body)', fontSize: 11, color: FG3, textAlign: 'center', margin: '0 0 12px' }}>
-                        今天未记录
-                      </p>
-                    ) : null}
+                    {profileIncomplete ? (
+                      <div style={{
+                        background: '#FCFAF7',
+                        borderRadius: 16,
+                        padding: '16px 20px',
+                        marginBottom: 12,
+                      }}>
+                        <div style={{ fontFamily: 'var(--font-serif)', fontSize: 15, color: '#2d322f' }}>
+                          根还不太了解 {sel.name} 的日常作息
+                        </div>
+                        <div style={{ fontSize: 13, color: FG2, marginTop: 4, lineHeight: 1.6 }}>
+                          填写睡觉时间和上课时间
+                          <br />
+                          根就能每天告诉你孩子的状态
+                        </div>
+                        <button
+                          type="button"
+                          onClick={openProfileSetup}
+                          style={{
+                            marginTop: 12,
+                            background: 'var(--accent-clay)',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: 8,
+                            padding: '8px 16px',
+                            fontSize: 14,
+                            cursor: 'pointer',
+                            fontFamily: 'var(--font-body)',
+                          }}
+                        >
+                          30秒完成设置
+                        </button>
+                      </div>
+                    ) : (
+                      <>
+                        <ChildEnergyCard
+                          name={sel.name}
+                          energy={energyResult}
+                          onClick={() => setShowStatusEditor(true)}
+                        />
+                        {!hasLoggedStatus ? (
+                          <p style={{ fontFamily: 'var(--font-body)', fontSize: 11, color: FG3, textAlign: 'center', margin: '0 0 12px' }}>
+                            今天未记录
+                          </p>
+                        ) : null}
+                      </>
+                    )}
 
-                    <Accordion variant="gc" title="今日时间线" count={timelineSegmentCount} defaultOpen>
-                      <TimelineSegment segments={timelineSegments} />
-                    </Accordion>
+                    {isWeekend ? (
+                      <div style={{
+                        background: 'linear-gradient(135deg, #d9e6da, #f0f6ef)',
+                        borderRadius: 16,
+                        padding: '20px',
+                        textAlign: 'center',
+                        marginBottom: 12,
+                      }}>
+                        <div style={{ fontSize: 32, marginBottom: 8 }}>🌿</div>
+                        <div style={{
+                          fontFamily: 'var(--font-serif)',
+                          fontSize: 16,
+                          color: '#2d322f',
+                          fontWeight: 500,
+                        }}>
+                          今天周末，好好休息
+                        </div>
+                        {nextSchoolDay ? (
+                          <div style={{ fontSize: 13, color: FG2, marginTop: 8 }}>
+                            下周一有{mondayClassCount}节课
+                          </div>
+                        ) : null}
+                      </div>
+                    ) : (
+                      <Accordion variant="gc" title="今日时间线" count={timelineSegmentCount} defaultOpen>
+                        <TimelineSegment segments={timelineSegments} />
+                      </Accordion>
+                    )}
 
-                    <Accordion variant="gc" title="今日携带" count={todayPackCount}
-                      badge={todayPackCount > 0 ? '需确认' : undefined}
-                      defaultOpen={todayPackCount > 0}>
-                      <PackingSection
-                        childId={sel.id}
-                        userId={userId}
-                        today={today}
-                        timeline={timeline}
-                        calendarToday={todayEvents}
-                        packingItems={packingItems}
-                        packingPreferences={packPrefs}
-                        onPrefsChange={setPackPrefs}
-                        onReload={reloadSchedule}
-                      />
-                    </Accordion>
+                    {!isWeekend && (
+                      packingRows.length === 0 ? (
+                        <div style={{
+                          fontFamily: 'var(--font-body)',
+                          fontSize: 13,
+                          color: FG2,
+                          textAlign: 'center',
+                          padding: '14px 0 4px',
+                        }}>
+                          今天没有特别需要带的东西 ✓
+                        </div>
+                      ) : (
+                        <Accordion variant="gc" title="今日携带" count={todayPackCount}
+                          badge={todayPackCount > 0 ? '需确认' : undefined}
+                          defaultOpen={todayPackCount > 0}>
+                          <PackingSection
+                            childId={sel.id}
+                            userId={userId}
+                            today={today}
+                            timeline={timeline}
+                            calendarToday={todayEvents}
+                            packingItems={packingItems}
+                            packingPreferences={packPrefs}
+                            onPrefsChange={setPackPrefs}
+                            onReload={reloadSchedule}
+                          />
+                        </Accordion>
+                      )
+                    )}
 
-                    <motion.button
-                      type="button"
-                      whileTap={{ scale: 0.97 }}
-                      onClick={openFullProfile}
-                      className="gc-btn gc-btn--ghost"
-                      style={{ width: '100%', marginTop: 8 }}
-                    >
-                      查看完整档案 →
-                    </motion.button>
                   </>
                 )}
               </>
             )}
           </div>
+
+          {kids.length > 0 ? (
+            <div style={{
+              flexShrink: 0,
+              background: 'white',
+              borderTop: '1px solid rgba(45,50,47,0.06)',
+              padding: '12px 20px',
+              display: 'flex',
+              gap: 10,
+            }}>
+              <motion.button
+                type="button"
+                whileTap={{ scale: 0.97 }}
+                onClick={openFullProfile}
+                className="gc-btn gc-btn--ghost"
+                style={{ flex: 1 }}
+              >
+                查看完整档案 →
+              </motion.button>
+              <motion.button
+                type="button"
+                whileTap={{ scale: 0.97 }}
+                onClick={() => sel && setShowStatusEditor(true)}
+                className="gc-btn"
+                style={{ flex: 1, opacity: sel ? 1 : 0.45 }}
+                disabled={!sel}
+              >
+                记录今日状态
+              </motion.button>
+            </div>
+          ) : null}
         </motion.div>
       </motion.div>
 

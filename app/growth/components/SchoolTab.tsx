@@ -7,6 +7,10 @@ import nextDynamic from 'next/dynamic'
 import { formatSubjectDisplay } from '@/app/_shared/_services/childService'
 import { isRealScheduleClass } from '@/app/_shared/_engine/momentCard'
 import type { ScheduleClass } from '@/app/_shared/_engine/momentCard'
+import {
+  findCourseLoad,
+  type WeeklyScheduleIntelligence,
+} from '@/lib/ai/scheduleIntelligence'
 import { fetchWithAuth } from '@/lib/auth/fetchWithAuth'
 import { prepareSchedulePhotoForUpload } from '@/lib/image/prepareSchedulePhoto'
 import { toast } from '@/app/components/Toast'
@@ -83,6 +87,36 @@ function getDayClasses(schedule: Record<string, unknown[]>, dayKey: string): Sch
   return sortClassesByTime(dedupeClasses(filtered))
 }
 
+function getDayAllSlots(schedule: Record<string, unknown[]>, dayKey: string): ScheduleClass[] {
+  const raw = schedule[dayKey] || []
+  const filtered = raw
+    .map(normalizeClass)
+    .filter((c): c is ScheduleClass => c != null)
+  return sortClassesByTime(dedupeClasses(filtered))
+}
+
+function isBreakSlot(cls: ScheduleClass): boolean {
+  const cat = String(cls.category || '').toLowerCase()
+  return cat === 'break' || cat === 'life' || cat === 'transition'
+}
+
+function getDayHeaderLabel(
+  dayKey: string,
+  dayLabel: string,
+  intelligence?: WeeklyScheduleIntelligence | null,
+): string {
+  if (!intelligence) return dayLabel
+  if (intelligence.hardestDay === dayKey) return `${dayLabel} · 最累的一天 💪`
+  if (intelligence.easiestDay === dayKey) return `${dayLabel} · 轻松 🌿`
+  return dayLabel
+}
+
+function getLoadIndicator(loadScore: number): { dots: string; color: string; label: string } {
+  if (loadScore <= 1.2) return { dots: '●', color: '#8ca88d', label: '轻松' }
+  if (loadScore <= 1.5) return { dots: '●●', color: '#D97706', label: '适中' }
+  return { dots: '●●●', color: '#EA580C', label: '挑战' }
+}
+
 function formatSchoolTime(start?: string, end?: string): string {
   const s = String(start || '').trim()
   const e = String(end || '').trim()
@@ -104,11 +138,16 @@ export default function SchoolTab({ child }: Props) {
   const router = useRouter()
   const { activeKid, setActiveKid } = useApp()
   const schedule = (child.class_schedule || {}) as Record<string, unknown[]>
+  const intelligence = (child.schedule_intelligence || null) as WeeklyScheduleIntelligence | null
   const fileRef = useRef<HTMLInputElement>(null)
   const [uploading, setUploading] = useState(false)
 
   const weekRows = useMemo(
-    () => WEEKDAYS.map((d) => ({ ...d, classes: getDayClasses(schedule, d.key) })),
+    () => WEEKDAYS.map((d) => ({
+      ...d,
+      classes: getDayClasses(schedule, d.key),
+      slots: getDayAllSlots(schedule, d.key),
+    })),
     [schedule],
   )
 
@@ -158,6 +197,16 @@ export default function SchoolTab({ child }: Props) {
           ...(result.school_end_time ? { school_end_time: result.school_end_time } : {}),
         })
       }
+      void fetchWithAuth('/api/children/analyze-schedule', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ childId: child.id }),
+      }).then(async (r) => {
+        const data = await r.json()
+        if (data.intelligence && activeKid?.id === child.id) {
+          setActiveKid({ ...activeKid, schedule_intelligence: data.intelligence })
+        }
+      }).catch(() => { /* background refresh */ })
     } catch {
       toast('课表解析失败，请重试或手动填写', 'error')
     } finally {
@@ -226,45 +275,97 @@ export default function SchoolTab({ child }: Props) {
                   color: 'var(--clay)',
                   marginBottom: 6,
                 }}>
-                  {day.label}
+                  {getDayHeaderLabel(day.key, day.label, intelligence)}
                 </div>
-                {day.classes.length > 0 ? (
+                {day.slots.length > 0 ? (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                    {day.classes.map((cls, i) => (
-                      <div
-                        key={`${day.key}-${classTime(cls) ?? ''}-${classSubjectKey(cls)}-${i}`}
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          gap: 8,
-                          padding: '10px 12px',
-                          borderRadius: 12,
-                          background: 'var(--canvas-light)',
-                        }}
-                      >
-                        {classTime(cls) ? (
-                          <span style={{ fontFamily: 'var(--font-body)', fontSize: 12, color: 'var(--fg3)', flexShrink: 0, minWidth: 44 }}>
-                            {classTime(cls)}
+                    {day.slots.map((cls, i) => {
+                      const isBreak = isBreakSlot(cls)
+                      const isClass = isRealScheduleClass(cls)
+                      const courseLoad = findCourseLoad(intelligence, classSubjectKey(cls))
+                      const loadIndicator = courseLoad && isClass
+                        ? getLoadIndicator(courseLoad.loadScore)
+                        : null
+
+                      return (
+                        <div
+                          key={`${day.key}-${classTime(cls) ?? ''}-${classSubjectKey(cls)}-${i}`}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            gap: 8,
+                            padding: isBreak ? '6px 12px' : '10px 12px',
+                            borderRadius: 12,
+                            background: isBreak ? 'transparent' : 'var(--canvas-light)',
+                          }}
+                        >
+                          {classTime(cls) && !isBreak ? (
+                            <span style={{ fontFamily: 'var(--font-body)', fontSize: 12, color: 'var(--fg3)', flexShrink: 0, minWidth: 44 }}>
+                              {classTime(cls)}
+                            </span>
+                          ) : null}
+                          <span style={{
+                            fontFamily: isBreak ? 'var(--font-body)' : 'var(--font-serif)',
+                            fontSize: isBreak ? 12 : 14,
+                            color: isBreak ? 'var(--fg3)' : 'var(--fg1)',
+                            flex: 1,
+                            textAlign: classTime(cls) && !isBreak ? 'left' : 'left',
+                          }}>
+                            {classLabel(cls)}
                           </span>
-                        ) : null}
-                        <span style={{
-                          fontFamily: 'var(--font-serif)',
-                          fontSize: 14,
-                          color: 'var(--fg1)',
-                          flex: 1,
-                          textAlign: classTime(cls) ? 'left' : 'center',
-                        }}>
-                          {classLabel(cls)}
-                        </span>
-                      </div>
-                    ))}
+                          {loadIndicator ? (
+                            <span
+                              title={courseLoad?.loadReason || loadIndicator.label}
+                              style={{
+                                fontFamily: 'var(--font-body)',
+                                fontSize: 11,
+                                color: loadIndicator.color,
+                                flexShrink: 0,
+                                letterSpacing: 1,
+                              }}
+                            >
+                              {loadIndicator.dots}
+                            </span>
+                          ) : null}
+                        </div>
+                      )
+                    })}
                   </div>
                 ) : (
                   <p style={{ margin: 0, fontFamily: 'var(--font-body)', fontSize: 12, color: 'var(--fg3)' }}>无课</p>
                 )}
               </div>
             ))}
+
+            {intelligence?.parentTips?.[0] ? (
+              <div style={{
+                marginTop: 16,
+                padding: '14px 16px',
+                borderRadius: 14,
+                background: 'rgba(217,230,218,0.35)',
+                border: '1px solid rgba(92,122,94,0.12)',
+              }}>
+                <div style={{
+                  fontFamily: 'var(--font-body)',
+                  fontSize: 11,
+                  fontWeight: 600,
+                  color: 'var(--jade, #5c7a5e)',
+                  marginBottom: 6,
+                }}>
+                  妈妈小贴士
+                </div>
+                <p style={{
+                  margin: 0,
+                  fontFamily: 'var(--font-body)',
+                  fontSize: 13,
+                  color: 'var(--fg2)',
+                  lineHeight: 1.6,
+                }}>
+                  {intelligence.parentTips[0]}
+                </p>
+              </div>
+            ) : null}
           </div>
         ) : (
           <p style={{ margin: 0, fontFamily: 'var(--font-body)', fontSize: 13, color: 'var(--fg3)', lineHeight: 1.6 }}>

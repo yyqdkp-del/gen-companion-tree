@@ -139,6 +139,7 @@ export type EnrichedChild = Child & {
   energy_label?: string
   energy_level?: EnergyLevel
   class_schedule?: Record<string, unknown[]>
+  schedule_intelligence?: import('@/lib/ai/scheduleIntelligence').WeeklyScheduleIntelligence | null
   homeroom_teacher?: string
 }
 

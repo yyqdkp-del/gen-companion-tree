@@ -1,5 +1,7 @@
 import type { RootBriefing } from '@/app/_shared/_components/design'
 import type { HotspotItem, TodoItem } from '@/app/_shared/_types'
+import type { WeeklyScheduleIntelligence } from '@/lib/ai/scheduleIntelligence'
+import { getPickupMomentSubtitle } from '@/lib/ai/scheduleIntelligence'
 import { getTodayStr } from '@/lib/date/localDate'
 
 export type MomentKind =
@@ -236,6 +238,7 @@ export type BuildMomentParams = {
   packReadyDismissed: boolean
   overviewBriefing: RootBriefing
   hotspots?: HotspotItem[]
+  scheduleIntelligence?: WeeklyScheduleIntelligence | null
 }
 
 function cleanTodoTitle(todo?: TodoItem): string {
@@ -458,6 +461,9 @@ export function buildMomentCard(p: BuildMomentParams): MomentCardData {
 
   // 优先级5：接送时间
   if (location === 'pickup' || isInPickupWindow(hour, minute, schoolEnd)) {
+    const todayKey = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'][p.now.getDay()]
+    const pickupSubtitle = getPickupMomentSubtitle(p.scheduleIntelligence, todayKey)
+
     return {
       kind: 'pickup',
       tier: 'important',
@@ -465,6 +471,7 @@ export function buildMomentCard(p: BuildMomentParams): MomentCardData {
       eyebrow: '接孩子',
       kidName,
       title: `距接 ${kidName} 还有`,
+      subtitle: pickupSubtitle,
       schoolEndTime: formatTime(schoolEnd),
       pickupLocation,
     }

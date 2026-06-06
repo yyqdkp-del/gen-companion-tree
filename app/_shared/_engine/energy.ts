@@ -2,6 +2,8 @@
 // 儿童精力引擎（年龄分层 + 当日强度 + 周累积疲劳）
 // ─────────────────────────────────────────
 
+import type { WeeklyScheduleIntelligence } from '@/lib/ai/scheduleIntelligence'
+
 export interface EnergyInput {
   age?: number
   grade?: number
@@ -15,6 +17,7 @@ export interface EnergyInput {
   isWeekend?: boolean
   todayEvents?: {
     event_type?: string
+    subject?: string
     requires_action?: boolean
     requires_payment?: number
     title?: string
@@ -26,6 +29,7 @@ export interface EnergyInput {
     health_status?: string
     date?: string
   }[]
+  intelligence?: WeeklyScheduleIntelligence
 }
 
 export type EnergyLevel = 'green' | 'yellow' | 'orange' | 'red' | 'unknown'
@@ -73,13 +77,14 @@ function calcSleepHours(input: EnergyInput): number | null {
   return null
 }
 
-function calcTodayIntensity(input: EnergyInput, params: AgeParams): number {
-  const events = input.todayEvents || []
-
+function simpleIntensityCalc(
+  events: NonNullable<EnergyInput['todayEvents']>,
+  params: AgeParams,
+): number {
   let load = 0
   let classCount = 0
 
-  events.forEach(e => {
+  events.forEach((e) => {
     switch (e.event_type) {
       case 'exam':
         load += 50
@@ -111,7 +116,38 @@ function calcTodayIntensity(input: EnergyInput, params: AgeParams): number {
   else if (classCount > 4) load += 10
 
   const loadScore = Math.max(0, 100 - load)
-  const intensity = 1 - loadScore / 100
+  return 1 - loadScore / 100
+}
+
+function calculateEventIntensity(
+  events: NonNullable<EnergyInput['todayEvents']>,
+  intelligence?: WeeklyScheduleIntelligence,
+): number | null {
+  if (!intelligence?.courses?.length) return null
+
+  let totalLoad = 1.0
+
+  for (const event of events) {
+    const subject = String(event.subject || event.title || '').trim()
+    if (!subject) continue
+
+    const courseLoad = intelligence.courses.find(
+      (c) => c.subject === subject || subject.includes(c.subject) || c.subject.includes(subject),
+    )
+    if (courseLoad) {
+      totalLoad += (courseLoad.loadScore - 1) * 0.1
+      totalLoad -= courseLoad.recoveryValue * 0.05
+    }
+  }
+
+  return Math.max(0.5, Math.min(2.5, totalLoad))
+}
+
+function calcTodayIntensity(input: EnergyInput, params: AgeParams): number {
+  const events = input.todayEvents || []
+
+  const aiIntensity = calculateEventIntensity(events, input.intelligence)
+  let intensity = aiIntensity ?? simpleIntensityCalc(events, params)
 
   let healthMultiplier = 1.0
   if (input.healthStatus === 'sick') healthMultiplier = 1.6

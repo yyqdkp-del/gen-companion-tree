@@ -304,6 +304,22 @@ function PickupBody({ data, now }: { data: MomentCardData; now: Date }) {
   return (
     <>
       <PickupCountdown schoolEndTime={data.schoolEndTime} now={now} />
+      {data.subtitle ? (
+        <p
+          style={{
+            fontFamily: 'var(--font-body)',
+            fontSize: 13,
+            color: 'var(--fg2)',
+            margin: '12px 0 0',
+            textAlign: 'center',
+            lineHeight: 1.6,
+            whiteSpace: 'pre-line',
+            paddingRight: 20,
+          }}
+        >
+          {data.subtitle}
+        </p>
+      ) : null}
       {locationLine ? (
         <p
           style={{
