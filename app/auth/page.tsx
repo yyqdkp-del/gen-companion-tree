@@ -323,7 +323,9 @@ export default function AuthPage() {
     try {
       const { error: oauthError } = await supabase.auth.signInWithOAuth({
         provider: 'google',
-        options: { redirectTo: `${window.location.origin}/auth/callback` },
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(returnPath)}`,
+        },
       })
       if (oauthError) {
         setError(formatAuthError(oauthError.message, oauthError.code))

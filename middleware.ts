@@ -5,7 +5,6 @@ import { NextResponse, type NextRequest } from 'next/server'
 // 1. 完全公开（不需要任何处理）
 const PUBLIC_STATIC = [
   '/auth/callback',      // OAuth 回调，必须直接放行
-  '/auth/callback-bridge',
   '/grandparent',        // 爷奶分享页
   '/api/realtime',       // 实时数据，无需鉴权
 ] as const

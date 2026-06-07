@@ -1,8 +1,42 @@
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { NextRequest, NextResponse } from 'next/server'
+import { sanitizeAuthNext } from '@/lib/auth/authNextPath'
 
-const CALLBACK_BRIDGE = '/auth/callback-bridge'
+type SessionCookie = { name: string; value: string; options?: Record<string, unknown> }
+
+function redirectWithSessionCookies(
+  origin: string,
+  next: string | null,
+  cookieStore: Awaited<ReturnType<typeof cookies>>,
+  sessionCookies: SessionCookie[],
+): NextResponse {
+  const dest = sanitizeAuthNext(next ?? '/')
+  const response = NextResponse.redirect(
+    new URL(dest === '/' ? '/' : dest, origin).toString(),
+  )
+
+  if (sessionCookies.length > 0) {
+    sessionCookies.forEach(({ name, value, options }) => {
+      response.cookies.set(
+        name,
+        value,
+        options as Parameters<typeof response.cookies.set>[2],
+      )
+    })
+  } else {
+    cookieStore.getAll().forEach((cookie) => {
+      response.cookies.set(cookie.name, cookie.value, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        path: '/',
+      })
+    })
+  }
+
+  return response
+}
 
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url)
@@ -10,6 +44,7 @@ export async function GET(request: NextRequest) {
   const oauthError = searchParams.get('error')
   const token_hash = searchParams.get('token_hash')
   const type = searchParams.get('type')
+  const next = searchParams.get('next')
 
   console.log('[callback] received:', {
     hasCode: !!code,
@@ -17,6 +52,7 @@ export async function GET(request: NextRequest) {
     error: oauthError,
     hasTokenHash: !!token_hash,
     type,
+    next,
     origin,
     fullUrl: request.url.slice(0, 200),
   })
@@ -26,8 +62,8 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(`${origin}/auth?error=${encodeURIComponent(oauthError)}`)
   }
 
-  let response = NextResponse.redirect(new URL(CALLBACK_BRIDGE, request.url))
   const cookieStore = await cookies()
+  const sessionCookies: SessionCookie[] = []
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -37,15 +73,11 @@ export async function GET(request: NextRequest) {
         getAll() {
           return cookieStore.getAll()
         },
-        setAll(cookiesToSet: { name: string; value: string; options?: Record<string, unknown> }[]) {
+        setAll(cookiesToSet: SessionCookie[]) {
           console.log('[callback] setAll cookies:', cookiesToSet.map((c) => c.name))
           cookiesToSet.forEach(({ name, value, options }) => {
             cookieStore.set(name, value, options)
-            response.cookies.set(
-              name,
-              value,
-              options as Parameters<typeof response.cookies.set>[2],
-            )
+            sessionCookies.push({ name, value, options })
           })
         },
       },
@@ -69,8 +101,14 @@ export async function GET(request: NextRequest) {
       return NextResponse.redirect(`${origin}/auth?error=exchange_failed&msg=${msg}`)
     }
 
-    console.log('[callback] success, redirecting to:', CALLBACK_BRIDGE)
-    return response
+    if (!data.session) {
+      console.error('[callback] exchange succeeded but no session')
+      return NextResponse.redirect(`${origin}/auth?error=session`)
+    }
+
+    const dest = sanitizeAuthNext(next ?? '/')
+    console.log('[callback] success, redirecting to:', dest)
+    return redirectWithSessionCookies(origin, next, cookieStore, sessionCookies)
   }
 
   // Line magiclink / email OTP
@@ -93,8 +131,14 @@ export async function GET(request: NextRequest) {
       return NextResponse.redirect(`${origin}/auth?error=exchange_failed&msg=${msg}`)
     }
 
-    console.log('[callback] verifyOtp success, redirecting to:', CALLBACK_BRIDGE)
-    return response
+    if (!data.session) {
+      console.error('[callback] verifyOtp succeeded but no session')
+      return NextResponse.redirect(`${origin}/auth?error=session`)
+    }
+
+    const dest = sanitizeAuthNext(next ?? '/')
+    console.log('[callback] verifyOtp success, redirecting to:', dest)
+    return redirectWithSessionCookies(origin, next, cookieStore, sessionCookies)
   }
 
   console.log('[callback] no code received, params:', Object.fromEntries(searchParams))
