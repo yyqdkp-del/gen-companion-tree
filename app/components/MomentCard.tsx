@@ -510,6 +510,8 @@ function getCardInteraction(data: MomentCardData): {
       return { clickable: true, cornerIcon: ChevronRight, tapScale: 0.97, pulse: true }
     case 'correlation':
       return { clickable: true, cornerIcon: ChevronRight, tapScale: 0.97, pulse: true }
+    case 'email_discovery':
+      return { clickable: true, cornerIcon: ChevronRight, tapScale: 0.97 }
     case 'night':
       return { clickable: false, tapScale: 0.97, breathe: true }
     default:
@@ -558,6 +560,9 @@ export default function MomentCard({
         if (data.primaryAction?.action.type === 'correlation') {
           onAction(data.primaryAction.action)
         }
+        break
+      case 'email_discovery':
+        onAction({ type: 'email_discovery' })
         break
       default:
         break

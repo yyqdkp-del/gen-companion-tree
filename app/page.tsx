@@ -47,6 +47,7 @@ import { useSmartPacking } from '@/lib/packing/useSmartPacking'
 import { recordAllPackingConfirmed } from '@/lib/packing/packingMemory'
 import { resolveResidentCity } from '@/lib/family/resolveResidentCity'
 import type { SimpleWeather } from '@/lib/realtime/weather'
+import { fetchRecentEmailDiscovery } from '@/app/_shared/_services/discoveryService'
 
 type ScheduleItem = ScheduleClass & { location?: string; requires_action?: string }
 type UrgentItem = { title: string; level: 'red' | 'orange' | 'yellow' }
@@ -825,6 +826,7 @@ export default function BasePage() {
   const [showProfileBanner, setShowProfileBanner] = useState(false)
   const [weather, setWeather] = useState<SimpleWeather | null>(null)
   const [weatherCity, setWeatherCity] = useState('Chiang Mai')
+  const [emailDiscovery, setEmailDiscovery] = useState<{ id: string; summary: string } | null>(null)
 
   const [optimisticDoneIds, setOptimisticDoneIds] = useState<Set<string>>(() => new Set())
 
@@ -955,6 +957,27 @@ export default function BasePage() {
         if (!cancelled) setWeatherCity('Chiang Mai')
       }
     })()
+    return () => { cancelled = true }
+  }, [userId])
+
+  useEffect(() => {
+    if (!userId) {
+      setEmailDiscovery(null)
+      return
+    }
+    let cancelled = false
+    void fetchRecentEmailDiscovery(userId)
+      .then((item) => {
+        if (cancelled) return
+        if (item?.summary) {
+          setEmailDiscovery({ id: item.id, summary: item.summary })
+        } else {
+          setEmailDiscovery(null)
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setEmailDiscovery(null)
+      })
     return () => { cancelled = true }
   }, [userId])
 
@@ -1237,6 +1260,7 @@ export default function BasePage() {
       smartPacking,
       tomorrowSmartPacking,
       weather,
+      emailDiscovery,
     }),
     [
       now,
@@ -1252,6 +1276,7 @@ export default function BasePage() {
       smartPacking,
       tomorrowSmartPacking,
       weather,
+      emailDiscovery,
     ],
   )
 
@@ -1317,6 +1342,9 @@ export default function BasePage() {
         if (hotspot) setBrainHotspot(hotspot)
         break
       }
+      case 'email_discovery':
+        router.push('/rian')
+        break
       default:
         break
     }

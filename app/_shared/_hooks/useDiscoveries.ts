@@ -2,7 +2,8 @@ import { useState, useEffect, useCallback } from 'react'
 import {
   fetchDiscoveries,
   dismissDiscovery,
-  addDiscoveryToTodo,
+  addDiscoveryToCalendar,
+  addDiscoveryReminder,
   type DiscoveryItem,
 } from '../_services/discoveryService'
 
@@ -37,11 +38,17 @@ export function useDiscoveries(userId: string | null | undefined) {
     setItems((prev) => prev.filter((x) => x.id !== item.id || x.table !== item.table))
   }, [userId])
 
-  const addTodo = useCallback(async (item: DiscoveryItem) => {
+  const addCalendar = useCallback(async (item: DiscoveryItem) => {
     if (!userId) return
-    await addDiscoveryToTodo(userId, item)
+    await addDiscoveryToCalendar(userId, item)
     setItems((prev) => prev.filter((x) => x.id !== item.id || x.table !== item.table))
   }, [userId])
 
-  return { items, loading, reload, dismiss, addTodo }
+  const addReminder = useCallback(async (item: DiscoveryItem) => {
+    if (!userId) return
+    await addDiscoveryReminder(userId, item)
+    setItems((prev) => prev.filter((x) => x.id !== item.id || x.table !== item.table))
+  }, [userId])
+
+  return { items, loading, reload, dismiss, addCalendar, addReminder }
 }

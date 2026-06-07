@@ -105,11 +105,21 @@ export default function RianPage() {
       .map(mapTodoToReminder)
   }, [tempTodos, groups.today, groups.soon])
 
-  const { items: discoveries, loading: discoveriesLoading, dismiss, addTodo: addDiscoveryTodo } =
-    useDiscoveries(userId)
+  const {
+    items: discoveries,
+    loading: discoveriesLoading,
+    dismiss,
+    addCalendar: addDiscoveryCalendar,
+    addReminder: addDiscoveryReminder,
+  } = useDiscoveries(userId)
 
-  const handleAddDiscoveryTodo = async (item: Parameters<typeof addDiscoveryTodo>[0]) => {
-    await addDiscoveryTodo(item)
+  const handleAddDiscoveryCalendar = async (item: Parameters<typeof addDiscoveryCalendar>[0]) => {
+    await addDiscoveryCalendar(item)
+    await ctxSync()
+  }
+
+  const handleAddDiscoveryReminder = async (item: Parameters<typeof addDiscoveryReminder>[0]) => {
+    await addDiscoveryReminder(item)
     await ctxSync()
   }
 
@@ -239,7 +249,8 @@ export default function RianPage() {
         <RootDiscoveries
           items={discoveries}
           loading={discoveriesLoading}
-          onAddTodo={handleAddDiscoveryTodo}
+          onAddCalendar={handleAddDiscoveryCalendar}
+          onAddReminder={handleAddDiscoveryReminder}
           onDismiss={dismiss}
         />
 

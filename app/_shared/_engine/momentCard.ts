@@ -10,6 +10,7 @@ export type MomentKind =
   | 'sick'
   | 'visa'
   | 'correlation'
+  | 'email_discovery'
   | 'weekend'
   | 'packing'
   | 'pickup'
@@ -34,6 +35,7 @@ export type MomentAction =
   | { type: 'briefing_urgent' }
   | { type: 'briefing_link'; href: string }
   | { type: 'correlation'; hotspotId: string }
+  | { type: 'email_discovery' }
 
 export type PackLine = { item: string; context?: string; isHighRisk?: boolean }
 
@@ -265,6 +267,7 @@ export type BuildMomentParams = {
   smartPacking?: SmartPackingItem[]
   tomorrowSmartPacking?: SmartPackingItem[]
   weather?: SimpleWeather | null
+  emailDiscovery?: { id: string; summary: string } | null
 }
 
 function cleanTodoTitle(todo?: TodoItem): string {
@@ -491,6 +494,25 @@ export function buildMomentCard(p: BuildMomentParams): MomentCardData {
       primaryAction: {
         label: '查看完整分析',
         action: { type: 'correlation', hotspotId: correlationHotspot.id },
+      },
+    }
+  }
+
+  // 优先级3.5：学校邮件新发现（24小时内，未 dismissed）
+  if (p.emailDiscovery?.summary) {
+    const summary = p.emailDiscovery.summary.length > 48
+      ? `${p.emailDiscovery.summary.slice(0, 48)}…`
+      : p.emailDiscovery.summary
+    return {
+      kind: 'email_discovery',
+      tier: 'important',
+      theme: 'neutral',
+      eyebrow: '根发现',
+      title: '📧 根从学校邮件发现了一件事',
+      subtitle: summary,
+      primaryAction: {
+        label: '查看详情',
+        action: { type: 'email_discovery' },
       },
     }
   }

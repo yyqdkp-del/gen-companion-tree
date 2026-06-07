@@ -6,8 +6,82 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { addDaysToYmd, getTodayStr } from '@/lib/date/localDate'
 import { fetchResidentCity } from '@/lib/family/resolveResidentCity'
+import { extractEmailWithAttachments } from '@/lib/email/gmailExtract'
+import {
+  extractFromAttachment,
+  extractFromEmailBody,
+  mergeExtractions,
+} from '@/lib/email/pdfExtractor'
+import { persistStructuredEmail } from '@/lib/email/syncStructuredEmail'
+import { getValidAccessToken } from '@/lib/google/tokenStore'
 
 const MAKE_WEBHOOK_URL = process.env.NEXT_PUBLIC_MAKE_WEBHOOK_URL || ''
+
+// ══ 结构化 Gmail + PDF 解析（Gemini，不存原文/附件）══════════════
+async function processStructuredEmail(
+  supabase: any,
+  email: EmailInput,
+  userId: string,
+): Promise<{
+  ok: true
+  summary: string
+  events_created: number
+  todos_created: number
+  has_attachments: boolean
+} | null> {
+  let extracted = {
+    subject: email.subject,
+    body: email.body,
+    from: email.from,
+    date: email.date,
+    attachments: [] as Array<{ filename: string; mimeType: string; data: string }>,
+  }
+
+  if (email.source === 'mcp_scan' && email.message_id) {
+    const token = await getValidAccessToken(userId, 'gmail')
+    if (token) {
+      try {
+        extracted = await extractEmailWithAttachments(token, email.message_id)
+      } catch (e) {
+        console.warn('[email/parse] Gmail fetch failed, using payload body:', (e as Error).message)
+      }
+    }
+  }
+
+  const bodyExtraction = await extractFromEmailBody(extracted.body, extracted.subject)
+  const attachmentExtractions = await Promise.all(
+    extracted.attachments.map((att) =>
+      extractFromAttachment(att.data, att.mimeType, att.filename, extracted.subject),
+    ),
+  )
+
+  const merged = mergeExtractions([bodyExtraction, ...attachmentExtractions])
+  const hasContent =
+    merged.summaryParts.length > 0 ||
+    merged.allEvents.length > 0 ||
+    merged.allAmounts.length > 0 ||
+    merged.allRequirements.length > 0
+
+  if (!hasContent) return null
+
+  const messageId = email.message_id || `${email.from}_${email.date}`
+  const { eventsWritten, todosWritten } = await persistStructuredEmail(supabase, {
+    userId,
+    messageId,
+    email: extracted,
+    bodyExtraction,
+    attachmentExtractions,
+    merged,
+  })
+
+  return {
+    ok: true,
+    summary: merged.summaryParts.filter(Boolean).join('；') || extracted.subject,
+    events_created: eventsWritten,
+    todos_created: todosWritten,
+    has_attachments: extracted.attachments.length > 0,
+  }
+}
 
 // ══ Claude邮件解析Prompt ══════════════════════════════════════
 function buildEmailPrompt(email: EmailInput, familyContext: string, city: string): string {
@@ -523,6 +597,22 @@ export async function POST(req: NextRequest) {
           continue
         }
 
+        // ── 结构化 Gmail + PDF 解析（优先，不存原文/附件）──
+        const structured = await processStructuredEmail(supabase, email, userId)
+        if (structured) {
+          results.push({
+            ok: true,
+            subject: email.subject,
+            pipeline: 'structured',
+            todos_created: structured.todos_created,
+            events_created: structured.events_created,
+            has_attachments: structured.has_attachments,
+            summary: structured.summary,
+          })
+          continue
+        }
+
+        // ── 降级：Claude 全文解析（Make webhook 等无附件场景）──
         // Claude解析
         const parsed = await parseEmailWithClaude(email, familyContext, city)
 

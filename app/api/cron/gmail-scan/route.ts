@@ -5,6 +5,7 @@ export const dynamic = 'force-dynamic'
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { getValidAccessToken } from '@/lib/google/tokenStore'
+import { extractEmailWithAttachments } from '@/lib/email/gmailExtract'
 
 const SCHOOL_FILTERS = [
   'school', 'academy', 'college', 'international',
@@ -24,40 +25,7 @@ type GmailMessageRow = {
   date: string
   body: string
   snippet: string
-}
-
-function decodeBase64Url(data: string): string {
-  const padded = data.replace(/-/g, '+').replace(/_/g, '/')
-  return Buffer.from(padded, 'base64').toString('utf8')
-}
-
-function extractBody(payload: { body?: { data?: string }; parts?: unknown[] } | undefined): string {
-  if (!payload) return ''
-  if (payload.body?.data) return decodeBase64Url(payload.body.data)
-  for (const part of payload.parts || []) {
-    const text = extractBody(part as { body?: { data?: string }; parts?: unknown[] })
-    if (text) return text
-  }
-  return ''
-}
-
-function parseGmailMessage(msg: {
-  id?: string
-  snippet?: string
-  payload?: { headers?: { name: string; value: string }[]; body?: { data?: string }; parts?: unknown[] }
-}): GmailMessageRow {
-  const headers = msg.payload?.headers || []
-  const getHeader = (name: string) =>
-    headers.find((h) => h.name.toLowerCase() === name.toLowerCase())?.value || ''
-
-  return {
-    message_id: msg.id || '',
-    from: getHeader('From'),
-    subject: getHeader('Subject'),
-    date: getHeader('Date'),
-    body: extractBody(msg.payload).slice(0, 2000),
-    snippet: msg.snippet || '',
-  }
+  attachment_count: number
 }
 
 async function listGmailUserIds(): Promise<string[]> {
@@ -106,13 +74,16 @@ async function fetchRecentEmailsForUser(userId: string): Promise<GmailMessageRow
 
   for (const id of ids) {
     try {
-      const msgRes = await fetch(
-        `https://gmail.googleapis.com/gmail/v1/users/me/messages/${id}?format=full`,
-        { headers: { Authorization: `Bearer ${accessToken}` } },
-      )
-      if (!msgRes.ok) continue
-      const msg = await msgRes.json()
-      emails.push(parseGmailMessage(msg))
+      const extracted = await extractEmailWithAttachments(accessToken, id)
+      emails.push({
+        message_id: id,
+        from: extracted.from,
+        subject: extracted.subject,
+        date: extracted.date,
+        body: extracted.body.slice(0, 8000),
+        snippet: extracted.body.slice(0, 200),
+        attachment_count: extracted.attachments.length,
+      })
     } catch (e) {
       console.warn(`[gmail-scan] user=${userId} message=${id} read failed:`, (e as Error).message)
     }

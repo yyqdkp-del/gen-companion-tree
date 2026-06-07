@@ -5,6 +5,14 @@ const supabase = createClient()
 
 export type DiscoverySourceKind = 'email' | 'photo' | 'chat'
 
+export type ExtractedEvent = {
+  title: string
+  date: string
+  requires_action?: boolean
+  requires_items?: string[]
+  deadline?: string
+}
+
 export type DiscoveryItem = {
   id: string
   sourceKind: DiscoverySourceKind
@@ -12,6 +20,9 @@ export type DiscoveryItem = {
   summary: string
   createdAt: string
   table: 'processed_emails' | 'raw_inputs'
+  extractedEvents?: ExtractedEvent[]
+  messageId?: string
+  hasAttachments?: boolean
 }
 
 function mapEmailRow(row: {
@@ -19,16 +30,26 @@ function mapEmailRow(row: {
   summary?: string | null
   subject?: string | null
   source_type?: string | null
+  message_id?: string | null
   created_at: string
+  extracted_events?: unknown
+  has_attachments?: boolean | null
 }): DiscoveryItem {
   const summary = String(row.summary || row.subject || '邮件中有新信息').trim()
+  const events = Array.isArray(row.extracted_events)
+    ? (row.extracted_events as ExtractedEvent[])
+    : []
+
   return {
     id: row.id,
     sourceKind: 'email',
-    sourceLabel: '来自邮件',
+    sourceLabel: '📧 学校邮件',
     summary,
     createdAt: row.created_at,
     table: 'processed_emails',
+    extractedEvents: events,
+    messageId: row.message_id || undefined,
+    hasAttachments: !!row.has_attachments,
   }
 }
 
@@ -87,7 +108,7 @@ export async function fetchDiscoveries(userId: string): Promise<DiscoveryItem[]>
 
   const emailPrimary = await supabase
     .from('processed_emails')
-    .select('id, source_type, summary, subject, created_at, status')
+    .select('id, source_type, summary, subject, message_id, created_at, status, extracted_events, has_attachments')
     .eq('user_id', userId)
     .gt('created_at', sevenDaysAgo)
     .neq('status', 'dismissed')
@@ -136,6 +157,33 @@ export async function fetchDiscoveries(userId: string): Promise<DiscoveryItem[]>
     .slice(0, 8)
 }
 
+export async function fetchRecentEmailDiscovery(userId: string): Promise<DiscoveryItem | null> {
+  const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+  const { data } = await supabase
+    .from('processed_emails')
+    .select('id, source_type, summary, subject, message_id, created_at, status, extracted_events, has_attachments')
+    .eq('user_id', userId)
+    .eq('status', 'active')
+    .eq('source_type', 'gmail')
+    .gt('created_at', since)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  if (!data) return null
+  return mapEmailRow(data as Parameters<typeof mapEmailRow>[0])
+}
+
+async function resolveChildId(userId: string): Promise<string | null> {
+  const { data } = await supabase
+    .from('children')
+    .select('id')
+    .eq('user_id', userId)
+    .limit(1)
+    .maybeSingle()
+  return data?.id || null
+}
+
 export async function dismissDiscovery(userId: string, item: DiscoveryItem): Promise<void> {
   if (item.table === 'processed_emails') {
     const { error } = await supabase
@@ -171,6 +219,65 @@ export async function addDiscoveryToTodo(userId: string, item: DiscoveryItem): P
   if (error) throw error
 }
 
+export async function addDiscoveryToCalendar(userId: string, item: DiscoveryItem): Promise<void> {
+  const childId = await resolveChildId(userId)
+  if (!childId) throw new Error('no_child')
+
+  const events = item.extractedEvents?.length
+    ? item.extractedEvents
+    : [{ title: item.summary, date: getTodayStr(), requires_action: true }]
+
+  for (const event of events.slice(0, 3)) {
+    if (!event.title) continue
+    const date = event.date || getTodayStr()
+
+    const { data: existing } = await supabase
+      .from('child_school_calendar')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('child_id', childId)
+      .eq('title', event.title)
+      .eq('date_start', date)
+      .maybeSingle()
+
+    if (existing) continue
+
+    const { error } = await supabase.from('child_school_calendar').insert({
+      user_id: userId,
+      child_id: childId,
+      title: event.title,
+      date_start: date,
+      date_end: date,
+      requires_action: event.requires_action ? '需要确认' : null,
+      requires_items: event.requires_items || [],
+      source: 'gmail',
+      source_email_id: item.messageId || null,
+      event_type: 'activity',
+    })
+    if (error) throw error
+  }
+}
+
+export async function addDiscoveryReminder(userId: string, item: DiscoveryItem): Promise<void> {
+  const childId = await resolveChildId(userId)
+  const firstEvent = item.extractedEvents?.[0]
+  const dueDate = firstEvent?.deadline || firstEvent?.date || getTodayStr()
+
+  const { error } = await supabase.from('todo_items').insert({
+    user_id: userId,
+    child_id: childId,
+    title: firstEvent?.title ? `提醒：${firstEvent.title}` : `跟进：${item.summary.slice(0, 60)}`,
+    description: item.summary,
+    priority: 'orange',
+    status: 'pending',
+    due_date: dueDate,
+    source: 'gmail',
+    category: 'education',
+    ai_action_data: item.messageId ? { source_email_id: item.messageId } : undefined,
+  })
+  if (error) throw error
+}
+
 export function formatDiscoveryTime(iso: string): string {
   const diff = Math.max(0, Date.now() - new Date(iso).getTime())
   const mins = Math.floor(diff / 60000)
@@ -181,4 +288,12 @@ export function formatDiscoveryTime(iso: string): string {
   const days = Math.floor(hrs / 24)
   if (days < 7) return `${days} 天前`
   return new Date(iso).toLocaleDateString('zh-CN', { month: 'numeric', day: 'numeric' })
+}
+
+export function formatEventDate(date: string): string {
+  try {
+    return new Date(`${date}T12:00:00`).toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' })
+  } catch {
+    return date
+  }
 }
