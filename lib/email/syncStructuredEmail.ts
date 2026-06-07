@@ -1,9 +1,9 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { EmailExtraction } from '@/lib/email/pdfExtractor'
 import type { ExtractedEmail } from '@/lib/email/gmailExtract'
+import { EmailService } from '@/lib/services/EmailService'
 import {
   buildEmailExtractionFromStructured,
-  persistEmailExtraction,
 } from '@/lib/email/persistEmailExtraction'
 
 export type StructuredEmailInput = {
@@ -40,7 +40,17 @@ export async function persistStructuredEmail(
     hasAttachments: email.attachments.length > 0,
   })
 
-  return persistEmailExtraction(supabase, extraction, userId)
+  const result = await EmailService.persist(
+    extraction,
+    userId,
+    undefined,
+    supabase,
+  )
+
+  return {
+    eventsWritten: result.eventsWritten ?? 0,
+    todosWritten: result.todosWritten ?? 0,
+  }
 }
 
 export async function fetchLatestEmailDiscovery(

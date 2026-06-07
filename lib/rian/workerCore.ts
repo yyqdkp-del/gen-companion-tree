@@ -1,5 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
-import { persistClassSchedule } from '@/lib/schedule/persistSchedule'
+import { CalendarService } from '@/lib/services/CalendarService'
+import { ScheduleService } from '@/lib/services/ScheduleService'
+import { TodoService, type TodoDimension } from '@/lib/services/TodoService'
 import { getUserLocation } from '@/lib/geofence'
 import { getTodayStr, getTodayStrInTimeZone } from '@/lib/date/localDate'
 import {
@@ -363,20 +365,19 @@ async function executeTool(
         estate: 'pay', education: 'send_email', selfcare: 'calendar',
       }
 
-      const { data: todo } = await supabase.from('todo_items').insert({
-        user_id: userId,
+      const createResult = await TodoService.create({
+        userId,
         title: input.title,
         description: input.claude_advice,
-        category: input.dimension,
-        priority,
-        status: 'pending',
-        repeat,
-        due_date: input.due_date || null,
+        dimension: input.dimension as TodoDimension,
+        priority: priority as 'red' | 'orange' | 'yellow',
+        dueDate: input.due_date || undefined,
+        repeat: repeat || undefined,
         source: 'rian',
-        source_ref_id: rawInputId,
-        ai_draft: input.ai_draft || null,
-        ai_action_type: aiActionTypeMap[input.dimension] || null,
-        ai_action_data: {
+        sourceRefId: rawInputId || undefined,
+        aiDraft: input.ai_draft || undefined,
+        aiActionType: aiActionTypeMap[input.dimension] || undefined,
+        aiActionData: {
           action_items: input.action_items,
           carry_items: input.carry_items,
           warnings: input.warnings,
@@ -387,10 +388,12 @@ async function executeTool(
             search_keywords: input.search_keywords || [],
             who: input.who,
             due_date: input.due_date,
-          }
+          },
         },
-        one_tap_ready: false, // 先设false，预热完成后改true
-      }).select().single()
+        oneTapReady: false,
+        client: supabase,
+      })
+      const todo = createResult.ok && createResult.id ? { id: createResult.id } : null
 
       // 三级提醒链
       if (todo && input.due_date) {
@@ -415,41 +418,44 @@ async function executeTool(
         console.warn('add_schedule: no child found, skipping')
         return null
       }
-      await supabase.from('child_school_calendar').insert({
-        child_id: childId,
-        user_id: userId,
-        event_type: input.event_type || 'activity',
+      await CalendarService.upsertEvent({
+        userId,
+        childId,
         title: input.title,
-        date_start: input.date_start,
-        date_end: input.date_end || input.date_start,
-        description: input.description || null,
-        requires_action: input.requires_action || null,
-        requires_items: input.requires_items || [],
-        requires_payment: input.requires_payment || null,
+        dateStart: input.date_start,
+        dateEnd: input.date_end || input.date_start,
+        description: input.description || undefined,
+        requiresActionText: input.requires_action || null,
+        requiresItems: input.requires_items || [],
+        requiresPayment: input.requires_payment || null,
+        eventType: input.event_type || 'activity',
         source: 'rian',
+        client: supabase,
       })
       // trip/activity 类型额外生成提醒待办
       if (input.event_type === 'trip' || input.event_type === 'activity') {
-        await supabase.from('todo_items').insert({
-          user_id: userId,
+        await TodoService.create({
+          userId,
           title: `📅 ${input.title}`,
-          due_date: input.date_start || null,
+          dueDate: input.date_start || undefined,
+          dimension: 'education',
           priority: 'yellow',
-          status: 'pending',
           description: input.description || '',
+          source: 'rian',
+          client: supabase,
         })
       }
       // 只有明确需要缴费才生成待办
       if (input.requires_payment && input.requires_payment > 0) {
-        await supabase.from('todo_items').insert({
-          user_id: userId,
+        await TodoService.create({
+          userId,
           title: `${input.title} - 缴费 ฿${input.requires_payment}`,
-          category: 'wealth',
+          dimension: 'wealth',
           priority: 'orange',
-          status: 'pending',
-          due_date: input.date_start,
+          dueDate: input.date_start,
           source: 'rian',
-          one_tap_ready: false,
+          oneTapReady: false,
+          client: supabase,
         })
       }
       await triggerMake(toolName, input, city)
@@ -488,15 +494,15 @@ async function executeTool(
       }
       // 复诊自动生成待办
       if (input.follow_up_date) {
-        await supabase.from('todo_items').insert({
-          user_id: userId,
-          title: `复诊预约${input.hospital ? ' - ' + input.hospital : ''}`,
-          category: 'medical',
+        await TodoService.create({
+          userId,
+          title: `复诊预约${input.hospital ? ` - ${input.hospital}` : ''}`,
+          dimension: 'medical',
           priority: 'orange',
-          status: 'pending',
-          due_date: input.follow_up_date,
+          dueDate: input.follow_up_date,
           source: 'rian',
-          one_tap_ready: false,
+          oneTapReady: false,
+          client: supabase,
         })
       }
       return null
@@ -513,15 +519,15 @@ async function executeTool(
         metadata: { notes: input.notes },
       })
       if (input.expiry_date) {
-        await supabase.from('todo_items').insert({
-          user_id: userId,
+        await TodoService.create({
+          userId,
           title: `${input.title}到期续签`,
-          category: 'compliance',
+          dimension: 'compliance',
           priority: 'orange',
-          status: 'pending',
-          due_date: input.expiry_date,
+          dueDate: input.expiry_date,
           source: 'rian',
-          one_tap_ready: false,
+          oneTapReady: false,
+          client: supabase,
         })
       }
       return null
@@ -685,10 +691,13 @@ async function executeRootVisionActions(
       switch (action.type) {
         case 'save_schedule': {
           if (!childId || !action.data) break
-          await persistClassSchedule(supabase, childId, userId, action.data, {
-            enrich: false,
-            source: 'rian',
-          })
+          await ScheduleService.save(
+            childId,
+            userId,
+            action.data as Record<string, unknown[]>,
+            'rian',
+            { enrich: false, client: supabase },
+          )
           break
         }
 

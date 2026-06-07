@@ -148,7 +148,7 @@ export async function GET(req: NextRequest) {
 
     const { error } = await supabase.from('hotspot_items').insert({
       user_id: r.userId,
-      category: 'visa',
+      category: 'compliance',
       urgency: r.urgency,
       title: r.title,
       summary: r.summary,

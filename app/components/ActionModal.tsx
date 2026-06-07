@@ -16,6 +16,7 @@ import {
   Shield, HeartPulse, GraduationCap, Plane, Home,
 } from 'lucide-react'
 import type { BrainHotspotActionData, BrainSuggestedAction } from '@/app/_shared/_types'
+import type { PreparedItem, RootAction, RootDecision } from '@/lib/action/rootBrain'
 import { formatThb } from '@/lib/realtime/exchangeRate'
 
 const THEME = { text: '#2C3E50', gold: '#8a7355', muted: '#6B8BAA', navy: '#2d3f4a' }
@@ -75,6 +76,28 @@ type UserAction = {
   value: string
   timing: 'now' | 'today' | 'tomorrow' | 'scheduled'
   reason: string
+  meta?: Record<string, unknown>
+}
+
+type ExecutionState = 'idle' | 'preparing' | 'confirming' | 'executing' | 'done'
+
+type MCPStatus = {
+  gmail: boolean
+  calendar: boolean
+  gmailMessage: string
+  calendarMessage: string
+}
+
+type ConfirmPayload = {
+  kind: 'email' | 'calendar'
+  to?: string
+  subject?: string
+  body?: string
+  title?: string
+  date?: string
+  notes?: string
+  draftId?: string
+  doneLines: string[]
 }
 
 type ActionData = {
@@ -119,7 +142,11 @@ const DIMENSION_ICON: Record<string, React.ReactNode> = {
   wealth: <CreditCard size={16} />,
   education: <GraduationCap size={16} />,
   mobility: <Plane size={16} />,
+  logistics: <span aria-hidden="true">🛍️</span>,
   estate: <Home size={16} />,
+  social: <span aria-hidden="true">👥</span>,
+  selfcare: <span aria-hidden="true">💆</span>,
+  weather_pickup: <span aria-hidden="true">🌧️</span>,
 }
 
 const USER_TIMING_LABEL: Record<UserAction['timing'], string> = {
@@ -130,7 +157,7 @@ const USER_TIMING_LABEL: Record<UserAction['timing'], string> = {
 }
 
 function dimensionIcon(category?: string) {
-  const key = String(category || 'estate').toLowerCase()
+  const key = String(category || 'education').toLowerCase()
   return DIMENSION_ICON[key] || <ClipboardList size={16} />
 }
 
@@ -144,6 +171,14 @@ function userActionToActionData(action: UserAction): ActionData {
       return { type: 'open_url', label: action.label, data: { url: action.value } }
     case 'open_draft':
       return { type: 'email', label: action.label, data: { note: action.reason } }
+    case 'send_leave_email': {
+      const data = action.meta || (action.value ? JSON.parse(action.value) : {})
+      return { type: 'send_leave_email', label: action.label, data }
+    }
+    case 'add_google_calendar': {
+      const data = action.meta || (action.value ? JSON.parse(action.value) : {})
+      return { type: 'add_google_calendar', label: action.label, data }
+    }
     default:
       return { type: action.action, label: action.label, data: { url: action.value } }
   }
@@ -370,6 +405,282 @@ function getFreshExecutionPack(aiActionData?: any): ExecutionPack | null {
   const ageHours = (Date.now() - new Date(preparedAt).getTime()) / 3600000
   if (ageHours >= 6) return null
   return pack as ExecutionPack
+}
+
+function getFreshRootDecision(aiActionData?: Record<string, unknown>): RootDecision | null {
+  const decision = aiActionData?.root_decision as RootDecision | undefined
+  const preparedAt = aiActionData?.prepared_at as string | undefined
+  if (!decision || !preparedAt) return null
+  const ageHours = (Date.now() - new Date(preparedAt).getTime()) / 3600000
+  if (ageHours >= 6) return null
+  return decision
+}
+
+const SOURCE_LABEL: Record<PreparedItem['source'], string> = {
+  claude: '根生成',
+  gemini: '视觉提取',
+  knowledge_base: '知识库',
+  user_data: '你的档案',
+}
+
+function PreparedSection({ item }: { item: PreparedItem }) {
+  const contentStr = typeof item.content === 'string'
+    ? item.content
+    : JSON.stringify(item.content, null, 2)
+
+  const copy = () => {
+    if (!item.copyable) return
+    void navigator.clipboard.writeText(contentStr)
+    toast('已复制', 'success')
+  }
+
+  return (
+    <div style={{
+      margin: '8px 12px 0', padding: '12px 14px', borderRadius: 12,
+      border: `0.5px solid ${G.border}`, background: 'rgba(255,255,255,0.75)',
+    }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+        <span style={{ fontSize: 12, fontWeight: 600, color: G.dark }}>{item.label}</span>
+        <span style={{ fontSize: 10, color: THEME.muted }}>{SOURCE_LABEL[item.source]}</span>
+      </div>
+      <div style={{
+        fontSize: 13, color: THEME.text, lineHeight: 1.55, whiteSpace: 'pre-wrap',
+        maxHeight: 160, overflowY: 'auto',
+      }}>
+        {contentStr}
+      </div>
+      {item.copyable && (
+        <motion.button whileTap={{ scale: 0.95 }} onClick={copy}
+          style={{
+            marginTop: 8, padding: '6px 12px', borderRadius: 8, border: `0.5px solid ${G.border}`,
+            background: G.bg, fontSize: 11, color: G.dark, cursor: 'pointer',
+          }}>
+          复制
+        </motion.button>
+      )}
+    </div>
+  )
+}
+
+function RootDecisionPanel({
+  decision,
+  userId,
+  autoCompleted,
+  onAllDone,
+  onClose,
+}: {
+  decision: RootDecision
+  userId: string
+  autoCompleted: string[]
+  onAllDone: () => void
+  onClose: () => void
+}) {
+  const [executingId, setExecutingId] = useState<string | null>(null)
+  const [confirming, setConfirming] = useState<RootAction | null>(null)
+  const [completedIds, setCompletedIds] = useState<Set<string>>(new Set())
+  const [finalDone, setFinalDone] = useState(false)
+  const [draftIds, setDraftIds] = useState<Record<string, string>>({})
+
+  const doExecute = async (action: RootAction) => {
+    setExecutingId(action.id)
+    setConfirming(null)
+
+    try {
+      let payload = action
+      if (action.executor.service === 'gmail' && action.executor.method === 'send_draft') {
+        const draftId = draftIds[action.id] || String(action.executor.params.draftId || '')
+        payload = {
+          ...action,
+          executor: {
+            ...action.executor,
+            params: { ...action.executor.params, draftId },
+          },
+        }
+      }
+
+      const res = await fetchWithAuth('/api/action/execute-step', {
+        method: 'POST',
+        body: JSON.stringify({ action: payload }),
+      })
+      const result = await res.json()
+
+      if (action.executor.service === 'gmail' && action.executor.method === 'create_draft' && result.draftId) {
+        setDraftIds((prev) => ({ ...prev, [action.id]: result.draftId }))
+      }
+
+      if (result.url) {
+        if (result.url.startsWith('tel:') || result.url.startsWith('mailto:')) {
+          window.location.href = result.url
+        } else {
+          window.open(resolveOpenUrl(result.url), '_blank', 'noopener,noreferrer')
+        }
+      }
+
+      if (result.ok !== false) {
+        setCompletedIds((prev) => new Set([...prev, action.id]))
+        const primaryActions = decision.actions.filter((a) => a.type === 'primary')
+        const nextCompleted = new Set([...completedIds, action.id])
+        if (primaryActions.length > 0 && primaryActions.every((a) => nextCompleted.has(a.id))) {
+          setTimeout(() => setFinalDone(true), 500)
+        }
+      } else {
+        toast(result.error || '执行失败', 'error')
+      }
+    } catch (e) {
+      logOrAlertNetworkError(e)
+    } finally {
+      setExecutingId(null)
+    }
+  }
+
+  const handleAction = (action: RootAction) => {
+    if (action.requiresConfirm) {
+      setConfirming(action)
+      return
+    }
+    void doExecute(action)
+  }
+
+  if (finalDone) {
+    return (
+      <div style={{ padding: '20px 16px' }}>
+        <div style={{ textAlign: 'center', marginBottom: 16 }}>
+          <CheckCircle2 size={36} color={G.deep} style={{ marginBottom: 12 }} />
+          <div style={{ fontSize: 16, fontWeight: 600, color: THEME.text, lineHeight: 1.5 }}>
+            {decision.completion.message}
+          </div>
+          {decision.completion.nextStep && (
+            <div style={{ fontSize: 13, color: THEME.muted, marginTop: 10, lineHeight: 1.55 }}>
+              {decision.completion.nextStep}
+            </div>
+          )}
+        </div>
+        <motion.button whileTap={{ scale: 0.97 }} onClick={onAllDone}
+          style={{
+            width: '100%', padding: '12px', borderRadius: 12, border: 'none',
+            background: G.dark, color: '#fff', fontSize: 14, fontWeight: 600, cursor: 'pointer',
+          }}>
+          好的 ✓
+        </motion.button>
+      </div>
+    )
+  }
+
+  if (confirming) {
+    return (
+      <div style={{ padding: '16px' }}>
+        <div style={{
+          fontSize: 14, color: THEME.text, lineHeight: 1.6, marginBottom: 16,
+          padding: '14px', borderRadius: 12, background: G.bg, border: `0.5px solid ${G.border}`,
+        }}>
+          {confirming.confirmMessage || '确认执行这个操作？'}
+        </div>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <motion.button whileTap={{ scale: 0.97 }} onClick={() => void doExecute(confirming)}
+            style={{
+              flex: 1, padding: '12px', borderRadius: 12, border: 'none',
+              background: G.dark, color: '#fff', fontSize: 14, fontWeight: 600, cursor: 'pointer',
+            }}>
+            确认
+          </motion.button>
+          <motion.button whileTap={{ scale: 0.97 }} onClick={() => setConfirming(null)}
+            style={{
+              flex: 1, padding: '12px', borderRadius: 12,
+              border: '0.5px solid rgba(0,0,0,0.1)', background: 'rgba(255,255,255,0.7)',
+              fontSize: 14, color: THEME.muted, cursor: 'pointer',
+            }}>
+            取消
+          </motion.button>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div style={{ padding: '8px 0 4px' }}>
+      <div style={{ padding: '0 14px 12px' }}>
+        <div style={{ fontSize: 17, fontWeight: 600, color: THEME.text, lineHeight: 1.4, marginBottom: 8 }}>
+          {decision.message.headline}
+        </div>
+        <div style={{ fontSize: 13, color: THEME.text, lineHeight: 1.6, marginBottom: 8 }}>
+          {decision.message.detail}
+        </div>
+        {decision.message.reassurance && (
+          <div style={{
+            fontSize: 12, color: G.dark, lineHeight: 1.55, padding: '10px 12px', borderRadius: 10,
+            background: G.bg, border: `0.5px solid ${G.border}`,
+          }}>
+            {decision.message.reassurance}
+          </div>
+        )}
+      </div>
+
+      {autoCompleted.length > 0 && (
+        <div style={{ padding: '0 14px 8px' }}>
+          {autoCompleted.map((line) => (
+            <div key={line} style={{ fontSize: 12, color: G.dark, marginBottom: 4 }}>
+              ✓ {line}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {decision.prepared.map((item, i) => (
+        <PreparedSection key={`${item.label}-${i}`} item={item} />
+      ))}
+
+      <div style={{ padding: '12px 14px 0', display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {decision.actions.map((action) => {
+          const done = completedIds.has(action.id)
+          const running = executingId === action.id
+          const isPrimary = action.type === 'primary'
+
+          return (
+            <motion.button
+              key={action.id}
+              whileTap={{ scale: running || done ? 1 : 0.97 }}
+              disabled={running || done}
+              onClick={() => !running && !done && handleAction(action)}
+              style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                padding: '12px 16px', borderRadius: 12, border: 'none', cursor: running || done ? 'default' : 'pointer',
+                background: done ? G.bg : isPrimary ? G.dark : 'rgba(255,255,255,0.8)',
+                color: done ? G.dark : isPrimary ? '#fff' : THEME.text,
+                borderWidth: done || isPrimary ? 0 : 0.5,
+                borderStyle: 'solid',
+                borderColor: 'rgba(0,0,0,0.1)',
+                opacity: running ? 0.7 : 1,
+              }}
+            >
+              {running ? <Loader size={16} /> : done ? <CheckCircle2 size={16} /> : null}
+              <span style={{ fontSize: 14, fontWeight: isPrimary ? 600 : 500 }}>
+                {done ? '已完成' : action.label}
+              </span>
+            </motion.button>
+          )
+        })}
+      </div>
+
+      <div style={{ padding: '12px 14px 4px', display: 'flex', gap: 8 }}>
+        <motion.button whileTap={{ scale: 0.97 }} onClick={() => setFinalDone(true)}
+          style={{
+            flex: 1, padding: '10px', borderRadius: 12,
+            background: 'rgba(141,200,160,0.35)', border: '0.5px solid rgba(141,200,160,0.5)',
+            fontSize: 13, fontWeight: 600, color: THEME.text, cursor: 'pointer',
+          }}>
+          搞定了 ✓
+        </motion.button>
+        <motion.button whileTap={{ scale: 0.97 }} onClick={onClose}
+          style={{
+            flex: 1, padding: '10px', borderRadius: 12,
+            background: 'rgba(255,255,255,0.4)', border: '0.5px solid rgba(0,0,0,0.08)',
+            fontSize: 13, color: THEME.muted, cursor: 'pointer',
+          }}>
+          明天再说
+        </motion.button>
+      </div>
+    </div>
+  )
 }
 
 // ── 语音播报（联动设置）──
@@ -826,10 +1137,199 @@ function AutoExecutePanel({
   onAllDone: () => void
 }) {
   const [runningIdx, setRunningIdx] = useState<number | null>(null)
+  const [execState, setExecState] = useState<ExecutionState>('idle')
+  const [mcpStatus, setMcpStatus] = useState<MCPStatus>({
+    gmail: false,
+    calendar: false,
+    gmailMessage: '连接 Gmail 后根可以帮你直接发送',
+    calendarMessage: '连接 Google 日历后根可以帮你自动加入',
+  })
+  const [confirmPayload, setConfirmPayload] = useState<ConfirmPayload | null>(null)
+  const [editBody, setEditBody] = useState('')
+
+  useEffect(() => {
+    let cancelled = false
+    void (async () => {
+      try {
+        const res = await fetchWithAuth('/api/action/mcp')
+        const data = await res.json()
+        if (!cancelled && data.ok) {
+          setMcpStatus({
+            gmail: !!data.gmail,
+            calendar: !!data.calendar,
+            gmailMessage: data.gmailMessage || '',
+            calendarMessage: data.calendarMessage || '',
+          })
+        }
+      } catch {
+        // keep defaults
+      }
+    })()
+    return () => { cancelled = true }
+  }, [])
+
+  const parseActionData = (action: UserAction): Record<string, unknown> => {
+    if (action.meta) return action.meta
+    if (!action.value) return {}
+    try {
+      return JSON.parse(action.value) as Record<string, unknown>
+    } catch {
+      return {}
+    }
+  }
+
+  const startEmailConfirm = async (action: UserAction, idx: number) => {
+    const data = parseActionData(action)
+    const to = String(data.to || '')
+    const subject = String(data.subject || '')
+    const body = String(data.body || '')
+    setEditBody(body)
+    setRunningIdx(idx)
+    setExecState('preparing')
+
+    let draftId = ''
+    if (mcpStatus.gmail && to) {
+      try {
+        const res = await fetchWithAuth('/api/action/mcp', {
+          method: 'POST',
+          body: JSON.stringify({ op: 'create_draft', to, subject, body }),
+        })
+        const json = await res.json()
+        if (json.ok && json.draftId) draftId = String(json.draftId)
+      } catch (e) {
+        logOrAlertNetworkError(e)
+      }
+    }
+
+    setConfirmPayload({
+      kind: 'email',
+      to,
+      subject,
+      body,
+      draftId,
+      doneLines: [],
+    })
+    setExecState('confirming')
+    setRunningIdx(null)
+  }
+
+  const startCalendarConfirm = (action: UserAction, idx: number) => {
+    const data = parseActionData(action)
+    setConfirmPayload({
+      kind: 'calendar',
+      title: String(data.title || ''),
+      date: String(data.date || ''),
+      notes: String(data.notes || ''),
+      doneLines: [],
+    })
+    setRunningIdx(idx)
+    setExecState('confirming')
+    setRunningIdx(null)
+  }
+
+  const confirmExecution = async () => {
+    if (!confirmPayload) return
+    setExecState('executing')
+
+    if (confirmPayload.kind === 'email') {
+      const to = confirmPayload.to || ''
+      const subject = confirmPayload.subject || ''
+      const body = editBody || confirmPayload.body || ''
+
+      if (mcpStatus.gmail && to) {
+        try {
+          const res = await fetchWithAuth('/api/action/mcp', {
+            method: 'POST',
+            body: JSON.stringify({
+              op: 'send_draft',
+              draftId: confirmPayload.draftId || '',
+              to,
+              subject,
+              body,
+            }),
+          })
+          const json = await res.json()
+          if (json.ok) {
+            setConfirmPayload({
+              ...confirmPayload,
+              doneLines: [
+                `✓ 邮件已发送${to ? `给 ${to}` : ''}`,
+                '✓ 今日缺课已记录',
+                '搞定了，安心照顾孩子',
+              ],
+            })
+            setExecState('done')
+            return
+          }
+        } catch (e) {
+          logOrAlertNetworkError(e)
+        }
+      }
+
+      if (to) {
+        window.location.href = `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`
+      }
+      setConfirmPayload({
+        ...confirmPayload,
+        doneLines: ['已打开邮件应用，请确认发送'],
+      })
+      setExecState('done')
+      return
+    }
+
+    if (confirmPayload.kind === 'calendar') {
+      if (mcpStatus.calendar) {
+        try {
+          const res = await fetchWithAuth('/api/action/mcp', {
+            method: 'POST',
+            body: JSON.stringify({
+              op: 'add_calendar',
+              title: confirmPayload.title,
+              date: confirmPayload.date,
+              notes: confirmPayload.notes,
+            }),
+          })
+          const json = await res.json()
+          if (json.ok) {
+            if (json.eventLink) window.open(json.eventLink, '_blank', 'noopener,noreferrer')
+            setConfirmPayload({
+              ...confirmPayload,
+              doneLines: ['✓ 已加入 Google 日历', '搞定了'],
+            })
+            setExecState('done')
+            return
+          }
+        } catch (e) {
+          logOrAlertNetworkError(e)
+        }
+      }
+
+      const title = encodeURIComponent(confirmPayload.title || '')
+      const d = (confirmPayload.date || '').replace(/-/g, '')
+      window.open(
+        `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&dates=${d}/${d}`,
+        '_blank',
+        'noopener,noreferrer',
+      )
+      setConfirmPayload({
+        ...confirmPayload,
+        doneLines: ['已打开 Google 日历，请确认添加'],
+      })
+      setExecState('done')
+    }
+  }
 
   const handleAction = async (action: UserAction, idx: number) => {
     if (action.action === 'open_draft') {
       onOpenDraft()
+      return
+    }
+    if (action.action === 'send_leave_email') {
+      await startEmailConfirm(action, idx)
+      return
+    }
+    if (action.action === 'add_google_calendar') {
+      startCalendarConfirm(action, idx)
       return
     }
     setRunningIdx(idx)
@@ -840,6 +1340,133 @@ function AutoExecutePanel({
     } finally {
       setRunningIdx(null)
     }
+  }
+
+  const resetConfirm = () => {
+    setExecState('idle')
+    setConfirmPayload(null)
+    setEditBody('')
+  }
+
+  if (execState !== 'idle' && confirmPayload) {
+    return (
+      <div style={{ padding: '10px 12px 0' }}>
+        <div style={{
+          fontSize: 11,
+          color: THEME.muted,
+          marginBottom: 10,
+          lineHeight: 1.5,
+        }}>
+          {confirmPayload.kind === 'email' ? mcpStatus.gmailMessage : mcpStatus.calendarMessage}
+        </div>
+
+        {execState === 'preparing' && (
+          <div style={{ padding: '24px 0', textAlign: 'center', color: THEME.muted, fontSize: 13 }}>
+            <div style={{ marginBottom: 8 }}><Loader size={18} /></div>
+            根在准备…
+          </div>
+        )}
+
+        {execState === 'confirming' && confirmPayload.kind === 'email' && (
+          <div style={{
+            background: 'rgba(255,255,255,0.85)',
+            borderRadius: 12,
+            border: '0.5px solid rgba(0,0,0,0.08)',
+            padding: '14px 16px',
+            marginBottom: 12,
+          }}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: THEME.text, marginBottom: 10 }}>
+              根已准备好：
+            </div>
+            <div style={{ fontSize: 12, color: THEME.muted, marginBottom: 4 }}>📧 请假邮件草稿</div>
+            {confirmPayload.to && (
+              <div style={{ fontSize: 12, color: THEME.text, marginBottom: 2 }}>
+                收件人：{confirmPayload.to}
+              </div>
+            )}
+            {confirmPayload.subject && (
+              <div style={{ fontSize: 12, color: THEME.text, marginBottom: 8 }}>
+                主题：{confirmPayload.subject}
+              </div>
+            )}
+            <textarea
+              value={editBody}
+              onChange={(e) => setEditBody(e.target.value)}
+              rows={6}
+              style={{
+                width: '100%',
+                boxSizing: 'border-box',
+                fontSize: 12,
+                lineHeight: 1.6,
+                borderRadius: 8,
+                border: '0.5px solid rgba(0,0,0,0.1)',
+                padding: '8px 10px',
+                resize: 'vertical',
+                fontFamily: 'inherit',
+              }}
+            />
+            <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+              <button type="button" className="gc-btn" style={{ flex: 1 }} onClick={() => void confirmExecution()}>
+                确认发送
+              </button>
+              <button type="button" className="gc-btn" style={{ flex: 1, background: 'rgba(0,0,0,0.06)', color: THEME.text }} onClick={resetConfirm}>
+                取消
+              </button>
+            </div>
+          </div>
+        )}
+
+        {execState === 'confirming' && confirmPayload.kind === 'calendar' && (
+          <div style={{
+            background: 'rgba(255,255,255,0.85)',
+            borderRadius: 12,
+            border: '0.5px solid rgba(0,0,0,0.08)',
+            padding: '14px 16px',
+            marginBottom: 12,
+          }}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: THEME.text, marginBottom: 8 }}>
+              根已准备好：
+            </div>
+            <div style={{ fontSize: 13, color: THEME.text, marginBottom: 4 }}>{confirmPayload.title}</div>
+            <div style={{ fontSize: 12, color: THEME.muted, marginBottom: 12 }}>{confirmPayload.date}</div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button type="button" className="gc-btn" style={{ flex: 1 }} onClick={() => void confirmExecution()}>
+                确认加入日历
+              </button>
+              <button type="button" className="gc-btn" style={{ flex: 1, background: 'rgba(0,0,0,0.06)', color: THEME.text }} onClick={resetConfirm}>
+                取消
+              </button>
+            </div>
+          </div>
+        )}
+
+        {execState === 'executing' && (
+          <div style={{ padding: '24px 0', textAlign: 'center', color: THEME.muted, fontSize: 13 }}>
+            <div style={{ marginBottom: 8 }}><Loader size={18} /></div>
+            正在执行…
+          </div>
+        )}
+
+        {execState === 'done' && (
+          <div style={{
+            background: 'rgba(141,200,160,0.12)',
+            border: '0.5px solid rgba(141,200,160,0.35)',
+            borderRadius: 12,
+            padding: '14px 16px',
+            marginBottom: 12,
+          }}>
+            {(confirmPayload.doneLines || []).map((line, i) => (
+              <div key={i} style={{ fontSize: 13, color: G.dark, marginBottom: i < confirmPayload.doneLines.length - 1 ? 6 : 0 }}>
+                {line}
+              </div>
+            ))}
+            <button type="button" className="gc-btn" style={{ width: '100%', marginTop: 12 }} onClick={resetConfirm}>
+              完成
+            </button>
+          </div>
+        )}
+      </div>
+    )
   }
 
   return (
@@ -870,6 +1497,9 @@ function AutoExecutePanel({
 
       {userActions.length > 0 && (
         <div style={{ marginBottom: 8 }}>
+          <div style={{ fontSize: 11, color: THEME.muted, marginBottom: 8, lineHeight: 1.5 }}>
+            {mcpStatus.gmail ? mcpStatus.gmailMessage : '连接 Gmail 后根可以帮你直接发送'}
+          </div>
           <div style={{ fontSize: 12, fontWeight: 600, color: THEME.text, marginBottom: 8 }}>
             还需要你做
           </div>
@@ -1081,6 +1711,8 @@ export default function ActionModal({
   const router = useRouter()
   const { sessionReady } = useApp()
   const [pack, setPack] = useState<ExecutionPack | null>(null)
+  const [decision, setDecision] = useState<RootDecision | null>(null)
+  const [brainAutoCompleted, setBrainAutoCompleted] = useState<string[]>([])
   const [autoCompleted, setAutoCompleted] = useState<string[]>([])
   const [userActions, setUserActions] = useState<UserAction[]>([])
   const [loading, setLoading] = useState(false)
@@ -1095,7 +1727,10 @@ export default function ActionModal({
   }
 
   const useAutoLayout = source_type === 'todo'
+    && !decision
     && (autoCompleted.length > 0 || userActions.length > 0)
+
+  const useRootBrain = source_type === 'todo' && !!decision
 
   const brainData = isBrainHotspotData(hotspot_action_data) ? hotspot_action_data : null
   const isBrainMode = source_type === 'hotspot' && !!brainData
@@ -1106,29 +1741,43 @@ export default function ActionModal({
 
     if (isBrainMode) {
       setPack(null)
+      setDecision(null)
       setAutoCompleted([])
       setUserActions([])
+      setBrainAutoCompleted([])
       setLoading(false)
       return
     }
 
-    const cachedPack = source_type === 'todo' ? getFreshExecutionPack(ai_action_data) : null
+    const cachedDecision = source_type === 'todo' ? getFreshRootDecision(ai_action_data) : null
+    if (cachedDecision) {
+      setDecision(cachedDecision)
+      setPack(null)
+      setBrainAutoCompleted([])
+      setLoading(false)
+    } else {
+      setDecision(null)
+    }
+
+    const cachedPack = source_type === 'todo' && !cachedDecision ? getFreshExecutionPack(ai_action_data) : null
     if (cachedPack) {
       setPack(cachedPack)
       syncAutoExecuteState(cachedPack)
       setLoading(false)
-    } else {
+    }
+
+    if (!cachedPack && !cachedDecision) {
       setPack(null)
       setAutoCompleted([])
       setUserActions([])
     }
 
     if (!sessionReady) {
-      if (!cachedPack) setLoading(true)
+      if (!cachedPack && !cachedDecision) setLoading(true)
       return
     }
 
-    if (!cachedPack) setLoading(true)
+    if (!cachedPack && !cachedDecision) setLoading(true)
 
     let cancelled = false
     void (async () => {
@@ -1154,8 +1803,14 @@ export default function ActionModal({
         const data = await res.json()
         if (cancelled) return
         if (handleLimitReached(data, () => router.push('/upgrade'))) return
-        if (data.ok && data.execution_pack) {
+        if (data.ok && data.decision) {
+          setDecision(data.decision as RootDecision)
+          setBrainAutoCompleted(data.autoCompleted || [])
+          setPack(null)
+          onSync?.()
+        } else if (data.ok && data.execution_pack) {
           setPack(data.execution_pack)
+          setDecision(null)
           syncAutoExecuteState(data.execution_pack, data.autoCompleted, data.userActions)
           onSync?.()
         }
@@ -1284,7 +1939,7 @@ export default function ActionModal({
             )}
 
             {/* 加载中 */}
-            {!isBrainMode && loading && !pack && (
+            {!isBrainMode && loading && !pack && !decision && (
               <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
                 <div style={{ display: 'flex', gap: 6 }}>
                   {[0,1,2].map(i => (
@@ -1299,11 +1954,22 @@ export default function ActionModal({
               </div>
             )}
 
-            {/* AI 摘要 */}
-            {!isBrainMode && pack && !useAutoLayout && <AiSummaryCard pack={pack} />}
+            {/* 根大脑决策（Claude 驱动） */}
+            {!isBrainMode && useRootBrain && decision && (
+              <RootDecisionPanel
+                decision={decision}
+                userId={userId}
+                autoCompleted={brainAutoCompleted}
+                onAllDone={() => onDone(source_id)}
+                onClose={onClose}
+              />
+            )}
 
-            {/* 根自动完成 + 用户必做 */}
-            {!isBrainMode && pack && useAutoLayout && (
+            {/* AI 摘要 */}
+            {!isBrainMode && !useRootBrain && pack && !useAutoLayout && <AiSummaryCard pack={pack} />}
+
+            {/* 根自动完成 + 用户必做（旧版兼容） */}
+            {!isBrainMode && !useRootBrain && pack && useAutoLayout && (
               <AutoExecutePanel
                 autoCompleted={autoCompleted}
                 userActions={userActions}
@@ -1316,7 +1982,7 @@ export default function ActionModal({
             )}
 
             {/* 标签页 */}
-            {!isBrainMode && pack && !useAutoLayout && (
+            {!isBrainMode && !useRootBrain && pack && !useAutoLayout && (
               <div style={{ display: 'flex', gap: 5, padding: '10px 12px 0' }}>
                 {tabs.filter(t => hasTab(t.key)).map(tab => {
                   const isOpen = activeTab === tab.key
@@ -1362,7 +2028,7 @@ export default function ActionModal({
               </div>
             )}
 
-            {pack && !useAutoLayout && (
+            {pack && !useRootBrain && !useAutoLayout && (
               <>
                 <div style={{ height: '0.5px', background: 'rgba(0,0,0,0.06)', margin: '10px 12px 0' }} />
                 <ActionsArea
@@ -1377,7 +2043,7 @@ export default function ActionModal({
               </>
             )}
 
-            {!isBrainMode && !pack && !loading && (
+            {!isBrainMode && !pack && !decision && !loading && (
               <div style={{ padding: '32px 20px', textAlign: 'center' }}>
                 <div style={{ fontSize: 13, color: THEME.muted }}>暂时无法加载执行包</div>
               </div>
@@ -1387,7 +2053,7 @@ export default function ActionModal({
           {/* 底部 */}
           <div style={{ flexShrink: 0, borderTop: '0.5px solid rgba(0,0,0,0.06)',
             padding: '10px 12px 16px', display: 'flex', gap: 8 }}>
-            {!useAutoLayout && (
+            {!useAutoLayout && !useRootBrain && (
               <motion.button whileTap={{ scale: 0.95 }} onClick={() => onDone(source_id)} disabled={saving}
                 style={{ flex: 1, padding: '11px', borderRadius: 12,
                   background: 'rgba(141,200,160,0.35)', border: '0.5px solid rgba(141,200,160,0.5)',

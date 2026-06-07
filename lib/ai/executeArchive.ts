@@ -1,5 +1,8 @@
 import { createClient } from '@supabase/supabase-js'
 import type { AutoArchiveResult } from '@/lib/ai/autoArchive'
+import { CalendarService } from '@/lib/services/CalendarService'
+import { ScheduleService } from '@/lib/services/ScheduleService'
+import { TodoService } from '@/lib/services/TodoService'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || '',
@@ -28,15 +31,14 @@ export async function executeArchive(
   switch (result.archiveType) {
     case 'class_schedule': {
       if (!result.childId) break
-      const { error } = await supabase.from('child_profiles').upsert(
-        {
-          user_id: userId,
-          child_id: result.childId,
-          class_schedule: result.archiveData,
-        },
-        { onConflict: 'child_id' },
+      const saved = await ScheduleService.save(
+        result.childId,
+        userId,
+        result.archiveData as Record<string, unknown[]>,
+        'archive',
+        { enrich: false, client: supabase },
       )
-      if (error) throw new Error(error.message)
+      if (!saved.ok) throw new Error(saved.error || 'schedule archive failed')
       break
     }
 
@@ -53,15 +55,16 @@ export async function executeArchive(
         const dateStart = dateOnly(event.date)
         if (!title || !dateStart) continue
 
-        await supabase.from('child_school_calendar').insert({
-          child_id: result.childId,
-          user_id: userId,
+        await CalendarService.upsertEvent({
+          userId,
+          childId: result.childId,
           title,
-          date_start: dateStart,
-          date_end: dateStart,
-          description: str(event.location) || str(notice.meta?.title),
-          event_type: 'other',
+          dateStart,
+          dateEnd: dateStart,
+          description: str(event.location) || str(notice.meta?.title) || undefined,
+          eventType: 'other',
           source: 'root_vision',
+          client: supabase,
         })
       }
 
@@ -69,15 +72,16 @@ export async function executeArchive(
         const title = str(todo.action)
         if (!title) continue
 
-        await supabase.from('todo_items').insert({
-          user_id: userId,
+        await TodoService.create({
+          userId,
+          childId: result.childId,
           title,
-          description: str(todo.required),
-          category: 'education',
+          description: str(todo.required) || undefined,
+          dimension: 'education',
           priority: 'orange',
-          status: 'pending',
-          due_date: dateOnly(todo.deadline),
+          dueDate: dateOnly(todo.deadline) || undefined,
           source: 'root_vision',
+          client: supabase,
         })
       }
       break
@@ -111,14 +115,14 @@ export async function executeArchive(
 
       const followDate = dateOnly(followup.followupDate)
       if (followDate) {
-        await supabase.from('todo_items').insert({
-          user_id: userId,
+        await TodoService.create({
+          userId,
           title: `复诊预约${str(diagnosis.hospital) ? ` - ${str(diagnosis.hospital)}` : ''}`,
-          category: 'medical',
+          dimension: 'medical',
           priority: 'orange',
-          status: 'pending',
-          due_date: followDate,
+          dueDate: followDate,
           source: 'root_vision',
+          client: supabase,
         })
       }
       break
@@ -158,14 +162,14 @@ export async function executeArchive(
 
       const expiry = dateOnly(doc.expiryDate)
       if (expiry) {
-        await supabase.from('todo_items').insert({
-          user_id: userId,
+        await TodoService.create({
+          userId,
           title: `${docType === 'visa' ? '签证' : '护照'}到期续签`,
-          category: 'compliance',
+          dimension: 'compliance',
           priority: 'orange',
-          status: 'pending',
-          due_date: expiry,
+          dueDate: expiry,
           source: 'root_vision',
+          client: supabase,
         })
       }
       break
@@ -181,18 +185,20 @@ export async function executeArchive(
       const total = str(header.total)
       const currency = str(header.currency) || ''
 
-      await supabase.from('todo_items').insert({
-        user_id: userId,
-        child_id: result.childId,
+      await TodoService.create({
+        userId,
+        childId: result.childId || undefined,
         title: `支付：${merchant}${total ? ` ${total}${currency}` : ''}`,
         description: Array.isArray(inv.items) && inv.items.length
           ? `共 ${inv.items.length} 项明细`
-          : null,
-        category: 'wealth',
+          : undefined,
+        dimension: 'wealth',
         priority: 'orange',
-        status: 'pending',
-        due_date: dateOnly(header.date),
+        dueDate: dateOnly(header.date) || undefined,
+        amount: total ? Number(total) : undefined,
+        currency: currency || undefined,
         source: 'root_vision',
+        client: supabase,
       })
       break
     }

@@ -6,6 +6,7 @@ import { createClient } from '@supabase/supabase-js'
 import { getAuthUser } from '@/lib/auth/getAuthUser'
 import { fetchFormTemplates, enrichActionsWithFormTemplates } from '@/lib/action/enrichPDF'
 import { familyServicePromptLabel, resolveResidentCityFromFamilyData } from '@/lib/family/resolveResidentCity'
+import { FamilyService } from '@/lib/services/FamilyService'
 
 const MAKE_WEBHOOK_URL = process.env.NEXT_PUBLIC_MAKE_WEBHOOK_URL || ''
 
@@ -39,54 +40,9 @@ const DIMENSION_DATA_NEEDED: Record<string, string[]> = {
   selfcare:   ['habits'],
 }
 
-// ══ 读取家庭档案 ══
+// ══ 读取家庭档案（FamilyService） ══
 async function getFamilyData(userId: string, needed: string[]) {
-  const result: any = {}
-  await Promise.all(needed.map(async (field) => {
-    switch (field) {
-      case 'passport': case 'visa': case 'medical': case 'address': case 'insurance': {
-        const { data } = await supabase.from('family_profile').select('*').eq('user_id', userId)
-        result.profile = data || []
-        break
-      }
-      case 'children': {
-        const { data } = await supabase.from('children').select('*').eq('user_id', userId)
-        result.children = data || []
-        break
-      }
-      case 'places': {
-        const { data } = await supabase.from('family_places').select('*').eq('user_id', userId)
-        result.places = data || []
-        break
-      }
-      case 'habits': {
-        const { data } = await supabase.from('family_habits').select('*').eq('user_id', userId)
-        result.habits = data || []
-        break
-      }
-      case 'finance': {
-        const { data } = await supabase.from('family_documents').select('*').eq('user_id', userId)
-        result.documents = data || []
-        break
-      }
-      case 'health': {
-        const { data } = await supabase
-          .from('child_health_records')
-          .select('*')
-          .eq('user_id', userId)
-          .order('date', { ascending: false })
-          .limit(5)
-        result.childHealth = data || []
-        break
-      }
-      case 'vehicles': {
-        const { data } = await supabase.from('vehicles').select('*').eq('user_id', userId)
-        result.vehicles = data || []
-        break
-      }
-    }
-  }))
-  return result
+  return FamilyService.getFields(userId, needed, supabase)
 }
 
 async function enrichPackActions(
@@ -166,7 +122,7 @@ function buildTodoPrompt(todo: any, brainInstruction: any, familyData: any, grok
     social:     '社交：餐厅活动推荐、礼品购买、三语祝福语、预算建议',
     selfcare:   '自我：课程社群推荐、计划表、习惯提醒',
   }
-  const dimension = brainInstruction?.dimension || 'other'
+  const dimension = brainInstruction?.dimension || 'education'
   const familyLabel = familyServicePromptLabel(resolveResidentCityFromFamilyData(familyData))
   return `你是日安执行引擎，${familyLabel}生成一键执行包。
 

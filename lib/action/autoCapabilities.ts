@@ -1,6 +1,8 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { generateDraftContent, type DraftType } from '@/lib/action/draftContent'
 import { getExchangeRate } from '@/lib/action/exchangeForPlanner'
+import { CalendarService } from '@/lib/services/CalendarService'
+import { TodoService } from '@/lib/services/TodoService'
 
 export function createAutoCapabilities(supabase: SupabaseClient) {
   return {
@@ -10,18 +12,17 @@ export function createAutoCapabilities(supabase: SupabaseClient) {
       userId: string
       childId?: string
     }) => {
-      const row: Record<string, unknown> = {
-        user_id: params.userId,
+      const result = await TodoService.create({
+        userId: params.userId,
+        childId: params.childId,
         title: params.title,
-        due_date: params.dueDate,
+        dueDate: params.dueDate,
+        dimension: 'selfcare',
         priority: 'yellow',
-        status: 'pending',
         source: 'auto_execute',
-      }
-      if (params.childId) row.child_id = params.childId
-
-      const { error } = await supabase.from('todo_items').insert(row)
-      if (error) throw error
+        client: supabase,
+      })
+      if (!result.ok) throw new Error(result.error || 'setReminder failed')
       return `已设置提醒：${params.title}`
     },
 
@@ -32,15 +33,16 @@ export function createAutoCapabilities(supabase: SupabaseClient) {
       childId: string
       notes?: string
     }) => {
-      const { error } = await supabase.from('child_school_calendar').insert({
-        user_id: params.userId,
-        child_id: params.childId,
+      const result = await CalendarService.upsertEvent({
+        userId: params.userId,
+        childId: params.childId,
         title: params.title,
-        date_start: params.date,
-        description: params.notes || null,
+        dateStart: params.date,
+        notes: params.notes,
         source: 'auto_execute',
+        client: supabase,
       })
-      if (error) throw error
+      if (!result.ok) throw new Error(result.error || 'addCalendarEvent failed')
       return `已写入校历：${params.title}`
     },
 
@@ -94,15 +96,16 @@ export function createAutoCapabilities(supabase: SupabaseClient) {
         date.setDate(date.getDate() - days)
         const dueDate = date.toISOString().slice(0, 10)
 
-        const { error } = await supabase.from('todo_items').insert({
-          user_id: params.userId,
+        const result = await TodoService.create({
+          userId: params.userId,
           title: `${params.title}（${days}天后到期）`,
-          due_date: dueDate,
+          dueDate,
+          dimension: 'selfcare',
           priority: days <= 3 ? 'red' : days <= 7 ? 'orange' : 'yellow',
-          status: 'pending',
           source: 'auto_execute',
+          client: supabase,
         })
-        if (error) throw error
+        if (!result.ok) throw new Error(result.error || 'setMultiReminders failed')
         results.push(`提前${days}天提醒已设置`)
       }
       return results

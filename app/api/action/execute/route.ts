@@ -5,9 +5,13 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { getAuthUser } from '@/lib/auth/getAuthUser'
 import { checkLimit, recordUsage } from '@/lib/limits/usage'
+import { buildFamilyContext } from '@/lib/action/contextBuilder'
+import { makeDecision } from '@/lib/action/claudeDecision'
+import { executeAction } from '@/lib/action/executor'
 import { fetchFormTemplates, enrichActionsWithFormTemplates } from '@/lib/action/enrichPDF'
-import { buildExecutionPackFromPlan, planAndExecute } from '@/lib/action/executionPlanner'
 import { familyServicePromptLabel, resolveResidentCityFromFamilyData } from '@/lib/family/resolveResidentCity'
+import type { RootAction, RootDecision } from '@/lib/action/rootBrain'
+import { FamilyService } from '@/lib/services/FamilyService'
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -97,55 +101,9 @@ const EXECUTION_PACK_SCHEMA = `严格只输出JSON，不加任何其他文字：
 
 【热点航班】若热点标题或摘要涉及航班、机票比价、订票：actions 必须包含 open_url，data.url 为 "/travel"。`
 
-// ══ 读取家庭档案 ══
+// ══ 读取家庭档案（FamilyService） ══
 async function getFamilyData(userId: string, needed: string[]) {
-  const result: any = {}
-  await Promise.all(needed.map(async (field) => {
-    switch (field) {
-      case 'passport': case 'visa': case 'medical':
-      case 'address': case 'insurance': {
-        const { data } = await supabase.from('family_profile').select('*').eq('user_id', userId)
-        result.profile = data || []
-        break
-      }
-      case 'children': {
-        const { data } = await supabase.from('children').select('*').eq('user_id', userId)
-        result.children = data || []
-        break
-      }
-      case 'places': {
-        const { data } = await supabase.from('family_places').select('*').eq('user_id', userId)
-        result.places = data || []
-        break
-      }
-      case 'habits': {
-        const { data } = await supabase.from('family_habits').select('*').eq('user_id', userId)
-        result.habits = data || []
-        break
-      }
-      case 'finance': {
-        const { data } = await supabase.from('family_documents').select('*').eq('user_id', userId)
-        result.documents = data || []
-        break
-      }
-      case 'health': {
-        const { data } = await supabase
-          .from('child_health_records')
-          .select('*')
-          .eq('user_id', userId)
-          .order('date', { ascending: false })
-          .limit(5)
-        result.childHealth = data || []
-        break
-      }
-      case 'vehicles': {
-        const { data } = await supabase.from('vehicles').select('*').eq('user_id', userId)
-        result.vehicles = data || []
-        break
-      }
-    }
-  }))
-  return result
+  return FamilyService.getFields(userId, needed, supabase)
 }
 
 // ══ 调用 Claude ══
@@ -232,6 +190,54 @@ function executionResponseBody(
     action_queue_id: actionQueueId,
     cached,
   }
+}
+
+function rootDecisionResponseBody(
+  decision: RootDecision,
+  autoCompleted: string[],
+  actionQueueId?: string,
+  cached = false,
+) {
+  return {
+    ok: true,
+    decision,
+    autoCompleted,
+    action_queue_id: actionQueueId,
+    cached,
+  }
+}
+
+async function runRootBrainForTodo(
+  userId: string,
+  todoId: string,
+  todo: Record<string, unknown>,
+): Promise<{ decision: RootDecision; autoCompleted: string[] }> {
+  const context = await buildFamilyContext(userId, todoId, supabase)
+  const decision = await makeDecision(context)
+
+  const autoActions = decision.actions.filter(
+    (a) => !a.requiresConfirm && a.executor.service === 'internal',
+  )
+
+  const autoCompleted: string[] = []
+  for (const action of autoActions) {
+    try {
+      const result = await executeAction(action, userId)
+      if (result.ok) autoCompleted.push(action.label)
+    } catch (e) {
+      console.error('[runRootBrainForTodo] auto action failed:', action.id, e)
+    }
+  }
+
+  await supabase.from('todo_items').update({
+    ai_action_data: {
+      ...(todo.ai_action_data as Record<string, unknown> || {}),
+      root_decision: decision,
+      prepared_at: new Date().toISOString(),
+    },
+  }).eq('id', todoId).eq('user_id', userId)
+
+  return { decision, autoCompleted }
 }
 
 // ══ 构建 TODO Prompt ══
@@ -492,9 +498,13 @@ export async function POST(req: NextRequest) {
       child_name,
     } = body
 
-    // ── 执行具体动作（Make.com）──
+    // ── 执行具体动作 ──
     if (execute_action || perform_action) {
       const action = execute_action || perform_action
+      if (action?.executor?.service) {
+        const result = await executeAction(action as RootAction, userId)
+        return NextResponse.json(result)
+      }
       const result = await performAction(action, userId)
       return NextResponse.json(result)
     }
@@ -520,8 +530,19 @@ export async function POST(req: NextRequest) {
     if (cached) {
       const ageHours = (Date.now() - new Date(cached.created_at).getTime()) / 3600000
       if (ageHours < 6) {
+        const pack = cached.execution_pack || {}
+        if (pack.root_decision) {
+          return NextResponse.json(
+            rootDecisionResponseBody(
+              pack.root_decision as RootDecision,
+              (pack.autoCompleted as string[]) || [],
+              cached.id,
+              true,
+            ),
+          )
+        }
         return NextResponse.json(
-          executionResponseBody(cached.execution_pack || {}, cached.id, true),
+          executionResponseBody(pack, cached.id, true),
         )
       }
     }
@@ -544,14 +565,13 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ ok: false, error: 'Todo not found' }, { status: 404 })
       }
 
-      // 读 todo_items 预生成缓存
-      const pack = todo.ai_action_data?.execution_pack
+      // 读 todo_items 预生成缓存（RootDecision）
+      const cachedDecision = todo.ai_action_data?.root_decision as RootDecision | undefined
       const preparedAt = todo.ai_action_data?.prepared_at
 
-      if (pack && preparedAt) {
+      if (cachedDecision && preparedAt) {
         const ageHours = (Date.now() - new Date(preparedAt).getTime()) / 3600000
         if (ageHours < 6) {
-          // 命中缓存，补写 action_queue 后直接返回
           const actionQueueId = await upsertActionQueue(
             userId,
             resolvedSourceType,
@@ -559,11 +579,11 @@ export async function POST(req: NextRequest) {
             todo.title,
             todo.category || 'other',
             todo.priority === 'red' ? 3 : todo.priority === 'orange' ? 2 : 1,
-            pack,
+            { root_decision: cachedDecision },
           )
 
           return NextResponse.json(
-            executionResponseBody(pack, actionQueueId, true),
+            rootDecisionResponseBody(cachedDecision, [], actionQueueId, true),
           )
         }
       }
@@ -580,23 +600,24 @@ export async function POST(req: NextRequest) {
       category = todo.category || 'other'
       urgencyLevel = todo.priority === 'red' ? 3 : todo.priority === 'orange' ? 2 : 1
 
-      const brainInstruction = todo.ai_action_data?.brain_instruction || {}
-      const dimension = brainInstruction.dimension || todo.category || 'estate'
-      const needed = brainInstruction.family_data_needed ||
-        DIMENSION_DATA_NEEDED[dimension] || ['places']
-      const familyData = await getFamilyData(userId, needed)
+      const brainResult = await runRootBrainForTodo(userId, resolvedSourceId, todo)
+      executionPack = { root_decision: brainResult.decision, autoCompleted: brainResult.autoCompleted }
 
-      const planResult = await planAndExecute(supabase, todo, familyData, userId)
-      executionPack = buildExecutionPackFromPlan(planResult)
+      const actionQueueId = await upsertActionQueue(
+        userId,
+        resolvedSourceType,
+        resolvedSourceId,
+        title,
+        category,
+        urgencyLevel,
+        executionPack,
+      )
 
-      // 同步更新 todo_items（向后兼容）
-      await supabase.from('todo_items').update({
-        ai_action_data: {
-          ...todo.ai_action_data,
-          execution_pack: executionPack,
-          prepared_at: new Date().toISOString(),
-        }
-      }).eq('id', resolvedSourceId).eq('user_id', userId)
+      await recordUsage(userId, 'one_tap')
+
+      return NextResponse.json(
+        rootDecisionResponseBody(brainResult.decision, brainResult.autoCompleted, actionQueueId),
+      )
     }
 
     // ── SCHEDULE 分支 ──

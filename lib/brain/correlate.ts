@@ -64,8 +64,8 @@ function daysUntil(dateStr: string): number {
   return Math.floor((t - Date.now()) / (1000 * 60 * 60 * 24))
 }
 
-function isWealthTodo(t: { category?: string; dimension?: string; title?: string }): boolean {
-  if (t.category === 'wealth' || t.dimension === 'wealth') return true
+function isWealthTodo(t: { category?: string; title?: string }): boolean {
+  if (t.category === 'wealth') return true
   const title = String(t.title || '')
   return /缴费|学费|账单|付款|续费/.test(title)
 }

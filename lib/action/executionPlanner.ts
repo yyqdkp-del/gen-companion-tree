@@ -9,6 +9,7 @@ export interface UserAction {
   value: string
   timing: 'now' | 'today' | 'tomorrow' | 'scheduled'
   reason: string
+  meta?: Record<string, unknown>
 }
 
 export interface PlanExecuteResult {
@@ -51,7 +52,7 @@ function enrichTodo(todo: PlannerTodo, familyData: Record<string, unknown>): Pla
 
   return {
     ...todo,
-    dimension: String(todo.dimension || brain.dimension || todo.category || 'estate'),
+    dimension: String(todo.dimension || brain.dimension || todo.category || 'education'),
     child_id: childId || todo.child_id,
     child_name: childName,
     follow_up_date: extra.follow_up_date || brain.follow_up_date,
@@ -82,6 +83,75 @@ function findHospitalMaps(todo: PlannerTodo): string {
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(hospital)}`
 }
 
+function findTeacherEmail(familyData: Record<string, unknown>, enriched: PlannerTodo): string {
+  const children = (familyData.children || []) as Array<{
+    id?: string
+    teacher_email?: string
+    school_email?: string
+  }>
+  const matched = children.find((c) => c.id && c.id === enriched.child_id)
+  return String(
+    matched?.teacher_email
+    || matched?.school_email
+    || (familyData.profile as { teacher_email?: string } | undefined)?.teacher_email
+    || '',
+  ).trim()
+}
+
+function buildLeaveEmailPayload(
+  enriched: PlannerTodo,
+  familyData: Record<string, unknown>,
+  body: string,
+  date: string,
+) {
+  const childName = String(enriched.child_name || '孩子')
+  const to = findTeacherEmail(familyData, enriched)
+  const subject = `Absence Notice - ${childName}`
+  return {
+    to,
+    subject,
+    body,
+    childName,
+    date,
+  }
+}
+
+function pushLeaveEmailAction(
+  userActions: UserAction[],
+  enriched: PlannerTodo,
+  familyData: Record<string, unknown>,
+  body: string,
+  date: string,
+) {
+  const payload = buildLeaveEmailPayload(enriched, familyData, body, date)
+  userActions.push({
+    label: '发送请假邮件',
+    action: 'send_leave_email',
+    value: JSON.stringify(payload),
+    timing: 'now',
+    reason: payload.to
+      ? '确认后根可代为发送给老师'
+      : '确认内容后发送（可在档案补充老师邮箱）',
+    meta: payload,
+  })
+}
+
+function pushGoogleCalendarAction(
+  userActions: UserAction[],
+  title: string,
+  date: string,
+  notes?: string,
+) {
+  userActions.push({
+    label: '加入 Google 日历',
+    action: 'add_google_calendar',
+    value: JSON.stringify({ title, date, notes: notes || '' }),
+    timing: 'now',
+    reason: '同步到你的 Google 日历',
+    meta: { title, date, notes },
+  })
+}
+
 export async function planAndExecute(
   supabase: SupabaseClient,
   todo: PlannerTodo,
@@ -90,7 +160,7 @@ export async function planAndExecute(
 ): Promise<PlanExecuteResult> {
   const AUTO_CAPABILITIES = createAutoCapabilities(supabase)
   const enriched = enrichTodo(todo, familyData)
-  const dimension = String(enriched.dimension || 'estate')
+  const dimension = String(enriched.dimension || 'education')
 
   const autoCompleted: string[] = []
   const userActions: UserAction[] = []
@@ -130,6 +200,8 @@ export async function planAndExecute(
 
     case 'medical': {
       if (enriched.child_id) {
+        const today = new Date().toISOString().slice(0, 10)
+
         if (enriched.follow_up_date) {
           await AUTO_CAPABILITIES.addCalendarEvent({
             title: `复诊：${enriched.title}`,
@@ -146,12 +218,23 @@ export async function planAndExecute(
           for (const med of meds) {
             await AUTO_CAPABILITIES.setReminder({
               title: `给${enriched.child_name}服药：${med.name || '药物'}`,
-              dueDate: new Date().toISOString().slice(0, 10),
+              dueDate: today,
               userId,
               childId: String(enriched.child_id),
             })
           }
           autoCompleted.push(`已设置${meds.length}个用药提醒`)
+        }
+
+        const leaveDraft = await AUTO_CAPABILITIES.generateDraft({
+          type: 'leave_letter',
+          context: { todo: { ...enriched, due_date: today } },
+          userId,
+        })
+        if (leaveDraft?.text) {
+          draft = leaveDraft.text
+          autoCompleted.push('已生成请假邮件草稿')
+          pushLeaveEmailAction(userActions, enriched, familyData, leaveDraft.text, today)
         }
       }
 
@@ -214,18 +297,24 @@ export async function planAndExecute(
           userId,
         })
         if (draftResult) {
-          autoCompleted.push('已生成回执草稿')
+          autoCompleted.push('已生成请假邮件草稿')
           draft = draftResult.text
+          pushLeaveEmailAction(
+            userActions,
+            enriched,
+            familyData,
+            draftResult.text,
+            String(enriched.due_date),
+          )
         }
-      }
 
-      userActions.push({
-        label: '查看草稿',
-        action: 'open_draft',
-        value: '',
-        timing: 'now',
-        reason: '确认内容后发给老师',
-      })
+        pushGoogleCalendarAction(
+          userActions,
+          String(enriched.title),
+          String(enriched.due_date),
+          draft,
+        )
+      }
       break
     }
 
@@ -296,6 +385,20 @@ export function userActionsToExecutionPackActions(userActions: UserAction[]) {
         return { type: 'open_url', label: ua.label, data: { url: ua.value } }
       case 'open_draft':
         return { type: 'email', label: ua.label, data: { note: ua.reason } }
+      case 'send_leave_email': {
+        let data: Record<string, unknown> = ua.meta || {}
+        if (!ua.meta && ua.value) {
+          try { data = JSON.parse(ua.value) as Record<string, unknown> } catch { /* ignore */ }
+        }
+        return { type: 'send_leave_email', label: ua.label, data }
+      }
+      case 'add_google_calendar': {
+        let data: Record<string, unknown> = ua.meta || {}
+        if (!ua.meta && ua.value) {
+          try { data = JSON.parse(ua.value) as Record<string, unknown> } catch { /* ignore */ }
+        }
+        return { type: 'add_google_calendar', label: ua.label, data }
+      }
       default:
         return { type: ua.action, label: ua.label, data: { url: ua.value } }
     }

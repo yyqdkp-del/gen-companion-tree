@@ -7,7 +7,7 @@ import { isPlaceholderSubject } from '@/lib/schedule/placeholderSubject'
 import { applyScheduleTimeValidation, type ParseWarning } from '@/lib/schedule/validateScheduleTime'
 import { validateScheduleStructure, type ScheduleValidationWarning } from '@/lib/schedule/validateScheduleStructure'
 import { processSchedule } from '@/lib/ai/rootVision'
-import { persistClassSchedule } from '@/lib/schedule/persistSchedule'
+import { ScheduleService, type ScheduleSource } from '@/lib/services/ScheduleService'
 import { enrichSchedule } from '@/lib/schedule/enrichSchedule'
 import {
   countScheduleEntries,
@@ -327,10 +327,13 @@ async function persistSchedule(
   options: { enrich?: boolean; source?: string } = {},
 ) {
   const supabase = createAuthedSupabase(req)
-  return persistClassSchedule(supabase, childId, userId, rawSchedule, {
-    enrich: options.enrich,
-    source: options.source || 'parse-schedule',
-  })
+  return ScheduleService.save(
+    childId,
+    userId,
+    rawSchedule as Record<string, unknown[]>,
+    (options.source || 'parse-schedule') as ScheduleSource,
+    { enrich: options.enrich, client: supabase },
+  )
 }
 
 async function runParsePipeline(image: string, mediaTypeHint?: string): Promise<{
@@ -435,6 +438,9 @@ export async function POST(req: NextRequest) {
         enrich: enrichOption !== false,
         source: sourceOption || 'manual',
       })
+      if (!saved.ok || !saved.schedule) {
+        return NextResponse.json({ error: saved.error || '保存失败' }, { status: 500 })
+      }
       if (countScheduleEntries(saved.schedule) === 0) {
         return NextResponse.json({ error: '课表为空，无法保存' }, { status: 400 })
       }

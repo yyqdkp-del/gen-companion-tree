@@ -172,7 +172,7 @@ export async function POST(req: NextRequest) {
         // 付款需要妈妈确认金额，推送到热点
         await supabase.from('hotspot_items').insert({
           family_id: 'default',
-          category: 'finance',
+          category: 'wealth',
           urgency: 'important',
           title: `💳 ${todo.title}`,
           summary: `根帮你准备好了，确认付款金额后点击完成。${todo.ai_draft || ''}`,
