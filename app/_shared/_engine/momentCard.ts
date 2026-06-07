@@ -4,6 +4,7 @@ import type { WeeklyScheduleIntelligence } from '@/lib/ai/scheduleIntelligence'
 import { getPickupMomentSubtitle } from '@/lib/ai/scheduleIntelligence'
 import { formatEveningPrepFromSmartItems, type SmartPackingItem } from '@/lib/packing/packingMemory'
 import { getTodayStr } from '@/lib/date/localDate'
+import { isRainyWeather, type SimpleWeather } from '@/lib/realtime/weather'
 
 export type MomentKind =
   | 'sick'
@@ -263,6 +264,7 @@ export type BuildMomentParams = {
   scheduleIntelligence?: WeeklyScheduleIntelligence | null
   smartPacking?: SmartPackingItem[]
   tomorrowSmartPacking?: SmartPackingItem[]
+  weather?: SimpleWeather | null
 }
 
 function cleanTodoTitle(todo?: TodoItem): string {
@@ -406,10 +408,12 @@ function buildEveningHomeCard(p: BuildMomentParams): MomentCardData {
     : null
   const tomorrow = smartEvening || collectTomorrowPrep(p.tomorrowClasses || [])
   const rainAlert = hasRainOrFloodAlert(p.hotspots || [])
+  const liveRain = p.weather?.hasRain === true
 
   const subtitleParts: string[] = []
   if (tomorrow) subtitleParts.push(tomorrow)
   if (rainAlert) subtitleParts.push('明天可能有雨，记得带伞')
+  if (liveRain && !rainAlert) subtitleParts.push('今天有雨，记得带伞')
 
   return {
     kind: 'after_school',
@@ -419,7 +423,7 @@ function buildEveningHomeCard(p: BuildMomentParams): MomentCardData {
     kidName,
     title: `${kidName}今天${moodPhrase}`,
     subtitle: subtitleParts.join('\n') || undefined,
-    showRainTip: rainAlert,
+    showRainTip: rainAlert || liveRain,
     primaryAction: { label: '查看孩子状态', action: { type: 'child' } },
   }
 }
@@ -533,7 +537,18 @@ export function buildMomentCard(p: BuildMomentParams): MomentCardData {
   // 优先级5：接送时间
   if (location === 'pickup' || isInPickupWindow(hour, minute, schoolEnd)) {
     const todayKey = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'][p.now.getDay()]
-    const pickupSubtitle = getPickupMomentSubtitle(p.scheduleIntelligence, todayKey)
+    const scheduleSubtitle = getPickupMomentSubtitle(p.scheduleIntelligence, todayKey)
+    const minutesLeft = minutesUntilSchoolEnd(p.now, schoolEnd) ?? 0
+    const rainy = isRainyWeather(p.weather)
+    const pickupSubtitle = rainy
+      ? `${minutesLeft} 分钟后接孩子 · 有雨提前出发`
+      : scheduleSubtitle || `${minutesLeft} 分钟后接孩子`
+    const pickupBullets: PackLine[] | undefined = rainy
+      ? [
+          { item: '今天有雨，建议提前出发' },
+          { item: '记得带伞' },
+        ]
+      : undefined
 
     return {
       kind: 'pickup',
@@ -543,6 +558,8 @@ export function buildMomentCard(p: BuildMomentParams): MomentCardData {
       kidName,
       title: `距接 ${kidName} 还有`,
       subtitle: pickupSubtitle,
+      bullets: pickupBullets,
+      showRainTip: rainy,
       schoolEndTime: formatTime(schoolEnd),
       pickupLocation,
     }

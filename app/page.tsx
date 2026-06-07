@@ -45,6 +45,8 @@ import HomeRefreshFromQuery from '@/app/components/HomeRefreshFromQuery'
 import { PAGE_BOTTOM_TAB_ONLY } from '@/app/_shared/_constants/layout'
 import { useSmartPacking } from '@/lib/packing/useSmartPacking'
 import { recordAllPackingConfirmed } from '@/lib/packing/packingMemory'
+import { resolveResidentCity } from '@/lib/family/resolveResidentCity'
+import type { SimpleWeather } from '@/lib/realtime/weather'
 
 type ScheduleItem = ScheduleClass & { location?: string; requires_action?: string }
 type UrgentItem = { title: string; level: 'red' | 'orange' | 'yellow' }
@@ -821,6 +823,8 @@ export default function BasePage() {
   const [greeting, setGreeting] = useState<Greeting | null>(null)
   const [keyboardOpen, setKeyboardOpen] = useState(false)
   const [showProfileBanner, setShowProfileBanner] = useState(false)
+  const [weather, setWeather] = useState<SimpleWeather | null>(null)
+  const [weatherCity, setWeatherCity] = useState('Chiang Mai')
 
   const [optimisticDoneIds, setOptimisticDoneIds] = useState<Set<string>>(() => new Set())
 
@@ -921,6 +925,50 @@ export default function BasePage() {
       setPackReadyDismissed(false)
     }
   }, [packReadyKey])
+
+  useEffect(() => {
+    if (!userId) {
+      setWeatherCity('Chiang Mai')
+      return
+    }
+    let cancelled = false
+    void (async () => {
+      try {
+        const { data: loc } = await supabase
+          .from('user_locations')
+          .select('city')
+          .eq('user_id', userId)
+          .maybeSingle()
+        if (cancelled) return
+        if (loc?.city?.trim()) {
+          setWeatherCity(loc.city.trim())
+          return
+        }
+        const { data: profile } = await supabase
+          .from('family_profile')
+          .select('resident_city, resident_city_custom')
+          .eq('user_id', userId)
+          .maybeSingle()
+        if (cancelled) return
+        setWeatherCity(resolveResidentCity(profile) || 'Chiang Mai')
+      } catch {
+        if (!cancelled) setWeatherCity('Chiang Mai')
+      }
+    })()
+    return () => { cancelled = true }
+  }, [userId])
+
+  useEffect(() => {
+    let cancelled = false
+    void fetch(`/api/realtime/weather?city=${encodeURIComponent(weatherCity)}`)
+      .then((r) => r.json())
+      .then((data: SimpleWeather | null) => {
+        if (cancelled || !data || typeof data.condition !== 'string') return
+        setWeather(data)
+      })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [weatherCity])
 
   const handleMarkDone = async (id: string) => {
     const todo = oneTapTodo ?? todos.find(t => t.id === id)
@@ -1188,6 +1236,7 @@ export default function BasePage() {
       scheduleIntelligence: (activeKid as { schedule_intelligence?: import('@/lib/ai/scheduleIntelligence').WeeklyScheduleIntelligence | null })?.schedule_intelligence ?? null,
       smartPacking,
       tomorrowSmartPacking,
+      weather,
     }),
     [
       now,
@@ -1202,6 +1251,7 @@ export default function BasePage() {
       unreadHotspots,
       smartPacking,
       tomorrowSmartPacking,
+      weather,
     ],
   )
 

@@ -331,6 +331,37 @@ function PickupBody({ data, now }: { data: MomentCardData; now: Date }) {
           {data.subtitle}
         </p>
       ) : null}
+      {data.bullets && data.bullets.length > 0 ? (
+        <ul style={{ margin: '14px 0 0', padding: 0, listStyle: 'none', textAlign: 'left' }}>
+          {data.bullets.map((b) => (
+            <li
+              key={b.item}
+              style={{
+                fontFamily: 'var(--font-body)',
+                fontSize: 13,
+                color: 'var(--clay)',
+                lineHeight: 1.55,
+                marginBottom: 6,
+                paddingLeft: 18,
+                position: 'relative',
+              }}
+            >
+              <span
+                style={{
+                  position: 'absolute',
+                  left: 0,
+                  top: '0.55em',
+                  width: 6,
+                  height: 6,
+                  borderRadius: '50%',
+                  background: 'var(--clay)',
+                }}
+              />
+              {b.item}
+            </li>
+          ))}
+        </ul>
+      ) : null}
       {locationLine ? (
         <p
           style={{
