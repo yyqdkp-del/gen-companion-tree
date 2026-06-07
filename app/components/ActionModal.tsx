@@ -13,6 +13,7 @@ import {
   Download, ExternalLink, CreditCard, ShoppingBag,
   Loader, ClipboardList, ShoppingCart, FileText,
   Volume2, ChevronDown, Zap, Brain,
+  Shield, HeartPulse, GraduationCap, Plane, Home,
 } from 'lucide-react'
 import type { BrainHotspotActionData, BrainSuggestedAction } from '@/app/_shared/_types'
 import { formatThb } from '@/lib/realtime/exchangeRate'
@@ -63,6 +64,17 @@ type ExecutionPack = {
   carry_items?: string[]
   primary_action_index?: number
   primary_action_reason?: string
+  autoCompleted?: string[]
+  userActions?: UserAction[]
+  nextStep?: string
+}
+
+type UserAction = {
+  label: string
+  action: string
+  value: string
+  timing: 'now' | 'today' | 'tomorrow' | 'scheduled'
+  reason: string
 }
 
 type ActionData = {
@@ -99,6 +111,42 @@ const BRAIN_URGENCY_LABEL: Record<string, string> = {
   high: '紧急',
   medium: '关注',
   low: '参考',
+}
+
+const DIMENSION_ICON: Record<string, React.ReactNode> = {
+  compliance: <Shield size={16} />,
+  medical: <HeartPulse size={16} />,
+  wealth: <CreditCard size={16} />,
+  education: <GraduationCap size={16} />,
+  mobility: <Plane size={16} />,
+  estate: <Home size={16} />,
+}
+
+const USER_TIMING_LABEL: Record<UserAction['timing'], string> = {
+  now: '现在',
+  today: '今天',
+  tomorrow: '明天',
+  scheduled: '稍后',
+}
+
+function dimensionIcon(category?: string) {
+  const key = String(category || 'estate').toLowerCase()
+  return DIMENSION_ICON[key] || <ClipboardList size={16} />
+}
+
+function userActionToActionData(action: UserAction): ActionData {
+  switch (action.action) {
+    case 'navigate':
+      return { type: 'navigate', label: action.label, data: { url: action.value } }
+    case 'call':
+      return { type: 'call', label: action.label, data: { phone: action.value.replace(/^tel:/, '') } }
+    case 'open_url':
+      return { type: 'open_url', label: action.label, data: { url: action.value } }
+    case 'open_draft':
+      return { type: 'email', label: action.label, data: { note: action.reason } }
+    default:
+      return { type: action.action, label: action.label, data: { url: action.value } }
+  }
 }
 
 function isBrainHotspotData(data?: BrainHotspotActionData | Record<string, unknown>): data is BrainHotspotActionData {
@@ -760,6 +808,111 @@ async function executeAction(
   }
 }
 
+function AutoExecutePanel({
+  autoCompleted,
+  userActions,
+  userId,
+  sourceType,
+  sourceId,
+  onOpenDraft,
+  onAllDone,
+}: {
+  autoCompleted: string[]
+  userActions: UserAction[]
+  userId: string
+  sourceType: ActionSource
+  sourceId: string
+  onOpenDraft: () => void
+  onAllDone: () => void
+}) {
+  const [runningIdx, setRunningIdx] = useState<number | null>(null)
+
+  const handleAction = async (action: UserAction, idx: number) => {
+    if (action.action === 'open_draft') {
+      onOpenDraft()
+      return
+    }
+    setRunningIdx(idx)
+    try {
+      await executeAction(userActionToActionData(action), userId, { sourceType, sourceId })
+    } catch (e) {
+      logOrAlertNetworkError(e)
+    } finally {
+      setRunningIdx(null)
+    }
+  }
+
+  return (
+    <div style={{ padding: '10px 12px 0' }}>
+      {autoCompleted.length > 0 && (
+        <div style={{
+          background: 'rgba(141,200,160,0.12)',
+          border: '0.5px solid rgba(141,200,160,0.35)',
+          borderRadius: 12,
+          padding: '12px 14px',
+          marginBottom: 12,
+        }}>
+          <div style={{ fontSize: 12, fontWeight: 600, color: G.dark, marginBottom: 8 }}>
+            根已帮你完成
+          </div>
+          {autoCompleted.map((item, i) => (
+            <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: i < autoCompleted.length - 1 ? 6 : 0 }}>
+              <span style={{ color: 'var(--accent-jade, #1D9E75)' }}>✓</span>
+              <span style={{ fontSize: 14, color: 'var(--text-primary, #2C3E50)' }}>{item}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {autoCompleted.length > 0 && userActions.length > 0 && (
+        <div style={{ height: '0.5px', background: 'rgba(0,0,0,0.06)', margin: '0 0 12px' }} />
+      )}
+
+      {userActions.length > 0 && (
+        <div style={{ marginBottom: 8 }}>
+          <div style={{ fontSize: 12, fontWeight: 600, color: THEME.text, marginBottom: 8 }}>
+            还需要你做
+          </div>
+          {userActions.map((action, i) => (
+            <div key={i} style={{
+              background: 'var(--canvas-card, rgba(255,255,255,0.7))',
+              borderRadius: 12,
+              padding: '12px 16px',
+              marginBottom: 8,
+              border: '0.5px solid rgba(0,0,0,0.06)',
+            }}>
+              <div style={{ fontSize: 12, color: 'var(--text-muted, #6B8BAA)', marginBottom: 4 }}>
+                {USER_TIMING_LABEL[action.timing] || '稍后'}
+              </div>
+              <div style={{ fontSize: 13, color: 'var(--text-secondary, #537b8e)', marginBottom: 8 }}>
+                {action.reason}
+              </div>
+              <button
+                type="button"
+                onClick={() => void handleAction(action, i)}
+                className="gc-btn"
+                disabled={runningIdx === i}
+                style={{ width: '100%' }}
+              >
+                {runningIdx === i ? '处理中…' : action.label}
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <motion.button
+        whileTap={{ scale: 0.97 }}
+        onClick={onAllDone}
+        className="gc-btn"
+        style={{ width: '100%', marginTop: 4, marginBottom: 4 }}
+      >
+        全部搞定了
+      </motion.button>
+    </div>
+  )
+}
+
 function ActionsArea({ actions, userId, primaryIndex, primaryReason, sourceId, sourceType, onAllDone }: {
   actions: ActionData[]
   userId: string
@@ -928,9 +1081,21 @@ export default function ActionModal({
   const router = useRouter()
   const { sessionReady } = useApp()
   const [pack, setPack] = useState<ExecutionPack | null>(null)
+  const [autoCompleted, setAutoCompleted] = useState<string[]>([])
+  const [userActions, setUserActions] = useState<UserAction[]>([])
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [activeTab, setActiveTab] = useState<TabKey | null>(null)
+
+  const syncAutoExecuteState = (nextPack: ExecutionPack | null, apiAuto?: string[], apiUser?: UserAction[]) => {
+    const completed = apiAuto?.length ? apiAuto : (nextPack?.autoCompleted || [])
+    const actions = apiUser?.length ? apiUser : (nextPack?.userActions || [])
+    setAutoCompleted(completed)
+    setUserActions(actions)
+  }
+
+  const useAutoLayout = source_type === 'todo'
+    && (autoCompleted.length > 0 || userActions.length > 0)
 
   const brainData = isBrainHotspotData(hotspot_action_data) ? hotspot_action_data : null
   const isBrainMode = source_type === 'hotspot' && !!brainData
@@ -941,6 +1106,8 @@ export default function ActionModal({
 
     if (isBrainMode) {
       setPack(null)
+      setAutoCompleted([])
+      setUserActions([])
       setLoading(false)
       return
     }
@@ -948,9 +1115,12 @@ export default function ActionModal({
     const cachedPack = source_type === 'todo' ? getFreshExecutionPack(ai_action_data) : null
     if (cachedPack) {
       setPack(cachedPack)
+      syncAutoExecuteState(cachedPack)
       setLoading(false)
     } else {
       setPack(null)
+      setAutoCompleted([])
+      setUserActions([])
     }
 
     if (!sessionReady) {
@@ -986,6 +1156,7 @@ export default function ActionModal({
         if (handleLimitReached(data, () => router.push('/upgrade'))) return
         if (data.ok && data.execution_pack) {
           setPack(data.execution_pack)
+          syncAutoExecuteState(data.execution_pack, data.autoCompleted, data.userActions)
           onSync?.()
         }
       } catch (e) {
@@ -1082,11 +1253,14 @@ export default function ActionModal({
           <div style={{ padding: '10px 14px 0', flexShrink: 0 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
               <div style={{ flex: 1 }}>
-                <span style={{ fontSize: 10, color: THEME.gold, fontWeight: 600, letterSpacing: '0.12em' }}>
-                  {source_type === 'schedule' && child_name ? `${child_name} · ` : ''}
-                  {isBrainMode ? '关联分析' : (category || source_type)}
-                  {due_date ? ` · ${new Date(due_date).toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' })}` : ''}
-                </span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+                  <span style={{ color: G.dark, display: 'flex' }}>{dimensionIcon(category)}</span>
+                  <span style={{ fontSize: 10, color: THEME.gold, fontWeight: 600, letterSpacing: '0.12em' }}>
+                    {source_type === 'schedule' && child_name ? `${child_name} · ` : ''}
+                    {isBrainMode ? '关联分析' : (category || source_type)}
+                    {due_date ? ` · ${new Date(due_date).toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' })}` : ''}
+                  </span>
+                </div>
                 <h2 style={{ fontSize: 18, fontWeight: 600, color: THEME.text, margin: '3px 0 0', lineHeight: 1.3 }}>
                   {title}
                 </h2>
@@ -1126,10 +1300,23 @@ export default function ActionModal({
             )}
 
             {/* AI 摘要 */}
-            {!isBrainMode && pack && <AiSummaryCard pack={pack} />}
+            {!isBrainMode && pack && !useAutoLayout && <AiSummaryCard pack={pack} />}
+
+            {/* 根自动完成 + 用户必做 */}
+            {!isBrainMode && pack && useAutoLayout && (
+              <AutoExecutePanel
+                autoCompleted={autoCompleted}
+                userActions={userActions}
+                userId={userId}
+                sourceType={source_type}
+                sourceId={source_id}
+                onOpenDraft={() => setActiveTab('draft')}
+                onAllDone={() => onDone(source_id)}
+              />
+            )}
 
             {/* 标签页 */}
-            {!isBrainMode && pack && (
+            {!isBrainMode && pack && !useAutoLayout && (
               <div style={{ display: 'flex', gap: 5, padding: '10px 12px 0' }}>
                 {tabs.filter(t => hasTab(t.key)).map(tab => {
                   const isOpen = activeTab === tab.key
@@ -1167,7 +1354,15 @@ export default function ActionModal({
               )}
             </AnimatePresence>
 
-            {pack && (
+            {useAutoLayout && pack?.draft && activeTab === 'draft' && (
+              <div style={{ margin: '6px 12px 0', padding: '12px 14px', borderRadius: 10,
+                border: `0.5px solid ${G.border}`, background: 'rgba(255,255,255,0.7)',
+                fontSize: 13, color: THEME.text, whiteSpace: 'pre-wrap', lineHeight: 1.5 }}>
+                {pack.draft}
+              </div>
+            )}
+
+            {pack && !useAutoLayout && (
               <>
                 <div style={{ height: '0.5px', background: 'rgba(0,0,0,0.06)', margin: '10px 12px 0' }} />
                 <ActionsArea
@@ -1192,14 +1387,16 @@ export default function ActionModal({
           {/* 底部 */}
           <div style={{ flexShrink: 0, borderTop: '0.5px solid rgba(0,0,0,0.06)',
             padding: '10px 12px 16px', display: 'flex', gap: 8 }}>
-            <motion.button whileTap={{ scale: 0.95 }} onClick={() => onDone(source_id)} disabled={saving}
-              style={{ flex: 1, padding: '11px', borderRadius: 12,
-                background: 'rgba(141,200,160,0.35)', border: '0.5px solid rgba(141,200,160,0.5)',
-                fontSize: 13, fontWeight: 600, color: THEME.text, cursor: saving ? 'not-allowed' : 'pointer',
-                opacity: saving ? 0.55 : 1,
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}>
-              <CheckCircle2 size={14} /> 已处理
-            </motion.button>
+            {!useAutoLayout && (
+              <motion.button whileTap={{ scale: 0.95 }} onClick={() => onDone(source_id)} disabled={saving}
+                style={{ flex: 1, padding: '11px', borderRadius: 12,
+                  background: 'rgba(141,200,160,0.35)', border: '0.5px solid rgba(141,200,160,0.5)',
+                  fontSize: 13, fontWeight: 600, color: THEME.text, cursor: saving ? 'not-allowed' : 'pointer',
+                  opacity: saving ? 0.55 : 1,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}>
+                <CheckCircle2 size={14} /> 已处理
+              </motion.button>
+            )}
             <motion.button whileTap={{ scale: 0.95 }} onClick={() => onSnooze(source_id)} disabled={saving}
               style={{ flex: 1, padding: '11px', borderRadius: 12,
                 background: 'rgba(255,255,255,0.4)', border: '0.5px solid rgba(0,0,0,0.08)',

@@ -6,6 +6,7 @@ import { createClient } from '@supabase/supabase-js'
 import { getAuthUser } from '@/lib/auth/getAuthUser'
 import { checkLimit, recordUsage } from '@/lib/limits/usage'
 import { fetchFormTemplates, enrichActionsWithFormTemplates } from '@/lib/action/enrichPDF'
+import { buildExecutionPackFromPlan, planAndExecute } from '@/lib/action/executionPlanner'
 import { familyServicePromptLabel, resolveResidentCityFromFamilyData } from '@/lib/family/resolveResidentCity'
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -215,6 +216,22 @@ async function upsertActionQueue(
   }).select('id').single()
 
   return data?.id
+}
+
+function executionResponseBody(
+  executionPack: Record<string, unknown>,
+  actionQueueId?: string,
+  cached = false,
+) {
+  return {
+    ok: true,
+    autoCompleted: (executionPack.autoCompleted as string[]) || [],
+    userActions: executionPack.userActions || [],
+    nextStep: (executionPack.nextStep as string) || executionPack.primary_action_reason || '',
+    execution_pack: executionPack,
+    action_queue_id: actionQueueId,
+    cached,
+  }
 }
 
 // ══ 构建 TODO Prompt ══
@@ -503,12 +520,9 @@ export async function POST(req: NextRequest) {
     if (cached) {
       const ageHours = (Date.now() - new Date(cached.created_at).getTime()) / 3600000
       if (ageHours < 6) {
-        return NextResponse.json({
-          ok: true,
-          execution_pack: cached.execution_pack,
-          action_queue_id: cached.id,
-          cached: true,
-        })
+        return NextResponse.json(
+          executionResponseBody(cached.execution_pack || {}, cached.id, true),
+        )
       }
     }
 
@@ -548,12 +562,9 @@ export async function POST(req: NextRequest) {
             pack,
           )
 
-          return NextResponse.json({
-            ok: true,
-            execution_pack: pack,
-            action_queue_id: actionQueueId,
-            cached: true,
-          })
+          return NextResponse.json(
+            executionResponseBody(pack, actionQueueId, true),
+          )
         }
       }
 
@@ -570,18 +581,13 @@ export async function POST(req: NextRequest) {
       urgencyLevel = todo.priority === 'red' ? 3 : todo.priority === 'orange' ? 2 : 1
 
       const brainInstruction = todo.ai_action_data?.brain_instruction || {}
+      const dimension = brainInstruction.dimension || todo.category || 'estate'
       const needed = brainInstruction.family_data_needed ||
-        DIMENSION_DATA_NEEDED[brainInstruction.dimension || 'education'] || []
+        DIMENSION_DATA_NEEDED[dimension] || ['places']
       const familyData = await getFamilyData(userId, needed)
-      const prompt = buildTodoPrompt(todo, brainInstruction, familyData)
-      executionPack = await callClaude(prompt)
 
-      // 提取需要的表格类型
-      const formTypes = (executionPack.actions || [])
-        .filter((a: any) => a.type === 'download_pdf' && a.data?.form_type)
-        .map((a: any) => a.data.form_type)
-      const formTemplates = await fetchFormTemplates(supabase, formTypes)
-      executionPack.actions = enrichActionsWithFormTemplates(executionPack.actions, familyData, formTemplates)
+      const planResult = await planAndExecute(supabase, todo, familyData, userId)
+      executionPack = buildExecutionPackFromPlan(planResult)
 
       // 同步更新 todo_items（向后兼容）
       await supabase.from('todo_items').update({
@@ -696,11 +702,9 @@ export async function POST(req: NextRequest) {
 
     await recordUsage(userId, 'one_tap')
 
-    return NextResponse.json({
-      ok: true,
-      execution_pack: executionPack,
-      action_queue_id: actionQueueId,
-    })
+    return NextResponse.json(
+      executionResponseBody(executionPack, actionQueueId),
+    )
 
   } catch (e: any) {
     console.error('Action execute error:', e?.message)
