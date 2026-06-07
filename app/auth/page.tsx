@@ -9,13 +9,47 @@ import {
   sanitizeAuthNext,
   stashAuthNextFromUrl,
 } from '@/lib/auth/authNextPath'
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion } from 'framer-motion'
 
-const supabase = createClient(
-)
+const supabase = createClient()
 
 const LINE_CLIENT_ID = process.env.NEXT_PUBLIC_LINE_CLIENT_ID || '2009745649'
 const EMAIL_VERIFY_PENDING_KEY = 'auth_email_verify_pending'
+
+const VALUE_POINTS = [
+  '📅 自动整理学校通知',
+  '⚠️ 签证到期提醒',
+  '🌙 深夜情感陪伴',
+] as const
+
+function formatAuthError(message: string, code?: string): string {
+  const m = message.toLowerCase()
+  if (code === 'refresh_token_not_found') return '登录已过期，请重新登录'
+  if (m.includes('invalid login credentials') || m.includes('invalid credentials')) {
+    return '邮箱或密码不正确，请检查后重试'
+  }
+  if (m.includes('email not confirmed')) return '请先点击邮件中的验证链接，再登录'
+  if (m.includes('user already registered')) return '该邮箱已注册，请切换到「登录」'
+  if (m.includes('password') && m.includes('6')) return '密码至少需要 6 位'
+  if (m.includes('valid email')) return '请输入有效的邮箱地址'
+  if (m.includes('signup is disabled')) return '当前暂不支持新用户注册'
+  if (m.includes('rate limit')) return '操作过于频繁，请稍后再试'
+  if (m.includes('network') || m.includes('fetch')) return '网络连接失败，请检查网络后重试'
+  return message || '操作失败，请重试'
+}
+
+function mapUrlAuthError(code: string | null): string {
+  switch (code) {
+    case 'callback_failed':
+      return 'Google 登录失败，请重试或改用邮箱登录'
+    case 'session':
+      return '登录会话已失效，请重新登录'
+    case 'no_code':
+      return '授权未完成，请重新尝试登录'
+    default:
+      return '登录失败，请重试'
+  }
+}
 
 async function ensureAuthSession(email: string, password: string): Promise<boolean> {
   let session = (await supabase.auth.getSession()).data.session
@@ -32,12 +66,48 @@ async function ensureAuthSession(email: string, password: string): Promise<boole
   return true
 }
 
+function GoogleLogo() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden>
+      <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+      <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+      <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
+      <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
+    </svg>
+  )
+}
+
+function LineLogo() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="#06C755" aria-hidden>
+      <path d="M19.365 9.863c.349 0 .63.285.63.631 0 .345-.281.63-.63.63H17.61v1.125h1.755c.349 0 .63.283.63.630 0 .344-.281.629-.63.629h-2.386c-.345 0-.627-.285-.627-.629V8.108c0-.345.282-.63.627-.63h2.386c.349 0 .63.285.63.63 0 .349-.281.63-.63.63H17.61v1.125h1.755zm-3.855 3.016c0 .27-.174.51-.432.596-.064.021-.133.031-.199.031-.211 0-.391-.09-.51-.25l-2.443-3.317v2.94c0 .344-.279.629-.631.629-.346 0-.626-.285-.626-.629V8.108c0-.27.173-.51.43-.595.06-.023.136-.033.194-.033.195 0 .375.104.495.254l2.462 3.33V8.108c0-.345.282-.63.63-.63.345 0 .63.285.63.63v4.771zm-5.741 0c0 .344-.282.629-.631.629-.345 0-.627-.285-.627-.629V8.108c0-.345.282-.63.627-.63.349 0 .631.285.631.63v4.771zm-2.466.629H4.917c-.345 0-.627-.285-.627-.629V8.108c0-.345.282-.63.627-.63.349 0 .631.285.631.63v4.141h1.755c.349 0 .63.283.63.630 0 .344-.281.629-.63.629M24 10.314C24 4.943 18.615.572 12 .572S0 4.943 0 10.314c0 4.811 4.27 8.842 10.035 9.608.391.082.923.258 1.058.59.12.301.079.766.038 1.08l-.164 1.02c-.045.301-.24 1.186 1.049.645 1.291-.539 6.916-4.078 9.436-6.975C23.176 14.393 24 12.458 24 10.314" />
+    </svg>
+  )
+}
+
+function Spinner({ color = 'var(--clay)' }: { color?: string }) {
+  return (
+    <span
+      style={{
+        width: 18,
+        height: 18,
+        border: `2px solid ${color}33`,
+        borderTopColor: color,
+        borderRadius: '50%',
+        display: 'inline-block',
+        animation: 'authSpin 0.8s linear infinite',
+      }}
+    />
+  )
+}
+
 export default function AuthPage() {
   const router = useRouter()
-  const [mode, setMode] = useState<'register' | 'login'>('register')
+  const [mode, setMode] = useState<'login' | 'register'>('login')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
+  const [googleLoading, setGoogleLoading] = useState(false)
   const [lineLoading, setLineLoading] = useState(false)
   const [error, setError] = useState('')
   const [done, setDone] = useState(false)
@@ -45,12 +115,14 @@ export default function AuthPage() {
   const [consentPrivacy, setConsentPrivacy] = useState(false)
   const [consentAI, setConsentAI] = useState(false)
   const [returnPath, setReturnPath] = useState('/')
-  const [emailExpanded, setEmailExpanded] = useState(false)
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
     setReturnPath(stashAuthNextFromUrl(params))
-    if (params.get('error')) setError('登录失败，请重试')
+
+    const urlError = params.get('error')
+    if (urlError) setError(mapUrlAuthError(urlError))
+    if (params.get('mode') === 'register') setMode('register')
     if (params.get('mode') === 'login') setMode('login')
 
     const pendingEmail = sessionStorage.getItem(EMAIL_VERIFY_PENDING_KEY)
@@ -62,8 +134,8 @@ export default function AuthPage() {
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (!session?.user) return
       fetch('/api/auth/check', { credentials: 'include' })
-        .then(r => r.json())
-        .then(data => {
+        .then((r) => r.json())
+        .then((data) => {
           if (!data.authenticated) return
           const explicitNext = params.get('next')
           if (explicitNext) {
@@ -97,7 +169,7 @@ export default function AuthPage() {
       if (!child?.name) return
 
       const schoolName = child.school_name || child.school || ''
-      const { data, error } = await supabase
+      const { data, error: insertError } = await supabase
         .from('children')
         .insert({
           user_id: userId,
@@ -110,8 +182,8 @@ export default function AuthPage() {
         .select('id')
         .single()
 
-      if (error) {
-        console.warn('saveChildData children insert:', error.message)
+      if (insertError) {
+        console.warn('saveChildData children insert:', insertError.message)
         return
       }
 
@@ -139,15 +211,27 @@ export default function AuthPage() {
 
   const handleSubmit = async () => {
     if (mode === 'register' && !consentPrivacy) {
-      setError('请先同意隐私政策')
+      setError('注册前请先勾选并同意隐私政策')
       return
     }
+    if (!email.trim()) {
+      setError('请输入邮箱地址')
+      return
+    }
+    if (!password || password.length < 6) {
+      setError('密码至少需要 6 位')
+      return
+    }
+
     setError('')
     setLoading(true)
     try {
       if (mode === 'register') {
-        const { data, error } = await supabase.auth.signUp({ email, password })
-        if (error) { setError(error.message); setLoading(false); return }
+        const { data, error: signUpError } = await supabase.auth.signUp({ email, password })
+        if (signUpError) {
+          setError(formatAuthError(signUpError.message, signUpError.code))
+          return
+        }
         if (data.user) {
           await saveChildData(data.user.id)
           await supabase.from('user_consents').upsert({
@@ -165,8 +249,11 @@ export default function AuthPage() {
         sessionStorage.setItem(EMAIL_VERIFY_PENDING_KEY, email)
         setDone(true)
       } else {
-        const { data, error } = await supabase.auth.signInWithPassword({ email, password })
-        if (error) { setError('邮箱或密码错误'); setLoading(false); return }
+        const { data, error: signInError } = await supabase.auth.signInWithPassword({ email, password })
+        if (signInError) {
+          setError(formatAuthError(signInError.message, signInError.code))
+          return
+        }
         if (data.user) await saveChildData(data.user.id)
         if (data.session) await saveSessionBundle(data.session)
 
@@ -176,25 +263,27 @@ export default function AuthPage() {
         if (checkData.authenticated) {
           navigateAfterAuth(router)
         } else {
-          await new Promise(r => setTimeout(r, 500))
+          await new Promise((r) => setTimeout(r, 500))
           const retryRes = await fetch('/api/auth/check', { credentials: 'include' })
           const retryData = await retryRes.json()
           if (retryData.authenticated) {
             navigateAfterAuth(router)
           } else {
-            setError('登录状态同步失败，请重试')
-            setLoading(false)
+            setError('登录成功但会话未同步，请刷新页面或重新登录')
           }
         }
       }
-    } catch {
-      setError('网络错误，请重试')
+    } catch (e) {
+      console.error('[auth] submit failed:', e)
+      setError(formatAuthError(e instanceof Error ? e.message : '网络连接失败，请检查网络后重试'))
+    } finally {
+      setLoading(false)
     }
-    setLoading(false)
   }
 
   const handleLine = () => {
     setLineLoading(true)
+    setError('')
     const params = new URLSearchParams({
       response_type: 'code',
       client_id: LINE_CLIENT_ID,
@@ -219,408 +308,501 @@ export default function AuthPage() {
           return
         }
       }
-      setError('请先点击邮件中的验证链接，或稍后再试')
-    } catch {
-      setError('网络错误，请重试')
+      setError('请先点击邮件中的验证链接，完成验证后再进入')
+    } catch (e) {
+      console.error('[auth] go ahead failed:', e)
+      setError(formatAuthError(e instanceof Error ? e.message : '网络连接失败，请稍后重试'))
     } finally {
       setExploreLoading(false)
     }
   }
 
   const handleGoogle = async () => {
-    await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: { redirectTo: `${window.location.origin}/auth/callback` }
-    })
+    setGoogleLoading(true)
+    setError('')
+    try {
+      const { error: oauthError } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: { redirectTo: `${window.location.origin}/auth/callback` },
+      })
+      if (oauthError) {
+        setError(formatAuthError(oauthError.message, oauthError.code))
+        setGoogleLoading(false)
+      }
+    } catch (e) {
+      console.error('[auth] google oauth failed:', e)
+      setError(formatAuthError(e instanceof Error ? e.message : 'Google 登录启动失败'))
+      setGoogleLoading(false)
+    }
   }
-  
-  // ── 邮件发送完成 ──
-  if (done) return (
-    <main style={styles.main}>
-      <motion.div
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
-        style={styles.card}
-      >
-        <div style={{ textAlign: 'center', padding: '8px 0' }}>
-          <div style={{ fontSize: 56, marginBottom: 16 }}>🌿</div>
-          <div style={{ fontSize: 20, fontWeight: 700, color: '#2d322f', marginBottom: 8, fontFamily: 'Noto Serif SC, serif' }}>
-            验证邮件已发送
-          </div>
-          <div style={{ fontSize: 14, color: '#6B8BAA', lineHeight: 1.8, marginBottom: 28 }}>
-            请检查 <strong style={{ color: '#2d322f' }}>{email}</strong><br />
+
+  const switchMode = (next: 'login' | 'register') => {
+    setMode(next)
+    setError('')
+  }
+
+  if (done) {
+    return (
+      <main className="canvas-texture" style={S.page}>
+        <motion.div
+          initial={{ opacity: 0, scale: 0.98 }}
+          animate={{ opacity: 1, scale: 1 }}
+          style={S.verifyCard}
+        >
+          <div style={{ fontSize: 48, marginBottom: 12 }}>🌿</div>
+          <h2 style={S.verifyTitle}>验证邮件已发送</h2>
+          <p style={S.verifyDesc}>
+            请检查 <strong style={{ color: 'var(--text-primary)' }}>{email}</strong>
+            <br />
             点击邮件中的链接完成注册
-          </div>
+          </p>
           <button
             type="button"
+            className="gc-btn"
             onClick={() => { void handleGoAhead() }}
             disabled={exploreLoading}
-            style={{
-              ...styles.btnPrimary,
-              opacity: exploreLoading ? 0.7 : 1,
-              cursor: exploreLoading ? 'wait' : 'pointer',
-            }}
+            style={{ width: '100%', height: 56, marginTop: 8 }}
           >
             {exploreLoading ? '进入中…' : '先去看看 →'}
           </button>
-          {error && (
-            <div style={{ fontSize: 13, color: '#E8892A', marginTop: 12, lineHeight: 1.6 }}>
-              {error}
-            </div>
-          )}
-        </div>
-      </motion.div>
-    </main>
-  )
+          {error && <p style={S.errorText}>{error}</p>}
+        </motion.div>
+        <style>{SPIN_KEYFRAMES}</style>
+      </main>
+    )
+  }
+
+  const submitDisabled =
+    loading ||
+    !email.trim() ||
+    !password ||
+    (mode === 'register' && !consentPrivacy)
 
   return (
-    <main style={styles.main}>
-      <motion.div
-        initial={{ opacity: 0, y: 16 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4 }}
-        style={styles.card}
-      >
-        {/* ── Logo ── */}
-        <div style={{ textAlign: 'center', marginBottom: 32 }}>
-          <div style={{ fontSize: 13, letterSpacing: 6, color: '#8a7355', marginBottom: 6, fontFamily: "'Noto Serif SC', serif" }}>
-            根·陪伴
-          </div>
-          <div style={{ fontSize: 22, fontWeight: 700, color: '#2d322f', fontFamily: 'Noto Serif SC, serif' }}>
-            {mode === 'register' ? '创建你的家庭账号' : '欢迎回来'}
-          </div>
-          <div style={{ fontSize: 13, color: '#6B8BAA', marginTop: 6 }}>
-            {mode === 'register' ? '海外华人家庭的智能陪伴助手' : '继续你的家庭陪伴之旅'}
-          </div>
-          {(returnPath === '/upgrade' || returnPath.startsWith('/upgrade?')) && (
-            <div style={{
-              marginTop: 14,
-              padding: '10px 14px',
-              borderRadius: 10,
-              background: 'rgba(164,99,85,0.08)',
-              border: '1px solid rgba(164,99,85,0.2)',
-              fontSize: 13,
-              color: '#a46355',
-              lineHeight: 1.6,
-            }}>
-              登录后将带你继续开通根陪伴 Pro
-            </div>
-          )}
+    <main className="canvas-texture" style={S.page}>
+      {/* ── 品牌区 40vh ── */}
+      <section style={S.brand}>
+        <div style={S.logoMark}>🌿</div>
+        <p style={S.logoWordmark}>根·陪伴</p>
+        <h1 style={S.heroTitle}>根</h1>
+        <p style={S.heroSubtitle}>陪你在异乡，照顾好孩子</p>
+        <div style={S.valueList}>
+          {VALUE_POINTS.map((point) => (
+            <span key={point} style={S.valueItem}>{point}</span>
+          ))}
         </div>
+      </section>
 
-        {/* ── Google按钮（主按钮） ── */}
-        <motion.button
-          whileTap={{ scale: 0.97 }}
-          onClick={handleGoogle}
-          style={styles.btnGooglePrimary}
-        >
-          <svg width="20" height="20" viewBox="0 0 24 24">
-            <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-            <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-            <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
-            <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
-          </svg>
-          <span style={{ fontSize: 16, fontWeight: 700, color: '#fff' }}>
-            用 Google {mode === 'register' ? '注册' : '登录'}
-          </span>
-        </motion.button>
-
-        {/* ── LINE按钮（次要） ── */}
-        <motion.button
-          whileTap={{ scale: 0.97 }}
-          onClick={handleLine}
-          disabled={lineLoading}
-          style={{ ...styles.btnLineSecondary, opacity: lineLoading ? 0.8 : 1 }}
-        >
-          {lineLoading ? (
-            <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-              <motion.div
-                animate={{ rotate: 360 }}
-                transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
-                style={{ width: 18, height: 18, border: '2px solid rgba(6,199,85,0.3)', borderTopColor: '#06C755', borderRadius: '50%' }}
-              />
-              正在跳转 LINE…
-            </span>
-          ) : (
-            <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="#06C755">
-                <path d="M19.365 9.863c.349 0 .63.285.63.631 0 .345-.281.63-.63.63H17.61v1.125h1.755c.349 0 .63.283.63.630 0 .344-.281.629-.63.629h-2.386c-.345 0-.627-.285-.627-.629V8.108c0-.345.282-.63.627-.63h2.386c.349 0 .63.285.63.63 0 .349-.281.63-.63.63H17.61v1.125h1.755zm-3.855 3.016c0 .27-.174.51-.432.596-.064.021-.133.031-.199.031-.211 0-.391-.09-.51-.25l-2.443-3.317v2.94c0 .344-.279.629-.631.629-.346 0-.626-.285-.626-.629V8.108c0-.27.173-.51.43-.595.06-.023.136-.033.194-.033.195 0 .375.104.495.254l2.462 3.33V8.108c0-.345.282-.63.63-.63.345 0 .63.285.63.63v4.771zm-5.741 0c0 .344-.282.629-.631.629-.345 0-.627-.285-.627-.629V8.108c0-.345.282-.63.627-.63.349 0 .631.285.631.63v4.771zm-2.466.629H4.917c-.345 0-.627-.285-.627-.629V8.108c0-.345.282-.63.627-.63.349 0 .631.285.631.63v4.141h1.755c.349 0 .63.283.63.630 0 .344-.281.629-.63.629M24 10.314C24 4.943 18.615.572 12 .572S0 4.943 0 10.314c0 4.811 4.27 8.842 10.035 9.608.391.082.923.258 1.058.59.12.301.079.766.038 1.08l-.164 1.02c-.045.301-.24 1.186 1.049.645 1.291-.539 6.916-4.078 9.436-6.975C23.176 14.393 24 12.458 24 10.314"/>
-              </svg>
-              <span style={{ fontSize: 15, fontWeight: 600, color: '#06C755' }}>
-                用 LINE {mode === 'register' ? '注册' : '登录'}
-              </span>
-            </span>
-          )}
-        </motion.button>
-
-        {/* ── 邮箱折叠入口 ── */}
-        <button
-          type="button"
-          onClick={() => setEmailExpanded(v => !v)}
-          style={styles.emailToggle}
-        >
-          {mode === 'register' ? '或用邮箱注册' : '或用邮箱登录'}
-          <span style={{ fontSize: 11, marginLeft: 4 }}>{emailExpanded ? '▴' : '▾'}</span>
-        </button>
-
-        {mode === 'register' && (
-          <div style={styles.trialHint}>
-            ✓ 30天免费体验全部功能 · 之后 $9.99/月，随时取消
+      {/* ── 主操作区 ── */}
+      <section style={S.actions}>
+        {(returnPath === '/upgrade' || returnPath.startsWith('/upgrade?')) && (
+          <div style={S.upgradeHint}>
+            登录后将带你继续开通根陪伴 Pro
           </div>
         )}
 
-        <AnimatePresence>
-          {emailExpanded && (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              exit={{ opacity: 0, height: 0 }}
-              style={{ overflow: 'hidden' }}
-            >
-              <input
-                value={email}
-                onChange={e => setEmail(e.target.value)}
-                placeholder="邮箱地址"
-                type="email"
-                autoComplete="email"
-                style={{ ...styles.input, marginTop: 4 }}
-              />
-              <input
-                value={password}
-                onChange={e => setPassword(e.target.value)}
-                placeholder="密码（6位以上）"
-                type="password"
-                autoComplete={mode === 'register' ? 'new-password' : 'current-password'}
-                onKeyDown={e => e.key === 'Enter' && handleSubmit()}
-                style={{ ...styles.input, marginBottom: mode === 'register' ? 16 : 20 }}
-              />
+        <motion.button
+          type="button"
+          whileTap={{ scale: googleLoading ? 1 : 0.98 }}
+          onClick={() => { void handleGoogle() }}
+          disabled={googleLoading || lineLoading}
+          style={S.googleBtn}
+        >
+          {googleLoading ? (
+            <Spinner color="var(--text-primary)" />
+          ) : (
+            <GoogleLogo />
+          )}
+          <span>{googleLoading ? '正在跳转 Google…' : '用 Google 账号登录'}</span>
+        </motion.button>
 
-              {/* ── 注册协议 ── */}
-              {mode === 'register' && (
-                <div style={{ marginBottom: 20 }}>
-                  <label style={styles.checkLabel}>
-                    <input
-                      type="checkbox"
-                      checked={consentPrivacy}
-                      onChange={e => setConsentPrivacy(e.target.checked)}
-                      style={styles.checkbox}
-                    />
-                    <span style={{ fontSize: 13, color: '#6B8BAA', lineHeight: 1.6 }}>
-                      我已阅读并同意
-                      <a href="/privacy" target="_blank" style={styles.link}>隐私政策</a>
-                      和
-                      <a href="/terms" target="_blank" style={styles.link}>服务条款</a>
-                      <span style={{ color: '#E8892A' }}> *</span>
-                    </span>
-                  </label>
-                  <label style={{ ...styles.checkLabel, marginBottom: 0 }}>
-                    <input
-                      type="checkbox"
-                      checked={consentAI}
-                      onChange={e => setConsentAI(e.target.checked)}
-                      style={styles.checkbox}
-                    />
-                    <span style={{ fontSize: 13, color: '#6B8BAA', lineHeight: 1.6 }}>
-                      可选：用于改进产品体验（匿名化使用数据）
-                    </span>
-                  </label>
-                </div>
-              )}
+        <motion.button
+          type="button"
+          whileTap={{ scale: lineLoading ? 1 : 0.98 }}
+          onClick={handleLine}
+          disabled={lineLoading || googleLoading}
+          style={S.lineBtn}
+        >
+          {lineLoading ? <Spinner color="#06C755" /> : <LineLogo />}
+          <span>{lineLoading ? '正在跳转 LINE…' : '用 LINE 账号登录'}</span>
+        </motion.button>
 
-              {/* ── 错误提示 ── */}
-              <AnimatePresence>
-                {error && (
-                  <motion.div
-                    initial={{ opacity: 0, y: -4 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0 }}
-                    style={{ fontSize: 13, color: '#E8892A', marginBottom: 12, textAlign: 'center', padding: '8px 12px', background: 'rgba(232,137,42,0.08)', borderRadius: 8 }}
-                  >
-                    {error}
-                  </motion.div>
-                )}
-              </AnimatePresence>
+        <div style={S.divider}>
+          <span style={S.dividerLine} />
+          <span style={S.dividerText}>或用邮箱</span>
+          <span style={S.dividerLine} />
+        </div>
 
-              {/* ── 提交按钮 ── */}
-              <motion.button
-                whileTap={{ scale: 0.97 }}
-                onClick={handleSubmit}
-                disabled={loading || !email || !password || (mode === 'register' && !consentPrivacy)}
+        <div style={S.tabRow} role="tablist" aria-label="登录或注册">
+          {(['login', 'register'] as const).map((tab) => {
+            const active = mode === tab
+            return (
+              <button
+                key={tab}
+                type="button"
+                role="tab"
+                aria-selected={active}
+                onClick={() => switchMode(tab)}
                 style={{
-                  ...styles.btnPrimary,
-                  opacity: (!email || !password || (mode === 'register' && !consentPrivacy)) ? 0.5 : 1,
-                  cursor: (!email || !password || (mode === 'register' && !consentPrivacy)) ? 'not-allowed' : 'pointer',
-                  marginBottom: 4,
+                  ...S.tabBtn,
+                  ...(active ? S.tabBtnActive : {}),
                 }}
               >
-                {loading ? '处理中…' : mode === 'register' ? '创建账号 →' : '登录 →'}
-              </motion.button>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        {/* ── 切换登录/注册 ── */}
-        <div style={{ textAlign: 'center', marginTop: 20, fontSize: 13, color: '#6B8BAA' }}>
-          {mode === 'register' ? '已有账号？' : '还没有账号？'}
-          <button
-            onClick={() => { setMode(mode === 'register' ? 'login' : 'register'); setError(''); setEmailExpanded(false) }}
-            style={{ background: 'none', border: 'none', color: '#E8892A', cursor: 'pointer', fontSize: 13, fontWeight: 600, marginLeft: 4 }}
-          >
-            {mode === 'register' ? '直接登录' : '立即注册'}
-          </button>
+                {tab === 'login' ? '登录' : '注册'}
+              </button>
+            )
+          })}
         </div>
-      </motion.div>
 
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;700&family=Noto+Sans+SC:wght@400;500;700&display=swap');
-        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-        input { font-family: 'Noto Sans SC', sans-serif; }
-        button { font-family: 'Noto Sans SC', sans-serif; }
-      `}</style>
+        <input
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          placeholder="邮箱地址"
+          type="email"
+          autoComplete="email"
+          style={S.input}
+        />
+        <input
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          placeholder={mode === 'register' ? '密码（6 位以上）' : '密码'}
+          type="password"
+          autoComplete={mode === 'register' ? 'new-password' : 'current-password'}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && !submitDisabled) void handleSubmit()
+          }}
+          style={{ ...S.input, marginBottom: mode === 'register' ? 12 : 8 }}
+        />
+
+        {error && <p style={S.errorText}>{error}</p>}
+
+        {mode === 'register' && (
+          <div style={{ marginBottom: 12 }}>
+            <label style={S.checkLabel}>
+              <input
+                type="checkbox"
+                checked={consentPrivacy}
+                onChange={(e) => setConsentPrivacy(e.target.checked)}
+                style={S.checkbox}
+              />
+              <span style={S.checkText}>
+                我已阅读并同意
+                <a href="/privacy" target="_blank" rel="noopener noreferrer" style={S.link}>隐私政策</a>
+                和
+                <a href="/terms" target="_blank" rel="noopener noreferrer" style={S.link}>服务条款</a>
+                <span style={{ color: 'var(--pri-red-dot)' }}> *</span>
+              </span>
+            </label>
+            <label style={{ ...S.checkLabel, marginBottom: 0 }}>
+              <input
+                type="checkbox"
+                checked={consentAI}
+                onChange={(e) => setConsentAI(e.target.checked)}
+                style={S.checkbox}
+              />
+              <span style={S.checkText}>可选：用于改进产品体验（匿名化使用数据）</span>
+            </label>
+            <p style={S.trialHint}>✓ 30 天免费体验全部功能 · 之后 $9.99/月，随时取消</p>
+          </div>
+        )}
+
+        <button
+          type="button"
+          className="gc-btn"
+          onClick={() => { void handleSubmit() }}
+          disabled={submitDisabled}
+          style={{
+            width: '100%',
+            height: 56,
+            opacity: submitDisabled ? 0.55 : 1,
+            cursor: submitDisabled ? 'not-allowed' : 'pointer',
+          }}
+        >
+          {loading ? '处理中…' : mode === 'login' ? '登录' : '注册'}
+        </button>
+
+        <div style={S.footer}>
+          <p style={S.footerSwitch}>
+            {mode === 'login' ? '还没有账号？' : '已有账号？'}
+            <button
+              type="button"
+              onClick={() => switchMode(mode === 'login' ? 'register' : 'login')}
+              style={S.footerLinkBtn}
+            >
+              {mode === 'login' ? '注册' : '登录'}
+            </button>
+          </p>
+          <p style={S.footerLegal}>
+            <a href="/privacy" target="_blank" rel="noopener noreferrer" style={S.link}>隐私政策</a>
+            <span style={{ margin: '0 8px', opacity: 0.35 }}>·</span>
+            <a href="/terms" target="_blank" rel="noopener noreferrer" style={S.link}>服务条款</a>
+          </p>
+        </div>
+      </section>
+
+      <style>{SPIN_KEYFRAMES}</style>
     </main>
   )
 }
 
-const styles = {
-  main: {
+const SPIN_KEYFRAMES = `
+  @keyframes authSpin {
+    to { transform: rotate(360deg); }
+  }
+`
+
+const S: Record<string, React.CSSProperties> = {
+  page: {
     minHeight: '100dvh',
-    backgroundColor: '#fbf9f6',
     display: 'flex',
+    flexDirection: 'column',
+    backgroundColor: 'var(--canvas-light)',
+    fontFamily: 'var(--font-body)',
+  },
+  brand: {
+    minHeight: '40vh',
+    display: 'flex',
+    flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: '20px 16px',
-    fontFamily: "'Noto Sans SC', sans-serif",
-  } as React.CSSProperties,
-
-  card: {
-    width: '100%',
-    maxWidth: 400,
-    background: '#FFFFFF',
-    borderRadius: 24,
-    padding: '36px 28px 32px',
-    boxShadow: '0 8px 40px rgba(45,63,74,0.10)',
-  } as React.CSSProperties,
-
-  btnGooglePrimary: {
-    width: '100%',
-    padding: '18px 16px',
-    background: '#2d322f',
-    color: '#fff',
-    border: 'none',
-    borderRadius: 16,
+    padding: '32px 24px 20px',
+    textAlign: 'center',
+  },
+  logoMark: {
+    fontSize: 28,
+    lineHeight: 1,
+    marginBottom: 6,
+  },
+  logoWordmark: {
+    margin: '0 0 16px',
+    fontFamily: 'var(--font-serif)',
+    fontSize: 11,
+    letterSpacing: '0.45em',
+    color: 'var(--clay)',
+    fontWeight: 500,
+  },
+  heroTitle: {
+    margin: 0,
+    fontFamily: 'var(--font-serif)',
+    fontSize: 48,
+    fontWeight: 300,
+    color: 'var(--clay)',
+    lineHeight: 1.1,
+  },
+  heroSubtitle: {
+    margin: '10px 0 18px',
+    fontFamily: 'var(--font-serif)',
     fontSize: 16,
-    fontWeight: 700,
-    cursor: 'pointer',
-    marginBottom: 10,
+    fontWeight: 300,
+    color: 'var(--fg2)',
+    lineHeight: 1.6,
+  },
+  valueList: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 6,
+    alignItems: 'center',
+  },
+  valueItem: {
+    fontSize: 12,
+    color: 'var(--fg3)',
+    fontFamily: 'var(--font-body)',
+    lineHeight: 1.5,
+  },
+  actions: {
+    flex: 1,
+    width: '100%',
+    maxWidth: 420,
+    margin: '0 auto',
+    padding: '8px 20px max(calc(env(safe-area-inset-bottom) + 24px), 32px)',
+  },
+  upgradeHint: {
+    marginBottom: 14,
+    padding: '10px 14px',
+    borderRadius: 12,
+    background: 'var(--clay-tint)',
+    border: '1px solid var(--line-clay)',
+    fontSize: 13,
+    color: 'var(--clay)',
+    lineHeight: 1.6,
+    textAlign: 'center',
+  },
+  googleBtn: {
+    width: '100%',
+    height: 56,
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 12,
-    boxShadow: '0 6px 20px rgba(45,50,47,0.25)',
-    transition: 'all 0.2s',
-  } as React.CSSProperties,
-
-  btnLineSecondary: {
-    width: '100%',
-    padding: '14px 16px',
     background: '#fff',
-    color: '#06C755',
-    border: '1.5px solid rgba(6,199,85,0.35)',
-    borderRadius: 14,
-    fontSize: 15,
-    fontWeight: 600,
+    border: '1px solid rgba(45,50,47,0.15)',
+    borderRadius: 16,
+    boxShadow: 'var(--sh-soft)',
+    fontFamily: 'var(--font-body)',
+    fontSize: 16,
+    color: 'var(--text-primary)',
     cursor: 'pointer',
-    marginBottom: 12,
+    marginBottom: 10,
+  },
+  lineBtn: {
+    width: '100%',
+    height: 48,
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    transition: 'all 0.2s',
-  } as React.CSSProperties,
-
-  emailToggle: {
-    width: '100%',
-    padding: '8px 0',
-    background: 'none',
-    border: 'none',
-    fontSize: 13,
-    color: '#6B8BAA',
-    cursor: 'pointer',
-    textAlign: 'center',
-    marginBottom: 8,
-  } as React.CSSProperties,
-
-  trialHint: {
-    textAlign: 'center',
-    fontSize: 12,
-    color: '#a46355',
-    lineHeight: 1.6,
-    marginBottom: 16,
-    padding: '0 4px',
-  } as React.CSSProperties,
-
-  btnPrimary: {
-    width: '100%',
-    padding: '15px',
-    background: '#a46355',
-    color: '#fff',
-    border: 'none',
+    gap: 10,
+    background: '#fff',
+    border: '1px solid rgba(6,199,85,0.25)',
     borderRadius: 14,
+    boxShadow: 'var(--sh-soft)',
+    fontFamily: 'var(--font-body)',
     fontSize: 15,
-    fontWeight: 700,
+    color: '#06C755',
     cursor: 'pointer',
-    transition: 'all 0.2s',
-  } as React.CSSProperties,
-
+    marginBottom: 18,
+  },
   divider: {
     display: 'flex',
     alignItems: 'center',
     gap: 12,
     marginBottom: 16,
-  } as React.CSSProperties,
-
+  },
   dividerLine: {
     flex: 1,
     height: 1,
-    background: '#E8EFF6',
-  } as React.CSSProperties,
-
+    background: 'var(--line)',
+  },
   dividerText: {
     fontSize: 12,
-    color: '#9BB0C4',
-  } as React.CSSProperties,
-
+    color: 'var(--fg3)',
+    whiteSpace: 'nowrap',
+  },
+  tabRow: {
+    display: 'grid',
+    gridTemplateColumns: '1fr 1fr',
+    gap: 8,
+    marginBottom: 14,
+    padding: 4,
+    borderRadius: 14,
+    background: 'rgba(255,255,255,0.55)',
+    border: '1px solid var(--line)',
+  },
+  tabBtn: {
+    height: 40,
+    border: 'none',
+    borderRadius: 10,
+    background: 'transparent',
+    fontFamily: 'var(--font-body)',
+    fontSize: 14,
+    color: 'var(--fg3)',
+    cursor: 'pointer',
+    transition: 'background 0.2s, color 0.2s',
+  },
+  tabBtnActive: {
+    background: '#fff',
+    color: 'var(--text-primary)',
+    fontWeight: 600,
+    boxShadow: 'var(--sh-soft)',
+  },
   input: {
     width: '100%',
-    padding: '14px 16px',
-    border: '1.5px solid rgba(164,99,85,0.15)',
-    borderRadius: 12,
+    height: 52,
+    padding: '0 16px',
+    border: '1px solid var(--line-clay)',
+    borderRadius: 14,
     fontSize: 15,
-    color: '#2d322f',
+    fontFamily: 'var(--font-body)',
+    color: 'var(--text-primary)',
+    background: 'rgba(255,255,255,0.72)',
     outline: 'none',
-    marginBottom: 12,
-    background: '#f7f4ee',
-    transition: 'border 0.2s, box-shadow 0.2s',
-  } as React.CSSProperties,
-
+    marginBottom: 10,
+  },
+  errorText: {
+    margin: '0 0 10px',
+    fontSize: 13,
+    lineHeight: 1.5,
+    color: 'var(--pri-red-dot)',
+    fontFamily: 'var(--font-body)',
+  },
   checkLabel: {
     display: 'flex',
     alignItems: 'flex-start',
     gap: 10,
-    marginBottom: 12,
+    marginBottom: 10,
     cursor: 'pointer',
-  } as React.CSSProperties,
-
+  },
   checkbox: {
     marginTop: 3,
-    accentColor: '#a46355',
+    accentColor: 'var(--clay)',
     flexShrink: 0,
     width: 16,
     height: 16,
-  } as React.CSSProperties,
-
+  },
+  checkText: {
+    fontSize: 13,
+    color: 'var(--fg2)',
+    lineHeight: 1.6,
+    fontFamily: 'var(--font-body)',
+  },
+  trialHint: {
+    margin: '10px 0 0',
+    fontSize: 12,
+    color: 'var(--clay)',
+    lineHeight: 1.5,
+  },
+  footer: {
+    marginTop: 20,
+    textAlign: 'center',
+  },
+  footerSwitch: {
+    margin: '0 0 10px',
+    fontSize: 13,
+    color: 'var(--fg3)',
+    fontFamily: 'var(--font-body)',
+  },
+  footerLinkBtn: {
+    background: 'none',
+    border: 'none',
+    color: 'var(--clay)',
+    fontSize: 13,
+    fontWeight: 600,
+    cursor: 'pointer',
+    marginLeft: 4,
+    fontFamily: 'var(--font-body)',
+  },
+  footerLegal: {
+    margin: 0,
+    fontSize: 12,
+    color: 'var(--fg3)',
+    fontFamily: 'var(--font-body)',
+  },
   link: {
-    color: '#2d322f',
+    color: 'var(--text-primary)',
     textDecoration: 'underline',
-    margin: '0 3px',
-  } as React.CSSProperties,
+    margin: '0 2px',
+  },
+  verifyCard: {
+    width: '100%',
+    maxWidth: 400,
+    margin: 'auto',
+    padding: '36px 28px',
+    background: 'rgba(255,255,255,0.88)',
+    borderRadius: 24,
+    boxShadow: 'var(--sh-soft)',
+    textAlign: 'center',
+  },
+  verifyTitle: {
+    margin: '0 0 8px',
+    fontFamily: 'var(--font-serif)',
+    fontSize: 20,
+    fontWeight: 600,
+    color: 'var(--text-primary)',
+  },
+  verifyDesc: {
+    margin: '0 0 20px',
+    fontSize: 14,
+    color: 'var(--fg2)',
+    lineHeight: 1.8,
+    fontFamily: 'var(--font-body)',
+  },
 }
