@@ -15,6 +15,7 @@ import HotspotPreferences from '@/app/_shared/_components/HotspotPreferences'
 import { logOrAlertNetworkError } from '@/lib/errors/logOrAlertNetworkError'
 import { track } from '@/lib/analytics/track'
 import { resolveHotspotLink, hotspotSearchUrl } from '@/lib/hotspot/url'
+import { shouldShowHotspotOneKey } from '@/lib/action/oneKeyEligibility'
 
 const HOTSPOT_GLASS: React.CSSProperties = {
   background: 'rgba(255,255,255,0.8)',
@@ -50,6 +51,16 @@ function timeAgo(dateStr: string): string {
   return `${Math.floor(hrs / 24)}天前`
 }
 
+function shouldShowOneKey(hotspot: HotspotItem): boolean {
+  return shouldShowHotspotOneKey({
+    action_available: hotspot.action_available,
+    source: (hotspot.action_data as BrainHotspotActionData | undefined)?.source,
+    linked_todo_id: hotspot.linked_todo_id,
+    category: hotspot.category,
+    action_data: hotspot.action_data as Record<string, unknown> | undefined,
+  })
+}
+
 function HotspotCard({ item, onRead, onActionModal, onConvertTodo }: {
   item: HotspotItem
   onRead: () => void
@@ -68,7 +79,7 @@ function HotspotCard({ item, onRead, onActionModal, onConvertTodo }: {
   const consumed = isConsumed(item.status)
   const isUrgent = item.urgency === 'urgent'
   const isImportant = item.urgency === 'important'
-  const showActionButton = (isUrgent || isImportant) && item.action_available
+  const showOneKey = shouldShowOneKey(item)
   const sourceLink = resolveHotspotLink(item)
   const externalHref = sourceLink || hotspotSearchUrl(displayTitle || titleStr)
   const externalLabel = sourceLink ? '打开来源' : '搜索更多'
@@ -193,7 +204,7 @@ function HotspotCard({ item, onRead, onActionModal, onConvertTodo }: {
                 <p style={{ fontSize: 11, color: '#7d3f37', marginBottom: 8 }}>添加失败，请重试</p>
               )}
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                {showActionButton && (
+                {showOneKey ? (
                   <motion.button whileTap={{ scale: 0.92 }}
                     onClick={e => { e.stopPropagation(); onActionModal() }}
                     style={{ display: 'flex', alignItems: 'center', gap: 5,
@@ -202,6 +213,33 @@ function HotspotCard({ item, onRead, onActionModal, onConvertTodo }: {
                       color: '#fff', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
                     ⚡ 一键处理
                   </motion.button>
+                ) : (
+                  <motion.a
+                    whileTap={{ scale: 0.92 }}
+                    href={externalHref}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={e => {
+                      e.stopPropagation()
+                      if (!consumed) onRead()
+                    }}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 5,
+                      padding: '8px 14px',
+                      borderRadius: 20,
+                      border: 'none',
+                      background: isUrgent ? '#d58074' : '#b88e5e',
+                      color: '#fff',
+                      fontSize: 12,
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      textDecoration: 'none',
+                    }}
+                  >
+                    <ExternalLink size={12} /> 了解更多
+                  </motion.a>
                 )}
                 <motion.button whileTap={{ scale: 0.92 }}
                   onClick={handleConvert} disabled={converting}
@@ -419,6 +457,9 @@ export default function HotspotSheet({ hotspots, onClose, onPatrol, patrolling, 
             }
             hotspot_summary={selectedHotspot.summary}
             hotspot_action_data={selectedHotspot.action_data as BrainHotspotActionData | undefined}
+            hotspot_action_available={selectedHotspot.action_available}
+            hotspot_linked_todo_id={selectedHotspot.linked_todo_id}
+            hotspot_source_url={selectedHotspot.source_url}
             userId={userId}
             onClose={() => setSelectedHotspot(null)}
             onDone={() => { onRead(selectedHotspot.id); setSelectedHotspot(null) }}

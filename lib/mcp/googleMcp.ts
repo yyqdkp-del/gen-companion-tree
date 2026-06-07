@@ -1,6 +1,7 @@
 import { addCalendarEvent } from '@/lib/google/calendar'
 import { createGmailDraft as createGmailDraftApi, sendGmail, sendGmailDraft as sendGmailDraftApi } from '@/lib/google/gmail'
 import { getValidAccessToken } from '@/lib/google/tokenStore'
+import { AI_MODELS } from '@/lib/ai/models'
 
 const GMAIL_MCP_URL = 'https://gmail.mcp.claude.com/mcp'
 const CALENDAR_MCP_URL = 'https://calendar.mcp.claude.com/mcp'
@@ -77,7 +78,7 @@ async function callAnthropicMcp(
         'anthropic-beta': 'mcp-client-2025-04-04',
       },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
+        model: AI_MODELS.claude.default,
         max_tokens: 1000,
         mcp_servers: [{ type: 'url', url: mcpUrl, name: mcpName }],
         messages: [{ role: 'user', content: prompt }],

@@ -6,13 +6,41 @@ import {
   searchNearby,
   searchRealtimeInfo,
 } from '@/lib/intelligence/realtime'
+import { AI_MODELS } from '@/lib/ai/models'
+import { formatMemoryForClaude } from '@/lib/memory/familyMemory'
 import { lookupAirlinePhone } from '@/lib/knowledge/base'
+import { getEmergencyPhone } from '@/lib/trust/emergencyContacts'
+import {
+  normalizeSourceLevel,
+  resolveItemDisclaimer,
+  SOURCE_CONFIG,
+} from '@/lib/trust/sourceLabel'
 
 type ToolInput = Record<string, unknown>
 
 type DecisionSession = {
-  phrases: PreparedItem[]
+  prepared: PreparedItem[]
   searchCache: Record<string, unknown>
+}
+
+const SERVICE_LABELS: Record<string, string> = {
+  hospital: '附近医院',
+  immigration: '移民局',
+  school: '学校',
+  shopping: '附近商店',
+  airport: '机场',
+  pharmacy: '药店',
+}
+
+function isEmergencyContext(context: FamilyContext, urgency?: unknown): boolean {
+  return urgency === 'emergency'
+    || context.child.healthStatus === 'emergency'
+    || /急诊|emergency|急救/.test(context.todo.title)
+}
+
+function pushPrepared(session: DecisionSession, item: PreparedItem): void {
+  const exists = session.prepared.some((p) => p.label === item.label && p.source === item.source)
+  if (!exists) session.prepared.push(item)
 }
 
 export const INTELLIGENT_TOOLS = [
@@ -72,7 +100,25 @@ export const INTELLIGENT_TOOLS = [
         next_step: { type: 'string' },
         key_facts: { type: 'array', items: { type: 'string' } },
         actions: { type: 'array', items: { type: 'object' } },
-        prepared: { type: 'array', items: { type: 'object' } },
+        prepared: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              type: {
+                type: 'string',
+                enum: ['checklist', 'draft', 'phrase', 'info', 'comparison'],
+              },
+              label: { type: 'string' },
+              content: {
+                type: 'string',
+                description: '必须填写实际内容，不能为空。checklist用换行分隔每项，draft是完整文本，phrase是话术文本',
+              },
+              copyable: { type: 'boolean' },
+            },
+            required: ['type', 'label', 'content'],
+          },
+        },
       },
       required: ['understand', 'insight', 'primary_action_label', 'done_message'],
     },
@@ -124,8 +170,12 @@ executor 规范（actions 内每项）：
 }
 
 function buildUserMessage(context: FamilyContext): string {
+  const memoryText = formatMemoryForClaude(context.familyMemory)
+
   return `当前家庭情境：
 ${JSON.stringify(context, null, 2)}
+
+${memoryText}
 
 请帮这位妈妈处理：${context.todo.title}
 
@@ -211,16 +261,62 @@ function parseAction(raw: unknown, index: number): RootAction | null {
   }
 }
 
-function parsePrepared(raw: unknown): PreparedItem | null {
-  if (!raw || typeof raw !== 'object') return null
-  const p = raw as Record<string, unknown>
+function parsePrepared(raw: unknown): PreparedItem {
+  const p = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>
+  const type = (p.type as PreparedItem['type']) || 'info'
+
+  const itemsField = p.items
+  const itemsContent = Array.isArray(itemsField)
+    ? itemsField
+      .map((i) => {
+        if (typeof i === 'string') return i
+        if (i && typeof i === 'object') {
+          const o = i as Record<string, unknown>
+          return String(o.item || o.name || o.label || JSON.stringify(i))
+        }
+        return String(i)
+      })
+      .filter(Boolean)
+      .join('\n')
+    : ''
+
+  const content =
+    p.content
+    ?? p.text
+    ?? p.body
+    ?? (itemsContent || undefined)
+    ?? p.value
+    ?? ''
+
+  const rawLabel = String(p.label || '信息')
+  const cleanLabel = rawLabel
+    .replace(/Thai/g, '泰语')
+    .replace(/视觉提取/g, 'AI生成')
+    .slice(0, 30)
+
+  const source = normalizeSourceLevel(p.source)
+
   return {
-    type: (p.type as PreparedItem['type']) || 'info',
-    label: String(p.label || '信息'),
-    content: p.content ?? '',
-    copyable: p.copyable !== false,
-    source: (p.source as PreparedItem['source']) || 'claude',
+    type,
+    label: cleanLabel,
+    content,
+    copyable: p.copyable !== undefined
+      ? Boolean(p.copyable)
+      : (type === 'draft' || type === 'phrase'),
+    source,
+    sourceUrl: p.sourceUrl ? String(p.sourceUrl) : undefined,
+    disclaimer: p.disclaimer
+      ? String(p.disclaimer)
+      : resolveItemDisclaimer(source) || undefined,
+    requiresConfirm: p.requiresConfirm === true || type === 'draft',
   }
+}
+
+function hasPreparedContent(item: PreparedItem): boolean {
+  if (item.content == null) return false
+  if (typeof item.content === 'string') return item.content.trim().length > 0
+  if (Array.isArray(item.content)) return item.content.length > 0
+  return true
 }
 
 function buildDecisionFromPresent(
@@ -236,8 +332,8 @@ function buildDecisionFromPresent(
 
   const rawPrepared = Array.isArray(input.prepared) ? input.prepared : []
   const prepared = [
-    ...session.phrases,
-    ...rawPrepared.map(parsePrepared).filter((p): p is PreparedItem => !!p),
+    ...session.prepared,
+    ...rawPrepared.map(parsePrepared).filter(hasPreparedContent),
   ]
 
   if (prepared.length === 0 && context.localInfo.visaPolicy) {
@@ -246,7 +342,9 @@ function buildDecisionFromPresent(
       label: '最新政策参考',
       content: context.localInfo.visaPolicy,
       copyable: true,
-      source: 'gemini',
+      source: 'official_search',
+      disclaimer: SOURCE_CONFIG.official_search.disclaimer,
+      requiresConfirm: false,
     })
   }
 
@@ -383,6 +481,39 @@ async function executeToolCall(
         urgency,
       })
       session.searchCache[serviceType] = results
+
+      if (isEmergencyContext(context, urgency)) {
+        const emergency = getEmergencyPhone(
+          context.mom.country || context.location.country,
+          'ambulance',
+        )
+        pushPrepared(session, {
+          type: 'info',
+          label: '急救电话',
+          content: emergency.phone,
+          copyable: true,
+          source: emergency.source,
+          disclaimer: '',
+          requiresConfirm: false,
+        })
+      }
+
+      if (results.length > 0) {
+        const top = results[0]
+        pushPrepared(session, {
+          type: 'info',
+          label: SERVICE_LABELS[serviceType] || '附近服务',
+          content: results,
+          copyable: false,
+          source: top.google_maps_url ? 'official_search' : 'ai_generated',
+          sourceUrl: top.google_maps_url || undefined,
+          disclaimer: top.google_maps_url
+            ? '建议出发前致电确认'
+            : SOURCE_CONFIG.ai_generated.disclaimer,
+          requiresConfirm: false,
+        })
+      }
+
       return results
     }
 
@@ -392,6 +523,19 @@ async function executeToolCall(
         context.location.city || context.mom.country,
       )
       session.searchCache.policy = text
+
+      if (text) {
+        pushPrepared(session, {
+          type: 'info',
+          label: '签证政策（实时搜索）',
+          content: text,
+          copyable: true,
+          source: 'official_search',
+          disclaimer: '政策可能变化，请以官网为准',
+          requiresConfirm: false,
+        })
+      }
+
       return text
     }
 
@@ -408,12 +552,14 @@ async function executeToolCall(
           : [],
       })
       if (text) {
-        session.phrases.push({
+        pushPrepared(session, {
           type: 'phrase',
-          label: `${targetLang}话术`,
+          label: `沟通话术（AI生成）`,
           content: text,
           copyable: true,
-          source: 'gemini',
+          source: 'ai_generated',
+          disclaimer: '请核对语意后再使用',
+          requiresConfirm: false,
         })
       }
       return text
@@ -428,7 +574,24 @@ export async function makeDecision(context: FamilyContext): Promise<RootDecision
   const apiKey = process.env.ANTHROPIC_API_KEY
   if (!apiKey) throw new Error('ANTHROPIC_API_KEY 未配置')
 
-  const session: DecisionSession = { phrases: [], searchCache: {} }
+  const session: DecisionSession = { prepared: [], searchCache: {} }
+
+  if (isEmergencyContext(context)) {
+    const emergency = getEmergencyPhone(
+      context.mom.country || context.location.country,
+      'ambulance',
+    )
+    session.prepared.push({
+      type: 'info',
+      label: '急救电话',
+      content: emergency.phone,
+      copyable: true,
+      source: emergency.source,
+      disclaimer: '',
+      requiresConfirm: false,
+    })
+  }
+
   const messages: Array<{ role: string; content: unknown }> = [
     { role: 'user', content: buildUserMessage(context) },
   ]
@@ -444,7 +607,7 @@ export async function makeDecision(context: FamilyContext): Promise<RootDecision
         'anthropic-version': '2023-06-01',
       },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
+        model: AI_MODELS.claude.default,
         max_tokens: 4000,
         system: buildSystemPrompt(context),
         tools: INTELLIGENT_TOOLS,
@@ -533,7 +696,11 @@ export async function makeDecision(context: FamilyContext): Promise<RootDecision
         executor: {
           service: 'tel',
           method: 'dial',
-          params: { phone, name: '航空公司' },
+          params: {
+            phone,
+            name: '航空公司',
+            phone_source: 'knowledge_base',
+          },
         },
       })
     }

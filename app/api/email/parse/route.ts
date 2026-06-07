@@ -6,6 +6,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { addDaysToYmd, getTodayStr } from '@/lib/date/localDate'
 import { fetchResidentCity } from '@/lib/family/resolveResidentCity'
+import { AI_MODELS } from '@/lib/ai/models'
 import { extractEmailWithAttachments } from '@/lib/email/gmailExtract'
 import {
   extractFromAttachment,
@@ -519,7 +520,7 @@ async function parseEmailWithClaude(email: EmailInput, familyContext: string, ci
       'anthropic-version': '2023-06-01',
     },
     body: JSON.stringify({
-      model: 'claude-opus-4-5',
+      model: AI_MODELS.claude.powerful,
       max_tokens: 3000,
       messages: [{
         role: 'user',

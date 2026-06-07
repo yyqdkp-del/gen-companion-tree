@@ -10,6 +10,7 @@ import { isValidHotspotUrl } from '@/lib/hotspot/url'
 import { analyzeCorrelations } from '@/lib/brain/correlate'
 import { gatherFamilyDataForCorrelations } from '@/lib/brain/gatherFamilyData'
 import { saveCorrelatedInsights } from '@/lib/brain/saveCorrelatedInsights'
+import { AI_MODELS, geminiGenerateContentUrl } from '@/lib/ai/models'
 
 function normalizePatrolSourceUrl(item: Record<string, unknown>): string {
   const raw = String(item.source_url || (item.action_data as { url?: string } | undefined)?.url || '').trim()
@@ -371,7 +372,7 @@ async function callGemini(
 
   try {
     const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${process.env.GOOGLE_AI_API_KEY}`,
+      geminiGenerateContentUrl(process.env.GOOGLE_AI_API_KEY),
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -470,7 +471,7 @@ async function callClaude(
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
+        model: AI_MODELS.claude.default,
         max_tokens: 2000,
         messages: [{
           role: 'user',

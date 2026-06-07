@@ -1,4 +1,5 @@
 export const dynamic = 'force-dynamic'
+import { AI_MODELS } from '@/lib/ai/models'
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { getAuthUser } from '@/lib/auth/getAuthUser'
@@ -77,7 +78,7 @@ export async function POST(req: NextRequest) {
       'anthropic-version': '2023-06-01',
     },
     body: JSON.stringify({
-      model: 'claude-sonnet-4-20250514',
+      model: AI_MODELS.claude.default,
       max_tokens: 100,
       messages: [{ role: 'user', content: prompt }],
     }),
@@ -88,8 +89,28 @@ export async function POST(req: NextRequest) {
   try {
     const text = data.content?.[0]?.text || '{}'
     const result = JSON.parse(text)
-    await supabase.from('children').update({ energy: result.energy }).eq('id', childId).eq('user_id', userId)
-    return NextResponse.json({ ok: true, energy: result.energy, reason: result.reason })
+    const energyScore = Math.round(Number(result.energy) || 0)
+
+    await supabase
+      .from('children')
+      .update({ energy: energyScore })
+      .eq('id', childId)
+      .eq('user_id', userId)
+
+    await supabase
+      .from('child_daily_log')
+      .upsert(
+        {
+          user_id: userId,
+          child_id: childId,
+          date: today,
+          energy: energyScore,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'child_id,date' },
+      )
+
+    return NextResponse.json({ ok: true, energy: energyScore, reason: result.reason })
   } catch {
     return NextResponse.json({ ok: false, error: '评估失败' }, { status: 500 })
   }

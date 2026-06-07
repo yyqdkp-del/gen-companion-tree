@@ -5,6 +5,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getAuthUser } from '@/lib/auth/getAuthUser'
 import { createClient } from '@supabase/supabase-js'
 import Anthropic from '@anthropic-ai/sdk'
+import { AI_MODELS } from '@/lib/ai/models'
 
 function getSupabase() {
   return createClient(
@@ -57,7 +58,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const response = await anthropic.messages.create({
-      model: 'claude-haiku-4-5-20251001',
+      model: AI_MODELS.claude.fast,
       max_tokens: 500,
       messages: [
         {

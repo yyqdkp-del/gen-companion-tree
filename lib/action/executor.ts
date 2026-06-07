@@ -10,6 +10,11 @@ import {
 import { sendGmail } from '@/lib/google/gmail'
 import { CalendarService } from '@/lib/services/CalendarService'
 import { TodoService } from '@/lib/services/TodoService'
+import {
+  normalizeSourceLevel,
+  TRUSTED_PHONE_SOURCES,
+  type SourceLevel,
+} from '@/lib/trust/sourceLabel'
 
 async function executeGmail(
   executor: ActionExecutor,
@@ -201,6 +206,22 @@ async function executeExecutor(
 
     case 'tel': {
       const phone = String(executor.params.phone || '').replace(/\s/g, '')
+      const phoneSource = normalizeSourceLevel(executor.params.phone_source) as SourceLevel
+      const name = String(executor.params.name || '机构')
+
+      if (!phone) {
+        return { ok: false, error: 'missing phone' }
+      }
+
+      if (!TRUSTED_PHONE_SOURCES.includes(phoneSource)) {
+        console.warn('[executor] Untrusted phone source:', phoneSource)
+        return {
+          ok: true,
+          url: `https://www.google.com/search?q=${encodeURIComponent(`${name} official phone number`)}`,
+          message: 'untrusted_phone_search',
+        }
+      }
+
       return { ok: true, url: `tel:${phone}` }
     }
 

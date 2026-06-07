@@ -37,7 +37,9 @@ const DAY_NAMES: Record<string, string> = {
   fri: '周五',
 }
 
-const CLAUDE_MODEL = 'claude-sonnet-4-20250514'
+import { AI_MODELS } from '@/lib/ai/models'
+
+const CLAUDE_MODEL = AI_MODELS.claude.default
 
 function inferChildAge(birthdate?: string | null, grade?: string): number {
   if (birthdate) {

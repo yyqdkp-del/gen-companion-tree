@@ -1,3 +1,4 @@
+/** @deprecated 已由 useSmartPacking / family_packing_memory 取代 */
 import type { TimelineItem } from '@/app/_shared/_types'
 import {
   isItemDismissed,

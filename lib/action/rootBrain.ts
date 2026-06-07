@@ -1,6 +1,8 @@
 /** 根的大脑 — 类型定义（Claude 决策输出结构） */
 
+import type { FamilyMemory } from '@/lib/memory/familyMemory'
 import type { PlaceResult, UserLocation } from '@/lib/intelligence/realtime'
+import type { SourceLevel } from '@/lib/trust/sourceLabel'
 
 export interface RootDecision {
   understanding: {
@@ -43,7 +45,10 @@ export interface PreparedItem {
   label: string
   content: unknown
   copyable: boolean
-  source: 'claude' | 'gemini' | 'knowledge_base' | 'user_data'
+  source: SourceLevel
+  sourceUrl?: string
+  disclaimer?: string
+  requiresConfirm?: boolean
 }
 
 export interface ExecutionResult {
@@ -115,7 +120,9 @@ export interface FamilyContext {
   }
   localInfo: LocalInfo
   location: UserLocation
+  /** @deprecated 请优先使用 familyMemory.packingMemory */
   packingMemory: Record<string, unknown>[]
+  familyMemory: FamilyMemory
   mcp: {
     gmail: boolean
     calendar: boolean

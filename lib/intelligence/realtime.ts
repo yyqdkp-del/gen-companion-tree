@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { getUserLocation as getGeofenceUserLocation } from '@/lib/geofence'
 import { resolveResidentCity } from '@/lib/family/resolveResidentCity'
+import { geminiGenerateContentUrl } from '@/lib/ai/models'
 
 export interface UserLocation {
   city: string
@@ -25,9 +26,6 @@ export interface PlaceResult {
   has_chinese?: boolean
   has_english?: boolean
 }
-
-const GEMINI_MODEL = 'gemini-2.5-flash'
-const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`
 
 const COMMON_COORDS: Record<string, { lat: number; lng: number }> = {
   'chiang mai': { lat: 18.7883, lng: 98.9853 },
@@ -137,7 +135,7 @@ export async function searchNearby(params: {
 ${mapsSearchUrl}`
 
   try {
-    const response = await fetch(`${GEMINI_URL}?key=${key}`, {
+    const response = await fetch(geminiGenerateContentUrl(key), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -191,7 +189,7 @@ export async function searchRealtimeInfo(
   if (!key) return ''
 
   try {
-    const response = await fetch(`${GEMINI_URL}?key=${key}`, {
+    const response = await fetch(geminiGenerateContentUrl(key), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -225,7 +223,7 @@ async function geocodeCity(city: string): Promise<{ lat: number; lng: number }> 
   if (!apiKey || !city.trim()) return { lat: 13.7563, lng: 100.5018 }
 
   try {
-    const response = await fetch(`${GEMINI_URL}?key=${apiKey}`, {
+    const response = await fetch(geminiGenerateContentUrl(apiKey), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -262,7 +260,7 @@ async function getTimezone(city: string): Promise<string> {
   if (!apiKey || !city.trim()) return 'Asia/Bangkok'
 
   try {
-    const response = await fetch(`${GEMINI_URL}?key=${apiKey}`, {
+    const response = await fetch(geminiGenerateContentUrl(apiKey), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -364,7 +362,7 @@ export async function generateLocalPhrase(params: {
   if (!key) return ''
 
   try {
-    const response = await fetch(`${GEMINI_URL}?key=${key}`, {
+    const response = await fetch(geminiGenerateContentUrl(key), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({

@@ -2,8 +2,9 @@
  * 根的眼睛 — 统一视觉文档处理入口（Gemini 2.5 Flash）
  */
 
-const GEMINI_URL =
-  'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent'
+import { geminiVisionGenerateContentUrl } from '@/lib/ai/models'
+
+const GEMINI_URL = geminiVisionGenerateContentUrl()
 
 export type VisionMimeType = 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp'
 

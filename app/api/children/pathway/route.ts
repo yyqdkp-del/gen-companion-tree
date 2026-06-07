@@ -1,4 +1,5 @@
 export const dynamic = 'force-dynamic'
+import { AI_MODELS } from '@/lib/ai/models'
 export const maxDuration = 60
 
 import { NextRequest, NextResponse } from 'next/server'
@@ -379,7 +380,7 @@ ${JSON.stringify(nodesWithCompletion, null, 2)}
         'anthropic-version': '2023-06-01',
       },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
+      model: AI_MODELS.claude.default,
         max_tokens: 3000,
         system: '你只输出合法的JSON对象，不加任何其他内容、注释或markdown代码块标记。所有数字字段必须是整数，不能是字符串。',
         messages: [{ role: 'user', content: prompt }],

@@ -17,7 +17,10 @@ import {
 } from 'lucide-react'
 import type { BrainHotspotActionData, BrainSuggestedAction } from '@/app/_shared/_types'
 import type { PreparedItem, RootAction, RootDecision } from '@/lib/action/rootBrain'
+import { shouldShowHotspotOneKey, shouldShowTodoFullOneKey } from '@/lib/action/oneKeyEligibility'
+import { SOURCE_CONFIG, type SourceLevel } from '@/lib/trust/sourceLabel'
 import { formatThb } from '@/lib/realtime/exchangeRate'
+import { resolveHotspotLink, hotspotSearchUrl } from '@/lib/hotspot/url'
 
 const THEME = { text: '#2C3E50', gold: '#8a7355', muted: '#6B8BAA', navy: '#2d3f4a' }
 const G = { bg: '#E1F5EE', border: '#9FE1CB', mid: '#5DCAA5', deep: '#1D9E75', dark: '#0F6E56', darkest: '#085041' }
@@ -43,6 +46,9 @@ export type ActionModalProps = {
   hotspot_summary?: string
   /** 关联分析 action_data（source: brain） */
   hotspot_action_data?: BrainHotspotActionData | Record<string, unknown>
+  hotspot_action_available?: boolean
+  hotspot_linked_todo_id?: string | null
+  hotspot_source_url?: string | null
   // 用户
   userId: string
   // 回调
@@ -403,54 +409,297 @@ function getFreshExecutionPack(aiActionData?: any): ExecutionPack | null {
   const preparedAt = aiActionData?.prepared_at
   if (!pack || !preparedAt) return null
   const ageHours = (Date.now() - new Date(preparedAt).getTime()) / 3600000
-  if (ageHours >= 6) return null
+  if (ageHours >= 2) return null
   return pack as ExecutionPack
 }
 
 function getFreshRootDecision(aiActionData?: Record<string, unknown>): RootDecision | null {
   const decision = aiActionData?.root_decision as RootDecision | undefined
-  const preparedAt = aiActionData?.prepared_at as string | undefined
-  if (!decision || !preparedAt) return null
-  const ageHours = (Date.now() - new Date(preparedAt).getTime()) / 3600000
-  if (ageHours >= 6) return null
+  const cachedAt = (aiActionData?.cached_at || aiActionData?.prepared_at) as string | undefined
+  if (!decision || !cachedAt) return null
+  const ageHours = (Date.now() - new Date(cachedAt).getTime()) / 3600000
+  if (ageHours >= 2) return null
   return decision
 }
 
-const SOURCE_LABEL: Record<PreparedItem['source'], string> = {
-  claude: '根生成',
-  gemini: '视觉提取',
-  knowledge_base: '知识库',
-  user_data: '你的档案',
+function isPreparedItemVisible(item: PreparedItem): boolean {
+  if (item.content == null) return false
+  if (typeof item.content === 'string' && !item.content.trim()) return false
+  if (Array.isArray(item.content) && item.content.length === 0) return false
+  return true
+}
+
+function renderPreparedContent(item: PreparedItem): React.ReactNode {
+  if (
+    !item.content
+    && (!Array.isArray(item.content) || item.content.length === 0)
+  ) {
+    return null
+  }
+
+  if (item.type === 'checklist') {
+    const items = Array.isArray(item.content)
+      ? item.content
+      : String(item.content).split('\n').filter(Boolean)
+
+    if (items.length === 0) return null
+
+    return (
+      <div>
+        {items.map((i: unknown, idx: number) => {
+          const text = typeof i === 'string'
+            ? i
+            : (i && typeof i === 'object'
+              ? String((i as { item?: string; name?: string }).item
+                || (i as { name?: string }).name
+                || JSON.stringify(i))
+              : String(i))
+          return (
+            <div
+              key={idx}
+              style={{
+                display: 'flex',
+                gap: 10,
+                padding: '8px 0',
+                borderBottom: '1px solid rgba(45,50,47,0.06)',
+                fontSize: 14,
+                lineHeight: 1.5,
+              }}
+            >
+              <span style={{ color: 'var(--text-muted, rgba(45,50,47,0.45))' }}>□</span>
+              <span>{text}</span>
+            </div>
+          )
+        })}
+      </div>
+    )
+  }
+
+  if (item.type === 'draft' || item.type === 'phrase') {
+    const text = String(item.content)
+    if (!text.trim()) return null
+
+    return (
+      <div>
+        <div style={{
+          background: item.type === 'phrase' ? '#f0f6ef' : 'var(--canvas-warm, rgba(251,249,246,0.9))',
+          borderRadius: 12,
+          padding: 16,
+          fontSize: 13,
+          lineHeight: 1.8,
+          whiteSpace: 'pre-line',
+          fontFamily: item.type === 'phrase' ? 'var(--font-body, inherit)' : 'inherit',
+        }}>
+          {text}
+        </div>
+        {item.copyable && (
+          <button
+            type="button"
+            onClick={() => {
+              void navigator.clipboard.writeText(text)
+              toast('已复制', 'success')
+            }}
+            style={{
+              marginTop: 8,
+              background: 'transparent',
+              border: '1px solid var(--clay, #a46355)',
+              color: 'var(--clay, #a46355)',
+              borderRadius: 20,
+              padding: '4px 16px',
+              fontSize: 12,
+              cursor: 'pointer',
+              display: 'block',
+            }}
+          >
+            复制
+          </button>
+        )}
+      </div>
+    )
+  }
+
+  if (item.type === 'comparison') {
+    const data = typeof item.content === 'string'
+      ? (() => { try { return JSON.parse(item.content) } catch { return null } })()
+      : item.content as Record<string, unknown> | null
+
+    if (!data || typeof data !== 'object') {
+      return <div style={{ fontSize: 14 }}>{String(item.content)}</div>
+    }
+
+    const recommended = data.recommended as { label?: string; fee?: string; cny?: string } | undefined
+    const alternatives = (data.alternatives || []) as Array<{ label?: string; fee?: string }>
+
+    return (
+      <div>
+        {recommended && (
+          <div style={{
+            background: '#f0f6ef',
+            borderRadius: 10,
+            padding: '10px 14px',
+            marginBottom: 8,
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+          }}>
+            <span style={{ color: 'var(--accent-jade, #2D6A4F)', fontWeight: 600 }}>
+              ✓ {recommended.label}
+            </span>
+            <span style={{ fontWeight: 600, fontSize: 15 }}>
+              {recommended.fee}
+              {recommended.cny && ` · ¥${recommended.cny}`}
+            </span>
+          </div>
+        )}
+        {alternatives.map((alt, i) => (
+          <div
+            key={i}
+            style={{
+              padding: '8px 14px',
+              display: 'flex',
+              justifyContent: 'space-between',
+              color: 'var(--text-muted, rgba(45,50,47,0.45))',
+              fontSize: 13,
+            }}
+          >
+            <span>{alt.label}</span>
+            <span>{alt.fee}</span>
+          </div>
+        ))}
+      </div>
+    )
+  }
+
+  const text = typeof item.content === 'string'
+    ? item.content
+    : Array.isArray(item.content)
+      ? item.content.map((i: unknown) => (typeof i === 'string' ? i : JSON.stringify(i))).join('\n')
+      : JSON.stringify(item.content, null, 2)
+
+  if (!text.trim()) return null
+
+  return (
+    <div style={{
+      fontSize: 14,
+      lineHeight: 1.7,
+      whiteSpace: 'pre-line',
+    }}>
+      {text}
+    </div>
+  )
+}
+
+function SourceBadge({
+  source,
+  sourceUrl,
+}: {
+  source: SourceLevel
+  sourceUrl?: string
+}) {
+  const config = SOURCE_CONFIG[source] || SOURCE_CONFIG.ai_generated
+
+  return (
+    <div style={{
+      display: 'flex',
+      alignItems: 'center',
+      gap: 4,
+      marginBottom: 6,
+      flexWrap: 'wrap',
+    }}>
+      <span style={{
+        fontSize: 11,
+        color: config.color,
+        background: `${config.color}15`,
+        padding: '2px 8px',
+        borderRadius: 20,
+      }}>
+        {config.icon} {config.label}
+      </span>
+      {sourceUrl && (
+        <a
+          href={sourceUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{ fontSize: 11, color: THEME.muted, textDecoration: 'none' }}
+        >
+          查看来源 →
+        </a>
+      )}
+    </div>
+  )
 }
 
 function PreparedSection({ item }: { item: PreparedItem }) {
-  const contentStr = typeof item.content === 'string'
-    ? item.content
-    : JSON.stringify(item.content, null, 2)
+  const [confirmed, setConfirmed] = useState(!item.requiresConfirm)
+  const config = SOURCE_CONFIG[item.source] || SOURCE_CONFIG.ai_generated
+  const canUse = !item.requiresConfirm || confirmed
+  const body = renderPreparedContent(item)
 
-  const copy = () => {
-    if (!item.copyable) return
-    void navigator.clipboard.writeText(contentStr)
+  if (!body) return null
+
+  const copyPlainText = () => {
+    if (!item.copyable || !canUse) return
+    const text = typeof item.content === 'string'
+      ? item.content
+      : JSON.stringify(item.content, null, 2)
+    void navigator.clipboard.writeText(text)
     toast('已复制', 'success')
   }
 
   return (
     <div style={{
-      margin: '8px 12px 0', padding: '12px 14px', borderRadius: 12,
-      border: `0.5px solid ${G.border}`, background: 'rgba(255,255,255,0.75)',
+      margin: '8px 12px 0',
+      padding: '12px 14px',
+      borderRadius: 12,
+      border: item.requiresConfirm && !confirmed
+        ? `1px dashed ${config.color}`
+        : `0.5px solid ${G.border}`,
+      background: 'rgba(255,255,255,0.75)',
     }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 4 }}>
         <span style={{ fontSize: 12, fontWeight: 600, color: G.dark }}>{item.label}</span>
-        <span style={{ fontSize: 10, color: THEME.muted }}>{SOURCE_LABEL[item.source]}</span>
       </div>
+      <SourceBadge source={item.source} sourceUrl={item.sourceUrl} />
       <div style={{
-        fontSize: 13, color: THEME.text, lineHeight: 1.55, whiteSpace: 'pre-wrap',
-        maxHeight: 160, overflowY: 'auto',
+        fontSize: 13,
+        color: THEME.text,
+        lineHeight: 1.55,
+        maxHeight: item.type === 'checklist' ? undefined : 160,
+        overflowY: item.type === 'checklist' ? undefined : 'auto',
       }}>
-        {contentStr}
+        {body}
       </div>
-      {item.copyable && (
-        <motion.button whileTap={{ scale: 0.95 }} onClick={copy}
+      {item.disclaimer && (
+        <div style={{
+          fontSize: 11,
+          color: THEME.muted,
+          marginTop: 6,
+          fontStyle: 'italic',
+        }}>
+          ⓘ {item.disclaimer}
+        </div>
+      )}
+      {item.requiresConfirm && !confirmed && (
+        <motion.button
+          whileTap={{ scale: 0.95 }}
+          onClick={() => setConfirmed(true)}
+          style={{
+            marginTop: 8,
+            padding: '6px 12px',
+            borderRadius: 8,
+            border: `0.5px solid ${config.color}`,
+            background: `${config.color}10`,
+            fontSize: 11,
+            color: config.color,
+            cursor: 'pointer',
+            fontWeight: 600,
+          }}
+        >
+          我已核对
+        </motion.button>
+      )}
+      {item.copyable && canUse && item.type !== 'draft' && item.type !== 'phrase' && (
+        <motion.button whileTap={{ scale: 0.95 }} onClick={copyPlainText}
           style={{
             marginTop: 8, padding: '6px 12px', borderRadius: 8, border: `0.5px solid ${G.border}`,
             background: G.bg, fontSize: 11, color: G.dark, cursor: 'pointer',
@@ -625,9 +874,11 @@ function RootDecisionPanel({
         </div>
       )}
 
-      {decision.prepared.map((item, i) => (
-        <PreparedSection key={`${item.label}-${i}`} item={item} />
-      ))}
+      {decision.prepared
+        .filter(isPreparedItemVisible)
+        .map((item, i) => (
+          <PreparedSection key={`${item.label}-${i}`} item={item} />
+        ))}
 
       <div style={{ padding: '12px 14px 0', display: 'flex', flexDirection: 'column', gap: 8 }}>
         {decision.actions.map((action) => {
@@ -1700,11 +1951,60 @@ function ActionsArea({ actions, userId, primaryIndex, primaryReason, sourceId, s
   )
 }
 
+function AdviceOnlyPanel({
+  summary,
+  learnMoreUrl,
+}: {
+  summary: string
+  learnMoreUrl?: string
+}) {
+  const href = learnMoreUrl || undefined
+  return (
+    <div style={{ padding: '16px 14px 8px' }}>
+      <p style={{ fontSize: 14, color: THEME.text, lineHeight: 1.7, margin: '0 0 14px', whiteSpace: 'pre-wrap' }}>
+        {summary}
+      </p>
+      {href && (
+        <motion.a
+          whileTap={{ scale: 0.95 }}
+          href={href}
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 6,
+            padding: '10px 16px',
+            borderRadius: 20,
+            background: G.bg,
+            border: `0.5px solid ${G.border}`,
+            color: G.dark,
+            fontSize: 13,
+            fontWeight: 600,
+            textDecoration: 'none',
+          }}
+        >
+          <ExternalLink size={14} /> 了解更多
+        </motion.a>
+      )}
+    </div>
+  )
+}
+
 // ══ 主组件 ══
+const LOADING_STEPS = [
+  '根正在理解这件事...',
+  '根正在搜索本地信息...',
+  '根正在准备方案...',
+  '马上就好...',
+]
+const LOADING_ICONS = ['🔍', '📍', '✍️', '✨']
+
 export default function ActionModal({
   source_type, source_id, title, category, urgency_level,
   due_date, event_data, child_name, ai_action_data,
   hotspot_summary, hotspot_action_data,
+  hotspot_action_available, hotspot_linked_todo_id, hotspot_source_url,
   userId,
   onClose, onDone, onSnooze, onSync, onBrainAction,
 }: ActionModalProps) {
@@ -1716,6 +2016,7 @@ export default function ActionModal({
   const [autoCompleted, setAutoCompleted] = useState<string[]>([])
   const [userActions, setUserActions] = useState<UserAction[]>([])
   const [loading, setLoading] = useState(false)
+  const [loadingStep, setLoadingStep] = useState(0)
   const [saving, setSaving] = useState(false)
   const [activeTab, setActiveTab] = useState<TabKey | null>(null)
 
@@ -1735,11 +2036,57 @@ export default function ActionModal({
   const brainData = isBrainHotspotData(hotspot_action_data) ? hotspot_action_data : null
   const isBrainMode = source_type === 'hotspot' && !!brainData
 
+  const showFullOneKey = isBrainMode || source_type === 'schedule' || (
+    source_type === 'todo'
+      ? shouldShowTodoFullOneKey({ due_date, urgency_level, category, ai_action_data })
+      : source_type === 'hotspot'
+        ? shouldShowHotspotOneKey({
+          action_available: hotspot_action_available,
+          source: brainData?.source,
+          linked_todo_id: hotspot_linked_todo_id,
+          category,
+          action_data: hotspot_action_data as Record<string, unknown> | undefined,
+        })
+        : true
+  )
+
+  const adviceSummary = hotspot_summary
+    || (source_type === 'todo'
+      ? '这条待办暂时没有明确截止行动，可以先查看详情再决定怎么处理。'
+      : title)
+  const learnMoreUrl = source_type === 'hotspot'
+    ? (hotspot_source_url || resolveHotspotLink({
+      source_url: hotspot_source_url,
+      action_data: hotspot_action_data as { url?: string } | undefined,
+    }) || hotspotSearchUrl(title))
+    : undefined
+
+  useEffect(() => {
+    if (!loading) {
+      setLoadingStep(0)
+      return
+    }
+    const timer = window.setInterval(() => {
+      setLoadingStep((prev) => Math.min(prev + 1, LOADING_STEPS.length - 1))
+    }, 3000)
+    return () => window.clearInterval(timer)
+  }, [loading])
+
   useEffect(() => {
     if (!source_id) return
     setActiveTab(null)
 
     if (isBrainMode) {
+      setPack(null)
+      setDecision(null)
+      setAutoCompleted([])
+      setUserActions([])
+      setBrainAutoCompleted([])
+      setLoading(false)
+      return
+    }
+
+    if (!showFullOneKey) {
       setPack(null)
       setDecision(null)
       setAutoCompleted([])
@@ -1822,7 +2169,7 @@ export default function ActionModal({
     })()
 
     return () => { cancelled = true }
-  }, [source_id, source_type, sessionReady, ai_action_data, event_data, child_name, onSync, router, isBrainMode])
+  }, [source_id, source_type, sessionReady, ai_action_data, event_data, child_name, onSync, router, isBrainMode, showFullOneKey])
 
   const brainUrgencyLevel: 1 | 2 | 3 =
     brainData?.urgency === 'high' ? 3
@@ -1938,24 +2285,35 @@ export default function ActionModal({
               />
             )}
 
+            {!isBrainMode && !showFullOneKey && (
+              <AdviceOnlyPanel summary={adviceSummary} learnMoreUrl={learnMoreUrl} />
+            )}
+
             {/* 加载中 */}
-            {!isBrainMode && loading && !pack && !decision && (
-              <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
-                <div style={{ display: 'flex', gap: 6 }}>
-                  {[0,1,2].map(i => (
-                    <motion.div key={i} animate={{ opacity: [0.3,1,0.3], y: [0,-4,0] }}
-                      transition={{ duration: 1, repeat: Infinity, delay: i * 0.2 }}
-                      style={{ width: 7, height: 7, borderRadius: '50%', background: THEME.gold }} />
-                  ))}
+            {!isBrainMode && showFullOneKey && loading && !pack && !decision && (
+              <div style={{ textAlign: 'center', padding: '40px 20px' }}>
+                <div style={{ fontSize: 32, marginBottom: 16 }}>
+                  {LOADING_ICONS[loadingStep]}
                 </div>
-                <span style={{ fontSize: 12, color: THEME.muted }}>
-                  {!sessionReady ? '正在恢复会话…' : '根正在为你准备…'}
-                </span>
+                <div style={{
+                  fontSize: 15,
+                  color: 'var(--text-primary, #2d322f)',
+                  fontFamily: 'var(--font-body, inherit)',
+                }}>
+                  {!sessionReady ? '正在恢复会话…' : LOADING_STEPS[loadingStep]}
+                </div>
+                <div style={{
+                  marginTop: 8,
+                  fontSize: 12,
+                  color: 'var(--text-muted, rgba(45,50,47,0.45))',
+                }}>
+                  通常需要10-20秒
+                </div>
               </div>
             )}
 
             {/* 根大脑决策（Claude 驱动） */}
-            {!isBrainMode && useRootBrain && decision && (
+            {!isBrainMode && showFullOneKey && useRootBrain && decision && (
               <RootDecisionPanel
                 decision={decision}
                 userId={userId}
@@ -1966,10 +2324,10 @@ export default function ActionModal({
             )}
 
             {/* AI 摘要 */}
-            {!isBrainMode && !useRootBrain && pack && !useAutoLayout && <AiSummaryCard pack={pack} />}
+            {!isBrainMode && showFullOneKey && !useRootBrain && pack && !useAutoLayout && <AiSummaryCard pack={pack} />}
 
             {/* 根自动完成 + 用户必做（旧版兼容） */}
-            {!isBrainMode && !useRootBrain && pack && useAutoLayout && (
+            {!isBrainMode && showFullOneKey && !useRootBrain && pack && useAutoLayout && (
               <AutoExecutePanel
                 autoCompleted={autoCompleted}
                 userActions={userActions}
@@ -1982,7 +2340,7 @@ export default function ActionModal({
             )}
 
             {/* 标签页 */}
-            {!isBrainMode && !useRootBrain && pack && !useAutoLayout && (
+            {!isBrainMode && showFullOneKey && !useRootBrain && pack && !useAutoLayout && (
               <div style={{ display: 'flex', gap: 5, padding: '10px 12px 0' }}>
                 {tabs.filter(t => hasTab(t.key)).map(tab => {
                   const isOpen = activeTab === tab.key
@@ -2028,7 +2386,7 @@ export default function ActionModal({
               </div>
             )}
 
-            {pack && !useRootBrain && !useAutoLayout && (
+            {showFullOneKey && pack && !useRootBrain && !useAutoLayout && (
               <>
                 <div style={{ height: '0.5px', background: 'rgba(0,0,0,0.06)', margin: '10px 12px 0' }} />
                 <ActionsArea
@@ -2043,7 +2401,7 @@ export default function ActionModal({
               </>
             )}
 
-            {!isBrainMode && !pack && !decision && !loading && (
+            {!isBrainMode && showFullOneKey && !pack && !decision && !loading && (
               <div style={{ padding: '32px 20px', textAlign: 'center' }}>
                 <div style={{ fontSize: 13, color: THEME.muted }}>暂时无法加载执行包</div>
               </div>

@@ -168,6 +168,7 @@ export type HotspotItem = {
   action_available: boolean
   action_type?: string
   action_data?: { url?: string } | BrainHotspotActionData
+  linked_todo_id?: string | null
   status: HotspotStatus
   created_at: string
 }

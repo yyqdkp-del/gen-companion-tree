@@ -1,4 +1,5 @@
 export const dynamic = 'force-dynamic'
+import { AI_MODELS } from '@/lib/ai/models'
 
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthUser } from '@/lib/auth/getAuthUser'
@@ -24,7 +25,7 @@ const anthropic = new Anthropic()
 
 async function callClaudeLetter(prompt: string, maxTokens = 1500) {
   const message = await anthropic.messages.create({
-    model: 'claude-sonnet-4-20250514',
+    model: AI_MODELS.claude.default,
     max_tokens: maxTokens,
     messages: [{ role: 'user', content: prompt }],
   })

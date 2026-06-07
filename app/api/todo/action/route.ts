@@ -6,6 +6,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { getAuthUser } from '@/lib/auth/getAuthUser'
 import { fetchResidentCity } from '@/lib/family/resolveResidentCity'
+import { AI_MODELS } from '@/lib/ai/models'
 
 const MAKE_WEBHOOK_URL = process.env.NEXT_PUBLIC_MAKE_WEBHOOK_URL || ''
 
@@ -26,7 +27,7 @@ async function sendEmail(todo: any, actionData: any): Promise<string> {
         'anthropic-beta': 'mcp-client-2025-04-04',
       },
       body: JSON.stringify({
-        model: 'claude-opus-4-5',
+        model: AI_MODELS.claude.powerful,
         max_tokens: 1000,
         mcp_servers: [{
           type: 'url',

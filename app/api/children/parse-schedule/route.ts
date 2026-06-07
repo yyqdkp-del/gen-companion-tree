@@ -18,6 +18,7 @@ import {
   type WeekSchedule,
 } from '@/lib/schedule/normalizeSchedule'
 import { createClient } from '@supabase/supabase-js'
+import { AI_MODELS } from '@/lib/ai/models'
 
 const DAYS = ['mon', 'tue', 'wed', 'thu', 'fri'] as const
 const DAY_KEY_ALIASES: Record<string, (typeof DAYS)[number]> = {
@@ -30,7 +31,7 @@ const DAY_KEY_ALIASES: Record<string, (typeof DAYS)[number]> = {
 const CATEGORY_SET = new Set(['class', 'life', 'break', 'transition', 'activity'] as const)
 type ScheduleCategory = 'class' | 'life' | 'break' | 'transition' | 'activity'
 
-const CLAUDE_MODEL = 'claude-haiku-4-5-20251001'
+const CLAUDE_MODEL = AI_MODELS.claude.fast
 
 type VisionMediaType = 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp'
 const VISION_MEDIA_TYPES = new Set<VisionMediaType>(['image/jpeg', 'image/png', 'image/gif', 'image/webp'])

@@ -13,6 +13,7 @@ import { getUserHour } from '@/lib/geofence'
 import { getTodayWeather } from '@/lib/realtime/weather'
 import { parseThbAmount } from '@/lib/realtime/exchangeRate'
 import { FamilyService } from '@/lib/services/FamilyService'
+import { getFamilyMemory } from '@/lib/memory/familyMemory'
 
 const DOW_KEY_BY_NUM: Record<number, string> = {
   0: 'sun', 1: 'mon', 2: 'tue', 3: 'wed', 4: 'thu', 5: 'fri', 6: 'sat',
@@ -232,15 +233,15 @@ export async function buildFamilyContext(
   const dimension = String(todo?.category || todo?.dimension || 'education')
   const title = String(todo?.title || '')
 
-  const childContext = await enrichChildContext(
-    supabase,
-    userId,
-    childId || undefined,
-    activeChild,
-  )
-
   const weatherCity = location.city || undefined
-  const [weather, exchange, localInfo] = await Promise.all([
+  const [childContext, familyMemory, weather, exchange, localInfo] = await Promise.all([
+    enrichChildContext(
+      supabase,
+      userId,
+      childId || undefined,
+      activeChild,
+    ),
+    getFamilyMemory(userId, childId, supabase),
     weatherCity ? getTodayWeather(weatherCity) : Promise.resolve(null),
     getExchangeRate(),
     getLocalInfo(dimension, title, location),
@@ -295,6 +296,7 @@ export async function buildFamilyContext(
     localInfo,
     location,
     packingMemory: (packingResult.data || []) as Record<string, unknown>[],
+    familyMemory,
     mcp: {
       gmail: gmailConnected,
       calendar: calendarConnected,

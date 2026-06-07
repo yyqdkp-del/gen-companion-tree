@@ -2,6 +2,7 @@ export const dynamic = 'force-dynamic'
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { getAuthUser } from '@/lib/auth/getAuthUser'
+import { AI_MODELS } from '@/lib/ai/models'
 
 const rateLimit = new Map<string, { count: number; reset: number }>()
 
@@ -127,7 +128,7 @@ export async function POST(req: NextRequest) {
         'anthropic-version': '2023-06-01',
       },
       body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001',
+        model: AI_MODELS.claude.fast,
         max_tokens: 2000,
         system: `你是专业的海外华人中文教育专家。只输出JSON对象，不加任何其他文字，不用代码块包裹，直接{开头}结尾。所有内容必须完整填写，不能有空字符串或null。mom_script必须口语化温暖，像邻居大姐说话，不像教科书。禁止出现「这个字的意思是」这类教科书句式。`,
         messages: [{ role: 'user', content: prompt }],

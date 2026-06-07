@@ -1,3 +1,4 @@
+/** @deprecated 已由 family_packing_memory + packing_confirm_logs 取代；保留只读兼容 */
 export type SubjectPackingPref = {
   items?: string[]
   dismissed?: string[]

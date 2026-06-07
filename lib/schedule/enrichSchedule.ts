@@ -6,7 +6,9 @@ import {
   type WeekSchedule,
 } from '@/lib/schedule/normalizeSchedule'
 
-const CLAUDE_MODEL = 'claude-haiku-4-5-20251001'
+import { AI_MODELS } from '@/lib/ai/models'
+
+const CLAUDE_MODEL = AI_MODELS.claude.fast
 
 async function callClaude(body: object, label: string): Promise<{ text: string; ok: boolean }> {
   const response = await fetch('https://api.anthropic.com/v1/messages', {

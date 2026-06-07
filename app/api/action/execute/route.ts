@@ -11,6 +11,7 @@ import { executeAction } from '@/lib/action/executor'
 import { fetchFormTemplates, enrichActionsWithFormTemplates } from '@/lib/action/enrichPDF'
 import { familyServicePromptLabel, resolveResidentCityFromFamilyData } from '@/lib/family/resolveResidentCity'
 import type { RootAction, RootDecision } from '@/lib/action/rootBrain'
+import { AI_MODELS } from '@/lib/ai/models'
 import { FamilyService } from '@/lib/services/FamilyService'
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -116,7 +117,7 @@ async function callClaude(prompt: string): Promise<any> {
       'anthropic-version': '2023-06-01',
     },
     body: JSON.stringify({
-      model: 'claude-sonnet-4-20250514',
+      model: AI_MODELS.claude.default,
       max_tokens: 4000,
       messages: [{ role: 'user', content: prompt }],
     }),
@@ -207,6 +208,30 @@ function rootDecisionResponseBody(
   }
 }
 
+const CACHE_DURATION_MS = 2 * 60 * 60 * 1000
+
+function isTodoDecisionCacheValid(
+  todo: Record<string, unknown>,
+  forceRefresh: boolean,
+): { valid: boolean; decision?: RootDecision } {
+  if (forceRefresh) return { valid: false }
+
+  const aiData = (todo.ai_action_data || {}) as Record<string, unknown>
+  const cachedDecision = aiData.root_decision as RootDecision | undefined
+  const cachedAt = String(aiData.cached_at || aiData.prepared_at || '')
+  if (!cachedDecision || !cachedAt) return { valid: false }
+
+  const cacheAge = Date.now() - new Date(cachedAt).getTime()
+  if (cacheAge >= CACHE_DURATION_MS) return { valid: false }
+
+  const todoUpdatedAt = todo.updated_at ? new Date(String(todo.updated_at)).getTime() : 0
+  if (todoUpdatedAt && new Date(cachedAt).getTime() <= todoUpdatedAt) {
+    return { valid: false }
+  }
+
+  return { valid: true, decision: cachedDecision }
+}
+
 async function runRootBrainForTodo(
   userId: string,
   todoId: string,
@@ -234,6 +259,7 @@ async function runRootBrainForTodo(
       ...(todo.ai_action_data as Record<string, unknown> || {}),
       root_decision: decision,
       prepared_at: new Date().toISOString(),
+      cached_at: new Date().toISOString(),
     },
   }).eq('id', todoId).eq('user_id', userId)
 
@@ -486,6 +512,9 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json()
+    const forceRefresh =
+      req.nextUrl.searchParams.get('refresh') === 'true'
+      || body.refresh === true
     const {
       source_type,
       source_id,
@@ -528,8 +557,8 @@ export async function POST(req: NextRequest) {
       .single()
 
     if (cached) {
-      const ageHours = (Date.now() - new Date(cached.created_at).getTime()) / 3600000
-      if (ageHours < 6) {
+      const cacheAge = Date.now() - new Date(cached.created_at).getTime()
+      if (cacheAge < CACHE_DURATION_MS && !forceRefresh) {
         const pack = cached.execution_pack || {}
         if (pack.root_decision) {
           return NextResponse.json(
@@ -566,26 +595,21 @@ export async function POST(req: NextRequest) {
       }
 
       // 读 todo_items 预生成缓存（RootDecision）
-      const cachedDecision = todo.ai_action_data?.root_decision as RootDecision | undefined
-      const preparedAt = todo.ai_action_data?.prepared_at
+      const cacheCheck = isTodoDecisionCacheValid(todo, forceRefresh)
+      if (cacheCheck.valid && cacheCheck.decision) {
+        const actionQueueId = await upsertActionQueue(
+          userId,
+          resolvedSourceType,
+          resolvedSourceId,
+          todo.title,
+          todo.category || 'other',
+          todo.priority === 'red' ? 3 : todo.priority === 'orange' ? 2 : 1,
+          { root_decision: cacheCheck.decision },
+        )
 
-      if (cachedDecision && preparedAt) {
-        const ageHours = (Date.now() - new Date(preparedAt).getTime()) / 3600000
-        if (ageHours < 6) {
-          const actionQueueId = await upsertActionQueue(
-            userId,
-            resolvedSourceType,
-            resolvedSourceId,
-            todo.title,
-            todo.category || 'other',
-            todo.priority === 'red' ? 3 : todo.priority === 'orange' ? 2 : 1,
-            { root_decision: cachedDecision },
-          )
-
-          return NextResponse.json(
-            rootDecisionResponseBody(cachedDecision, [], actionQueueId, true),
-          )
-        }
+        return NextResponse.json(
+          rootDecisionResponseBody(cacheCheck.decision, [], actionQueueId, true),
+        )
       }
 
       const oneTapLimit = await checkLimit(userId, 'one_tap', user.email)

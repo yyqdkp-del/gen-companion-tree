@@ -3,9 +3,9 @@ export const dynamic = 'force-dynamic'
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { getAuthUser } from '@/lib/auth/getAuthUser'
+import { geminiGenerateContentUrl } from '@/lib/ai/models'
 
-const GEMINI_URL =
-  'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent'
+const GEMINI_URL = geminiGenerateContentUrl()
 
 type CalendarRow = {
   title: string

@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getAuthUser } from '@/lib/auth/getAuthUser'
 import { createClient } from '@supabase/supabase-js'
 import { fetchResidentCity } from '@/lib/family/resolveResidentCity'
+import { AI_MODELS } from '@/lib/ai/models'
 
 const ANON_IP_DAILY_LIMIT = 3
 type AssessIpBucket = { day: string; count: number }
@@ -147,7 +148,7 @@ local_line 字段必须结合 ${geofence.city} 的真实生活场景，
         'anthropic-version': '2023-06-01',
       },
       body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001',
+        model: AI_MODELS.claude.fast,
         max_tokens: 800,
         system: SYSTEM_PROMPT,
         messages: [{

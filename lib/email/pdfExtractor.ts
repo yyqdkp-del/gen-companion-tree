@@ -1,3 +1,5 @@
+import { geminiGenerateContentUrl } from '@/lib/ai/models'
+
 export interface EmailExtraction {
   docType: 'notice' | 'invoice' | 'schedule' | 'other'
   summary: string
@@ -67,7 +69,7 @@ async function callGeminiExtraction(
 
   try {
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
+      geminiGenerateContentUrl(apiKey),
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

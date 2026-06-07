@@ -2,6 +2,7 @@ import { createClient } from '@supabase/supabase-js'
 import { CalendarService } from '@/lib/services/CalendarService'
 import { ScheduleService } from '@/lib/services/ScheduleService'
 import { TodoService, type TodoDimension } from '@/lib/services/TodoService'
+import { AI_MODELS, geminiGenerateContentUrl } from '@/lib/ai/models'
 import { getUserLocation } from '@/lib/geofence'
 import { getTodayStr, getTodayStrInTimeZone } from '@/lib/date/localDate'
 import {
@@ -193,7 +194,7 @@ async function transcribeAudio(fileUrl: string): Promise<string> {
     const audioBuffer = await audioRes.arrayBuffer()
     const base64Audio = Buffer.from(audioBuffer).toString('base64')
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${process.env.GOOGLE_AI_API_KEY}`,
+      geminiGenerateContentUrl(process.env.GOOGLE_AI_API_KEY),
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -584,25 +585,30 @@ async function executeTool(
     }
 
     case 'learn_pattern': {
+      const cycleDays = input.cycle_days as number | undefined
+      const description = String(input.description || '')
+      const notes = cycleDays
+        ? `${description}（周期约${cycleDays}天）`.trim()
+        : description
+
       await supabase.from('family_habits').insert({
         user_id: userId,
         habit_type: input.pattern_type,
-        cycle_days: input.cycle_days || null,
-        notes: input.description,
+        pattern_type: input.pattern_type,
+        notes,
       })
       for (const sig of (input.interest_signals || [])) {
         const { data: existing } = await supabase.from('interest_weights').select('*').eq('user_id', userId).eq('topic', sig.topic).single()
         if (existing) {
           await supabase.from('interest_weights').update({
             weight: Math.min(100, existing.weight + (sig.weight_delta || 1)),
-            signal_count: existing.signal_count + 1,
-            last_signal_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
           }).eq('id', existing.id)
         } else {
           await supabase.from('interest_weights').insert({
-            user_id: userId, topic: sig.topic,
+            user_id: userId,
+            topic: sig.topic,
             weight: 10 + (sig.weight_delta || 1),
-            signal_count: 1, last_signal_at: new Date().toISOString(),
           })
         }
       }
@@ -892,7 +898,7 @@ export async function processJob(job: any) {
         'anthropic-version': '2023-06-01',
       },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-6',
+        model: AI_MODELS.claude.default,
         max_tokens: 800,
         system: buildWorkerSystemPrompt(jobCtx, today),
         messages,

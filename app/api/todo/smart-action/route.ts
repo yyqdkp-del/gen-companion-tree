@@ -1,4 +1,5 @@
 export const dynamic = 'force-dynamic'
+import { AI_MODELS } from '@/lib/ai/models'
 export const maxDuration = 60
 
 import { NextRequest, NextResponse } from 'next/server'
@@ -224,7 +225,7 @@ async function callClaude(prompt: string): Promise<any> {
       'anthropic-version': '2023-06-01',
     },
     body: JSON.stringify({
-      model: 'claude-sonnet-4-20250514',
+      model: AI_MODELS.claude.default,
       max_tokens: 4000,
       messages: [{ role: 'user', content: prompt }],
     }),

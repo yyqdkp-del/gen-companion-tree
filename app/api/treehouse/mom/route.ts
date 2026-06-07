@@ -1,4 +1,5 @@
 export const dynamic = 'force-dynamic'
+import { AI_MODELS } from '@/lib/ai/models'
 export const runtime = 'nodejs'
 
 import { NextRequest, NextResponse } from 'next/server'
@@ -233,7 +234,7 @@ export async function POST(req: NextRequest) {
       : KAPOK_SYSTEM_PROMPT) + memoryContext
 
   const stream = anthropic.messages.stream({
-    model: 'claude-sonnet-4-20250514',
+    model: AI_MODELS.claude.default,
     max_tokens: 500,
     system: systemPrompt,
     messages,

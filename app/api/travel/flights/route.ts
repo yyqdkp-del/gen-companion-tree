@@ -1,4 +1,5 @@
 export const dynamic = 'force-dynamic'
+import { AI_MODELS } from '@/lib/ai/models'
 export const maxDuration = 60
 
 import { NextRequest, NextResponse } from 'next/server'
@@ -108,7 +109,7 @@ ${return_date ? `返回日期：${return_date}` : '单程'}
       'anthropic-version': '2023-06-01',
     },
     body: JSON.stringify({
-      model: 'claude-sonnet-4-20250514',
+      model: AI_MODELS.claude.default,
       max_tokens: 2000,
       messages: [{ role: 'user', content: prompt }],
     }),
