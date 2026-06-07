@@ -1,5 +1,5 @@
 'use client'
-import React, { useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { getJsonAuthHeaders } from '@/lib/auth/clientAuthHeaders'
 import { fetchWithAuth } from '@/lib/auth/fetchWithAuth'
@@ -417,6 +417,7 @@ function getFreshRootDecision(aiActionData?: Record<string, unknown>): RootDecis
   const decision = aiActionData?.root_decision as RootDecision | undefined
   const cachedAt = (aiActionData?.cached_at || aiActionData?.prepared_at) as string | undefined
   if (!decision || !cachedAt) return null
+  if ((decision as RootDecision & { isPartial?: boolean }).isPartial) return null
   const ageHours = (Date.now() - new Date(cachedAt).getTime()) / 3600000
   if (ageHours >= 2) return null
   return decision
@@ -715,12 +716,14 @@ function RootDecisionPanel({
   decision,
   userId,
   autoCompleted,
+  deepPending,
   onAllDone,
   onClose,
 }: {
   decision: RootDecision
   userId: string
   autoCompleted: string[]
+  deepPending?: boolean
   onAllDone: () => void
   onClose: () => void
 }) {
@@ -847,6 +850,40 @@ function RootDecisionPanel({
 
   return (
     <div style={{ padding: '8px 0 4px' }}>
+      {deepPending && (
+        <div style={{ padding: '0 14px 8px' }}>
+          <div style={{
+            background: 'var(--canvas-warm, #fbf9f6)',
+            borderRadius: 20,
+            padding: '4px 12px',
+            fontSize: 12,
+            color: 'var(--text-muted, rgba(45,50,47,0.45))',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 6,
+          }}>
+            <span style={{
+              width: 6,
+              height: 6,
+              borderRadius: '50%',
+              background: 'var(--clay, #a46355)',
+            }}>
+              <motion.span
+                animate={{ opacity: [0.4, 1, 0.4] }}
+                transition={{ duration: 1.5, repeat: Infinity }}
+                style={{
+                  display: 'block',
+                  width: 6,
+                  height: 6,
+                  borderRadius: '50%',
+                  background: 'var(--clay, #a46355)',
+                }}
+              />
+            </span>
+            根正在深度分析...
+          </div>
+        </div>
+      )}
       <div style={{ padding: '0 14px 12px' }}>
         <div style={{ fontSize: 17, fontWeight: 600, color: THEME.text, lineHeight: 1.4, marginBottom: 8 }}>
           {decision.message.headline}
@@ -2017,6 +2054,8 @@ export default function ActionModal({
   const [userActions, setUserActions] = useState<UserAction[]>([])
   const [loading, setLoading] = useState(false)
   const [loadingStep, setLoadingStep] = useState(0)
+  const [deepPending, setDeepPending] = useState(false)
+  const deepRefreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [saving, setSaving] = useState(false)
   const [activeTab, setActiveTab] = useState<TabKey | null>(null)
 
@@ -2060,6 +2099,32 @@ export default function ActionModal({
       action_data: hotspot_action_data as { url?: string } | undefined,
     }) || hotspotSearchUrl(title))
     : undefined
+
+  const refreshDecision = useCallback(async () => {
+    try {
+      const res = await fetchWithAuth('/api/action/execute?refresh=true', {
+        method: 'POST',
+        body: JSON.stringify({
+          source_type,
+          source_id,
+          event_data,
+          child_name,
+          refresh: true,
+        }),
+      })
+      const data = await res.json()
+      if (data.ok && data.decision && !(data.decision as RootDecision & { isPartial?: boolean }).isPartial) {
+        setDecision(data.decision as RootDecision)
+        setBrainAutoCompleted(data.autoCompleted || [])
+        setDeepPending(false)
+        onSync?.()
+      } else if (data.deepAnalysisPending) {
+        setDeepPending(true)
+      }
+    } catch (e) {
+      logOrAlertNetworkError(e)
+    }
+  }, [source_type, source_id, event_data, child_name, onSync])
 
   useEffect(() => {
     if (!loading) {
@@ -2154,6 +2219,15 @@ export default function ActionModal({
           setDecision(data.decision as RootDecision)
           setBrainAutoCompleted(data.autoCompleted || [])
           setPack(null)
+          if (data.deepAnalysisPending) {
+            setDeepPending(true)
+            if (deepRefreshTimerRef.current) clearTimeout(deepRefreshTimerRef.current)
+            deepRefreshTimerRef.current = setTimeout(() => {
+              void refreshDecision()
+            }, 30000)
+          } else {
+            setDeepPending(false)
+          }
           onSync?.()
         } else if (data.ok && data.execution_pack) {
           setPack(data.execution_pack)
@@ -2168,8 +2242,14 @@ export default function ActionModal({
       }
     })()
 
-    return () => { cancelled = true }
-  }, [source_id, source_type, sessionReady, ai_action_data, event_data, child_name, onSync, router, isBrainMode, showFullOneKey])
+    return () => {
+      cancelled = true
+      if (deepRefreshTimerRef.current) {
+        clearTimeout(deepRefreshTimerRef.current)
+        deepRefreshTimerRef.current = null
+      }
+    }
+  }, [source_id, source_type, sessionReady, ai_action_data, event_data, child_name, onSync, router, isBrainMode, showFullOneKey, refreshDecision])
 
   const brainUrgencyLevel: 1 | 2 | 3 =
     brainData?.urgency === 'high' ? 3
@@ -2318,6 +2398,7 @@ export default function ActionModal({
                 decision={decision}
                 userId={userId}
                 autoCompleted={brainAutoCompleted}
+                deepPending={deepPending}
                 onAllDone={() => onDone(source_id)}
                 onClose={onClose}
               />

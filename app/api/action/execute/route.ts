@@ -5,8 +5,13 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { getAuthUser } from '@/lib/auth/getAuthUser'
 import { checkLimit, recordUsage } from '@/lib/limits/usage'
-import { buildFamilyContext } from '@/lib/action/contextBuilder'
-import { makeDecision } from '@/lib/action/claudeDecision'
+import { getExchangeRate } from '@/lib/action/exchangeForPlanner'
+import {
+  buildInstantResponse,
+  isFullRootDecision,
+  loadInstantChild,
+} from '@/lib/action/instantDecision'
+import { runDeepAnalysisForTodo, triggerDeepAnalysis } from '@/lib/action/deepAnalysis'
 import { executeAction } from '@/lib/action/executor'
 import { fetchFormTemplates, enrichActionsWithFormTemplates } from '@/lib/action/enrichPDF'
 import { familyServicePromptLabel, resolveResidentCityFromFamilyData } from '@/lib/family/resolveResidentCity'
@@ -198,6 +203,7 @@ function rootDecisionResponseBody(
   autoCompleted: string[],
   actionQueueId?: string,
   cached = false,
+  extra: Record<string, unknown> = {},
 ) {
   return {
     ok: true,
@@ -205,6 +211,7 @@ function rootDecisionResponseBody(
     autoCompleted,
     action_queue_id: actionQueueId,
     cached,
+    ...extra,
   }
 }
 
@@ -220,6 +227,7 @@ function isTodoDecisionCacheValid(
   const cachedDecision = aiData.root_decision as RootDecision | undefined
   const cachedAt = String(aiData.cached_at || aiData.prepared_at || '')
   if (!cachedDecision || !cachedAt) return { valid: false }
+  if (!isFullRootDecision(cachedDecision)) return { valid: false }
 
   const cacheAge = Date.now() - new Date(cachedAt).getTime()
   if (cacheAge >= CACHE_DURATION_MS) return { valid: false }
@@ -237,33 +245,7 @@ async function runRootBrainForTodo(
   todoId: string,
   todo: Record<string, unknown>,
 ): Promise<{ decision: RootDecision; autoCompleted: string[] }> {
-  const context = await buildFamilyContext(userId, todoId, supabase)
-  const decision = await makeDecision(context)
-
-  const autoActions = decision.actions.filter(
-    (a) => !a.requiresConfirm && a.executor.service === 'internal',
-  )
-
-  const autoCompleted: string[] = []
-  for (const action of autoActions) {
-    try {
-      const result = await executeAction(action, userId)
-      if (result.ok) autoCompleted.push(action.label)
-    } catch (e) {
-      console.error('[runRootBrainForTodo] auto action failed:', action.id, e)
-    }
-  }
-
-  await supabase.from('todo_items').update({
-    ai_action_data: {
-      ...(todo.ai_action_data as Record<string, unknown> || {}),
-      root_decision: decision,
-      prepared_at: new Date().toISOString(),
-      cached_at: new Date().toISOString(),
-    },
-  }).eq('id', todoId).eq('user_id', userId)
-
-  return { decision, autoCompleted }
+  return runDeepAnalysisForTodo(supabase, userId, todoId, todo)
 }
 
 // ══ 构建 TODO Prompt ══
@@ -525,6 +507,8 @@ export async function POST(req: NextRequest) {
       // 额外数据
       event_data,
       child_name,
+      sync_deep,
+      source: requestSource,
     } = body
 
     // ── 执行具体动作 ──
@@ -560,7 +544,7 @@ export async function POST(req: NextRequest) {
       const cacheAge = Date.now() - new Date(cached.created_at).getTime()
       if (cacheAge < CACHE_DURATION_MS && !forceRefresh) {
         const pack = cached.execution_pack || {}
-        if (pack.root_decision) {
+        if (pack.root_decision && isFullRootDecision(pack.root_decision as RootDecision)) {
           return NextResponse.json(
             rootDecisionResponseBody(
               pack.root_decision as RootDecision,
@@ -594,7 +578,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ ok: false, error: 'Todo not found' }, { status: 404 })
       }
 
-      // 读 todo_items 预生成缓存（RootDecision）
+      // 读 todo_items 预生成缓存（完整 RootDecision）
       const cacheCheck = isTodoDecisionCacheValid(todo, forceRefresh)
       if (cacheCheck.valid && cacheCheck.decision) {
         const actionQueueId = await upsertActionQueue(
@@ -624,8 +608,48 @@ export async function POST(req: NextRequest) {
       category = todo.category || 'other'
       urgencyLevel = todo.priority === 'red' ? 3 : todo.priority === 'orange' ? 2 : 1
 
-      const brainResult = await runRootBrainForTodo(userId, resolvedSourceId, todo)
-      executionPack = { root_decision: brainResult.decision, autoCompleted: brainResult.autoCompleted }
+      // Cron / 显式同步：跑完整 AI（可能较慢）
+      if (sync_deep === true || requestSource === 'cron') {
+        const brainResult = await runRootBrainForTodo(userId, resolvedSourceId, todo)
+        executionPack = { root_decision: brainResult.decision, autoCompleted: brainResult.autoCompleted }
+
+        const actionQueueId = await upsertActionQueue(
+          userId,
+          resolvedSourceType,
+          resolvedSourceId,
+          title,
+          category,
+          urgencyLevel,
+          executionPack,
+        )
+
+        await recordUsage(userId, 'one_tap')
+
+        return NextResponse.json(
+          rootDecisionResponseBody(brainResult.decision, brainResult.autoCompleted, actionQueueId),
+        )
+      }
+
+      // 两阶段：即时响应（<1s）+ 后台深度分析
+      const todoChildId = todo.child_id ? String(todo.child_id) : null
+      const [familyResult, exchangeResult] = await Promise.all([
+        FamilyService.getData(userId, {
+          childId: todoChildId || undefined,
+          includeTodos: false,
+          includeCalendar: false,
+          client: supabase,
+        }),
+        getExchangeRate().catch(() => null),
+      ])
+
+      const resolvedChild = todoChildId
+        ? familyResult.children.find((c) => c.id === todoChildId) || familyResult.activeChild
+        : familyResult.activeChild
+
+      const instantChild = await loadInstantChild(supabase, resolvedChild?.id, resolvedChild)
+      const instantDecision = buildInstantResponse(todo, instantChild, exchangeResult)
+
+      void triggerDeepAnalysis(supabase, userId, resolvedSourceId, todo)
 
       const actionQueueId = await upsertActionQueue(
         userId,
@@ -634,13 +658,15 @@ export async function POST(req: NextRequest) {
         title,
         category,
         urgencyLevel,
-        executionPack,
+        { root_decision: instantDecision, autoCompleted: [] },
       )
 
       await recordUsage(userId, 'one_tap')
 
       return NextResponse.json(
-        rootDecisionResponseBody(brainResult.decision, brainResult.autoCompleted, actionQueueId),
+        rootDecisionResponseBody(instantDecision, [], actionQueueId, false, {
+          deepAnalysisPending: true,
+        }),
       )
     }
 

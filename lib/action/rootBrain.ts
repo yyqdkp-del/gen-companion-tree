@@ -5,6 +5,8 @@ import type { PlaceResult, UserLocation } from '@/lib/intelligence/realtime'
 import type { SourceLevel } from '@/lib/trust/sourceLabel'
 
 export interface RootDecision {
+  /** 即时响应占位；深度分析完成后为 false 或省略 */
+  isPartial?: boolean
   understanding: {
     situation: string
     urgency: 'critical' | 'urgent' | 'normal' | 'low'

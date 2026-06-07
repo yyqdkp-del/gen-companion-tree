@@ -21,15 +21,37 @@ const DOW_KEY_BY_NUM: Record<number, string> = {
 
 const DOW_ZH = ['周日', '周一', '周二', '周三', '周四', '周五', '周六']
 
-function calculateAge(birthdate?: string | null): number | null {
-  if (!birthdate) return null
-  const birth = new Date(`${birthdate.slice(0, 10)}T12:00:00`)
-  if (Number.isNaN(birth.getTime())) return null
-  const now = new Date()
-  let age = now.getFullYear() - birth.getFullYear()
-  const m = now.getMonth() - birth.getMonth()
-  if (m < 0 || (m === 0 && now.getDate() < birth.getDate())) age--
-  return age
+function calculateAge(
+  birthdate?: string | null,
+  birthDateAlt?: string | null,
+  grade?: string | null,
+): number | null {
+  const dateStr = birthdate || birthDateAlt
+  if (dateStr) {
+    const birth = new Date(`${dateStr.slice(0, 10)}T12:00:00`)
+    if (!Number.isNaN(birth.getTime())) {
+      const now = new Date()
+      let age = now.getFullYear() - birth.getFullYear()
+      const m = now.getMonth() - birth.getMonth()
+      if (m < 0 || (m === 0 && now.getDate() < birth.getDate())) age--
+      if (age >= 2 && age <= 20) return age
+    }
+  }
+
+  if (grade) {
+    const g = String(grade).trim().toUpperCase()
+    const map: Record<string, number> = {
+      K1: 4, K2: 5, K3: 6,
+      G1: 7, G2: 8, G3: 9,
+      G4: 10, G5: 11, G6: 12,
+    }
+    if (map[g]) return map[g]
+    if (g.startsWith('K')) return 5
+    const n = parseInt(g.replace(/\D/g, ''), 10)
+    if (!Number.isNaN(n) && n >= 1 && n <= 12) return 6 + n
+  }
+
+  return null
 }
 
 function getDaysLeft(dueDate?: string | null): number | null {
@@ -52,6 +74,7 @@ async function enrichChildContext(
     school_name?: string | null
     school?: string | null
     birthdate?: string | null
+    birth_date?: string | null
   } | null,
 ): Promise<FamilyContext['child']> {
   const todayYmd = new Date().toISOString().slice(0, 10)
@@ -93,7 +116,7 @@ async function enrichChildContext(
   return {
     name: familyChild?.name || '',
     nameEn,
-    age: calculateAge(familyChild?.birthdate),
+    age: calculateAge(familyChild?.birthdate, familyChild?.birth_date, familyChild?.grade),
     grade: String(familyChild?.grade || ''),
     school: String(familyChild?.school_name || familyChild?.school || ''),
     teacherName,
@@ -204,18 +227,11 @@ export async function buildFamilyContext(
   const location = await getUserLocation(userId, supabase)
 
   const [
-    familyData,
     todoResult,
     packingResult,
     gmailConnected,
     calendarConnected,
   ] = await Promise.all([
-    FamilyService.getData(userId, {
-      includeTodos: true,
-      includeCalendar: true,
-      daysAhead: 30,
-      client: supabase,
-    }),
     supabase.from('todo_items').select('*').eq('id', todoId).eq('user_id', userId).single(),
     supabase
       .from('family_packing_memory')
@@ -228,8 +244,17 @@ export async function buildFamilyContext(
   ])
 
   const todo = todoResult.data as Record<string, unknown> | null
-  const activeChild = familyData.activeChild
-  const childId = String(todo?.child_id || activeChild?.id || '')
+  const childId = String(todo?.child_id || '')
+  const familyData = await FamilyService.getData(userId, {
+    includeTodos: true,
+    includeCalendar: true,
+    daysAhead: 30,
+    childId: childId || undefined,
+    client: supabase,
+  })
+  const activeChild = childId
+    ? familyData.children.find((c) => c.id === childId) || familyData.activeChild
+    : familyData.activeChild
   const dimension = String(todo?.category || todo?.dimension || 'education')
   const title = String(todo?.title || '')
 
@@ -238,10 +263,10 @@ export async function buildFamilyContext(
     enrichChildContext(
       supabase,
       userId,
-      childId || undefined,
+      childId || activeChild?.id || undefined,
       activeChild,
     ),
-    getFamilyMemory(userId, childId, supabase),
+    getFamilyMemory(userId, childId || activeChild?.id || '', supabase),
     weatherCity ? getTodayWeather(weatherCity) : Promise.resolve(null),
     getExchangeRate(),
     getLocalInfo(dimension, title, location),

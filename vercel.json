@@ -5,6 +5,14 @@
       "schedule": "0 8 * * *"
     },
     {
+      "path": "/api/cron/push-reminders",
+      "schedule": "0 7 * * *"
+    },
+    {
+      "path": "/api/cron/push-reminders",
+      "schedule": "0 21 * * *"
+    },
+    {
       "path": "/api/cron/account-purge",
       "schedule": "0 2 * * *"
     }
@@ -32,6 +40,9 @@
       "maxDuration": 60
     },
     "app/api/cron/notify/route.ts": {
+      "maxDuration": 60
+    },
+    "app/api/cron/push-reminders/route.ts": {
       "maxDuration": 60
     },
     "app/api/cron/visa-reminder/route.ts": {

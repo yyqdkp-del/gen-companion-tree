@@ -19,6 +19,7 @@ export interface FamilyChildRow {
   school: string | null
   emoji: string | null
   birthdate: string | null
+  birth_date?: string | null
   status: string | null
 }
 
@@ -46,9 +47,10 @@ export const FamilyService = {
       const [childrenRes, todosRes, calendarRes, profileRes] = await Promise.all([
         supabase
           .from('children')
-          .select('id, name, grade, school_name, school, emoji, birthdate, status')
+          .select('id, name, grade, school_name, school, emoji, birthdate, birth_date, status')
           .eq('user_id', userId)
-          .eq('status', 'active'),
+          .eq('status', 'active')
+          .order('name'),
 
         options.includeTodos !== false
           ? supabase
