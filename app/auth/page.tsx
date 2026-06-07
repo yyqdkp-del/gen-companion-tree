@@ -1,7 +1,7 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import React, { useState, useEffect, Suspense } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { saveSessionBundle } from '@/lib/auth/saveSessionBundle'
 import {
@@ -38,17 +38,41 @@ function formatAuthError(message: string, code?: string): string {
   return message || '操作失败，请重试'
 }
 
-function mapUrlAuthError(code: string | null): string {
-  switch (code) {
-    case 'callback_failed':
-      return 'Google 登录失败，请重试或改用邮箱登录'
-    case 'session':
-      return '登录会话已失效，请重新登录'
-    case 'no_code':
-      return '授权未完成，请重新尝试登录'
-    default:
-      return '登录失败，请重试'
-  }
+const ERROR_MAP: Record<string, string> = {
+  no_code: '登录链接已失效，请重新登录',
+  exchange_failed: 'Google 登录失败，请重试',
+  server_error: '服务器暂时异常，请稍后重试',
+  line_failed: 'LINE 登录失败，请重试',
+  callback: '登录过程中断，请重新登录',
+  callback_failed: 'Google 登录失败，请重试或改用邮箱登录',
+  session: '登录状态已过期，请重新登录',
+  'Multiple accounts': '该邮箱已注册，请直接登录',
+  unexpected_failure: '登录失败，请重试',
+}
+
+function mapUrlAuthError(error: string, msg?: string): string {
+  if (ERROR_MAP[error]) return ERROR_MAP[error]
+  if (msg?.includes('Multiple accounts')) return ERROR_MAP['Multiple accounts']
+  if (msg?.includes('email')) return '邮箱相关错误，请用邮箱密码登录'
+  return '登录失败，请重试'
+}
+
+function isMultipleAccountsConflict(params: URLSearchParams): boolean {
+  const desc = params.get('error_description') ?? ''
+  const err = params.get('error') ?? ''
+  const msg = params.get('msg') ?? ''
+  return desc.includes('Multiple accounts')
+    || err.includes('Multiple accounts')
+    || msg.includes('Multiple accounts')
+}
+
+function clearOAuthErrorParams() {
+  const url = new URL(window.location.href)
+  url.searchParams.delete('error')
+  url.searchParams.delete('error_description')
+  url.searchParams.delete('msg')
+  const qs = url.searchParams.toString()
+  window.history.replaceState({}, '', qs ? `${url.pathname}?${qs}` : url.pathname)
 }
 
 async function ensureAuthSession(email: string, password: string): Promise<boolean> {
@@ -101,9 +125,10 @@ function Spinner({ color = 'var(--clay)' }: { color?: string }) {
   )
 }
 
-export default function AuthPage() {
+function AuthPageInner() {
   const router = useRouter()
-  const [mode, setMode] = useState<'login' | 'register'>('login')
+  const searchParams = useSearchParams()
+  const [mode, setMode] = useState<'login' | 'register' | 'forgot'>('login')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
@@ -121,9 +146,12 @@ export default function AuthPage() {
     setReturnPath(stashAuthNextFromUrl(params))
 
     const urlError = params.get('error')
-    if (urlError) setError(mapUrlAuthError(urlError))
+    if (!isMultipleAccountsConflict(params) && urlError) {
+      setError(mapUrlAuthError(urlError, params.get('msg') ?? params.get('error_description') ?? undefined))
+    }
     if (params.get('mode') === 'register') setMode('register')
     if (params.get('mode') === 'login') setMode('login')
+    if (params.get('mode') === 'forgot') setMode('forgot')
 
     const pendingEmail = sessionStorage.getItem(EMAIL_VERIFY_PENDING_KEY)
     if (pendingEmail) {
@@ -338,12 +366,39 @@ export default function AuthPage() {
     }
   }
 
-  const switchMode = (next: 'login' | 'register') => {
+  const switchMode = (next: 'login' | 'register' | 'forgot') => {
     setMode(next)
     setError('')
   }
 
+  const handleForgotSend = async () => {
+    if (!email.trim()) {
+      setError('请输入邮箱地址')
+      return
+    }
+    setError('')
+    setLoading(true)
+    try {
+      const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/auth/reset-password`,
+      })
+      if (resetError) {
+        setError(formatAuthError(resetError.message, resetError.code))
+        return
+      }
+      setDone(true)
+    } catch (e) {
+      console.error('[auth] reset password email failed:', e)
+      setError(formatAuthError(e instanceof Error ? e.message : '网络连接失败，请稍后重试'))
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const accountConflict = isMultipleAccountsConflict(searchParams)
+
   if (done) {
+    const isForgotDone = mode === 'forgot'
     return (
       <main className="canvas-texture" style={S.page}>
         <motion.div
@@ -352,21 +407,39 @@ export default function AuthPage() {
           style={S.verifyCard}
         >
           <div style={{ fontSize: 48, marginBottom: 12 }}>🌿</div>
-          <h2 style={S.verifyTitle}>验证邮件已发送</h2>
+          <h2 style={S.verifyTitle}>{isForgotDone ? '重置链接已发送' : '验证邮件已发送'}</h2>
           <p style={S.verifyDesc}>
-            请检查 <strong style={{ color: 'var(--text-primary)' }}>{email}</strong>
-            <br />
-            点击邮件中的链接完成注册
+            {isForgotDone ? (
+              <>重置链接已发送到 <strong style={{ color: 'var(--text-primary)' }}>{email}</strong></>
+            ) : (
+              <>
+                请检查 <strong style={{ color: 'var(--text-primary)' }}>{email}</strong>
+                <br />
+                点击邮件中的链接完成注册
+              </>
+            )}
           </p>
-          <button
-            type="button"
-            className="gc-btn"
-            onClick={() => { void handleGoAhead() }}
-            disabled={exploreLoading}
-            style={{ width: '100%', height: 56, marginTop: 8 }}
-          >
-            {exploreLoading ? '进入中…' : '先去看看 →'}
-          </button>
+          {!isForgotDone && (
+            <button
+              type="button"
+              className="gc-btn"
+              onClick={() => { void handleGoAhead() }}
+              disabled={exploreLoading}
+              style={{ width: '100%', height: 56, marginTop: 8 }}
+            >
+              {exploreLoading ? '进入中…' : '先去看看 →'}
+            </button>
+          )}
+          {isForgotDone && (
+            <button
+              type="button"
+              className="gc-btn"
+              onClick={() => { setDone(false); switchMode('login') }}
+              style={{ width: '100%', height: 56, marginTop: 8 }}
+            >
+              返回登录
+            </button>
+          )}
           {error && <p style={S.errorText}>{error}</p>}
         </motion.div>
         <style>{SPIN_KEYFRAMES}</style>
@@ -379,6 +452,8 @@ export default function AuthPage() {
     !email.trim() ||
     !password ||
     (mode === 'register' && !consentPrivacy)
+
+  const forgotDisabled = loading || !email.trim()
 
   return (
     <main className="canvas-texture" style={S.page}>
@@ -397,12 +472,79 @@ export default function AuthPage() {
 
       {/* ── 主操作区 ── */}
       <section style={S.actions}>
-        {(returnPath === '/upgrade' || returnPath.startsWith('/upgrade?')) && (
+        {(returnPath === '/upgrade' || returnPath.startsWith('/upgrade?')) && mode !== 'forgot' && (
           <div style={S.upgradeHint}>
             登录后将带你继续开通根陪伴 Pro
           </div>
         )}
 
+        {accountConflict && (
+          <div style={S.conflictCard}>
+            <p style={S.conflictText}>
+              检测到该 Google 邮箱已用邮箱密码注册
+              <br />
+              请直接用邮箱登录，或重置密码
+            </p>
+            <div style={S.conflictActions}>
+              <button
+                type="button"
+                className="gc-btn"
+                onClick={() => { clearOAuthErrorParams(); switchMode('login') }}
+                style={S.conflictPrimaryBtn}
+              >
+                切换到邮箱登录
+              </button>
+              <button
+                type="button"
+                onClick={() => { clearOAuthErrorParams(); switchMode('forgot') }}
+                style={S.conflictSecondaryBtn}
+              >
+                重置密码
+              </button>
+            </div>
+          </div>
+        )}
+
+        {mode === 'forgot' ? (
+          <>
+            <h2 style={S.forgotTitle}>重置密码</h2>
+            <p style={S.forgotSubtitle}>输入邮箱，根发送重置链接</p>
+            <input
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="邮箱地址"
+              type="email"
+              autoComplete="email"
+              style={S.input}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !forgotDisabled) void handleForgotSend()
+              }}
+            />
+            {error && <p style={S.errorText}>{error}</p>}
+            <button
+              type="button"
+              className="gc-btn"
+              onClick={() => { void handleForgotSend() }}
+              disabled={forgotDisabled}
+              style={{
+                width: '100%',
+                height: 56,
+                opacity: forgotDisabled ? 0.55 : 1,
+                cursor: forgotDisabled ? 'not-allowed' : 'pointer',
+              }}
+            >
+              {loading ? '发送中…' : '发送重置链接'}
+            </button>
+            <button
+              type="button"
+              onClick={() => switchMode('login')}
+              style={S.backLink}
+            >
+              ← 返回登录
+            </button>
+          </>
+        ) : (
+          <>
         <motion.button
           type="button"
           whileTap={{ scale: googleLoading ? 1 : 0.98 }}
@@ -476,7 +618,19 @@ export default function AuthPage() {
           style={{ ...S.input, marginBottom: mode === 'register' ? 12 : 8 }}
         />
 
-        {error && <p style={S.errorText}>{error}</p>}
+        {mode === 'login' && (
+          <div style={S.forgotRow}>
+            <button
+              type="button"
+              onClick={() => switchMode('forgot')}
+              style={S.forgotLink}
+            >
+              忘记密码？
+            </button>
+          </div>
+        )}
+
+        {error && !accountConflict && <p style={S.errorText}>{error}</p>}
 
         {mode === 'register' && (
           <div style={{ marginBottom: 12 }}>
@@ -540,10 +694,26 @@ export default function AuthPage() {
             <a href="/terms" target="_blank" rel="noopener noreferrer" style={S.link}>服务条款</a>
           </p>
         </div>
+          </>
+        )}
       </section>
 
       <style>{SPIN_KEYFRAMES}</style>
     </main>
+  )
+}
+
+export default function AuthPage() {
+  return (
+    <Suspense fallback={
+      <main className="canvas-texture" style={S.page}>
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <Spinner />
+        </div>
+      </main>
+    }>
+      <AuthPageInner />
+    </Suspense>
   )
 }
 
@@ -806,5 +976,83 @@ const S: Record<string, React.CSSProperties> = {
     color: 'var(--fg2)',
     lineHeight: 1.8,
     fontFamily: 'var(--font-body)',
+  },
+  forgotTitle: {
+    margin: '0 0 6px',
+    fontFamily: 'var(--font-serif)',
+    fontSize: 22,
+    fontWeight: 600,
+    color: 'var(--text-primary)',
+    textAlign: 'center',
+  },
+  forgotSubtitle: {
+    margin: '0 0 18px',
+    fontSize: 14,
+    color: 'var(--fg2)',
+    lineHeight: 1.6,
+    textAlign: 'center',
+    fontFamily: 'var(--font-body)',
+  },
+  forgotRow: {
+    display: 'flex',
+    justifyContent: 'flex-end',
+    margin: '-4px 0 10px',
+  },
+  forgotLink: {
+    background: 'none',
+    border: 'none',
+    padding: 0,
+    fontSize: 13,
+    color: 'var(--clay)',
+    cursor: 'pointer',
+    fontFamily: 'var(--font-body)',
+  },
+  backLink: {
+    display: 'block',
+    width: '100%',
+    marginTop: 16,
+    background: 'none',
+    border: 'none',
+    fontSize: 14,
+    color: 'var(--fg3)',
+    cursor: 'pointer',
+    textAlign: 'center',
+    fontFamily: 'var(--font-body)',
+  },
+  conflictCard: {
+    marginBottom: 16,
+    padding: '16px 14px',
+    borderRadius: 14,
+    background: 'rgba(255,255,255,0.88)',
+    border: '1px solid var(--line-clay)',
+    boxShadow: 'var(--sh-soft)',
+  },
+  conflictText: {
+    margin: '0 0 14px',
+    fontSize: 14,
+    lineHeight: 1.7,
+    color: 'var(--text-primary)',
+    textAlign: 'center',
+    fontFamily: 'var(--font-body)',
+  },
+  conflictActions: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 10,
+  },
+  conflictPrimaryBtn: {
+    width: '100%',
+    height: 48,
+  },
+  conflictSecondaryBtn: {
+    width: '100%',
+    height: 44,
+    border: '1px solid var(--line-clay)',
+    borderRadius: 14,
+    background: 'rgba(255,255,255,0.72)',
+    fontFamily: 'var(--font-body)',
+    fontSize: 15,
+    color: 'var(--clay)',
+    cursor: 'pointer',
   },
 }
