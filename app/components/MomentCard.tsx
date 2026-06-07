@@ -477,6 +477,8 @@ function getCardInteraction(data: MomentCardData): {
       return { clickable: true, cornerIcon: ChevronRight, tapScale: 0.97 }
     case 'visa':
       return { clickable: true, cornerIcon: ChevronRight, tapScale: 0.97, pulse: true }
+    case 'correlation':
+      return { clickable: true, cornerIcon: ChevronRight, tapScale: 0.97, pulse: true }
     case 'night':
       return { clickable: false, tapScale: 0.97, breathe: true }
     default:
@@ -520,6 +522,11 @@ export default function MomentCard({
         break
       case 'visa':
         onAction({ type: 'visa' })
+        break
+      case 'correlation':
+        if (data.primaryAction?.action.type === 'correlation') {
+          onAction(data.primaryAction.action)
+        }
         break
       default:
         break

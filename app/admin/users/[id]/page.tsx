@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { getAdminSupabase } from '@/lib/admin/supabase'
+import { formatAuthEmail, formatProfileEmail, isLineFakeEmail } from '@/lib/admin/formatUserEmail'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -21,6 +22,7 @@ export default async function UserDetail({
 
   const [
     { data: profile },
+    { data: authUser },
     { data: children },
     { data: todos },
     { data: hotspots },
@@ -28,6 +30,7 @@ export default async function UserDetail({
     { count: sessionCount },
   ] = await Promise.all([
     supabase.from('family_profile').select('*').eq('user_id', userId).maybeSingle(),
+    supabase.auth.admin.getUserById(userId),
     supabase
       .from('children')
       .select('id, name, grade, chinese_level, level, total_hanzi')
@@ -62,6 +65,11 @@ export default async function UserDetail({
     )
   }
 
+  const authEmail = authUser?.user?.email ?? null
+  const loginProvider = isLineFakeEmail(authEmail)
+    ? 'LINE'
+    : authUser?.user?.app_metadata?.provider || authUser?.user?.user_metadata?.provider || '邮箱'
+
   return (
     <div>
       <Link href="/admin/users" style={{ color: '#a46355', fontSize: 14, textDecoration: 'none' }}>
@@ -88,6 +96,9 @@ export default async function UserDetail({
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
           {[
             ['姓名', profile.member_name || '未填写'],
+            ['注册邮箱', formatAuthEmail(authEmail)],
+            ['登录方式', loginProvider],
+            ['资料邮箱', formatProfileEmail(profile.email as string | null)],
             ['城市', profile.resident_city || '—'],
             ['电话', profile.phone || '—'],
             ['Pro状态', profile.is_pro ? '✅ Pro' : '免费'],

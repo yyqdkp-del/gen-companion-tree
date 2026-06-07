@@ -1,18 +1,13 @@
 'use client'
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { CHINESE_THEME as T } from '@/app/_shared/_constants/chineseTheme'
+import { CHINESE_THEME as T, SOLID_CARD } from '@/app/_shared/_constants/chineseTheme'
 import { useApp } from '@/app/context/AppContext'
 import { fetchWithAuth } from '@/lib/auth/fetchWithAuth'
 import { toast } from '@/app/components/Toast'
 
-const GLASS_CARD: React.CSSProperties = {
-  background: 'rgba(255,255,255,0.82)',
-  backdropFilter: 'blur(12px)',
-  WebkitBackdropFilter: 'blur(12px)',
-  border: '1px solid rgba(255,255,255,0.6)',
-  borderRadius: 20,
-  boxShadow: '0 8px 32px rgba(45,50,47,0.05), inset 0 1px 0 rgba(255,255,255,0.8)',
+const CARD: React.CSSProperties = {
+  ...SOLID_CARD,
   padding: '20px',
   marginBottom: 12,
 }
@@ -26,7 +21,7 @@ const MOM_SCRIPT_BOX: React.CSSProperties = {
 }
 
 const CANVAS_GRID_WRAP: React.CSSProperties = {
-  background: '#faf7f0',
+  background: 'var(--canvas-light)',
   border: '3px double rgba(164,99,85,0.3)',
   borderRadius: 16,
   backgroundImage: `
@@ -53,7 +48,7 @@ const PROGRESS_FILL: React.CSSProperties = {
 }
 
 function drawTianZiGrid(ctx: CanvasRenderingContext2D, size: number, char: string) {
-  ctx.fillStyle = '#faf7f0'
+  ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--canvas-light').trim() || '#f7f4ef'
   ctx.fillRect(0, 0, size, size)
   ctx.strokeStyle = 'rgba(164, 99, 85, 0.15)'
   ctx.lineWidth = 0.8
@@ -73,17 +68,17 @@ function drawTianZiGrid(ctx: CanvasRenderingContext2D, size: number, char: strin
 
 const PRIMARY_BTN: React.CSSProperties = {
   width: '100%',
-  padding: '16px',
-  borderRadius: 16,
+  padding: '14px 20px',
+  borderRadius: 'var(--r-md)',
   border: 'none',
-  background: 'linear-gradient(135deg, #a46355 0%, #8a5548 100%)',
+  background: 'var(--clay)',
   color: '#fff',
-  fontSize: 16,
+  fontSize: 14,
   fontWeight: 600,
+  fontFamily: 'var(--font-body)',
   cursor: 'pointer',
-  fontFamily: "'Noto Serif SC', serif",
   letterSpacing: '0.05em',
-  boxShadow: '0 6px 20px rgba(164,99,85,0.28)',
+  boxShadow: 'var(--sh-warm)',
 }
 
 type Step = 'origin' | 'structure' | 'write' | 'use'
@@ -236,7 +231,7 @@ function StepOrigin({ data, char, onNext }: {
               onClick={() => setActiveStage(i)}
               style={{ flex: 1, padding: '8px 4px', borderRadius: 10,
                 border: `1px solid ${i === activeStage ? '#a46355' : 'rgba(164,99,85,0.2)'}`,
-                background: i === activeStage ? 'rgba(164,99,85,0.08)' : '#f7f4ee',
+                background: i === activeStage ? 'rgba(164,99,85,0.08)' : 'var(--canvas-warm)',
                 cursor: 'pointer', textAlign: 'center' }}>
               <div style={{ fontSize: i === activeStage ? 26 : 20,
                 fontFamily: "'Noto Serif SC', serif",
@@ -274,7 +269,7 @@ function StepOrigin({ data, char, onNext }: {
           <motion.div key={activeStage}
             initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.2 }}
-            style={{ ...GLASS_CARD, padding: '14px 16px', borderRadius: 14,
+            style={{ ...CARD, padding: '14px 16px', borderRadius: 14,
               borderLeft: '3px solid rgba(164,99,85,0.35)',
               fontSize: 14, color: T.text, lineHeight: 1.9,
               fontFamily: 'sans-serif' }}>
@@ -288,7 +283,7 @@ function StepOrigin({ data, char, onNext }: {
       {data.memory_trick && (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}
           transition={{ delay: 0.5 }}
-          style={{ ...GLASS_CARD, padding: '12px 16px', marginBottom: 16,
+          style={{ ...CARD, padding: '12px 16px', marginBottom: 16,
             fontSize: 14, color: T.gold, fontStyle: 'italic',
             fontFamily: 'sans-serif' }}>
           🎵 {data.memory_trick}
@@ -307,7 +302,7 @@ const LIUSHU_CFG: Record<string, { color: string; bg: string; desc: string }> = 
   '象形': { color: '#a46355', bg: 'rgba(164,99,85,0.08)', desc: '照着东西的样子画出来' },
   '指事': { color: '#BA6A00', bg: 'rgba(186,106,0,0.08)', desc: '用符号指示抽象概念' },
   '会意': { color: '#5c7a5e', bg: 'rgba(45,106,79,0.08)', desc: '两个或多个部件合起来表意' },
-  '形声': { color: '#2d3f4a', bg: 'rgba(45,63,74,0.08)', desc: '一部分表意，一部分表音' },
+  '形声': { color: 'var(--clay-deep)', bg: 'var(--clay-tint)', desc: '一部分表意，一部分表音' },
   '转注': { color: '#7A5C48', bg: 'rgba(122,92,72,0.08)', desc: '意义相通的字互相解释' },
   '假借': { color: '#5C6E00', bg: 'rgba(92,110,0,0.08)', desc: '借用同音字表达新意思' },
 }
@@ -426,7 +421,7 @@ function StepStructure({ data, char, onNext }: {
                 stop()
               }}
               style={{ padding: '12px 16px', borderRadius: 14,
-                background: activeIdx === i ? 'rgba(164,99,85,0.1)' : '#f7f4ee',
+                background: activeIdx === i ? 'rgba(164,99,85,0.1)' : 'var(--canvas-warm)',
                 border: `1.5px solid ${activeIdx === i
                   ? 'rgba(164,99,85,0.4)' : 'rgba(164,99,85,0.25)'}`,
                 cursor: 'pointer', textAlign: 'center',
@@ -473,7 +468,7 @@ function StepStructure({ data, char, onNext }: {
       <motion.div whileTap={{ scale: 0.98 }}
         onClick={() => setShowMom(o => !o)}
         style={{ padding: '12px 16px', borderRadius: 14,
-          background: showMom ? 'rgba(164,99,85,0.08)' : '#f7f4ee',
+          background: showMom ? 'rgba(164,99,85,0.08)' : 'var(--canvas-warm)',
           border: `1px solid ${showMom ? 'rgba(164,99,85,0.35)' : 'rgba(164,99,85,0.2)'}`,
           cursor: 'pointer', marginBottom: 12,
           display: 'flex', justifyContent: 'space-between',
@@ -659,7 +654,7 @@ function StepWrite({ data, char, canvasRef, onNext }: {
           <motion.div key={activeStroke}
             initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 10 }}
-            style={{ ...GLASS_CARD, padding: '14px 16px', marginBottom: 12 }}>
+            style={{ ...CARD, padding: '14px 16px', marginBottom: 12 }}>
             <div style={{ display: 'flex', alignItems: 'center',
               justifyContent: 'space-between', marginBottom: 8 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -838,8 +833,8 @@ async function generateCard(
   const ctx = cardCanvas.getContext('2d')!
   ctx.scale(dpr, dpr)
 
-  // 背景
-  ctx.fillStyle = '#faf7f2'
+  const canvasWarm = getComputedStyle(document.documentElement).getPropertyValue('--canvas-warm').trim() || '#fbf9f6'
+  ctx.fillStyle = canvasWarm
   ctx.fillRect(0, 0, W, H)
 
   // 左侧装饰线
@@ -1336,28 +1331,23 @@ export default function LearnSession({
     <motion.div initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: 20 }}
+      className="canvas-texture"
       style={{
         position: 'fixed',
         inset: 0,
-        backgroundColor: '#fbf9f6',
-        backgroundImage: `
-    radial-gradient(at 80% 10%, rgba(228,237,228,0.3) 0px, transparent 50%),
-    radial-gradient(at 20% 90%, rgba(245,214,209,0.2) 0px, transparent 50%)
-  `,
+        backgroundColor: 'var(--canvas-warm)',
         zIndex: 100,
         overflow: 'hidden',
         display: 'flex',
         flexDirection: 'column',
-        fontFamily: 'sans-serif',
+        fontFamily: 'var(--font-body)',
       }}>
 
       {/* 顶部导航 */}
       <div style={{
         flexShrink: 0,
-        background: 'rgba(251,249,246,0.92)',
-        backdropFilter: 'blur(20px)',
-        WebkitBackdropFilter: 'blur(20px)',
-        borderBottom: '1px solid rgba(45,50,47,0.06)',
+        background: 'var(--canvas-warm)',
+        borderBottom: '1px solid var(--line)',
         padding: 'calc(12px + env(safe-area-inset-top)) 16px 12px',
         display: 'flex',
         alignItems: 'center',
@@ -1365,16 +1355,16 @@ export default function LearnSession({
       }}>
         <button onClick={onClose}
           style={{ background: 'none', border: 'none',
-            fontSize: 13, color: 'rgba(45,50,47,0.45)',
-            cursor: 'pointer', fontFamily: 'sans-serif' }}>
+            fontSize: 13, color: 'var(--fg3)',
+            cursor: 'pointer', fontFamily: 'var(--font-body)' }}>
           ← 退出
         </button>
-        <div style={{ fontSize: 14, fontWeight: 700, color: '#2d322f',
-          fontFamily: "'Noto Serif SC', serif" }}>
+        <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--fg1)',
+          fontFamily: 'var(--font-serif)' }}>
           {step.emoji} {step.label}
         </div>
-        <div style={{ fontSize: 12, color: 'rgba(45,50,47,0.45)',
-          fontFamily: 'sans-serif' }}>
+        <div style={{ fontSize: 12, color: 'var(--fg3)',
+          fontFamily: 'var(--font-latin)' }}>
           {currentStep + 1} / {STEPS.length}
         </div>
       </div>
@@ -1416,10 +1406,8 @@ export default function LearnSession({
           flexShrink: 0,
           padding: '12px 16px',
           paddingBottom: 'max(env(safe-area-inset-bottom), 16px)',
-          background: 'rgba(251,249,246,0.95)',
-          backdropFilter: 'blur(10px)',
-          WebkitBackdropFilter: 'blur(10px)',
-          borderTop: '1px solid rgba(45,50,47,0.06)',
+          background: 'var(--canvas-warm)',
+          borderTop: '1px solid var(--line)',
         }}>
           {bottomBar}
         </div>

@@ -1,7 +1,7 @@
 'use client'
 import React, { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { CHINESE_THEME as T } from '@/app/_shared/_constants/chineseTheme'
+import { CHINESE_THEME as T, SOLID_CARD } from '@/app/_shared/_constants/chineseTheme'
 
 type Props = {
   title: string
@@ -23,23 +23,20 @@ export default function ChineseAccordion({
         style={{
           width: '100%',
           padding: '12px 16px',
-          background: 'rgba(255,255,255,0.6)',
-          border: '1px solid rgba(255,255,255,0.5)',
-          borderRadius: 14,
+          ...SOLID_CARD,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
           cursor: 'pointer',
           marginBottom: open ? 0 : 8,
-          backdropFilter: 'blur(8px)',
         }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           {emoji && <span style={{ fontSize: 16 }}>{emoji}</span>}
           <span style={{
             fontSize: 13,
             fontWeight: 500,
-            color: '#a46355',
-            fontFamily: "'Noto Serif SC', serif",
+            color: 'var(--clay)',
+            fontFamily: 'var(--font-serif)',
             letterSpacing: '0.05em',
             ...titleStyle,
           }}>{title}</span>
@@ -55,11 +52,10 @@ export default function ChineseAccordion({
             exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.25 }}
             style={{ overflow: 'hidden' }}>
             <div style={{
-              background: 'rgba(255,255,255,0.5)',
-              borderRadius: '0 0 14px 14px',
+              ...SOLID_CARD,
+              borderRadius: '0 0 var(--r-xl) var(--r-xl)',
               padding: '12px 16px 16px',
               marginBottom: 8,
-              border: '1px solid rgba(255,255,255,0.5)',
               borderTop: 'none',
             }}>
               {children}

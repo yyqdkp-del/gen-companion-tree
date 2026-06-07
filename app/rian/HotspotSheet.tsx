@@ -9,7 +9,7 @@ import { useHotspotEngine } from '@/app/_shared/_hooks/useHotspotEngine'
 import { isConsumed } from '@/app/_shared/_engine/hotspot'
 import { convertHotspotToTodoAndMarkRead } from '@/app/_shared/_services/todoService'
 import { useApp } from '@/app/context/AppContext'
-import type { HotspotItem } from '@/app/_shared/_types'
+import type { HotspotItem, BrainHotspotActionData } from '@/app/_shared/_types'
 import ActionModal from '@/app/components/ActionModal'
 import HotspotPreferences from '@/app/_shared/_components/HotspotPreferences'
 import { logOrAlertNetworkError } from '@/lib/errors/logOrAlertNetworkError'
@@ -257,9 +257,10 @@ type Props = {
   onRead: (id: string) => void
   userId: string
   onSync?: () => void
+  onBrainAction?: (action: string, value?: string) => void
 }
 
-export default function HotspotSheet({ hotspots, onClose, onPatrol, patrolling, onRead, userId, onSync }: Props) {
+export default function HotspotSheet({ hotspots, onClose, onPatrol, patrolling, onRead, userId, onSync, onBrainAction }: Props) {
   const [selectedHotspot, setSelectedHotspot] = useState<HotspotItem | null>(null)
   const [showPrefs, setShowPrefs] = useState(false)
   const [unreadOnly, setUnreadOnly] = useState(false)
@@ -409,12 +410,24 @@ export default function HotspotSheet({ hotspots, onClose, onPatrol, patrolling, 
             source_id={selectedHotspot.id}
             title={selectedHotspot.title}
             category={selectedHotspot.category}
-            urgency_level={selectedHotspot.urgency === 'urgent' ? 3 : selectedHotspot.urgency === 'important' ? 2 : 1}
+            urgency_level={
+              (selectedHotspot.action_data as { urgency?: string } | undefined)?.urgency === 'high' ? 3
+              : (selectedHotspot.action_data as { urgency?: string } | undefined)?.urgency === 'medium' ? 2
+              : selectedHotspot.urgency === 'urgent' ? 3
+              : selectedHotspot.urgency === 'important' ? 2
+              : 1
+            }
+            hotspot_summary={selectedHotspot.summary}
+            hotspot_action_data={selectedHotspot.action_data as BrainHotspotActionData | undefined}
             userId={userId}
             onClose={() => setSelectedHotspot(null)}
             onDone={() => { onRead(selectedHotspot.id); setSelectedHotspot(null) }}
             onSnooze={() => setSelectedHotspot(null)}
             onSync={onSync}
+            onBrainAction={(action, value) => {
+              setSelectedHotspot(null)
+              onBrainAction?.(action, value)
+            }}
           />
         )}
       </AnimatePresence>

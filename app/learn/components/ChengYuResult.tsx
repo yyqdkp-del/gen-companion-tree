@@ -5,15 +5,12 @@ import { useApp } from '@/app/context/AppContext'
 import ChineseAccordion from './ChineseAccordion'
 import { WordPopup } from './WordPopup'
 
+import { SOLID_CARD } from '@/app/_shared/_constants/chineseTheme'
+
 type Props = { data: any; onMomCopy: () => void }
 
-const GLASS_CARD: React.CSSProperties = {
-  background: 'rgba(255,255,255,0.8)',
-  backdropFilter: 'blur(10px)',
-  WebkitBackdropFilter: 'blur(10px)',
-  borderRadius: 18,
-  border: '1px solid rgba(255,255,255,0.6)',
-  boxShadow: '0 4px 20px rgba(45,50,47,0.05)',
+const CARD: React.CSSProperties = {
+  ...SOLID_CARD,
   marginBottom: 10,
   padding: '16px 18px',
 }
@@ -37,7 +34,7 @@ export default function ChengYuResult({ data, onMomCopy }: Props) {
     <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4 }} style={{ background: 'transparent' }}>
 
-      <div style={{ ...GLASS_CARD, textAlign: 'center' }}>
+      <div style={{ ...CARD, textAlign: 'center' }}>
         <motion.div initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
           transition={{ type: 'spring', stiffness: 150, damping: 15 }}
           style={{
@@ -75,7 +72,7 @@ export default function ChengYuResult({ data, onMomCopy }: Props) {
                 background: 'rgba(164,99,85,0.05)', textAlign: 'center' }}>
                 <div style={{ fontSize: 10, color: 'rgba(45,50,47,0.45)', marginBottom: 4,
                   fontFamily: 'sans-serif' }}>English</div>
-                <div style={{ fontSize: 12, color: '#2d3f4a', fontStyle: 'italic',
+                <div style={{ fontSize: 12, color: 'var(--fg2)', fontStyle: 'italic',
                   fontFamily: 'sans-serif' }}>「{data.english_idiom}」</div>
               </div>
               <div style={{ fontSize: 16, color: '#8a7355' }}>⟷</div>
@@ -151,7 +148,7 @@ export default function ChengYuResult({ data, onMomCopy }: Props) {
 
       {relatedWords.length > 0 && (
         <>
-          <div style={GLASS_CARD}>
+          <div style={CARD}>
             <div style={{ fontSize: 10, letterSpacing: 3, color: '#a46355',
               marginBottom: 10, fontFamily: 'sans-serif' }}>🌳 相关词汇</div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7 }}>

@@ -11,6 +11,7 @@ import {
   Mic, Camera, Phone, Send, Upload,
 } from 'lucide-react'
 import TodoDetailModal from '@/app/rian/TodoDetailModal'
+import ActionModal from '@/app/components/ActionModal'
 import ChildSheet from '@/app/rian/ChildSheet'
 import HotspotSheet from '@/app/rian/HotspotSheet'
 import Onboarding from '@/app/components/Onboarding'
@@ -27,7 +28,7 @@ import {
   type MomentAction,
   type ScheduleClass,
 } from '@/app/_shared/_engine/momentCard'
-import type { TodoItem, HotspotItem } from '@/app/_shared/_types'
+import type { TodoItem, HotspotItem, BrainHotspotActionData } from '@/app/_shared/_types'
 import ChildSwitcher from '@/app/_shared/_components/child/ChildSwitcher'
 import { useTodoActions } from '@/app/_shared/_hooks/useTodoActions'
 import { useTodoEngine } from '@/app/_shared/_hooks/useTodoEngine'
@@ -809,6 +810,7 @@ export default function BasePage() {
   const openModal = (m: typeof modal) => { setModal(m); setModalOpen(true) }
   const closeModal = () => { setModal(null); setModalOpen(false) }
   const [oneTapTodo, setOneTapTodo] = useState<TodoItem | null>(null)
+  const [brainHotspot, setBrainHotspot] = useState<HotspotItem | null>(null)
   const [inputPrefill, setInputPrefill] = useState<string | undefined>()
   const [patrolling, setPatrolling] = useState(false)
   const patrolTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -1258,6 +1260,13 @@ export default function BasePage() {
         openModal('oneTap')
         break
       }
+      case 'correlation': {
+        const hotspot =
+          unreadHotspots.find((h) => h.id === action.hotspotId)
+          || hotspots.find((h) => h.id === action.hotspotId)
+        if (hotspot) setBrainHotspot(hotspot)
+        break
+      }
       default:
         break
     }
@@ -1271,6 +1280,8 @@ export default function BasePage() {
     displayTodos,
     rootBriefing.urgentTodoId,
     topTodo,
+    unreadHotspots,
+    hotspots,
     router,
   ])
 
@@ -1290,6 +1301,43 @@ export default function BasePage() {
     setOneTapTodo(todo)
     openModal('oneTap')
   }, [todayFocusTodos, displayTodos])
+
+  const handleBrainAction = useCallback((action: string, value?: string) => {
+    if (action === 'one_tap' && value) {
+      setBrainHotspot(null)
+      handleOneTap(value)
+      return
+    }
+    if (action === 'generate_leave_letter' && value) {
+      try {
+        const payload = JSON.parse(value) as {
+          childName?: string
+          classes?: Array<{ subject?: string; name?: string; name_zh?: string }>
+        }
+        const classNames = (payload.classes || [])
+          .map((c) => c.name_zh || c.subject || c.name)
+          .filter(Boolean)
+          .join('、')
+        const lines = [
+          '请帮我写一份请假信',
+          payload.childName ? `孩子：${payload.childName}` : '',
+          classNames ? `今日课程：${classNames}` : '',
+        ].filter(Boolean)
+        setInputPrefill(lines.join('\n'))
+        setBrainHotspot(null)
+        openModal('input')
+      } catch {
+        setInputPrefill('请帮我写一份请假信')
+        setBrainHotspot(null)
+        openModal('input')
+      }
+      return
+    }
+    if (action === 'open_packing') {
+      setBrainHotspot(null)
+      openModal('child')
+    }
+  }, [handleOneTap])
 
   const handlePhotoCapture = () => {
     if (!userId) {
@@ -1561,7 +1609,8 @@ export default function BasePage() {
           <HotspotSheet key="hotspot" hotspots={hotspots}
             onClose={() => closeModal()}
             onPatrol={handlePatrol} patrolling={patrolling}
-            onRead={handleRead} userId={userId} onSync={ctxSync} />
+            onRead={handleRead} userId={userId} onSync={ctxSync}
+            onBrainAction={handleBrainAction} />
         )}
         {modal === 'addChild' && (
           <AddChildSheet key="add" onClose={() => closeModal()} onSave={handleAddChild} />
@@ -1587,6 +1636,27 @@ export default function BasePage() {
             onClose={() => { setInputPrefill(undefined); closeModal() }}
             userId={userId}
             onProcessing={() => setProcessStatus({ status: 'processing', message: '根正在整理中...' })}
+          />
+        )}
+        {brainHotspot && (
+          <ActionModal
+            key={`brain-${brainHotspot.id}`}
+            source_type="hotspot"
+            source_id={brainHotspot.id}
+            title={brainHotspot.title}
+            category="correlation"
+            urgency_level={
+              (brainHotspot.action_data as BrainHotspotActionData | undefined)?.urgency === 'high' ? 3
+              : (brainHotspot.action_data as BrainHotspotActionData | undefined)?.urgency === 'medium' ? 2
+              : 1
+            }
+            hotspot_summary={brainHotspot.summary}
+            hotspot_action_data={brainHotspot.action_data as BrainHotspotActionData | undefined}
+            userId={userId}
+            onClose={() => setBrainHotspot(null)}
+            onDone={(id) => { void handleRead(id); setBrainHotspot(null) }}
+            onSnooze={() => setBrainHotspot(null)}
+            onBrainAction={handleBrainAction}
           />
         )}
       </AnimatePresence>

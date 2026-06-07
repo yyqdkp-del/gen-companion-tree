@@ -8,6 +8,9 @@ type AdminUser = {
   user_id: string
   member_name: string | null
   resident_city: string | null
+  email: string | null
+  auth_email: string | null
+  auth_email_label: string
   is_pro: boolean | null
   created_at: string | null
   updated_at: string | null
@@ -60,7 +63,10 @@ export default function AdminUsers() {
       (u) =>
         u.member_name?.includes(q) ||
         u.resident_city?.includes(q) ||
-        u.user_id.includes(q),
+        u.user_id.includes(q) ||
+        u.auth_email?.includes(q) ||
+        u.email?.includes(q) ||
+        u.auth_email_label.includes(q),
     )
   }, [users, search])
 
@@ -95,7 +101,7 @@ export default function AdminUsers() {
       <input
         value={search}
         onChange={(e) => setSearch(e.target.value)}
-        placeholder="搜索姓名或城市..."
+        placeholder="搜索姓名、邮箱或城市..."
         style={{
           padding: '8px 16px',
           borderRadius: 8,
@@ -118,7 +124,7 @@ export default function AdminUsers() {
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ borderBottom: '1px solid #f0ede8' }}>
-                {['姓名', '城市', '孩子数', '订阅', '注册时间', '操作'].map((h) => (
+                {['姓名', '注册邮箱', '城市', '孩子数', '订阅', '注册时间', '操作'].map((h) => (
                   <th
                     key={h}
                     style={{
@@ -137,7 +143,7 @@ export default function AdminUsers() {
             <tbody>
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={6} style={{ padding: 16, fontSize: 14, color: 'rgba(45,50,47,0.45)' }}>
+                  <td colSpan={7} style={{ padding: 16, fontSize: 14, color: 'rgba(45,50,47,0.45)' }}>
                     {search.trim() ? '无匹配用户' : '暂无用户'}
                   </td>
                 </tr>
@@ -149,6 +155,9 @@ export default function AdminUsers() {
                     <tr key={user.user_id} style={{ borderBottom: '1px solid #f0ede8' }}>
                       <td style={{ padding: '12px', fontSize: 14, color: '#2d322f' }}>
                         {user.member_name || '未填写'}
+                      </td>
+                      <td style={{ padding: '12px', fontSize: 13, color: 'rgba(45,50,47,0.65)' }}>
+                        {user.auth_email_label}
                       </td>
                       <td style={{ padding: '12px', fontSize: 14, color: 'rgba(45,50,47,0.6)' }}>
                         {user.resident_city || '—'}

@@ -34,23 +34,24 @@ export default async function GrandparentPage({ params }: PageProps) {
   if (!report) {
     return (
       <div
+        className="canvas-texture"
         style={{
           minHeight: '100dvh',
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
           justifyContent: 'center',
-          background: '#fbf9f6',
-          fontFamily: "'Noto Serif SC', serif",
+          background: 'var(--canvas-mist)',
+          fontFamily: 'var(--font-serif)',
           padding: '20px',
           textAlign: 'center',
         }}
       >
         <div style={{ fontSize: 48, marginBottom: 16 }}>🌳</div>
-        <div style={{ fontSize: 18, color: '#2d322f', marginBottom: 8 }}>
+        <div style={{ fontSize: 18, color: 'var(--fg1)', marginBottom: 8 }}>
           这份成长周报已过期
         </div>
-        <div style={{ fontSize: 14, color: 'rgba(45,50,47,0.5)' }}>
+        <div style={{ fontSize: 14, color: 'var(--fg3)', fontFamily: 'var(--font-body)' }}>
           请让孩子的妈妈重新生成一份新的周报
         </div>
       </div>

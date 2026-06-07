@@ -2,10 +2,17 @@
 // 根·中文专属主题色（与 globals.css token 对齐，见 REDESIGN_ROADMAP）
 // ─────────────────────────────────────────
 
+/** 与首页 MomentCard 一致：实心白卡 + warm shadow */
+export const SOLID_CARD = {
+  background: '#fff',
+  borderRadius: 'var(--r-xl)',
+  boxShadow: 'var(--sh-warm)',
+} as const
+
 export const CHINESE_THEME = {
-  bg: '#fbf9f6', // --canvas-light
+  bg: 'var(--canvas-warm)',
   white: '#ffffff',
-  paper: '#f7f4ee',
+  paper: 'var(--canvas-warm)',
   text: '#2d322f', // --text-primary（已与全局统一）
   textMid: '#5a5a4a', // --text-secondary
   textDim: 'rgba(45,50,47,0.45)', // --text-muted

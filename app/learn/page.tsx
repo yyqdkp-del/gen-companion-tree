@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import { createClient } from '@/lib/supabase/client'
 import type { UserLocation } from '@/lib/geofence/types'
-import { CHINESE_THEME as THEME, CHINESE_LEVELS as LEVELS, LOAD_MSGS, QUICK_CHENGYU, QUICK_WRITING } from '@/app/_shared/_constants/chineseTheme'
+import { CHINESE_THEME as THEME, CHINESE_LEVELS as LEVELS, LOAD_MSGS, QUICK_CHENGYU, QUICK_WRITING, SOLID_CARD } from '@/app/_shared/_constants/chineseTheme'
 import { useApp } from '@/app/context/AppContext'
 import { fetchWithAuth } from '@/lib/auth/fetchWithAuth'
 import { logOrAlertNetworkError } from '@/lib/errors/logOrAlertNetworkError'
@@ -299,56 +299,49 @@ export default function DecodePage() {
   const writingCount = learnedItems.filter(i => i.type === 'writing').length
 
     return (
-    <main style={{
+    <main className="canvas-texture" style={{
       minHeight: '100dvh',
-      backgroundColor: '#fbf9f6',
-      backgroundImage: `
-    radial-gradient(at 80% 10%, rgba(228,237,228,0.3) 0px, transparent 50%),
-    radial-gradient(at 20% 90%, rgba(245,214,209,0.2) 0px, transparent 50%)
-  `,
-      fontFamily: "'Noto Serif SC', Georgia, serif",
+      fontFamily: 'var(--font-body)',
       paddingBottom: `calc(${SAFE_BOTTOM_INSET} + 24px)`,
     }}>
 
       {/* 顶部导航 */}
       <div style={{
-        background: 'rgba(251,249,246,0.92)',
-        backdropFilter: 'blur(20px)',
-        WebkitBackdropFilter: 'blur(20px)',
-        borderBottom: '1px solid rgba(45,50,47,0.06)',
+        background: '#fff',
+        borderBottom: '1px solid var(--line)',
         padding: `${STICKY_HEADER_PADDING_TOP} 16px 12px`,
         display: 'flex',
         alignItems: 'center',
         position: 'sticky',
         top: 0,
         zIndex: 50,
-        boxShadow: '0 2px 20px rgba(45,50,47,0.04)',
+        boxShadow: 'var(--sh-soft)',
       }}>
-        <button onClick={() => router.back()} style={{ background: 'none', border: 'none', color: THEME.textDim, fontSize: 13, cursor: 'pointer', marginRight: 10, fontFamily: 'sans-serif', padding: '4px 8px' }}>←</button>
+        <button onClick={() => router.back()} style={{ background: 'none', border: 'none', color: THEME.textDim, fontSize: 13, cursor: 'pointer', marginRight: 10, fontFamily: 'var(--font-body)', padding: '4px 8px' }}>←</button>
         <div style={{ flex: 1 }}>
           <div style={{
             fontSize: 9,
             letterSpacing: 4,
-            color: '#a46355',
+            color: 'var(--clay)',
             textTransform: 'uppercase',
             marginBottom: 2,
-            fontFamily: "'Montserrat', sans-serif",
+            fontFamily: 'var(--font-latin)',
           }}>根·中文</div>
           <div style={{
             fontSize: 16,
             fontWeight: 500,
-            color: '#2d322f',
-            fontFamily: "'Noto Serif SC', serif",
+            color: 'var(--fg1)',
+            fontFamily: 'var(--font-serif)',
             letterSpacing: '0.05em',
           }}>字理解码器</div>
         </div>
         {childInfo.name && (
-          <div style={{ padding: '3px 10px', borderRadius: 20, background: 'rgba(164,99,85,0.08)', border: '1px solid rgba(164,99,85,0.2)', fontSize: 11, color: THEME.textMid, fontFamily: 'sans-serif', marginRight: 8 }}>
+          <div style={{ padding: '3px 10px', borderRadius: 20, background: 'var(--clay-tint)', border: '1px solid var(--line-clay)', fontSize: 11, color: THEME.textMid, fontFamily: 'var(--font-body)', marginRight: 8 }}>
             {childInfo.name} · {childInfo.level}
           </div>
         )}
         <button onClick={() => setShowProgress(!showProgress)}
-          style={{ background: 'none', border: 'none', color: THEME.textDim, fontSize: 12, cursor: 'pointer', fontFamily: 'sans-serif' }}>
+          style={{ background: 'none', border: 'none', color: THEME.textDim, fontSize: 12, cursor: 'pointer', fontFamily: 'var(--font-body)' }}>
           🌳 {hanziCount + chengYuCount + writingCount}
         </button>
       </div>
@@ -360,16 +353,12 @@ export default function DecodePage() {
           {showProgress && (
             <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} style={{ overflow: 'hidden', marginBottom: 12 }}>
               <div style={{
-                background: 'rgba(255,255,255,0.8)',
-                backdropFilter: 'blur(10px)',
-                borderRadius: 18,
+                ...SOLID_CARD,
                 padding: '16px',
-                border: '1px solid rgba(255,255,255,0.6)',
-                boxShadow: '0 4px 20px rgba(45,50,47,0.05)',
                 marginBottom: 12,
               }}>
                 <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
-                  {[{ label: '汉字', count: hanziCount, color: THEME.red, emoji: '🧩' }, { label: '成语', count: chengYuCount, color: THEME.orange, emoji: '🌟' }, { label: '文化句', count: writingCount, color: THEME.green, emoji: '📜' }].map(s => (
+                  {[{ label: '汉字', count: hanziCount, emoji: '🧩' }, { label: '成语', count: chengYuCount, emoji: '🌟' }, { label: '文化句', count: writingCount, emoji: '📜' }].map(s => (
                     <div key={s.label} style={{
                       flex: 1,
                       textAlign: 'center',
@@ -379,8 +368,8 @@ export default function DecodePage() {
                       border: '1px solid rgba(164,99,85,0.1)',
                     }}>
                       <div style={{ fontSize: 18 }}>{s.emoji}</div>
-                      <div style={{ fontSize: 18, fontWeight: 700, color: s.color, fontFamily: 'sans-serif' }}>{s.count}</div>
-                      <div style={{ fontSize: 10, color: THEME.textDim, fontFamily: 'sans-serif' }}>{s.label}</div>
+                      <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--clay)', fontFamily: 'var(--font-latin)' }}>{s.count}</div>
+                      <div style={{ fontSize: 10, color: THEME.textDim, fontFamily: 'var(--font-body)' }}>{s.label}</div>
                     </div>
                   ))}
                 </div>
@@ -390,11 +379,11 @@ export default function DecodePage() {
                       <span key={i} style={{
                         padding: '4px 12px',
                         borderRadius: 12,
-                        background: 'rgba(255,255,255,0.7)',
-                        border: '1px solid rgba(164,99,85,0.1)',
+                        background: '#fff',
+                        border: '1px solid var(--line-clay)',
                         fontSize: 16,
-                        fontFamily: "'Noto Serif SC', serif",
-                        color: '#2d322f',
+                        fontFamily: 'var(--font-serif)',
+                        color: 'var(--fg1)',
                         cursor: 'pointer',
                         boxShadow: '0 2px 6px rgba(45,50,47,0.05)',
                       }}
@@ -413,13 +402,8 @@ export default function DecodePage() {
 
         {/* 输入区 */}
         <div style={{
-          background: 'rgba(255,255,255,0.8)',
-          backdropFilter: 'blur(10px)',
-          WebkitBackdropFilter: 'blur(10px)',
-          borderRadius: 20,
+          ...SOLID_CARD,
           padding: '18px',
-          boxShadow: '0 4px 24px rgba(45,50,47,0.06), 0 1px 4px rgba(45,50,47,0.04)',
-          border: '1px solid rgba(255,255,255,0.6)',
           marginBottom: 12,
         }}>
 
@@ -445,40 +429,31 @@ export default function DecodePage() {
                       fontSize: 52,
                       border: '1.5px solid rgba(164,99,85,0.2)',
                       borderRadius: 18,
-                      fontFamily: "'Noto Serif SC', serif",
-                      color: '#2d322f',
-                      background: '#f7f4ee',
+                      fontFamily: 'var(--font-serif)',
+                      color: 'var(--fg1)',
+                      background: 'var(--canvas-light)',
                       outline: 'none',
-                      caretColor: '#a46355',
+                      caretColor: 'var(--clay)',
                       cursor: 'text',
                       boxShadow: 'inset 0 2px 8px rgba(45,50,47,0.04)',
                     }}
                   />
                 </div>
                 <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  <div style={{ fontSize: 11, color: THEME.textDim, fontFamily: 'sans-serif', lineHeight: 1.5 }}>
+                  <div style={{ fontSize: 11, color: THEME.textDim, fontFamily: 'var(--font-body)', lineHeight: 1.5 }}>
                     输入一个汉字<br />
                     <span style={{ fontSize: 10, color: THEME.textDim }}>支持手写/拼音输入法</span>
                   </div>
                   <motion.button whileTap={{ scale: 0.96 }}
                     onClick={() => { const c = [...input].find(c => /\p{Script=Han}/u.test(c)) || input.trim(); if (c) { setInput(c); generate(c) } }}
                     disabled={loading || !input.trim()}
+                    className="gc-btn"
                     style={{
                       padding: '11px 18px',
-                      background: loading || !input.trim()
-                        ? 'rgba(45,50,47,0.08)'
-                        : '#a46355',
-                      color: loading || !input.trim() ? 'rgba(45,50,47,0.35)' : '#fff',
-                      border: 'none',
-                      borderRadius: 14,
-                      fontSize: 14,
-                      fontFamily: "'Noto Serif SC', serif",
+                      width: 'auto',
+                      opacity: loading || !input.trim() ? 0.45 : 1,
                       cursor: loading || !input.trim() ? 'not-allowed' : 'pointer',
                       letterSpacing: '0.05em',
-                      boxShadow: !loading && input.trim()
-                        ? '0 4px 16px rgba(164,99,85,0.25)'
-                        : 'none',
-                      transition: 'all 0.2s ease',
                     }}>
                     {loading ? '解析中…' : '🧩 拆解'}
                   </motion.button>
@@ -488,8 +463,8 @@ export default function DecodePage() {
               {remaining !== null && remaining < 3 && (
                 <div style={{
                   fontSize: 12,
-                  color: remaining === 0 ? '#a46355' : 'rgba(45,50,47,0.4)',
-                  fontFamily: 'sans-serif',
+                  color: remaining === 0 ? 'var(--clay)' : 'var(--fg3)',
+                  fontFamily: 'var(--font-body)',
                   textAlign: 'center',
                   marginTop: 8,
                   marginBottom: 4,
@@ -512,9 +487,9 @@ export default function DecodePage() {
                 onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); generate() } }}
                 placeholder="孩子说了什么？英文中文都行&#10;如：very many people / 一下子就做完了"
                 rows={3}
-                style={{ width: '100%', background: THEME.paper, border: '1.5px solid rgba(176,112,80,0.22)', borderRadius: 12, padding: '11px 13px', fontSize: 14, color: THEME.text, outline: 'none', resize: 'none', fontFamily: 'sans-serif', lineHeight: 1.7, marginBottom: 10, boxSizing: 'border-box', caretColor: THEME.orange }} />
+                style={{ width: '100%', background: THEME.paper, border: '1.5px solid var(--line-clay)', borderRadius: 12, padding: '11px 13px', fontSize: 14, color: THEME.text, outline: 'none', resize: 'none', fontFamily: 'var(--font-body)', lineHeight: 1.7, marginBottom: 10, boxSizing: 'border-box', caretColor: 'var(--clay)' }} />
               <motion.button whileTap={{ scale: 0.96 }} onClick={() => generate()} disabled={loading || !input.trim()}
-                style={{ width: '100%', padding: '12px', background: !input.trim() ? 'rgba(45,50,47,0.15)' : THEME.red, color: '#fff', border: 'none', borderRadius: 14, fontSize: 14, fontFamily: "'Noto Serif SC', serif", cursor: !input.trim() ? 'not-allowed' : 'pointer', marginBottom: 10 }}>
+                className="gc-btn" style={{ width: '100%', marginBottom: 10, opacity: !input.trim() ? 0.45 : 1, cursor: !input.trim() ? 'not-allowed' : 'pointer' }}>
                 {loading ? '生成中…' : '🌟 生成成语脚本'}
               </motion.button>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
@@ -523,12 +498,12 @@ export default function DecodePage() {
                     style={{
                       padding: '6px 14px',
                       borderRadius: 20,
-                      background: 'rgba(176,112,80,0.08)',
-                      border: '1px solid rgba(176,112,80,0.2)',
+                      background: 'var(--clay-tint)',
+                      border: '1px solid var(--line-clay)',
                       fontSize: 12,
-                      color: THEME.orange,
+                      color: 'var(--clay-deep)',
                       cursor: 'pointer',
-                      fontFamily: 'sans-serif',
+                      fontFamily: 'var(--font-body)',
                       transition: 'all 0.15s ease',
                     }}>
                     {s}
@@ -545,9 +520,9 @@ export default function DecodePage() {
                 onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); generate() } }}
                 placeholder="孩子今天经历了什么？让他说，你来打&#10;如：今天去夜市，人超多，我吃了芒果糯米饭"
                 rows={3}
-                style={{ width: '100%', background: THEME.paper, border: '1.5px solid rgba(92,122,94,0.22)', borderRadius: 12, padding: '11px 13px', fontSize: 14, color: THEME.text, outline: 'none', resize: 'none', fontFamily: 'sans-serif', lineHeight: 1.7, marginBottom: 10, boxSizing: 'border-box', caretColor: THEME.green }} />
+                style={{ width: '100%', background: THEME.paper, border: '1.5px solid var(--line-clay)', borderRadius: 12, padding: '11px 13px', fontSize: 14, color: THEME.text, outline: 'none', resize: 'none', fontFamily: 'var(--font-body)', lineHeight: 1.7, marginBottom: 10, boxSizing: 'border-box', caretColor: 'var(--clay)' }} />
               <motion.button whileTap={{ scale: 0.96 }} onClick={() => generate()} disabled={loading || !input.trim()}
-                style={{ width: '100%', padding: '12px', background: !input.trim() ? 'rgba(45,50,47,0.15)' : '#2D6A4F', color: '#fff', border: 'none', borderRadius: 14, fontSize: 14, fontFamily: "'Noto Serif SC', serif", cursor: !input.trim() ? 'not-allowed' : 'pointer', marginBottom: 10 }}>
+                className="gc-btn" style={{ width: '100%', marginBottom: 10, opacity: !input.trim() ? 0.45 : 1, cursor: !input.trim() ? 'not-allowed' : 'pointer' }}>
                 {loading ? '升华中…' : '📜 生成文化句'}
               </motion.button>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
@@ -556,12 +531,12 @@ export default function DecodePage() {
                     style={{
                       padding: '6px 14px',
                       borderRadius: 20,
-                      background: 'rgba(92,122,94,0.06)',
-                      border: '1px solid rgba(92,122,94,0.15)',
+                      background: 'var(--clay-tint)',
+                      border: '1px solid var(--line-clay)',
                       fontSize: 12,
-                      color: '#5c7a5e',
+                      color: 'var(--clay-deep)',
                       cursor: 'pointer',
-                      fontFamily: 'sans-serif',
+                      fontFamily: 'var(--font-body)',
                     }}>
                     {s}
                   </motion.button>
@@ -578,10 +553,10 @@ export default function DecodePage() {
             border: '1px solid rgba(164,99,85,0.2)',
             borderRadius: 14,
             padding: '11px 14px',
-            color: '#a46355',
+            color: 'var(--clay)',
             fontSize: 13,
             marginBottom: 10,
-            fontFamily: 'sans-serif',
+            fontFamily: 'var(--font-body)',
           }}>
             ⚠️ {error}
           </div>
@@ -590,23 +565,20 @@ export default function DecodePage() {
         {/* 加载动画 */}
         {loading && (
           <div style={{
-            background: 'rgba(255,255,255,0.8)',
-            backdropFilter: 'blur(10px)',
-            borderRadius: 20,
+            ...SOLID_CARD,
             padding: '36px 20px',
             textAlign: 'center',
-            boxShadow: '0 4px 24px rgba(45,50,47,0.06)',
             marginBottom: 12,
           }}>
             <div style={{ display: 'flex', justifyContent: 'center', gap: 7, marginBottom: 14 }}>
               {[0, 1, 2].map(i => (
                 <motion.div key={i} animate={{ opacity: [0.3, 1, 0.3], scale: [0.8, 1.2, 0.8] }}
                   transition={{ duration: 1.2, repeat: Infinity, delay: i * 0.2 }}
-                  style={{ width: 9, height: 9, borderRadius: '50%', background: '#a46355' }} />
+                  style={{ width: 9, height: 9, borderRadius: '50%', background: 'var(--clay)' }} />
               ))}
             </div>
             <motion.div key={loadMsg} initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }}
-              style={{ fontSize: 12, color: THEME.textDim, letterSpacing: 1, fontFamily: 'sans-serif' }}>
+              style={{ fontSize: 12, color: THEME.textDim, letterSpacing: 1, fontFamily: 'var(--font-body)' }}>
               {loadMsg}
             </motion.div>
           </div>
@@ -623,7 +595,7 @@ export default function DecodePage() {
               <AnimatePresence>
                 {copied && (
                   <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
-                    style={{ position: 'fixed', top: 72, left: '50%', transform: 'translateX(-50%)', background: 'linear-gradient(135deg, #a46355 0%, #8a5548 100%)', color: '#fff', padding: '9px 18px', borderRadius: 20, fontSize: 12, fontFamily: 'sans-serif', zIndex: 200, whiteSpace: 'nowrap', boxShadow: '0 6px 20px rgba(164,99,85,0.28)' }}>
+                    style={{ position: 'fixed', top: 72, left: '50%', transform: 'translateX(-50%)', background: 'var(--clay)', color: '#fff', padding: '9px 18px', borderRadius: 20, fontSize: 12, fontFamily: 'var(--font-body)', zIndex: 200, whiteSpace: 'nowrap', boxShadow: 'var(--sh-warm)' }}>
                     ✅ 台词已复制，去跟孩子说吧！
                   </motion.div>
                 )}
@@ -631,34 +603,11 @@ export default function DecodePage() {
 
               <div style={{ display: 'flex', gap: 10, marginTop: 4, marginBottom: 20 }}>
                 <motion.button whileTap={{ scale: 0.97 }} onClick={() => router.push('/')}
-                  style={{
-                    flex: 1,
-                    padding: 14,
-                    background: '#a46355',
-                    color: '#fff',
-                    border: 'none',
-                    borderRadius: 16,
-                    fontSize: 14,
-                    fontWeight: 500,
-                    cursor: 'pointer',
-                    fontFamily: "'Noto Serif SC', serif",
-                    letterSpacing: '0.05em',
-                    boxShadow: '0 4px 16px rgba(164,99,85,0.25)',
-                  }}>
+                  className="gc-btn" style={{ flex: 1 }}>
                   回到根·陪伴 →
                 </motion.button>
                 <motion.button whileTap={{ scale: 0.97 }} onClick={() => { setData(null); setInput('') }}
-                  style={{
-                    flex: 1,
-                    padding: 14,
-                    background: 'transparent',
-                    color: 'rgba(45,50,47,0.5)',
-                    border: '1px solid rgba(45,50,47,0.1)',
-                    borderRadius: 16,
-                    fontSize: 13,
-                    cursor: 'pointer',
-                    fontFamily: 'sans-serif',
-                  }}>
+                  className="gc-btn gc-btn--ghost" style={{ flex: 1 }}>
                   再学一个
                 </motion.button>
               </div>
@@ -671,28 +620,21 @@ export default function DecodePage() {
           <div style={{ textAlign: 'center', padding: '32px 16px', color: THEME.textDim }}>
             <div style={{
               fontSize: 72,
-              fontFamily: "'Noto Serif SC', serif",
-              color: 'rgba(164,99,85,0.1)',
+              fontFamily: 'var(--font-serif)',
+              color: 'var(--clay-tint)',
               lineHeight: 1,
               marginBottom: 16,
             }}>
               {activeTab === 'hanzi' ? '字' : activeTab === 'chengyu' ? '成' : '文'}
             </div>
-            <div style={{ fontSize: 13, lineHeight: 1.9, fontFamily: 'sans-serif' }}>
-              {activeTab === 'hanzi' && <>输入任意汉字，秒懂字的灵魂<br /><span style={{ color: THEME.red }}>字理拆解 · 中英互通 · 妈妈台词</span></>}
-              {activeTab === 'chengyu' && <>孩子怎么说，我们找成语<br /><span style={{ color: THEME.orange }}>中英对照 · 三步解码 · 今天就用</span></>}
-              {activeTab === 'writing' && <>孩子的故事，连接古人的智慧<br /><span style={{ color: THEME.green }}>口述升华 · 文化根脉 · 情感连接</span></>}
+            <div style={{ fontSize: 13, lineHeight: 1.9, fontFamily: 'var(--font-body)' }}>
+              {activeTab === 'hanzi' && <>输入任意汉字，秒懂字的灵魂<br /><span style={{ color: 'var(--clay)' }}>字理拆解 · 中英互通 · 妈妈台词</span></>}
+              {activeTab === 'chengyu' && <>孩子怎么说，我们找成语<br /><span style={{ color: 'var(--clay)' }}>中英对照 · 三步解码 · 今天就用</span></>}
+              {activeTab === 'writing' && <>孩子的故事，连接古人的智慧<br /><span style={{ color: 'var(--clay)' }}>口述升华 · 文化根脉 · 情感连接</span></>}
             </div>
           </div>
         )}
       </div>
-
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;700;900&family=Noto+Sans+SC:wght@300;400;500;700&display=swap');
-        * { -webkit-tap-highlight-color: transparent; box-sizing: border-box; }
-        input, textarea { font-family: 'Noto Sans SC', sans-serif; }
-        button:active { opacity: 0.85; }
-      `}</style>
 
       <TourGuide tourId="learn" steps={LEARN_TOUR} />
     </main>

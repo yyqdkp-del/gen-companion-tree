@@ -5,15 +5,12 @@ import { useApp } from '@/app/context/AppContext'
 import ChineseAccordion from './ChineseAccordion'
 import { WordPopup } from './WordPopup'
 
+import { SOLID_CARD } from '@/app/_shared/_constants/chineseTheme'
+
 type Props = { data: any; onMomCopy: () => void }
 
-const GLASS_CARD: React.CSSProperties = {
-  background: 'rgba(255,255,255,0.8)',
-  backdropFilter: 'blur(10px)',
-  WebkitBackdropFilter: 'blur(10px)',
-  borderRadius: 18,
-  border: '1px solid rgba(255,255,255,0.6)',
-  boxShadow: '0 4px 20px rgba(45,50,47,0.05)',
+const CARD: React.CSSProperties = {
+  ...SOLID_CARD,
   marginBottom: 10,
   padding: '16px 18px',
 }
@@ -35,8 +32,8 @@ export default function WritingResult({ data, onMomCopy }: Props) {
       transition={{ duration: 0.4 }}>
 
       {data.draft && (
-        <div style={GLASS_CARD}>
-          <div style={{ fontSize: 10, letterSpacing: 3, color: '#2d3f4a',
+        <div style={CARD}>
+          <div style={{ fontSize: 10, letterSpacing: 3, color: 'var(--fg2)',
             marginBottom: 10, fontFamily: 'sans-serif' }}>✍️ 书面升华版</div>
           <div style={{ fontSize: 14, color: '#2d322f', lineHeight: 2.1,
             fontFamily: "'Noto Serif SC', serif" }}>{data.draft}</div>
@@ -113,7 +110,7 @@ export default function WritingResult({ data, onMomCopy }: Props) {
 
       {keyWords.length > 0 && (
         <>
-          <div style={GLASS_CARD}>
+          <div style={CARD}>
             <div style={{ fontSize: 10, letterSpacing: 3, color: '#a46355',
               marginBottom: 10, fontFamily: 'sans-serif' }}>🌳 关键词</div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7 }}>

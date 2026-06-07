@@ -5,6 +5,22 @@ import { fetchWithAuth } from '@/lib/auth/fetchWithAuth'
 import { fetchHanziCache } from '@/app/_shared/_services/chineseService'
 import { logOrAlertNetworkError } from '@/lib/errors/logOrAlertNetworkError'
 
+import { SOLID_CARD } from '@/app/_shared/_constants/chineseTheme'
+
+const POPUP_SHEET: React.CSSProperties = {
+  ...SOLID_CARD,
+  position: 'fixed',
+  bottom: 0,
+  left: 0,
+  right: 0,
+  maxWidth: 520,
+  margin: '0 auto',
+  borderRadius: '24px 24px 0 0',
+  padding: '20px 20px 40px',
+  maxHeight: '75vh',
+  overflowY: 'auto',
+}
+
 type PopupItem = { word: string; type: 'word' | 'chengyu' | 'cultural'; extra?: any }
 
 export function WordPopup({ word, onClose, childLevel }: {
@@ -54,50 +70,36 @@ export function WordPopup({ word, onClose, childLevel }: {
         position: 'fixed',
         inset: 0,
         background: 'rgba(45,50,47,0.4)',
-        backdropFilter: 'blur(8px)',
         zIndex: 200,
       }}
       onClick={onClose}>
       <motion.div initial={{ y: 60, opacity: 0 }} animate={{ y: 0, opacity: 1 }}
         exit={{ y: 60, opacity: 0 }}
         transition={{ type: 'spring', damping: 28, stiffness: 300 }}
-        style={{
-          position: 'fixed',
-          bottom: 0,
-          left: 0,
-          right: 0,
-          maxWidth: 520,
-          margin: '0 auto',
-          background: '#fbf9f6',
-          borderRadius: '24px 24px 0 0',
-          padding: '20px 20px 40px',
-          maxHeight: '75vh',
-          overflowY: 'auto',
-          boxShadow: '0 -8px 40px rgba(45,50,47,0.12)',
-        }}
+        style={POPUP_SHEET}
         onClick={e => e.stopPropagation()}>
         <div style={{
           width: 36,
           height: 4,
-          background: 'rgba(45,50,47,0.15)',
+          background: 'var(--line)',
           borderRadius: 2,
           margin: '0 auto 20px',
         }} />
         <div style={{ display: 'flex', justifyContent: 'space-between',
           alignItems: 'center', marginBottom: 14 }}>
-          <div style={{ fontSize: 32, fontFamily: "'Noto Serif SC', serif",
-            color: '#2d322f' }}>{word}</div>
+          <div style={{ fontSize: 32, fontFamily: 'var(--font-serif)',
+            color: 'var(--fg1)' }}>{word}</div>
           <button onClick={onClose} style={{ background: 'none', border: 'none',
             fontSize: 18, color: 'rgba(45,50,47,0.45)', cursor: 'pointer' }}>✕</button>
         </div>
         {loading ? (
-          <div style={{ textAlign: 'center', padding: '20px 0', color: 'rgba(45,50,47,0.45)',
-            fontFamily: 'sans-serif', fontSize: 13 }}>正在查询…</div>
+          <div style={{ textAlign: 'center', padding: '20px 0', color: 'var(--fg3)',
+            fontFamily: 'var(--font-body)', fontSize: 13 }}>正在查询…</div>
         ) : data ? (
-          <div style={{ fontFamily: 'sans-serif' }}>
-            {data.pinyin && <div style={{ fontSize: 13, color: 'rgba(45,50,47,0.45)', marginBottom: 8 }}>{data.pinyin}</div>}
-            {data.meaning && <div style={{ fontSize: 15, fontWeight: 600, color: '#2d322f',
-              marginBottom: 10, fontFamily: "'Noto Serif SC', serif" }}>{data.meaning}</div>}
+          <div style={{ fontFamily: 'var(--font-body)' }}>
+            {data.pinyin && <div style={{ fontSize: 13, color: 'var(--fg3)', marginBottom: 8 }}>{data.pinyin}</div>}
+            {data.meaning && <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--fg1)',
+              marginBottom: 10, fontFamily: 'var(--font-serif)' }}>{data.meaning}</div>}
             {data.story && <div style={{ fontSize: 13, color: '#5a5a4a', lineHeight: 1.85,
               marginBottom: 10 }}>{data.story}</div>}
             {data.scene && <div style={{ fontSize: 12, color: '#5a5a4a', lineHeight: 1.75,
@@ -124,8 +126,8 @@ export function WordPopup({ word, onClose, childLevel }: {
   )
 }
 
-const POPUP_BODY = { color: '#2d322f', fontFamily: 'sans-serif', lineHeight: 1.8 } as const
-const POPUP_TITLE = { color: '#a46355', fontFamily: "'Noto Serif SC', serif" } as const
+const POPUP_BODY = { color: 'var(--fg1)', fontFamily: 'var(--font-body)', lineHeight: 1.8 } as const
+const POPUP_TITLE = { color: 'var(--clay)', fontFamily: 'var(--font-serif)' } as const
 
 export function FamilyPopup({ item, onClose, childLevel }: {
   item: PopupItem; onClose: () => void; childLevel?: string
@@ -168,32 +170,18 @@ export function FamilyPopup({ item, onClose, childLevel }: {
         position: 'fixed',
         inset: 0,
         background: 'rgba(45,50,47,0.4)',
-        backdropFilter: 'blur(8px)',
         zIndex: 200,
       }}
       onClick={onClose}>
       <motion.div initial={{ y: 60, opacity: 0 }} animate={{ y: 0, opacity: 1 }}
         exit={{ y: 60, opacity: 0 }}
         transition={{ type: 'spring', damping: 28, stiffness: 300 }}
-        style={{
-          position: 'fixed',
-          bottom: 0,
-          left: 0,
-          right: 0,
-          maxWidth: 520,
-          margin: '0 auto',
-          background: '#fbf9f6',
-          borderRadius: '24px 24px 0 0',
-          padding: '20px 20px 40px',
-          maxHeight: '75vh',
-          overflowY: 'auto',
-          boxShadow: '0 -8px 40px rgba(45,50,47,0.12)',
-        }}
+        style={POPUP_SHEET}
         onClick={e => e.stopPropagation()}>
         <div style={{
           width: 36,
           height: 4,
-          background: 'rgba(45,50,47,0.15)',
+          background: 'var(--line)',
           borderRadius: 2,
           margin: '0 auto 20px',
         }} />
@@ -235,8 +223,8 @@ export function FamilyPopup({ item, onClose, childLevel }: {
 
         {item.type === 'cultural' && item.extra && (
           <div style={{ fontFamily: 'sans-serif' }}>
-            <div style={{ fontSize: 18, fontFamily: "'Noto Serif SC', serif", fontWeight: 700,
-              color: '#2d322f', lineHeight: 1.8, marginBottom: 8 }}>{item.extra.cultural_sentence}</div>
+            <div style={{ fontSize: 18, fontFamily: 'var(--font-serif)', fontWeight: 700,
+              color: 'var(--fg1)', lineHeight: 1.8, marginBottom: 8 }}>{item.extra.cultural_sentence}</div>
             {item.extra.cultural_author && <div style={{ fontSize: 12, color: 'rgba(45,50,47,0.45)',
               marginBottom: 10 }}>—— {item.extra.cultural_author}</div>}
             {item.extra.cultural_meaning && <div style={{ fontSize: 13, color: '#5a5a4a',
@@ -244,7 +232,7 @@ export function FamilyPopup({ item, onClose, childLevel }: {
               paddingTop: 10 }}>{item.extra.cultural_meaning}</div>}
             {item.extra.overseas_connection && (
               <div style={{ padding: '9px 12px', borderRadius: 10,
-                background: 'rgba(45,63,74,0.05)', fontSize: 12, color: '#2d3f4a', lineHeight: 1.75 }}>
+                background: 'var(--clay-tint)', fontSize: 12, color: 'var(--fg2)', lineHeight: 1.75 }}>
                 🌍 {item.extra.overseas_connection}
               </div>
             )}

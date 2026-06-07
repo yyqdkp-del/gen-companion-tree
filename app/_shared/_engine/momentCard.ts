@@ -8,6 +8,7 @@ import { getTodayStr } from '@/lib/date/localDate'
 export type MomentKind =
   | 'sick'
   | 'visa'
+  | 'correlation'
   | 'weekend'
   | 'packing'
   | 'pickup'
@@ -31,6 +32,7 @@ export type MomentAction =
   | { type: 'briefing_todo'; todoId: string }
   | { type: 'briefing_urgent' }
   | { type: 'briefing_link'; href: string }
+  | { type: 'correlation'; hotspotId: string }
 
 export type PackLine = { item: string; context?: string; isHighRisk?: boolean }
 
@@ -75,6 +77,25 @@ export type MomentCardData = {
 }
 
 const PICKUP_RE = /pick\s*up|pickup|drop\s*off|dropoff|接送/i
+
+const CORRELATION_SHORT_TITLE: Record<string, string> = {
+  visa_school_correlation: '签证+学期结束',
+  flight_weather_risk: '航班出行',
+  sick_school_correlation: '生病请假',
+  payment_timing: '付款时机',
+  event_packing_reminder: '活动准备',
+}
+
+export function findHighCorrelationHotspot(hotspots: HotspotItem[]): HotspotItem | null {
+  for (const h of hotspots) {
+    if (h.category !== 'correlation') continue
+    const data = h.action_data as { source?: string; urgency?: string } | undefined
+    if (data?.source === 'brain' && data?.urgency === 'high') {
+      if (h.status === 'unread' || !h.status) return h
+    }
+  }
+  return null
+}
 
 /** 统一时间展示：只取 HH:MM，去掉秒数 */
 export function formatTime(t: string): string {
@@ -442,6 +463,31 @@ export function buildMomentCard(p: BuildMomentParams): MomentCardData {
       title: `签证还有 ${p.visaDaysLeft} 天`,
       subtitle: '现在必须处理',
       primaryAction: { label: '查看续签清单', action: { type: 'visa' } },
+    }
+  }
+
+  // 优先级2.5：根的大脑关联洞察（high urgency）
+  const correlationHotspot = findHighCorrelationHotspot(hotspots)
+  if (correlationHotspot) {
+    const brain = correlationHotspot.action_data as {
+      insight_type?: string
+      reason?: string
+    } | undefined
+    const shortTitle =
+      CORRELATION_SHORT_TITLE[brain?.insight_type || ''] ||
+      correlationHotspot.title.replace(/ · .+$/, '')
+    return {
+      kind: 'correlation',
+      tier: 'urgent',
+      theme: 'clay-red',
+      pulse: true,
+      eyebrow: '根发现',
+      title: shortTitle,
+      subtitle: correlationHotspot.summary || brain?.reason || '根发现了事件之间的关联',
+      primaryAction: {
+        label: '查看完整分析',
+        action: { type: 'correlation', hotspotId: correlationHotspot.id },
+      },
     }
   }
 

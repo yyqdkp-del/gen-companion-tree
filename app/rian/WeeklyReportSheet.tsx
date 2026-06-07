@@ -27,9 +27,11 @@ type Props = {
   onClose: () => void
 }
 
-const PAPER = '#F6F3EB'
+const PAPER = 'var(--canvas-mist)'
 const CLAY = 'var(--clay, #a46355)'
-const INK = '#262A29'
+const INK = 'var(--fg1)'
+const LETTER_STAMP = '根陪伴 · 成长家书'
+const FOOTER_TAGLINE = '根陪伴 · 陪你在异乡'
 
 export default function WeeklyReportSheet({
   childId,
@@ -126,6 +128,7 @@ export default function WeeklyReportSheet({
         childName: displayName,
         weekLabel,
         letter: content.letter,
+        achievements: content.achievements,
       })
       const filename = `成长家书-${displayName}-${Date.now()}.png`
       await shareOrDownloadLetterImage(blob, filename)
@@ -264,9 +267,9 @@ export default function WeeklyReportSheet({
             <>
               <div style={{
                 background: '#fff',
-                borderRadius: 16,
+                borderRadius: 'var(--r-xl)',
                 padding: 24,
-                boxShadow: 'var(--sh-soft)',
+                boxShadow: 'var(--sh-warm)',
                 marginBottom: 14,
               }}>
                 <div style={{
@@ -277,7 +280,7 @@ export default function WeeklyReportSheet({
                   marginBottom: 6,
                   fontFamily: 'var(--font-body)',
                 }}>
-                  根陪伴 · 成长家书
+                  {LETTER_STAMP}
                 </div>
                 {weekLabel ? (
                   <div style={{
@@ -368,6 +371,18 @@ export default function WeeklyReportSheet({
                   </AnimatePresence>
                 </div>
               ) : null}
+
+              <p style={{
+                fontSize: 11,
+                color: 'var(--fg3)',
+                textAlign: 'center',
+                lineHeight: 1.6,
+                margin: '8px 0 0',
+                fontFamily: 'var(--font-body)',
+                letterSpacing: '0.12em',
+              }}>
+                {FOOTER_TAGLINE}
+              </p>
             </>
           )}
         </div>
@@ -376,30 +391,23 @@ export default function WeeklyReportSheet({
           <div style={{
             padding: '12px 18px',
             paddingBottom: 'max(env(safe-area-inset-bottom), 16px)',
-            borderTop: '1px solid rgba(45,50,47,0.06)',
+            borderTop: '1px solid var(--line)',
             flexShrink: 0,
           }}>
             <button
               type="button"
               disabled={exporting}
               onClick={() => void handleExportImage()}
+              className="gc-btn"
               style={{
                 width: '100%',
-                padding: '14px',
-                borderRadius: 18,
-                border: 'none',
-                background: '#a46355',
-                color: '#fff',
-                fontSize: 15,
-                fontWeight: 600,
-                cursor: exporting ? 'wait' : 'pointer',
+                marginBottom: 10,
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 gap: 8,
-                marginBottom: 10,
-                fontFamily: 'var(--font-serif)',
                 opacity: exporting ? 0.75 : 1,
+                cursor: exporting ? 'wait' : 'pointer',
               }}
             >
               {exporting ? <Loader size={18} style={{ animation: 'spin 1s linear infinite' }} /> : <ImageIcon size={18} />}

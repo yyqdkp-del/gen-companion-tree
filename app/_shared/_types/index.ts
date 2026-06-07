@@ -133,6 +133,23 @@ export type Reminder = {
   }
 }
 
+export type BrainSuggestedAction = {
+  label: string
+  action: string
+  value?: string
+  timing: string
+}
+
+export type BrainHotspotActionData = {
+  source: 'brain'
+  urgency: 'high' | 'medium' | 'low'
+  insight_type?: string
+  reason?: string
+  suggestedActions?: BrainSuggestedAction[]
+  relatedItems?: string[]
+  url?: string
+}
+
 export type HotspotItem = {
   id: string
   title: string
@@ -144,7 +161,7 @@ export type HotspotItem = {
   source_url?: string | null
   action_available: boolean
   action_type?: string
-  action_data?: { url?: string }
+  action_data?: { url?: string } | BrainHotspotActionData
   status: HotspotStatus
   created_at: string
 }

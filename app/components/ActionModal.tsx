@@ -12,8 +12,9 @@ import {
   X, CheckCircle2, Navigation, Phone, Mail, Calendar,
   Download, ExternalLink, CreditCard, ShoppingBag,
   Loader, ClipboardList, ShoppingCart, FileText,
-  Volume2, ChevronDown, Zap,
+  Volume2, ChevronDown, Zap, Brain,
 } from 'lucide-react'
+import type { BrainHotspotActionData, BrainSuggestedAction } from '@/app/_shared/_types'
 
 const THEME = { text: '#2C3E50', gold: '#8a7355', muted: '#6B8BAA', navy: '#2d3f4a' }
 const G = { bg: '#E1F5EE', border: '#9FE1CB', mid: '#5DCAA5', deep: '#1D9E75', dark: '#0F6E56', darkest: '#085041' }
@@ -35,6 +36,10 @@ export type ActionModalProps = {
   child_name?: string
   /** 待办预生成数据（有 execution_pack 时可即时展示） */
   ai_action_data?: any
+  /** 关联分析热点摘要 */
+  hotspot_summary?: string
+  /** 关联分析 action_data（source: brain） */
+  hotspot_action_data?: BrainHotspotActionData | Record<string, unknown>
   // 用户
   userId: string
   // 回调
@@ -42,6 +47,8 @@ export type ActionModalProps = {
   onDone: (id: string) => void
   onSnooze: (id: string) => void
   onSync?: () => void
+  /** 根的大脑建议动作（one_tap / generate_leave_letter / open_packing） */
+  onBrainAction?: (action: string, value?: string) => void
 }
 
 type ExecutionPack = {
@@ -78,6 +85,138 @@ function resolveOpenUrl(url: string): string {
   if (typeof window === 'undefined') return u
   const path = u.startsWith('/') ? u : `/${u}`
   return `${window.location.origin}${path}`
+}
+
+const BRAIN_TIMING_LABEL: Record<string, string> = {
+  now: '现在',
+  today: '今天',
+  tonight: '今晚',
+  this_week: '本周',
+}
+
+const BRAIN_URGENCY_LABEL: Record<string, string> = {
+  high: '紧急',
+  medium: '关注',
+  low: '参考',
+}
+
+function isBrainHotspotData(data?: BrainHotspotActionData | Record<string, unknown>): data is BrainHotspotActionData {
+  return !!data && (data as BrainHotspotActionData).source === 'brain'
+}
+
+function runBrainSuggestedAction(
+  action: BrainSuggestedAction,
+  onBrainAction?: (action: string, value?: string) => void,
+) {
+  switch (action.action) {
+    case 'call':
+      if (action.value) window.location.href = action.value
+      break
+    case 'open_url':
+      if (action.value) window.open(resolveOpenUrl(action.value), '_blank', 'noopener,noreferrer')
+      break
+    case 'open_email':
+      if (action.value) {
+        const href = action.value.startsWith('mailto:') ? action.value : `mailto:${action.value}`
+        window.location.href = href
+      }
+      break
+    case 'one_tap':
+    case 'generate_leave_letter':
+    case 'open_packing':
+      onBrainAction?.(action.action, action.value)
+      break
+    default:
+      if (action.value?.startsWith('http') || action.value?.startsWith('/')) {
+        window.open(resolveOpenUrl(action.value), '_blank', 'noopener,noreferrer')
+      }
+      break
+  }
+}
+
+function BrainInsightPanel({
+  brain,
+  summary,
+  onBrainAction,
+}: {
+  brain: BrainHotspotActionData
+  summary?: string
+  onBrainAction?: (action: string, value?: string) => void
+}) {
+  const reason = brain.reason || summary || ''
+  const actions = brain.suggestedActions || []
+  const urgency = brain.urgency || 'medium'
+  const urgencyColor =
+    urgency === 'high' ? '#d58074'
+    : urgency === 'medium' ? '#b88e5e'
+    : '#537b8e'
+
+  return (
+    <div style={{ padding: '12px 14px 4px' }}>
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12,
+        padding: '10px 12px', borderRadius: 12,
+        background: urgency === 'high' ? 'rgba(213,128,116,0.1)' : urgency === 'medium' ? 'rgba(184,142,94,0.1)' : 'rgba(83,123,142,0.08)',
+        border: `0.5px solid ${urgencyColor}44`,
+      }}>
+        <Brain size={16} color={urgencyColor} />
+        <div>
+          <div style={{ fontSize: 11, fontWeight: 600, color: urgencyColor, letterSpacing: '0.06em' }}>
+            {BRAIN_URGENCY_LABEL[urgency] || '关联分析'}
+          </div>
+          <div style={{ fontSize: 10, color: THEME.muted, marginTop: 2 }}>根的分析</div>
+        </div>
+      </div>
+
+      {reason ? (
+        <div style={{
+          fontSize: 14, color: THEME.text, lineHeight: 1.65,
+          padding: '12px 14px', borderRadius: 12,
+          background: 'rgba(255,255,255,0.65)',
+          border: '0.5px solid rgba(0,0,0,0.06)',
+          marginBottom: 12,
+        }}>
+          {reason}
+        </div>
+      ) : null}
+
+      {actions.length > 0 && (
+        <div>
+          <div style={{ fontSize: 10, fontWeight: 500, color: THEME.muted, letterSpacing: '0.05em', marginBottom: 8 }}>
+            建议动作
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {actions.map((action, i) => (
+              <motion.button
+                key={i}
+                whileTap={{ scale: 0.97 }}
+                onClick={() => runBrainSuggestedAction(action, onBrainAction)}
+                style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  padding: '12px 14px', borderRadius: 12, border: 'none',
+                  background: i === 0 ? G.dark : 'rgba(255,255,255,0.75)',
+                  color: i === 0 ? '#fff' : THEME.text,
+                  cursor: 'pointer', textAlign: 'left',
+                  boxShadow: i === 0 ? '0 2px 8px rgba(15,110,86,0.2)' : undefined,
+                  borderWidth: i === 0 ? 0 : 0.5,
+                  borderStyle: 'solid',
+                  borderColor: 'rgba(0,0,0,0.08)',
+                }}
+              >
+                <span style={{ fontSize: 14, fontWeight: i === 0 ? 600 : 500 }}>{action.label}</span>
+                <span style={{
+                  fontSize: 10, opacity: 0.75, flexShrink: 0, marginLeft: 8,
+                  color: i === 0 ? 'rgba(255,255,255,0.75)' : THEME.muted,
+                }}>
+                  {BRAIN_TIMING_LABEL[action.timing] || action.timing}
+                </span>
+              </motion.button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
 }
 
 function getFreshExecutionPack(aiActionData?: any): ExecutionPack | null {
@@ -685,8 +824,10 @@ function ActionsArea({ actions, userId, primaryIndex, primaryReason, sourceId, s
 // ══ 主组件 ══
 export default function ActionModal({
   source_type, source_id, title, category, urgency_level,
-  due_date, event_data, child_name, ai_action_data, userId,
-  onClose, onDone, onSnooze, onSync,
+  due_date, event_data, child_name, ai_action_data,
+  hotspot_summary, hotspot_action_data,
+  userId,
+  onClose, onDone, onSnooze, onSync, onBrainAction,
 }: ActionModalProps) {
   const router = useRouter()
   const { sessionReady } = useApp()
@@ -695,9 +836,18 @@ export default function ActionModal({
   const [saving, setSaving] = useState(false)
   const [activeTab, setActiveTab] = useState<TabKey | null>(null)
 
+  const brainData = isBrainHotspotData(hotspot_action_data) ? hotspot_action_data : null
+  const isBrainMode = source_type === 'hotspot' && !!brainData
+
   useEffect(() => {
     if (!source_id) return
     setActiveTab(null)
+
+    if (isBrainMode) {
+      setPack(null)
+      setLoading(false)
+      return
+    }
 
     const cachedPack = source_type === 'todo' ? getFreshExecutionPack(ai_action_data) : null
     if (cachedPack) {
@@ -750,7 +900,13 @@ export default function ActionModal({
     })()
 
     return () => { cancelled = true }
-  }, [source_id, source_type, sessionReady, ai_action_data, event_data, child_name, onSync, router])
+  }, [source_id, source_type, sessionReady, ai_action_data, event_data, child_name, onSync, router, isBrainMode])
+
+  const brainUrgencyLevel: 1 | 2 | 3 =
+    brainData?.urgency === 'high' ? 3
+    : brainData?.urgency === 'medium' ? 2
+    : 1
+  const displayUrgencyLevel = isBrainMode ? brainUrgencyLevel : urgency_level
 
   const savePack = async (newPack: ExecutionPack) => {
     setPack(newPack)
@@ -788,8 +944,8 @@ export default function ActionModal({
   }
 
   const urgencyGradient =
-    urgency_level === 3 ? 'linear-gradient(90deg,#d58074,#e6a89e)'
-    : urgency_level === 2 ? 'linear-gradient(90deg,#b88e5e,#f2e2cd)'
+    displayUrgencyLevel === 3 ? 'linear-gradient(90deg,#d58074,#e6a89e)'
+    : displayUrgencyLevel === 2 ? 'linear-gradient(90deg,#b88e5e,#f2e2cd)'
     : 'linear-gradient(90deg,#537b8e,#cddce5)'
 
   const tabs: { key: TabKey; icon: React.ReactNode; label: string }[] = [
@@ -832,7 +988,7 @@ export default function ActionModal({
               <div style={{ flex: 1 }}>
                 <span style={{ fontSize: 10, color: THEME.gold, fontWeight: 600, letterSpacing: '0.12em' }}>
                   {source_type === 'schedule' && child_name ? `${child_name} · ` : ''}
-                  {category || source_type}
+                  {isBrainMode ? '关联分析' : (category || source_type)}
                   {due_date ? ` · ${new Date(due_date).toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' })}` : ''}
                 </span>
                 <h2 style={{ fontSize: 18, fontWeight: 600, color: THEME.text, margin: '3px 0 0', lineHeight: 1.3 }}>
@@ -849,8 +1005,16 @@ export default function ActionModal({
           {/* 滚动区 */}
           <div style={{ overflowY: 'auto', flex: 1, WebkitOverflowScrolling: 'touch' as any }}>
 
+            {isBrainMode && brainData && (
+              <BrainInsightPanel
+                brain={brainData}
+                summary={hotspot_summary}
+                onBrainAction={onBrainAction}
+              />
+            )}
+
             {/* 加载中 */}
-            {loading && !pack && (
+            {!isBrainMode && loading && !pack && (
               <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
                 <div style={{ display: 'flex', gap: 6 }}>
                   {[0,1,2].map(i => (
@@ -866,10 +1030,10 @@ export default function ActionModal({
             )}
 
             {/* AI 摘要 */}
-            {pack && <AiSummaryCard pack={pack} />}
+            {!isBrainMode && pack && <AiSummaryCard pack={pack} />}
 
             {/* 标签页 */}
-            {pack && (
+            {!isBrainMode && pack && (
               <div style={{ display: 'flex', gap: 5, padding: '10px 12px 0' }}>
                 {tabs.filter(t => hasTab(t.key)).map(tab => {
                   const isOpen = activeTab === tab.key
@@ -922,7 +1086,7 @@ export default function ActionModal({
               </>
             )}
 
-            {!pack && !loading && (
+            {!isBrainMode && !pack && !loading && (
               <div style={{ padding: '32px 20px', textAlign: 'center' }}>
                 <div style={{ fontSize: 13, color: THEME.muted }}>暂时无法加载执行包</div>
               </div>

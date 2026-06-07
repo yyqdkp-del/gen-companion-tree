@@ -2,6 +2,7 @@
 import React, { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import { fetchSmartChars } from '@/app/_shared/_services/chineseService'
+import { SOLID_CARD } from '@/app/_shared/_constants/chineseTheme'
 
 type Props = {
   level: string
@@ -24,9 +25,9 @@ export default function SmartQuickChars({ level, learnedChars, onSelect }: Props
       <div style={{
         fontSize: 10,
         letterSpacing: '0.2em',
-        color: 'rgba(45,50,47,0.4)',
+        color: 'var(--fg3)',
         marginBottom: 8,
-        fontFamily: "'Montserrat', sans-serif",
+        fontFamily: 'var(--font-latin)',
         textTransform: 'uppercase',
       }}>
         {level} 推荐
@@ -35,16 +36,14 @@ export default function SmartQuickChars({ level, learnedChars, onSelect }: Props
         {chars.map(c => (
           <motion.button key={c} whileTap={{ scale: 0.88 }} onClick={() => onSelect(c)}
             style={{
+              ...SOLID_CARD,
               padding: '8px 14px',
               borderRadius: 14,
-              background: 'rgba(255,255,255,0.7)',
-              border: '1px solid rgba(164,99,85,0.12)',
+              border: '1px solid var(--line-clay)',
               fontSize: 18,
-              fontFamily: "'Noto Serif SC', serif",
-              color: '#2d322f',
+              fontFamily: 'var(--font-serif)',
+              color: 'var(--fg1)',
               cursor: 'pointer',
-              boxShadow: '0 2px 8px rgba(45,50,47,0.06)',
-              backdropFilter: 'blur(8px)',
             }}>
             {c}
           </motion.button>

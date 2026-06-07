@@ -7,6 +7,9 @@ import { getAuthUser } from '@/lib/auth/getAuthUser'
 import { checkLimit, recordUsage } from '@/lib/limits/usage'
 import { getTodayStr, getTodayStrInTimeZone } from '@/lib/date/localDate'
 import { isValidHotspotUrl } from '@/lib/hotspot/url'
+import { analyzeCorrelations } from '@/lib/brain/correlate'
+import { gatherFamilyDataForCorrelations } from '@/lib/brain/gatherFamilyData'
+import { saveCorrelatedInsights } from '@/lib/brain/saveCorrelatedInsights'
 
 function normalizePatrolSourceUrl(item: Record<string, unknown>): string {
   const raw = String(item.source_url || (item.action_data as { url?: string } | undefined)?.url || '').trim()
@@ -650,6 +653,15 @@ async function runPatrolForUsers(userIds: string[], _patrolTime: string) {
         console.error('hotspots not saved for user:', userId)
       }
 
+      let correlationSaved = 0
+      try {
+        const familyData = await gatherFamilyDataForCorrelations(supabase, userId, todayYmd)
+        const correlatedInsights = await analyzeCorrelations(familyData)
+        correlationSaved = await saveCorrelatedInsights(supabase, userId, correlatedInsights)
+      } catch (corrErr: unknown) {
+        console.error('[patrol] correlation analysis failed:', (corrErr as Error)?.message)
+      }
+
       await supabase
         .from('family_profile')
         .update({ updated_at: new Date().toISOString() })
@@ -660,6 +672,7 @@ async function runPatrolForUsers(userIds: string[], _patrolTime: string) {
         location,
         generated: rawHotspots.length,
         saved: saved.count,
+        correlation_saved: correlationSaved,
       })
     } catch (e: any) {
       console.error(`用户${userId.slice(0, 8)}巡逻失败:`, e?.message)

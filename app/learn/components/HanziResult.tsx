@@ -1,20 +1,15 @@
 'use client'
 import React, { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { CHINESE_THEME as T, CHINESE_LEVELS } from '@/app/_shared/_constants/chineseTheme'
+import { CHINESE_THEME as T, CHINESE_LEVELS, SOLID_CARD } from '@/app/_shared/_constants/chineseTheme'
 import { useApp } from '@/app/context/AppContext'
 import ChineseAccordion from './ChineseAccordion'
 import LearnSession from './LearnSession'
 import { WordPopup, FamilyPopup, type PopupItem } from './WordPopup'
 import { safeString } from '@/lib/ai/safeRender'
 
-const GLASS_CARD: React.CSSProperties = {
-  background: 'rgba(255,255,255,0.8)',
-  backdropFilter: 'blur(10px)',
-  WebkitBackdropFilter: 'blur(10px)',
-  borderRadius: 18,
-  border: '1px solid rgba(255,255,255,0.6)',
-  boxShadow: '0 4px 20px rgba(45,50,47,0.05)',
+const CARD: React.CSSProperties = {
+  ...SOLID_CARD,
   marginBottom: 10,
   padding: '16px 18px',
 }
@@ -43,19 +38,16 @@ function PartsDisplay({ parts, char, evolution }: {
 
   return (
     <div style={{
-      background: 'rgba(255,255,255,0.8)',
-      borderRadius: 18,
+      ...SOLID_CARD,
       padding: '18px 16px',
       marginBottom: 10,
-      border: '1px solid rgba(255,255,255,0.6)',
-      boxShadow: '0 4px 20px rgba(45,50,47,0.05)',
     }}>
       <div style={{ display: 'flex', alignItems: 'stretch', gap: 10,
         marginBottom: evolutionText ? 12 : 0 }}>
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
           {parts.slice(0, Math.ceil(parts.length / 2)).map((p: any, i: number) => (
             <button key={i} onClick={() => setOpenIdx(openIdx === i ? null : i)}
-              style={{ background: openIdx === i ? 'rgba(164,99,85,0.08)' : '#f7f4ee',
+              style={{ background: openIdx === i ? 'rgba(164,99,85,0.08)' : 'var(--canvas-warm)',
                 border: `1.5px solid ${openIdx === i ? 'rgba(164,99,85,0.3)' : 'rgba(164,99,85,0.1)'}`,
                 borderRadius: 10, padding: '8px 10px', cursor: 'pointer',
                 textAlign: 'center', transition: 'all 0.2s' }}>
@@ -82,7 +74,7 @@ function PartsDisplay({ parts, char, evolution }: {
             const idx = i + Math.ceil(parts.length / 2)
             return (
               <button key={idx} onClick={() => setOpenIdx(openIdx === idx ? null : idx)}
-                style={{ background: openIdx === idx ? 'rgba(164,99,85,0.08)' : '#f7f4ee',
+                style={{ background: openIdx === idx ? 'rgba(164,99,85,0.08)' : 'var(--canvas-warm)',
                   border: `1.5px solid ${openIdx === idx ? 'rgba(164,99,85,0.3)' : 'rgba(164,99,85,0.1)'}`,
                   borderRadius: 10, padding: '8px 10px', cursor: 'pointer',
                   textAlign: 'center', transition: 'all 0.2s' }}>
@@ -248,13 +240,9 @@ export default function HanziResult({ data, char, onMomCopy, childLevel, childNa
       </motion.button>
 
       <div style={{
-        background: 'rgba(255,255,255,0.8)',
-        backdropFilter: 'blur(10px)',
-        borderRadius: 18,
+        ...SOLID_CARD,
         padding: '16px 18px',
         marginBottom: 10,
-        border: '1px solid rgba(255,255,255,0.6)',
-        boxShadow: '0 4px 20px rgba(45,50,47,0.05)',
         display: 'flex',
         alignItems: 'center',
         gap: 10,
@@ -264,7 +252,7 @@ export default function HanziResult({ data, char, onMomCopy, childLevel, childNa
           padding: '5px 16px',
           borderRadius: 20,
           fontSize: 15,
-          background: '#f7f4ee',
+          background: 'var(--canvas-warm)',
           border: '1px solid rgba(164,99,85,0.15)',
           color: '#5a5a4a',
           fontFamily: 'sans-serif',
@@ -334,7 +322,7 @@ export default function HanziResult({ data, char, onMomCopy, childLevel, childNa
 
       {/* 书写引导 */}
       {data.writing_guide && (
-        <div style={GLASS_CARD}>
+        <div style={CARD}>
           <div style={{ fontSize: 10, letterSpacing: 3, color: T.gold,
             marginBottom: 8, fontFamily: 'sans-serif' }}>
             ✍️ 学着写 · {data.stroke_count ? `${data.stroke_count}画` : ''}
