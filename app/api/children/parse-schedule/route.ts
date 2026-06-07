@@ -7,8 +7,16 @@ import { isPlaceholderSubject } from '@/lib/schedule/placeholderSubject'
 import { applyScheduleTimeValidation, type ParseWarning } from '@/lib/schedule/validateScheduleTime'
 import { validateScheduleStructure, type ScheduleValidationWarning } from '@/lib/schedule/validateScheduleStructure'
 import { processSchedule } from '@/lib/ai/rootVision'
-import { refreshScheduleIntelligence } from '@/lib/ai/scheduleIntelligence'
-import { initPackingMemoryFromSchedule } from '@/lib/packing/packingMemory'
+import { persistClassSchedule } from '@/lib/schedule/persistSchedule'
+import { enrichSchedule } from '@/lib/schedule/enrichSchedule'
+import {
+  countScheduleEntries,
+  inferSchoolTimes,
+  normalizeWeekSchedule,
+  parseRawSchedule,
+  preserveCategories,
+  type WeekSchedule,
+} from '@/lib/schedule/normalizeSchedule'
 import { createClient } from '@supabase/supabase-js'
 
 const DAYS = ['mon', 'tue', 'wed', 'thu', 'fri'] as const
@@ -46,7 +54,7 @@ type ScheduleEntry = {
   requires_items?: string[]
 }
 
-type ScheduleByDay = Record<(typeof DAYS)[number], ScheduleEntry[]>
+type ScheduleByDay = WeekSchedule
 
 function prepareVisionImageInput(image: string, mediaTypeHint?: string): {
   data: string
@@ -181,27 +189,6 @@ function countRawDayEntries(daysObj: Record<string, unknown>): Record<string, nu
   return counts
 }
 
-function inferSchoolTimes(schedule: ScheduleByDay): {
-  school_start_time: string | null
-  school_end_time: string | null
-} {
-  let schoolStart: string | null = null
-  let schoolEnd: string | null = null
-
-  for (const d of DAYS) {
-    const entries = schedule[d]
-    if (!entries.length) continue
-    if (!schoolStart) schoolStart = entries[0].time
-    schoolEnd = entries[entries.length - 1].time
-  }
-
-  return { school_start_time: schoolStart, school_end_time: schoolEnd }
-}
-
-function countScheduleEntries(schedule: ScheduleByDay): number {
-  return DAYS.reduce((n, d) => n + schedule[d].length, 0)
-}
-
 function createAuthedSupabase(req: NextRequest) {
   const authHeader = req.headers.get('Authorization') ?? req.headers.get('authorization')
   const token = authHeader?.replace(/^Bearer\s+/i, '') || ''
@@ -317,68 +304,6 @@ function parseStats(raw: unknown): ScheduleStats | null {
   return { timeDirection, dayDirection, days, timeSlots, orientation }
 }
 
-/** 语义理解，补充 name_zh + category（enrichSchedule） */
-async function enrichSchedule(step1: ScheduleByDay): Promise<ScheduleByDay | null> {
-  const totalEntries = countScheduleEntries(step1)
-  console.error('[parse-schedule] enrich start, entries:', totalEntries)
-
-  const inputJson = JSON.stringify(step1)
-
-  const result = await callClaude({
-    model: CLAUDE_MODEL,
-    max_tokens: 3000,
-    messages: [{
-      role: 'user',
-      content: `以下是国际学校课表数据，请为每个 subject 补充：
-- name_zh：中文简称2-6字
-- category：见下方分类规则
-- requires_items：需要携带物品的中文数组（可选）
-
-对每个课程条目，判断 category：
-- class：真实学科课程（Math/Science/ELA/Thai 等）
-- activity：课外活动/特色课（Stack/Art/Music/PE/Swimming 等）
-- transition：过渡性安排（Pick up/Drop off/Morning Routine 等）
-- break：休息时间（Snack/Lunch/Rest Time/Recess 等）
-
-请为每个条目加上 category 字段。
-transition 和 break 类别的条目，妈妈不需要在课程提醒里看到，
-但需要保留在完整课表里供时间线参考。
-
-对需要携带物品的课程，添加 requires_items 字段（中文数组）。
-根据课程常识判断，例如：
-- P.E./体育 → ["运动服", "运动鞋"]
-- Swimming/游泳 → ["泳衣", "泳镜", "毛巾"]
-- Art/美术 → ["美术围裙"]
-- Music/音乐（有乐器） → 根据具体乐器判断
-- 普通学科课 → 不加或空数组
-只加有把握的，不确定留空数组
-
-返回相同结构，每个条目加上 name_zh、category、requires_items 字段
-只返回 JSON
-
-${inputJson}`,
-    }],
-  }, 'semantic')
-
-  const enrichRaw = result.text
-  console.error('[parse-schedule] enrich raw FULL:', enrichRaw?.slice(0, 1000))
-
-  if (!result.ok) return null
-  if (result.stop_reason === 'max_tokens') {
-    console.error('[parse-schedule] enrich WARNING: truncated at max_tokens')
-  }
-
-  const parsed = parseClaudeJson(enrichRaw, 'semantic')
-  if (!parsed) {
-    console.error('[parse-schedule] enrich parse failed')
-    return null
-  }
-
-  const enriched = normalizeSchedule(parsed, true)
-  console.error('[parse-schedule] enrich success, sample:', JSON.stringify(enriched.mon?.slice(0, 2)))
-  return enriched
-}
-
 function finalizeSchedule(raw: ScheduleByDay): {
   schedule: ScheduleByDay
   parse_warnings: ParseWarning[]
@@ -398,60 +323,19 @@ async function persistSchedule(
   req: NextRequest,
   userId: string,
   childId: string,
-  schedule: ScheduleByDay,
-  school_start_time: string | null,
-  school_end_time: string | null,
+  rawSchedule: unknown,
+  options: { enrich?: boolean; source?: string } = {},
 ) {
   const supabase = createAuthedSupabase(req)
-
-  const { error: profileError } = await supabase
-    .from('child_profiles')
-    .upsert(
-      { user_id: userId, child_id: childId, class_schedule: schedule },
-      { onConflict: 'child_id' },
-    )
-
-  if (profileError) {
-    console.error('[parse-schedule] child_profiles upsert failed:', profileError.message)
-    throw new Error(profileError.message)
-  }
-
-  const serviceSupabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  )
-  void refreshScheduleIntelligence({
-    userId,
-    childId,
-    classSchedule: schedule,
-    supabase: serviceSupabase,
-  }).catch((err) => {
-    console.error('[parse-schedule] schedule intelligence failed:', err)
+  return persistClassSchedule(supabase, childId, userId, rawSchedule, {
+    enrich: options.enrich,
+    source: options.source || 'parse-schedule',
   })
-
-  void initPackingMemoryFromSchedule(childId, userId, schedule, serviceSupabase).catch((err) => {
-    console.error('[parse-schedule] packing memory init failed:', err)
-  })
-
-  if (school_start_time || school_end_time) {
-    const childUpdate: { school_start_time?: string; school_end_time?: string } = {}
-    if (school_start_time) childUpdate.school_start_time = school_start_time
-    if (school_end_time) childUpdate.school_end_time = school_end_time
-
-    const { error: childError } = await supabase
-      .from('children')
-      .update(childUpdate)
-      .eq('id', childId)
-      .eq('user_id', userId)
-
-    if (childError) {
-      console.error('[parse-schedule] children update failed:', childError.message)
-    }
-  }
 }
 
 async function runParsePipeline(image: string, mediaTypeHint?: string): Promise<{
   schedule: ScheduleByDay
+  rawSchedule: unknown
   parse_warnings: ParseWarning[]
   validation_warnings: ScheduleValidationWarning[]
   school_start_time: string | null
@@ -483,16 +367,18 @@ async function runParsePipeline(image: string, mediaTypeHint?: string): Promise<
     DAYS.map((d) => [d, Array.isArray(scheduleData[d]) ? scheduleData[d].length : 0]),
   ))
 
-  const step1 = normalizeSchedule(scheduleData, false)
-  if (countScheduleEntries(step1) === 0) {
+  const parsed = parseRawSchedule(scheduleData)
+  const normalized = normalizeWeekSchedule(parsed)
+  const withCategory = preserveCategories(normalized, parsed)
+  if (countScheduleEntries(withCategory) === 0) {
     console.error('[parse-schedule] rootVision schedule empty after normalize')
     return null
   }
 
-  console.error('[parse-schedule] step1 entries:', countScheduleEntries(step1))
+  console.error('[parse-schedule] step1 entries:', countScheduleEntries(withCategory))
 
-  const step2 = await enrichSchedule(step1)
-  const enriched = step2 ?? step1
+  const step2 = await enrichSchedule(withCategory)
+  const enriched = step2 ?? withCategory
   if (!step2) {
     console.error('[parse-schedule] enrich failed, using step1 only')
   }
@@ -501,6 +387,7 @@ async function runParsePipeline(image: string, mediaTypeHint?: string): Promise<
   const validation_warnings = validateScheduleStructure(finalized.schedule)
   return {
     ...finalized,
+    rawSchedule: scheduleData,
     validation_warnings,
     stats: defaultStats(),
     rootVision: {
@@ -522,6 +409,8 @@ export async function POST(req: NextRequest) {
   let mediaType: string | undefined
   let save = false
   let scheduleInput: unknown
+  let enrichOption: boolean | undefined
+  let sourceOption: string | undefined
   try {
     const body = await req.json()
     image = body.image
@@ -529,6 +418,8 @@ export async function POST(req: NextRequest) {
     mediaType = body.mediaType
     save = body.save === true
     scheduleInput = body.schedule
+    enrichOption = body.enrich
+    sourceOption = body.source
   } catch (parseBodyErr) {
     console.error('[parse-schedule] req.json failed:', parseBodyErr)
     return NextResponse.json({ error: '请求体解析失败' }, { status: 400 })
@@ -540,18 +431,18 @@ export async function POST(req: NextRequest) {
 
   try {
     if (scheduleInput && save) {
-      const normalized = normalizeSchedule(scheduleInput, true)
-      const finalized = finalizeSchedule(normalized)
-      if (countScheduleEntries(finalized.schedule) === 0) {
+      const saved = await persistSchedule(req, user.id, childId, scheduleInput, {
+        enrich: enrichOption !== false,
+        source: sourceOption || 'manual',
+      })
+      if (countScheduleEntries(saved.schedule) === 0) {
         return NextResponse.json({ error: '课表为空，无法保存' }, { status: 400 })
       }
-      const validation_warnings = validateScheduleStructure(finalized.schedule)
-      await persistSchedule(req, user.id, childId, finalized.schedule, finalized.school_start_time, finalized.school_end_time)
+      const validation_warnings = validateScheduleStructure(saved.schedule)
       return NextResponse.json({
-        schedule: finalized.schedule,
-        school_start_time: finalized.school_start_time,
-        school_end_time: finalized.school_end_time,
-        parse_warnings: finalized.parse_warnings,
+        schedule: saved.schedule,
+        school_start_time: saved.school_start_time,
+        school_end_time: saved.school_end_time,
         validation_warnings,
         saved: true,
       })
@@ -576,7 +467,10 @@ export async function POST(req: NextRequest) {
     }
 
     if (save) {
-      await persistSchedule(req, user.id, childId, parsed.schedule, parsed.school_start_time, parsed.school_end_time)
+      await persistSchedule(req, user.id, childId, parsed.rawSchedule, {
+        enrich: true,
+        source: 'parse-schedule',
+      })
     }
 
     return NextResponse.json({

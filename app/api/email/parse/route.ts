@@ -13,6 +13,10 @@ import {
   mergeExtractions,
 } from '@/lib/email/pdfExtractor'
 import { persistStructuredEmail } from '@/lib/email/syncStructuredEmail'
+import {
+  buildEmailExtractionFromClaude,
+  persistEmailExtraction,
+} from '@/lib/email/persistEmailExtraction'
 import { getValidAccessToken } from '@/lib/google/tokenStore'
 
 const MAKE_WEBHOOK_URL = process.env.NEXT_PUBLIC_MAKE_WEBHOOK_URL || ''
@@ -621,18 +625,24 @@ export async function POST(req: NextRequest) {
           continue
         }
 
-        // 写入三珠
-        await syncEmailToThreeDrops(supabase, parsed, email, userId, city)
+        // 写入统一邮件层
+        const extraction = buildEmailExtractionFromClaude(parsed, email)
+        const { eventsWritten, todosWritten } = await persistEmailExtraction(
+          supabase,
+          extraction,
+          userId,
+        )
 
-        // 记录已处理
-        await markAsProcessed(supabase, email, parsed)
+        for (const event of parsed.events || []) {
+          await triggerCalendar(event, city)
+        }
 
         results.push({
           ok: true,
           subject: email.subject,
-          type: parsed.email_type,
-          todos_created: parsed.todos?.length || 0,
-          events_created: parsed.events?.length || 0,
+          pipeline: 'claude',
+          todos_created: todosWritten,
+          events_created: eventsWritten,
           reply_needed: parsed.reply_needed,
           summary: parsed.summary,
         })

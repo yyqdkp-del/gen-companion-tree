@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { NAV_HEIGHT_CSS, STICKY_HEADER_PADDING_TOP } from '@/app/_shared/_constants/layout'
 import { createClient } from '@/lib/supabase/client'
+import { getSchoolName } from '@/lib/child/schoolName'
 import { motion } from 'framer-motion'
 import { Plus, ChevronRight, Check } from 'lucide-react'
 
@@ -37,6 +38,7 @@ type Child = {
   id: string
   name: string
   grade: string
+  school_name?: string
   school: string
   emoji: string
   status: string
@@ -61,7 +63,7 @@ export default function ChildrenPage() {
 
     const { data } = await supabase
       .from('children')
-      .select('id, name, grade, school, emoji, status')
+      .select('id, name, grade, school_name, school, emoji, status')
       .eq('user_id', session.user.id)
       .order('created_at')
 
@@ -101,7 +103,7 @@ export default function ChildrenPage() {
       grade: child.grade,
       level: child.chinese_level || 'R2',
       emoji: child.emoji || '🌟',
-      school: child.school,
+      school: getSchoolName(child),
     }))
     setActiveId(child.id)
   }
@@ -155,7 +157,7 @@ export default function ChildrenPage() {
                           <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 8, background: lvCfg.bg, color: lvCfg.color, fontWeight: 600 }}>{child.chinese_level}</span>
                         )}
                       </div>
-                      <div style={{ fontSize: 12, color: PAGE.muted }}>{child.school || '未填写学校'}</div>
+                      <div style={{ fontSize: 12, color: PAGE.muted }}>{getSchoolName(child) || '未填写学校'}</div>
                     </div>
 
                     {/* 右侧 */}

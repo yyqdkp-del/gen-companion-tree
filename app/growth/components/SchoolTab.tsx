@@ -17,6 +17,7 @@ import { toast } from '@/app/components/Toast'
 import { useApp } from '@/app/context/AppContext'
 import { CARD, SectionTitle, type EnrichedChild } from './growthShared'
 import SchoolNotificationHistory from './SchoolNotificationHistory'
+import Accordion from '@/app/_shared/_components/Accordion'
 
 const WEEKDAYS = [
   { key: 'mon', label: '周一' },
@@ -263,114 +264,123 @@ export default function SchoolTab({ child }: Props) {
       </section>
 
       <section style={CARD}>
-        <SectionTitle>本周课表</SectionTitle>
         {hasSchedule ? (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {weekRows.map((day) => (
-              <div key={day.key}>
-                <div style={{
-                  fontFamily: 'var(--font-body)',
-                  fontSize: 12,
-                  fontWeight: 600,
-                  color: 'var(--clay)',
-                  marginBottom: 6,
-                }}>
-                  {getDayHeaderLabel(day.key, day.label, intelligence)}
-                </div>
-                {day.slots.length > 0 ? (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                    {day.slots.map((cls, i) => {
-                      const isBreak = isBreakSlot(cls)
-                      const isClass = isRealScheduleClass(cls)
-                      const courseLoad = findCourseLoad(intelligence, classSubjectKey(cls))
-                      const loadIndicator = courseLoad && isClass
-                        ? getLoadIndicator(courseLoad.loadScore)
-                        : null
-
-                      return (
-                        <div
-                          key={`${day.key}-${classTime(cls) ?? ''}-${classSubjectKey(cls)}-${i}`}
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'space-between',
-                            gap: 8,
-                            padding: isBreak ? '6px 12px' : '10px 12px',
-                            borderRadius: 12,
-                            background: isBreak ? 'transparent' : 'var(--canvas-light)',
-                          }}
-                        >
-                          {classTime(cls) && !isBreak ? (
-                            <span style={{ fontFamily: 'var(--font-body)', fontSize: 12, color: 'var(--fg3)', flexShrink: 0, minWidth: 44 }}>
-                              {classTime(cls)}
-                            </span>
-                          ) : null}
-                          <span style={{
-                            fontFamily: isBreak ? 'var(--font-body)' : 'var(--font-serif)',
-                            fontSize: isBreak ? 12 : 14,
-                            color: isBreak ? 'var(--fg3)' : 'var(--fg1)',
-                            flex: 1,
-                            textAlign: classTime(cls) && !isBreak ? 'left' : 'left',
-                          }}>
-                            {classLabel(cls)}
-                          </span>
-                          {loadIndicator ? (
-                            <span
-                              title={courseLoad?.loadReason || loadIndicator.label}
-                              style={{
-                                fontFamily: 'var(--font-body)',
-                                fontSize: 11,
-                                color: loadIndicator.color,
-                                flexShrink: 0,
-                                letterSpacing: 1,
-                              }}
-                            >
-                              {loadIndicator.dots}
-                            </span>
-                          ) : null}
-                        </div>
-                      )
-                    })}
+          <Accordion
+            variant="gc"
+            title="本周课表"
+            count={weekRows.filter((d) => d.classes.length > 0).length}
+            defaultOpen={false}
+          >
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {weekRows.map((day) => (
+                <div key={day.key}>
+                  <div style={{
+                    fontFamily: 'var(--font-body)',
+                    fontSize: 12,
+                    fontWeight: 600,
+                    color: 'var(--clay)',
+                    marginBottom: 6,
+                  }}>
+                    {getDayHeaderLabel(day.key, day.label, intelligence)}
                   </div>
-                ) : (
-                  <p style={{ margin: 0, fontFamily: 'var(--font-body)', fontSize: 12, color: 'var(--fg3)' }}>无课</p>
-                )}
-              </div>
-            ))}
+                  {day.slots.length > 0 ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      {day.slots.map((cls, i) => {
+                        const isBreak = isBreakSlot(cls)
+                        const isClass = isRealScheduleClass(cls)
+                        const courseLoad = findCourseLoad(intelligence, classSubjectKey(cls))
+                        const loadIndicator = courseLoad && isClass
+                          ? getLoadIndicator(courseLoad.loadScore)
+                          : null
 
-            {intelligence?.parentTips?.[0] ? (
-              <div style={{
-                marginTop: 16,
-                padding: '14px 16px',
-                borderRadius: 14,
-                background: 'rgba(217,230,218,0.35)',
-                border: '1px solid rgba(92,122,94,0.12)',
-              }}>
-                <div style={{
-                  fontFamily: 'var(--font-body)',
-                  fontSize: 11,
-                  fontWeight: 600,
-                  color: 'var(--jade, #5c7a5e)',
-                  marginBottom: 6,
-                }}>
-                  妈妈小贴士
+                        return (
+                          <div
+                            key={`${day.key}-${classTime(cls) ?? ''}-${classSubjectKey(cls)}-${i}`}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              gap: 8,
+                              padding: isBreak ? '6px 12px' : '10px 12px',
+                              borderRadius: 12,
+                              background: isBreak ? 'transparent' : 'var(--canvas-light)',
+                            }}
+                          >
+                            {classTime(cls) && !isBreak ? (
+                              <span style={{ fontFamily: 'var(--font-body)', fontSize: 12, color: 'var(--fg3)', flexShrink: 0, minWidth: 44 }}>
+                                {classTime(cls)}
+                              </span>
+                            ) : null}
+                            <span style={{
+                              fontFamily: isBreak ? 'var(--font-body)' : 'var(--font-serif)',
+                              fontSize: isBreak ? 12 : 14,
+                              color: isBreak ? 'var(--fg3)' : 'var(--fg1)',
+                              flex: 1,
+                              textAlign: classTime(cls) && !isBreak ? 'left' : 'left',
+                            }}>
+                              {classLabel(cls)}
+                            </span>
+                            {loadIndicator ? (
+                              <span
+                                title={courseLoad?.loadReason || loadIndicator.label}
+                                style={{
+                                  fontFamily: 'var(--font-body)',
+                                  fontSize: 11,
+                                  color: loadIndicator.color,
+                                  flexShrink: 0,
+                                  letterSpacing: 1,
+                                }}
+                              >
+                                {loadIndicator.dots}
+                              </span>
+                            ) : null}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  ) : (
+                    <p style={{ margin: 0, fontFamily: 'var(--font-body)', fontSize: 12, color: 'var(--fg3)' }}>无课</p>
+                  )}
                 </div>
-                <p style={{
-                  margin: 0,
-                  fontFamily: 'var(--font-body)',
-                  fontSize: 13,
-                  color: 'var(--fg2)',
-                  lineHeight: 1.6,
+              ))}
+
+              {intelligence?.parentTips?.[0] ? (
+                <div style={{
+                  marginTop: 16,
+                  padding: '14px 16px',
+                  borderRadius: 14,
+                  background: 'rgba(217,230,218,0.35)',
+                  border: '1px solid rgba(92,122,94,0.12)',
                 }}>
-                  {intelligence.parentTips[0]}
-                </p>
-              </div>
-            ) : null}
-          </div>
+                  <div style={{
+                    fontFamily: 'var(--font-body)',
+                    fontSize: 11,
+                    fontWeight: 600,
+                    color: 'var(--jade, #5c7a5e)',
+                    marginBottom: 6,
+                  }}>
+                    妈妈小贴士
+                  </div>
+                  <p style={{
+                    margin: 0,
+                    fontFamily: 'var(--font-body)',
+                    fontSize: 13,
+                    color: 'var(--fg2)',
+                    lineHeight: 1.6,
+                  }}>
+                    {intelligence.parentTips[0]}
+                  </p>
+                </div>
+              ) : null}
+            </div>
+          </Accordion>
         ) : (
-          <p style={{ margin: 0, fontFamily: 'var(--font-body)', fontSize: 13, color: 'var(--fg3)', lineHeight: 1.6 }}>
-            还没有课表，可在孩子档案中上传或手动填写
-          </p>
+          <>
+            <SectionTitle>本周课表</SectionTitle>
+            <p style={{ margin: 0, fontFamily: 'var(--font-body)', fontSize: 13, color: 'var(--fg3)', lineHeight: 1.6 }}>
+              还没有课表，可在孩子档案中上传或手动填写
+            </p>
+          </>
         )}
 
         {(scheduleIncomplete || !hasSchedule) ? (

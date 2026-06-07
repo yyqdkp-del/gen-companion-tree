@@ -157,6 +157,7 @@ function StepSchedule({ data, onChange }: { data: any; onChange: (d: any) => voi
   const [parsePhase, setParsePhase] = useState<ParsePhase>('idle')
   const [parsing, setParsing] = useState(false)
   const [savingConfirm, setSavingConfirm] = useState(false)
+  const [savingEdit, setSavingEdit] = useState(false)
   const [parseError, setParseError] = useState('')
   const [parsedResult, setParsedResult] = useState<ParsedResult | null>(null)
   const [pendingSchedule, setPendingSchedule] = useState<ScheduleByDay>({})
@@ -272,6 +273,8 @@ function StepSchedule({ data, onChange }: { data: any; onChange: (d: any) => voi
           childId,
           schedule: pendingSchedule,
           save: true,
+          enrich: false,
+          source: 'parse-schedule',
         }),
       })
       const result = await resp.json()
@@ -343,8 +346,8 @@ function StepSchedule({ data, onChange }: { data: any; onChange: (d: any) => voi
     return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
   }
 
-  const saveEdit = () => {
-    if (!editDay) return
+  const saveEdit = async () => {
+    if (!editDay || savingEdit) return
     const slots = editText
       .split('\n')
       .map(s => s.trim())
@@ -358,8 +361,37 @@ function StepSchedule({ data, onChange }: { data: any; onChange: (d: any) => voi
         return { time, subject }
       })
       .filter(Boolean) as { time: string; subject: string }[]
-    onChange({ ...data, class_schedule: { ...schedule, [editDay]: slots } })
-    setEditDay(null)
+
+    const editedSchedule = { ...schedule, [editDay]: slots }
+    setSavingEdit(true)
+    setParseError('')
+    try {
+      const resp = await fetchWithAuth('/api/children/parse-schedule', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          childId,
+          schedule: editedSchedule,
+          save: true,
+          enrich: false,
+          source: 'manual',
+        }),
+      })
+      const result = await resp.json()
+      if (result.error) throw new Error(result.error)
+
+      onChange({
+        ...data,
+        class_schedule: result.schedule,
+        ...(result.school_start_time ? { school_start_time: result.school_start_time } : {}),
+        ...(result.school_end_time ? { school_end_time: result.school_end_time } : {}),
+      })
+      setEditDay(null)
+      toast('课表已保存', 'success')
+    } catch {
+      toast('保存失败，请重试', 'error')
+    }
+    setSavingEdit(false)
   }
 
   const getDayCount = (day: string) => (schedule[day] || []).length
@@ -709,9 +741,9 @@ function StepSchedule({ data, onChange }: { data: any; onChange: (d: any) => voi
                 style={{ flex: 1, width: '100%', padding: '12px 14px', borderRadius: 12, border: '1px solid rgba(0,0,0,0.1)', background: 'rgba(245,240,232,0.8)', fontSize: 13, color: THEME.text, outline: 'none', resize: 'none', fontFamily: 'inherit', lineHeight: 2, boxSizing: 'border-box', minHeight: 200 }}
               />
 
-              <motion.button whileTap={{ scale: 0.97 }} onClick={saveEdit}
-                style={{ width: '100%', marginTop: 12, padding: '13px', borderRadius: 12, border: 'none', background: THEME.navy, color: '#fff', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
-                保存
+              <motion.button whileTap={{ scale: 0.97 }} onClick={saveEdit} disabled={savingEdit}
+                style={{ width: '100%', marginTop: 12, padding: '13px', borderRadius: 12, border: 'none', background: THEME.navy, color: '#fff', fontSize: 14, fontWeight: 600, cursor: savingEdit ? 'wait' : 'pointer', opacity: savingEdit ? 0.7 : 1 }}>
+                {savingEdit ? '保存中…' : '保存'}
               </motion.button>
             </motion.div>
           </motion.div>

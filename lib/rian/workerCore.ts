@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
+import { persistClassSchedule } from '@/lib/schedule/persistSchedule'
 import { getUserLocation } from '@/lib/geofence'
 import { getTodayStr, getTodayStrInTimeZone } from '@/lib/date/localDate'
 import {
@@ -684,10 +685,10 @@ async function executeRootVisionActions(
       switch (action.type) {
         case 'save_schedule': {
           if (!childId || !action.data) break
-          await supabase.from('child_profiles').upsert(
-            { user_id: userId, child_id: childId, class_schedule: action.data },
-            { onConflict: 'child_id' },
-          )
+          await persistClassSchedule(supabase, childId, userId, action.data, {
+            enrich: false,
+            source: 'rian',
+          })
           break
         }
 

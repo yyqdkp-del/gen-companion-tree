@@ -1,10 +1,56 @@
 'use client'
 
-import { Suspense, useState } from 'react'
+import { Suspense, useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
+import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 
 const supabase = createClient()
+
+/** 从邮件链接建立 recovery session（支持 hash / code / token_hash 三种 Supabase 格式） */
+async function establishRecoverySession(searchParams: URLSearchParams): Promise<string | null> {
+  const { data: { session } } = await supabase.auth.getSession()
+  if (session) return null
+
+  const token_hash = searchParams.get('token_hash')
+  const type = searchParams.get('type')
+  if (token_hash && type === 'recovery') {
+    const { error } = await supabase.auth.verifyOtp({ token_hash, type: 'recovery' })
+    return error?.message ?? null
+  }
+
+  const code = searchParams.get('code')
+  if (code) {
+    const { error } = await supabase.auth.exchangeCodeForSession(code)
+    return error?.message ?? null
+  }
+
+  const hash = typeof window !== 'undefined' ? window.location.hash.slice(1) : ''
+  if (hash) {
+    const hashParams = new URLSearchParams(hash)
+    const access_token = hashParams.get('access_token')
+    const refresh_token = hashParams.get('refresh_token')
+    if (access_token && refresh_token) {
+      const { error } = await supabase.auth.setSession({ access_token, refresh_token })
+      return error?.message ?? null
+    }
+  }
+
+  const { data: { session: afterDetect } } = await supabase.auth.getSession()
+  if (afterDetect) return null
+
+  return '重置链接无效或已过期，请重新申请'
+}
+
+function stripAuthParamsFromUrl() {
+  const url = new URL(window.location.href)
+  url.hash = ''
+  url.searchParams.delete('code')
+  url.searchParams.delete('token_hash')
+  url.searchParams.delete('type')
+  const qs = url.searchParams.toString()
+  window.history.replaceState({}, '', qs ? `${url.pathname}?${qs}` : url.pathname)
+}
 
 function ResetPasswordInner() {
   const router = useRouter()
@@ -12,7 +58,21 @@ function ResetPasswordInner() {
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')
   const [loading, setLoading] = useState(false)
+  const [checking, setChecking] = useState(true)
+  const [linkError, setLinkError] = useState('')
   const [error, setError] = useState('')
+
+  useEffect(() => {
+    void (async () => {
+      const err = await establishRecoverySession(searchParams)
+      if (err) {
+        setLinkError(err)
+      } else {
+        stripAuthParamsFromUrl()
+      }
+      setChecking(false)
+    })()
+  }, [searchParams])
 
   const handleSubmit = async () => {
     if (password.length < 6) {
@@ -24,21 +84,12 @@ function ResetPasswordInner() {
       return
     }
 
-    const token_hash = searchParams.get('token_hash')
-    if (!token_hash) {
-      setError('重置链接无效或已过期，请重新申请')
-      return
-    }
-
     setLoading(true)
     setError('')
     try {
-      const { error: otpError } = await supabase.auth.verifyOtp({
-        token_hash,
-        type: 'recovery',
-      })
-      if (otpError) {
-        setError(otpError.message || '重置链接无效或已过期')
+      let sessionErr = await establishRecoverySession(searchParams)
+      if (sessionErr) {
+        setError(sessionErr)
         return
       }
 
@@ -56,7 +107,29 @@ function ResetPasswordInner() {
     }
   }
 
-  const disabled = loading || !password || !confirm
+  const disabled = loading || checking || !!linkError || !password || !confirm
+
+  if (checking) {
+    return (
+      <main className="canvas-texture" style={S.page}>
+        <p style={S.loading}>正在验证重置链接…</p>
+      </main>
+    )
+  }
+
+  if (linkError) {
+    return (
+      <main className="canvas-texture" style={S.page}>
+        <div style={S.card}>
+          <div style={{ fontSize: 40, marginBottom: 12, textAlign: 'center' }}>🌿</div>
+          <p style={S.error}>{linkError}</p>
+          <Link href="/auth?mode=forgot" style={S.linkBtn}>
+            重新申请重置链接
+          </Link>
+        </div>
+      </main>
+    )
+  }
 
   return (
     <main className="canvas-texture" style={S.page}>
@@ -154,14 +227,28 @@ const S: Record<string, React.CSSProperties> = {
     outline: 'none',
   },
   error: {
-    margin: '0 0 10px',
+    margin: '0 0 14px',
     fontSize: 13,
     lineHeight: 1.5,
     color: 'var(--pri-red-dot)',
+    textAlign: 'center',
   },
   loading: {
     margin: 'auto',
     fontSize: 14,
     color: 'var(--fg3)',
+  },
+  linkBtn: {
+    display: 'block',
+    width: '100%',
+    height: 48,
+    lineHeight: '48px',
+    textAlign: 'center',
+    borderRadius: 14,
+    background: 'var(--clay)',
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: 600,
+    textDecoration: 'none',
   },
 }

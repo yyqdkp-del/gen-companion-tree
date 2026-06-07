@@ -17,6 +17,47 @@ function decodeBase64Url(data: string): string {
   return Buffer.from(padded, 'base64').toString('utf8')
 }
 
+function htmlToText(html: string): string {
+  return html
+    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/p>/gi, '\n')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+function extractBody(parts: GmailPart[] | undefined): string {
+  let plainText = ''
+  let htmlText = ''
+
+  function traverse(partList: GmailPart[] | undefined) {
+    for (const part of partList || []) {
+      if (part.parts?.length) {
+        traverse(part.parts)
+        continue
+      }
+      if (part.mimeType === 'text/plain' && part.body?.data && !plainText) {
+        plainText = decodeBase64Url(part.body.data)
+      }
+      if (part.mimeType === 'text/html' && part.body?.data && !htmlText) {
+        htmlText = decodeBase64Url(part.body.data)
+      }
+    }
+  }
+
+  traverse(parts)
+
+  if (plainText.trim()) return plainText
+  if (htmlText.trim()) return htmlToText(htmlText)
+  return ''
+}
+
 type GmailPart = {
   mimeType?: string
   filename?: string
@@ -26,8 +67,6 @@ type GmailPart = {
 
 /**
  * 从 Gmail REST API 拉取邮件正文与附件（base64 仅用于当前处理，不持久化）。
- * @param accessToken OAuth access token
- * @param messageId Gmail message id
  */
 export async function extractEmailWithAttachments(
   accessToken: string,
@@ -50,21 +89,21 @@ export async function extractEmailWithAttachments(
   const from = headers.find((h) => h.name === 'From')?.value || ''
   const date = headers.find((h) => h.name === 'Date')?.value || ''
 
-  let body = ''
+  let body = extractBody(message.payload?.parts)
+
+  if (!body && message.payload?.body?.data) {
+    body = decodeBase64Url(message.payload.body.data)
+  }
+
   const attachmentRefs: Array<{ filename: string; mimeType: string; attachmentId: string }> = []
 
-  function extractParts(parts: GmailPart[] | undefined) {
+  function collectAttachments(parts: GmailPart[] | undefined) {
     if (!parts) return
     for (const part of parts) {
       if (part.parts?.length) {
-        extractParts(part.parts)
+        collectAttachments(part.parts)
         continue
       }
-
-      if (part.mimeType === 'text/plain' && part.body?.data && !body) {
-        body = decodeBase64Url(part.body.data)
-      }
-
       if (
         (part.mimeType === 'application/pdf' || part.mimeType?.startsWith('image/')) &&
         part.body?.attachmentId
@@ -78,11 +117,7 @@ export async function extractEmailWithAttachments(
     }
   }
 
-  extractParts(message.payload?.parts || [])
-
-  if (!body && message.payload?.body?.data) {
-    body = decodeBase64Url(message.payload.body.data)
-  }
+  collectAttachments(message.payload?.parts || [])
 
   const attachmentData = await Promise.all(
     attachmentRefs.slice(0, 3).map(async (att) => {
