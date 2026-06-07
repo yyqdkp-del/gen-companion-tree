@@ -15,6 +15,7 @@ import {
   Volume2, ChevronDown, Zap, Brain,
 } from 'lucide-react'
 import type { BrainHotspotActionData, BrainSuggestedAction } from '@/app/_shared/_types'
+import { formatThb } from '@/lib/realtime/exchangeRate'
 
 const THEME = { text: '#2C3E50', gold: '#8a7355', muted: '#6B8BAA', navy: '#2d3f4a' }
 const G = { bg: '#E1F5EE', border: '#9FE1CB', mid: '#5DCAA5', deep: '#1D9E75', dark: '#0F6E56', darkest: '#085041' }
@@ -134,6 +135,89 @@ function runBrainSuggestedAction(
   }
 }
 
+function PaymentTimingPanel({
+  quote,
+  reason,
+  actions,
+  onBrainAction,
+}: {
+  quote: NonNullable<BrainHotspotActionData['paymentQuote']>
+  reason: string
+  actions: BrainSuggestedAction[]
+  onBrainAction?: (action: string, value?: string) => void
+}) {
+  const title = quote.todoTitle || '待付款项'
+  const reasonLines = reason.split('\n').filter(Boolean)
+  const primary = actions.find((a) => a.action === 'one_tap') || actions[0]
+  const secondary = actions.filter((a) => a !== primary)
+
+  return (
+    <div style={{ padding: '12px 14px 4px' }}>
+      <div style={{
+        padding: '20px 18px',
+        borderRadius: 16,
+        background: '#fff',
+        border: '0.5px solid rgba(164,99,85,0.12)',
+        boxShadow: 'var(--sh-warm)',
+        marginBottom: 12,
+      }}>
+        <div style={{
+          fontFamily: 'var(--font-serif)',
+          fontSize: 22,
+          fontWeight: 600,
+          color: THEME.text,
+          marginBottom: 10,
+          lineHeight: 1.35,
+        }}>
+          {title.includes('฿') || title.includes('THB') ? title : `${title} ${formatThb(quote.amountThb)}`}
+        </div>
+        {reasonLines.map((line) => (
+          <div
+            key={line}
+            style={{
+              fontFamily: 'var(--font-body)',
+              fontSize: line.includes('约合人民币') ? 15 : 14,
+              color: line.includes('现在付款') ? 'var(--clay)' : 'var(--fg2)',
+              fontWeight: line.includes('现在付款') ? 600 : 400,
+              lineHeight: 1.65,
+              marginBottom: line.includes('现在付款') ? 0 : 6,
+            }}
+          >
+            {line.includes('约合人民币') ? line : line}
+          </div>
+        ))}
+      </div>
+
+      {primary ? (
+        <motion.button
+          whileTap={{ scale: 0.97 }}
+          onClick={() => runBrainSuggestedAction(primary, onBrainAction)}
+          className="gc-btn"
+          style={{ width: '100%', marginBottom: secondary.length ? 8 : 0 }}
+        >
+          {primary.label}
+        </motion.button>
+      ) : null}
+
+      {secondary.length > 0 && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {secondary.map((action, i) => (
+            <motion.button
+              key={i}
+              whileTap={{ scale: 0.97 }}
+              onClick={() => runBrainSuggestedAction(action, onBrainAction)}
+              className="gc-btn gc-btn--ghost"
+              style={{ width: '100%' }}
+            >
+              {action.label}
+            </motion.button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 function BrainInsightPanel({
   brain,
   summary,
@@ -146,6 +230,18 @@ function BrainInsightPanel({
   const reason = brain.reason || summary || ''
   const actions = brain.suggestedActions || []
   const urgency = brain.urgency || 'medium'
+
+  if (brain.insight_type === 'payment_timing' && brain.paymentQuote) {
+    return (
+      <PaymentTimingPanel
+        quote={brain.paymentQuote}
+        reason={reason}
+        actions={actions}
+        onBrainAction={onBrainAction}
+      />
+    )
+  }
+
   const urgencyColor =
     urgency === 'high' ? '#d58074'
     : urgency === 'medium' ? '#b88e5e'

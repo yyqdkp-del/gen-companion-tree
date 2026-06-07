@@ -18,6 +18,7 @@ export async function saveCorrelatedInsights(
       reason: insight.reason,
       suggestedActions: insight.suggestedActions,
       relatedItems: insight.relatedItems,
+      paymentQuote: insight.paymentQuote,
     }
 
     const { data: existing } = await db

@@ -1,3 +1,10 @@
+import {
+  buildPaymentTimingReason,
+  getPaymentFxQuote,
+  parseThbAmount,
+  paymentTimingUrgencyBoost,
+} from '@/lib/realtime/exchangeRate'
+
 export interface CorrelatedInsight {
   type: string
   title: string
@@ -10,6 +17,12 @@ export interface CorrelatedInsight {
     timing: string
   }>
   relatedItems: string[]
+  paymentQuote?: {
+    amountThb: number
+    amountCny: number
+    savingsCny: number
+    todoTitle?: string
+  }
 }
 
 export type FamilyDataForCorrelation = {
@@ -186,22 +199,42 @@ export async function analyzeCorrelations(
     const daysUntilDue = daysUntil(String(todo.due_date))
 
     if (daysUntilDue <= 7 && daysUntilDue > 0) {
+      const todoTitle = todo.title || '待付款项'
+      const amountThb = parseThbAmount(todoTitle)
+      const fxQuote = amountThb ? await getPaymentFxQuote(amountThb) : null
+
+      let reason = `还有${daysUntilDue}天截止，建议尽快处理`
+      let urgency: CorrelatedInsight['urgency'] = daysUntilDue <= 3 ? 'high' : 'medium'
+      let paymentQuote: CorrelatedInsight['paymentQuote']
+
+      if (fxQuote) {
+        reason = buildPaymentTimingReason(fxQuote)
+        urgency = paymentTimingUrgencyBoost(fxQuote, daysUntilDue)
+        paymentQuote = {
+          amountThb: fxQuote.amountThb,
+          amountCny: fxQuote.amountCny,
+          savingsCny: fxQuote.savingsCny,
+          todoTitle,
+        }
+      }
+
       insights.push({
         type: 'payment_timing',
-        title: `${todo.title || '待付款项'} · 付款提醒`,
-        reason: `还有${daysUntilDue}天截止，建议尽快处理`,
-        urgency: daysUntilDue <= 3 ? 'high' : 'medium',
+        title: fxQuote ? todoTitle : `${todoTitle} · 付款提醒`,
+        reason,
+        urgency,
+        paymentQuote,
         suggestedActions: [
+          {
+            label: '立即办理',
+            action: 'one_tap',
+            value: todo.id,
+            timing: 'now',
+          },
           {
             label: '查今日汇率',
             action: 'open_url',
             value: 'https://wise.com/gb/currency-converter/thb-to-cny-rate',
-            timing: 'now',
-          },
-          {
-            label: '立即付款',
-            action: 'one_tap',
-            value: todo.id,
             timing: 'now',
           },
         ],

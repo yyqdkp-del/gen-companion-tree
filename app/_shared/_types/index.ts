@@ -147,6 +147,12 @@ export type BrainHotspotActionData = {
   reason?: string
   suggestedActions?: BrainSuggestedAction[]
   relatedItems?: string[]
+  paymentQuote?: {
+    amountThb: number
+    amountCny: number
+    savingsCny: number
+    todoTitle?: string
+  }
   url?: string
 }
 
