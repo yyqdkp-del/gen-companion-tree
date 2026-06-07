@@ -2,6 +2,7 @@
 import { createClient } from '@/lib/supabase/client'
 const supabase = createClient()
 import { createContext, useContext, useState, useEffect, useRef, useCallback, useMemo, ReactNode } from 'react'
+import { useRouter } from 'next/navigation'
 import useSWR, { useSWRConfig } from 'swr'
 import { fetchAppData, readAppCoreCache, writeAppCoreCache } from '@/app/_shared/_services/syncService'
 import { enrichOneChild } from '@/app/_shared/_services/childService'
@@ -53,6 +54,7 @@ type AppContextType = {
 const AppContext = createContext<AppContextType | null>(null)
 
 export function AppProvider({ children }: { children: ReactNode }) {
+  const router = useRouter()
   const { mutate: globalMutate } = useSWRConfig()
   const [userId, setUserId] = useState('')
   const userIdRef = useRef('')
@@ -199,6 +201,25 @@ export function AppProvider({ children }: { children: ReactNode }) {
     await signOutWithPushCleanup()
   }, [])
 
+  const clearStaleSession = useCallback(async () => {
+    await supabase.auth.signOut()
+    userIdRef.current = ''
+    setUserId('')
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('app_user_id')
+      if ('caches' in window) {
+        try {
+          const cache = await caches.open('auth-v1')
+          await cache.delete('/auth/session-bundle')
+          await cache.delete('/auth/user-id')
+        } catch {
+          // ignore
+        }
+      }
+    }
+    router.push('/auth')
+  }, [router])
+
   useEffect(() => {
     const bootLoggedIn = (uid: string, session: Session) => {
       setUserIdSafe(uid)
@@ -208,7 +229,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
     const initSession = async () => {
       try {
-        const { data: { session } } = await supabase.auth.getSession()
+        const { data: { session }, error } = await supabase.auth.getSession()
+        if (error?.code === 'refresh_token_not_found') {
+          await clearStaleSession()
+          return
+        }
         if (session?.user?.id) {
           bootLoggedIn(session.user.id, session)
           return
@@ -221,10 +246,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
             if (sessionRes) {
               const bundle = await sessionRes.json() as { access_token?: string; refresh_token?: string }
               if (bundle?.access_token && bundle?.refresh_token) {
-                const { data: { session: s } } = await supabase.auth.setSession({
+                const { data: { session: s }, error: setError } = await supabase.auth.setSession({
                   access_token: bundle.access_token,
                   refresh_token: bundle.refresh_token,
                 })
+                if (setError?.code === 'refresh_token_not_found') {
+                  await clearStaleSession()
+                  return
+                }
                 if (s?.user?.id) {
                   bootLoggedIn(s.user.id, s)
                   return
@@ -234,7 +263,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
           } catch (e) { logOrAlertNetworkError(e) }
         }
 
-        const { data: refreshData } = await supabase.auth.refreshSession()
+        const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession()
+        if (refreshError?.code === 'refresh_token_not_found') {
+          await clearStaleSession()
+          return
+        }
         if (refreshData.session?.user?.id) {
           bootLoggedIn(refreshData.session.user.id, refreshData.session)
           return
@@ -247,7 +280,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     void initSession()
     // 仅启动时执行一次
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [clearStaleSession])
 
   useEffect(() => {
     if (!sessionReady || loading || !userId) return
