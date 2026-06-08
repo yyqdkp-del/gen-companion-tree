@@ -11,7 +11,7 @@ import {
   isFullRootDecision,
   loadInstantChild,
 } from '@/lib/action/instantDecision'
-import { runDeepAnalysisForTodo, triggerDeepAnalysis } from '@/lib/action/deepAnalysis'
+import { isCachedRootDecisionValid, DECISION_CACHE_MS } from '@/lib/action/decisionCache'
 import { executeAction } from '@/lib/action/executor'
 import { fetchFormTemplates, enrichActionsWithFormTemplates } from '@/lib/action/enrichPDF'
 import { familyServicePromptLabel, resolveResidentCityFromFamilyData } from '@/lib/family/resolveResidentCity'
@@ -215,38 +215,7 @@ function rootDecisionResponseBody(
   }
 }
 
-const CACHE_DURATION_MS = 2 * 60 * 60 * 1000
-
-function isTodoDecisionCacheValid(
-  todo: Record<string, unknown>,
-  forceRefresh: boolean,
-): { valid: boolean; decision?: RootDecision } {
-  if (forceRefresh) return { valid: false }
-
-  const aiData = (todo.ai_action_data || {}) as Record<string, unknown>
-  const cachedDecision = aiData.root_decision as RootDecision | undefined
-  const cachedAt = String(aiData.cached_at || aiData.prepared_at || '')
-  if (!cachedDecision || !cachedAt) return { valid: false }
-  if (!isFullRootDecision(cachedDecision)) return { valid: false }
-
-  const cacheAge = Date.now() - new Date(cachedAt).getTime()
-  if (cacheAge >= CACHE_DURATION_MS) return { valid: false }
-
-  const todoUpdatedAt = todo.updated_at ? new Date(String(todo.updated_at)).getTime() : 0
-  if (todoUpdatedAt && new Date(cachedAt).getTime() <= todoUpdatedAt) {
-    return { valid: false }
-  }
-
-  return { valid: true, decision: cachedDecision }
-}
-
-async function runRootBrainForTodo(
-  userId: string,
-  todoId: string,
-  todo: Record<string, unknown>,
-): Promise<{ decision: RootDecision; autoCompleted: string[] }> {
-  return runDeepAnalysisForTodo(supabase, userId, todoId, todo)
-}
+const CACHE_DURATION_MS = DECISION_CACHE_MS
 
 // ══ 构建 TODO Prompt ══
 function buildTodoPrompt(todo: any, brainInstruction: any, familyData: any): string {
@@ -578,8 +547,10 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ ok: false, error: 'Todo not found' }, { status: 404 })
       }
 
-      // 读 todo_items 预生成缓存（完整 RootDecision）
-      const cacheCheck = isTodoDecisionCacheValid(todo, forceRefresh)
+      // 有完整缓存直接返回，不跑 AI
+      const cacheCheck = forceRefresh
+        ? { valid: false as const }
+        : isCachedRootDecisionValid(todo.ai_action_data)
       if (cacheCheck.valid && cacheCheck.decision) {
         const actionQueueId = await upsertActionQueue(
           userId,
@@ -608,29 +579,7 @@ export async function POST(req: NextRequest) {
       category = todo.category || 'other'
       urgencyLevel = todo.priority === 'red' ? 3 : todo.priority === 'orange' ? 2 : 1
 
-      // Cron / 显式同步：跑完整 AI（可能较慢）
-      if (sync_deep === true || requestSource === 'cron') {
-        const brainResult = await runRootBrainForTodo(userId, resolvedSourceId, todo)
-        executionPack = { root_decision: brainResult.decision, autoCompleted: brainResult.autoCompleted }
-
-        const actionQueueId = await upsertActionQueue(
-          userId,
-          resolvedSourceType,
-          resolvedSourceId,
-          title,
-          category,
-          urgencyLevel,
-          executionPack,
-        )
-
-        await recordUsage(userId, 'one_tap')
-
-        return NextResponse.json(
-          rootDecisionResponseBody(brainResult.decision, brainResult.autoCompleted, actionQueueId),
-        )
-      }
-
-      // 两阶段：即时响应（<1s）+ 后台深度分析
+      // 没有缓存：返回 instant，前端调 deep-analyze
       const todoChildId = todo.child_id ? String(todo.child_id) : null
       const [familyResult, exchangeResult] = await Promise.all([
         FamilyService.getData(userId, {
@@ -649,8 +598,6 @@ export async function POST(req: NextRequest) {
       const instantChild = await loadInstantChild(supabase, resolvedChild?.id, resolvedChild)
       const instantDecision = buildInstantResponse(todo, instantChild, exchangeResult)
 
-      void triggerDeepAnalysis(supabase, userId, resolvedSourceId, todo)
-
       const actionQueueId = await upsertActionQueue(
         userId,
         resolvedSourceType,
@@ -663,11 +610,12 @@ export async function POST(req: NextRequest) {
 
       await recordUsage(userId, 'one_tap')
 
-      return NextResponse.json(
-        rootDecisionResponseBody(instantDecision, [], actionQueueId, false, {
+      return NextResponse.json({
+        ...rootDecisionResponseBody(instantDecision, [], actionQueueId, false, {
           deepAnalysisPending: true,
         }),
-      )
+        todoId: todo.id,
+      })
     }
 
     // ── SCHEDULE 分支 ──

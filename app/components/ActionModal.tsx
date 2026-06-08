@@ -17,10 +17,13 @@ import {
 } from 'lucide-react'
 import type { BrainHotspotActionData, BrainSuggestedAction } from '@/app/_shared/_types'
 import type { PreparedItem, RootAction, RootDecision } from '@/lib/action/rootBrain'
-import { shouldShowHotspotOneKey, shouldShowTodoFullOneKey } from '@/lib/action/oneKeyEligibility'
+import { shouldShowHotspotOneKey, shouldShowOneKey } from '@/lib/action/oneKeyEligibility'
 import { SOURCE_CONFIG, type SourceLevel } from '@/lib/trust/sourceLabel'
 import { formatThb } from '@/lib/realtime/exchangeRate'
 import { resolveHotspotLink, hotspotSearchUrl } from '@/lib/hotspot/url'
+import { DECISION_CACHE_MS } from '@/lib/action/decisionCache'
+import SmartPackingPanel from '@/app/components/SmartPackingPanel'
+import { useSmartPacking } from '@/lib/packing/useSmartPacking'
 
 const THEME = { text: '#2C3E50', gold: '#8a7355', muted: '#6B8BAA', navy: '#2d3f4a' }
 const G = { bg: '#E1F5EE', border: '#9FE1CB', mid: '#5DCAA5', deep: '#1D9E75', dark: '#0F6E56', darkest: '#085041' }
@@ -42,6 +45,13 @@ export type ActionModalProps = {
   child_name?: string
   /** 待办预生成数据（有 execution_pack 时可即时展示） */
   ai_action_data?: any
+  /** 待办来源（hotspot / gmail / rian 等） */
+  todo_source?: string | null
+  todo_priority?: string | null
+  todo_child_id?: string | null
+  todo_requires_action?: boolean | null
+  todo_amount_thb?: number | null
+  todo_source_url?: string | null
   /** 关联分析热点摘要 */
   hotspot_summary?: string
   /** 关联分析 action_data（source: brain） */
@@ -418,8 +428,8 @@ function getFreshRootDecision(aiActionData?: Record<string, unknown>): RootDecis
   const cachedAt = (aiActionData?.cached_at || aiActionData?.prepared_at) as string | undefined
   if (!decision || !cachedAt) return null
   if ((decision as RootDecision & { isPartial?: boolean }).isPartial) return null
-  const ageHours = (Date.now() - new Date(cachedAt).getTime()) / 3600000
-  if (ageHours >= 2) return null
+  const ageMs = Date.now() - new Date(cachedAt).getTime()
+  if (ageMs >= DECISION_CACHE_MS) return null
   return decision
 }
 
@@ -1988,6 +1998,109 @@ function ActionsArea({ actions, userId, primaryIndex, primaryReason, sourceId, s
   )
 }
 
+function HotspotInfoPanel({ todo, onClose }: {
+  todo: {
+    title?: string | null
+    source_url?: string | null
+  }
+  onClose: () => void
+}) {
+  const parseHotspot = (title: string) => {
+    const parts = title.split('｜')
+    const main = parts[0]?.replace('跟进：', '').trim()
+    const impact = parts.find((p) => p.startsWith('影响：'))?.replace('影响：', '')
+    const suggestion = parts.find((p) => p.startsWith('建议：'))?.replace('建议：', '')
+    return { main, impact, suggestion }
+  }
+
+  const { main, impact, suggestion } = parseHotspot(todo.title || '')
+
+  return (
+    <div style={{ padding: '24px 20px' }}>
+      <div style={{
+        fontSize: 17,
+        fontWeight: 600,
+        marginBottom: 16,
+        fontFamily: 'var(--font-display)',
+      }}>
+        {main}
+      </div>
+
+      {impact && (
+        <div style={{ marginBottom: 12 }}>
+          <div style={{
+            fontSize: 11,
+            color: 'var(--text-muted)',
+            marginBottom: 4,
+          }}>
+            影响
+          </div>
+          <div style={{ fontSize: 14 }}>{impact}</div>
+        </div>
+      )}
+
+      {suggestion && (
+        <div style={{ marginBottom: 24 }}>
+          <div style={{
+            fontSize: 11,
+            color: 'var(--text-muted)',
+            marginBottom: 4,
+          }}>
+            根的建议
+          </div>
+          <div style={{
+            fontSize: 14,
+            background: 'var(--canvas-warm)',
+            borderRadius: 12,
+            padding: 12,
+          }}>
+            {suggestion}
+          </div>
+        </div>
+      )}
+
+      <div style={{ display: 'flex', gap: 8 }}>
+        <button
+          type="button"
+          onClick={() => {
+            onClose()
+          }}
+          style={{
+            flex: 1,
+            height: 48,
+            background: 'var(--clay)',
+            color: 'white',
+            border: 'none',
+            borderRadius: 24,
+            fontSize: 15,
+            cursor: 'pointer',
+          }}
+        >
+          知道了
+        </button>
+        {todo.source_url && (
+          <button
+            type="button"
+            onClick={() => window.open(todo.source_url!, '_blank')}
+            style={{
+              flex: 1,
+              height: 48,
+              background: 'transparent',
+              color: 'var(--clay)',
+              border: '1px solid var(--clay)',
+              borderRadius: 24,
+              fontSize: 15,
+              cursor: 'pointer',
+            }}
+          >
+            了解更多
+          </button>
+        )}
+      </div>
+    </div>
+  )
+}
+
 function AdviceOnlyPanel({
   summary,
   learnMoreUrl,
@@ -2040,13 +2153,14 @@ const LOADING_ICONS = ['🔍', '📍', '✍️', '✨']
 export default function ActionModal({
   source_type, source_id, title, category, urgency_level,
   due_date, event_data, child_name, ai_action_data,
+  todo_source, todo_priority, todo_child_id, todo_requires_action, todo_amount_thb, todo_source_url,
   hotspot_summary, hotspot_action_data,
   hotspot_action_available, hotspot_linked_todo_id, hotspot_source_url,
   userId,
   onClose, onDone, onSnooze, onSync, onBrainAction,
 }: ActionModalProps) {
   const router = useRouter()
-  const { sessionReady } = useApp()
+  const { sessionReady, activeKid } = useApp()
   const [pack, setPack] = useState<ExecutionPack | null>(null)
   const [decision, setDecision] = useState<RootDecision | null>(null)
   const [brainAutoCompleted, setBrainAutoCompleted] = useState<string[]>([])
@@ -2075,18 +2189,63 @@ export default function ActionModal({
   const brainData = isBrainHotspotData(hotspot_action_data) ? hotspot_action_data : null
   const isBrainMode = source_type === 'hotspot' && !!brainData
 
-  const showFullOneKey = isBrainMode || source_type === 'schedule' || (
-    source_type === 'todo'
-      ? shouldShowTodoFullOneKey({ due_date, urgency_level, category, ai_action_data })
-      : source_type === 'hotspot'
-        ? shouldShowHotspotOneKey({
-          action_available: hotspot_action_available,
-          source: brainData?.source,
-          linked_todo_id: hotspot_linked_todo_id,
-          category,
-          action_data: hotspot_action_data as Record<string, unknown> | undefined,
+  const isHotspotInfoTodo = source_type === 'todo' && (
+    todo_source === 'hotspot' || title?.startsWith('跟进：【')
+  )
+
+  const packingChildId = todo_child_id
+    || (event_data?.child_id as string | undefined)
+    || activeKid?.id
+  const packingKid = packingChildId && packingChildId === activeKid?.id ? activeKid : null
+  const packingTodayClasses = (packingKid as { today_classes?: unknown[] } | null)?.today_classes ?? []
+  const packingClassSchedule = (packingKid as { class_schedule?: Record<string, unknown[]> } | null)?.class_schedule
+
+  const { smartPacking, reloadSmartPacking } = useSmartPacking(
+    packingChildId,
+    userId,
+    packingTodayClasses,
+    packingClassSchedule,
+  )
+
+  const handlePackingRefresh = useCallback(async () => {
+    await reloadSmartPacking()
+    onSync?.()
+  }, [reloadSmartPacking, onSync])
+
+  const showPackingConfirm = !!packingChildId
+    && smartPacking.length > 0
+    && !isBrainMode
+    && !isHotspotInfoTodo
+
+  const resolvedTodoPriority = todo_priority
+    || (urgency_level === 3 ? 'red' : urgency_level === 2 ? 'orange' : 'yellow')
+  const resolvedTodoAmount = todo_amount_thb
+    ?? (ai_action_data?.amount != null ? Number(ai_action_data.amount) : null)
+  const resolvedSourceUrl = todo_source_url
+    || (typeof ai_action_data?.source_url === 'string' ? ai_action_data.source_url : null)
+
+  const showFullOneKey = !isHotspotInfoTodo && (
+    isBrainMode || source_type === 'schedule' || (
+      source_type === 'todo'
+        ? shouldShowOneKey({
+          source: todo_source,
+          title,
+          due_date,
+          priority: resolvedTodoPriority,
+          requires_action: todo_requires_action ?? ai_action_data?.requires_action === true,
+          child_id: todo_child_id,
+          amount_thb: resolvedTodoAmount,
         })
-        : true
+        : source_type === 'hotspot'
+          ? shouldShowHotspotOneKey({
+            action_available: hotspot_action_available,
+            source: brainData?.source,
+            linked_todo_id: hotspot_linked_todo_id,
+            category,
+            action_data: hotspot_action_data as Record<string, unknown> | undefined,
+          })
+          : true
+    )
   )
 
   const adviceSummary = hotspot_summary
@@ -2100,31 +2259,38 @@ export default function ActionModal({
     }) || hotspotSearchUrl(title))
     : undefined
 
-  const refreshDecision = useCallback(async () => {
+  const triggerDeepAnalysis = useCallback(async (todoId: string) => {
+    console.log('[ActionModal] triggerDeepAnalysis called', todoId)
+
     try {
-      const res = await fetchWithAuth('/api/action/execute?refresh=true', {
+      console.log('[ActionModal] calling /api/action/deep-analyze')
+      const res = await fetchWithAuth('/api/action/deep-analyze', {
         method: 'POST',
-        body: JSON.stringify({
-          source_type,
-          source_id,
-          event_data,
-          child_name,
-          refresh: true,
-        }),
+        body: JSON.stringify({ todoId, source_id: todoId }),
       })
-      const data = await res.json()
-      if (data.ok && data.decision && !(data.decision as RootDecision & { isPartial?: boolean }).isPartial) {
-        setDecision(data.decision as RootDecision)
-        setBrainAutoCompleted(data.autoCompleted || [])
+
+      console.log('[ActionModal] deep-analyze status', res.status)
+      const result = await res.json()
+      console.log('[ActionModal] deep-analyze result', result.ok, result.decision?.isPartial)
+
+      if (handleLimitReached(result, () => router.push('/upgrade'))) return
+
+      if (result.ok && result.decision && !(result.decision as RootDecision & { isPartial?: boolean }).isPartial) {
+        setDecision(result.decision as RootDecision)
+        setBrainAutoCompleted(result.autoCompleted || [])
         setDeepPending(false)
+        console.log('[ActionModal] decision updated with full content')
         onSync?.()
-      } else if (data.deepAnalysisPending) {
-        setDeepPending(true)
+      } else {
+        console.warn('[ActionModal] deep-analyze returned partial or failed')
+        setDeepPending(false)
       }
-    } catch (e) {
-      logOrAlertNetworkError(e)
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : String(e)
+      console.error('[ActionModal] deep-analyze error', message)
+      setDeepPending(false)
     }
-  }, [source_type, source_id, event_data, child_name, onSync])
+  }, [onSync, router])
 
   useEffect(() => {
     if (!loading) {
@@ -2141,7 +2307,7 @@ export default function ActionModal({
     if (!source_id) return
     setActiveTab(null)
 
-    if (isBrainMode) {
+    if (isBrainMode || isHotspotInfoTodo) {
       setPack(null)
       setDecision(null)
       setAutoCompleted([])
@@ -2214,17 +2380,17 @@ export default function ActionModal({
         })
         const data = await res.json()
         if (cancelled) return
+        console.log('[ActionModal] execute response', data.ok, data.deepAnalysisPending)
         if (handleLimitReached(data, () => router.push('/upgrade'))) return
         if (data.ok && data.decision) {
           setDecision(data.decision as RootDecision)
           setBrainAutoCompleted(data.autoCompleted || [])
           setPack(null)
-          if (data.deepAnalysisPending) {
+          setLoading(false)
+          if (data.deepAnalysisPending && (data.todoId || source_id)) {
+            console.log('[ActionModal] starting deep analysis')
             setDeepPending(true)
-            if (deepRefreshTimerRef.current) clearTimeout(deepRefreshTimerRef.current)
-            deepRefreshTimerRef.current = setTimeout(() => {
-              void refreshDecision()
-            }, 30000)
+            void triggerDeepAnalysis(String(data.todoId || source_id))
           } else {
             setDeepPending(false)
           }
@@ -2249,7 +2415,7 @@ export default function ActionModal({
         deepRefreshTimerRef.current = null
       }
     }
-  }, [source_id, source_type, sessionReady, ai_action_data, event_data, child_name, onSync, router, isBrainMode, showFullOneKey, refreshDecision])
+  }, [source_id, source_type, sessionReady, ai_action_data, event_data, child_name, onSync, router, isBrainMode, isHotspotInfoTodo, showFullOneKey, triggerDeepAnalysis])
 
   const brainUrgencyLevel: 1 | 2 | 3 =
     brainData?.urgency === 'high' ? 3
@@ -2306,7 +2472,10 @@ export default function ActionModal({
   const hasTab = (key: TabKey) => {
     if (!pack) return false
     if (key === 'checklist') return (pack.checklist?.length || 0) > 0
-    if (key === 'carry') return (pack.carry_items?.length || 0) > 0
+    if (key === 'carry') {
+      if (showPackingConfirm) return false
+      return (pack.carry_items?.length || 0) > 0
+    }
     if (key === 'draft') return !!pack.draft
     return false
   }
@@ -2365,7 +2534,28 @@ export default function ActionModal({
               />
             )}
 
-            {!isBrainMode && !showFullOneKey && (
+            {isHotspotInfoTodo && (
+              <HotspotInfoPanel
+                todo={{ title, source_url: resolvedSourceUrl }}
+                onClose={onClose}
+              />
+            )}
+
+            {showPackingConfirm && packingChildId && (
+              <div style={{ padding: '12px 14px 0' }}>
+                <SmartPackingPanel
+                  childId={packingChildId}
+                  userId={userId}
+                  items={smartPacking}
+                  onRefresh={handlePackingRefresh}
+                  variant="compact"
+                  showManualAdd={false}
+                  title="出发前确认"
+                />
+              </div>
+            )}
+
+            {!isBrainMode && !isHotspotInfoTodo && !showFullOneKey && (
               <AdviceOnlyPanel summary={adviceSummary} learnMoreUrl={learnMoreUrl} />
             )}
 

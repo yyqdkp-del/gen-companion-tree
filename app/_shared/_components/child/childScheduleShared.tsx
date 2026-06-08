@@ -5,13 +5,8 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { X } from 'lucide-react'
 import { THEME, GREEN } from '@/app/_shared/_constants/theme'
 import { EVENT_TYPE_EMOJI } from '@/app/_shared/_constants/categories'
-import { packingSubjectKey } from '@/lib/packing/packingPreferences'
-import {
-  addManualPackingMemory,
-  recordAllPackingConfirmed,
-  recordPackingAction,
-  type SmartPackingItem,
-} from '@/lib/packing/packingMemory'
+import SmartPackingPanel from '@/app/components/SmartPackingPanel'
+import type { SmartPackingItem } from '@/lib/packing/packingMemory'
 import type { Child, TimelineItem, HealthStatus, MoodStatus } from '@/app/_shared/_types'
 import { addDaysStr, getTodayStr } from '@/lib/date/localDate'
 import { logOrAlertNetworkError } from '@/lib/errors/logOrAlertNetworkError'
@@ -110,210 +105,16 @@ export function PackingSection({
   timeline: TimelineItem[]
   onRefresh: () => void | Promise<void>
 }) {
-  const [showAdd, setShowAdd] = useState(false)
-  const [addName, setAddName] = useState('')
-  const [addCourse, setAddCourse] = useState('__once__')
-  const [busy, setBusy] = useState(false)
-
-  const courseOptions = useMemo(() => {
-    const opts: { key: string; label: string }[] = [{ key: '__once__', label: '不关联课程' }]
-    const seen = new Set<string>()
-    for (const t of timeline.filter((x) => x.source === 'schedule')) {
-      const ev = (t.event || {}) as { subject?: string }
-      const key = packingSubjectKey(ev.subject)
-      if (!key || seen.has(key)) continue
-      seen.add(key)
-      opts.push({ key, label: t.title || key })
-    }
-    return opts
-  }, [timeline])
-
-  const pendingItems = smartItems.filter((i) => !i.isConfirmed)
-  const allConfirmed = smartItems.length > 0 && pendingItems.length === 0
-
-  const handleConfirm = async (item: SmartPackingItem) => {
-    setBusy(true)
-    try {
-      await recordPackingAction(childId, userId, item.itemName, item.course, 'confirmed')
-      await onRefresh()
-    } catch (e) {
-      logOrAlertNetworkError(e)
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  const handleDismiss = async (item: SmartPackingItem) => {
-    const label = item.course || item.itemName
-    if (!window.confirm(`不再提醒「${item.itemName}」${item.course ? `（${label}）` : ''}吗？`)) return
-    setBusy(true)
-    try {
-      await recordPackingAction(childId, userId, item.itemName, item.course, 'dismissed')
-      toast('已设为不再提示', 'info')
-      await onRefresh()
-    } catch (e) {
-      logOrAlertNetworkError(e)
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  const handleAllConfirmed = async () => {
-    setBusy(true)
-    try {
-      await recordAllPackingConfirmed(childId, userId, smartItems)
-      toast('太棒了，全部带好了 ✓', 'success')
-      await onRefresh()
-    } catch (e) {
-      logOrAlertNetworkError(e)
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  const submitManualAdd = async () => {
-    const name = addName.trim()
-    if (!name) return
-    setBusy(true)
-    try {
-      const course = addCourse === '__once__' ? null : addCourse
-      await addManualPackingMemory(childId, userId, name, course)
-      setAddName('')
-      setShowAdd(false)
-      toast('已添加', 'info')
-      await onRefresh()
-    } catch (e) {
-      logOrAlertNetworkError(e)
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  if (!smartItems.length && !showAdd) {
-    return (
-      <div>
-        <div style={{ fontFamily: 'var(--font-body)', fontSize: 12, color: FG3, opacity: 0.7, textAlign: 'center', padding: '8px 0' }}>
-          今天没有需要携带的物品
-        </div>
-        <motion.button type="button" whileTap={{ scale: 0.97 }} onClick={() => setShowAdd(true)}
-          style={{ width: '100%', marginTop: 8, padding: '6px 0', border: 'none', background: 'transparent',
-            color: CLAY, fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
-          + 手动添加
-        </motion.button>
-      </div>
-    )
-  }
-
   return (
-    <div>
-      {allConfirmed ? (
-        <div style={{ fontFamily: 'var(--font-body)', fontSize: 12, color: 'var(--accent-jade, #5c7a5e)', textAlign: 'center', padding: '8px 0', fontWeight: 600 }}>
-          今日携带已全部确认 ✓
-        </div>
-      ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 7, marginBottom: 8 }}>
-          {smartItems.map((item) => {
-            const confirmed = item.isConfirmed
-            const dotColor = confirmed ? '#8ca88d' : item.isHighRisk ? '#EA580C' : CLAY
-            return (
-              <div key={item.id} style={{
-                display: 'flex', alignItems: 'center', gap: 10, padding: '10px 13px',
-                borderRadius: 13, background: '#fff',
-                boxShadow: 'var(--sh-soft)',
-                opacity: confirmed ? 0.72 : 1,
-              }}>
-                <span style={{
-                  width: 8, height: 8, borderRadius: '50%',
-                  background: dotColor, flexShrink: 0,
-                }} />
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{
-                    fontFamily: 'var(--font-serif)', fontSize: 14, fontWeight: 500,
-                    color: confirmed ? FG3 : FG1,
-                    textDecoration: confirmed ? 'line-through' : 'none',
-                  }}>
-                    {confirmed ? '✓ ' : ''}{item.itemName}
-                  </div>
-                  <div style={{ fontFamily: 'var(--font-body)', fontSize: 11, color: FG3, marginTop: 2 }}>
-                    {item.isHighRisk ? (
-                      <span style={{ color: '#EA580C' }}>⚠️ 上次忘带过</span>
-                    ) : item.course ? (
-                      item.course
-                    ) : (
-                      '今天额外'
-                    )}
-                  </div>
-                </div>
-                {!confirmed ? (
-                  <>
-                    <motion.button type="button" whileTap={{ scale: 0.92 }} disabled={busy}
-                      onClick={() => { void handleConfirm(item) }}
-                      className="gc-btn gc-btn--ghost"
-                      style={{ padding: '5px 10px', fontSize: 11, flexShrink: 0 }}>
-                      ✓ 带了
-                    </motion.button>
-                    <motion.button type="button" whileTap={{ scale: 0.92 }} disabled={busy}
-                      onClick={() => { void handleDismiss(item) }}
-                      className="gc-btn gc-btn--ghost"
-                      style={{ padding: '5px 8px', fontSize: 11, flexShrink: 0, color: FG3 }}>
-                      ✗ 不需要
-                    </motion.button>
-                  </>
-                ) : null}
-              </div>
-            )
-          })}
-        </div>
-      )}
-
-      {pendingItems.length > 0 ? (
-        <motion.button type="button" whileTap={{ scale: 0.97 }} disabled={busy}
-          onClick={() => { void handleAllConfirmed() }}
-          className="gc-btn"
-          style={{ width: '100%', marginBottom: 8, padding: '10px' }}>
-          全部带好了
-        </motion.button>
-      ) : null}
-
-      <AnimatePresence>
-        {showAdd ? (
-          <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}
-            style={{ overflow: 'hidden', marginBottom: 8 }}>
-            <input value={addName} onChange={(e) => setAddName(e.target.value)}
-              placeholder="物品名称，如：泳衣"
-              style={{ width: '100%', padding: '10px 12px', borderRadius: 10, fontSize: 13,
-                border: '1px solid rgba(45,50,47,0.1)', background: '#fff',
-                color: FG1, outline: 'none', boxSizing: 'border-box', marginBottom: 6 }} />
-            <select value={addCourse} onChange={(e) => setAddCourse(e.target.value)}
-              style={{ width: '100%', padding: '10px 12px', borderRadius: 10, fontSize: 13,
-                border: '1px solid rgba(45,50,47,0.1)', background: '#fff',
-                color: FG1, marginBottom: 8, boxSizing: 'border-box' }}>
-              {courseOptions.map((o) => (
-                <option key={o.key} value={o.key}>{o.label}</option>
-              ))}
-            </select>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <motion.button type="button" whileTap={{ scale: 0.92 }} disabled={busy} onClick={() => { void submitManualAdd() }}
-                className="gc-btn" style={{ flex: 1, padding: '10px' }}>
-                保存
-              </motion.button>
-              <motion.button type="button" whileTap={{ scale: 0.92 }} onClick={() => { setShowAdd(false); setAddName('') }}
-                className="gc-btn gc-btn--ghost" style={{ padding: '10px 16px' }}>
-                取消
-              </motion.button>
-            </div>
-          </motion.div>
-        ) : null}
-      </AnimatePresence>
-
-      {!showAdd && (
-        <motion.button type="button" whileTap={{ scale: 0.97 }} onClick={() => setShowAdd(true)}
-          style={{ width: '100%', padding: '6px 0', border: 'none', background: 'transparent',
-            color: CLAY, fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
-          + 手动添加
-        </motion.button>
-      )}
-    </div>
+    <SmartPackingPanel
+      childId={childId}
+      userId={userId}
+      items={smartItems}
+      timeline={timeline}
+      onRefresh={onRefresh}
+      variant="full"
+      showManualAdd
+    />
   )
 }
 

@@ -1571,6 +1571,10 @@ export default function BasePage() {
               onOpenChild={handleOpenChild}
               onOpenInput={handleOpenInput}
               onOneTap={handleOneTap}
+              packingChildId={activeKid?.id}
+              packingUserId={userId ?? undefined}
+              smartPacking={smartPacking}
+              onPackingRefresh={reloadSmartPacking}
             />
           </AnimatePresence>
 
@@ -1701,6 +1705,12 @@ export default function BasePage() {
               urgency_level: oneTapTodo.priority === 'red' ? 3 : oneTapTodo.priority === 'orange' ? 2 : 1,
               due_date: oneTapTodo.due_date, status: oneTapTodo.status,
               ai_action_data: oneTapTodo.ai_action_data,
+              source: oneTapTodo.source,
+              priority: oneTapTodo.priority,
+              child_id: oneTapTodo.child_id,
+              requires_action: oneTapTodo.requires_action,
+              amount_thb: oneTapTodo.amount_thb,
+              source_url: oneTapTodo.source_url,
             }}
             userId={userId}
             onClose={() => { setOneTapTodo(null); openModal('todo') }}

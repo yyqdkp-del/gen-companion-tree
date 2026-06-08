@@ -330,7 +330,7 @@ export function smartItemsToPackLines(items: SmartPackingItem[]): { item: string
     .filter((i) => !i.isConfirmed)
     .map((i) => ({
       item: i.itemName,
-      context: i.isHighRisk ? '上次忘带过' : (i.course || undefined),
+      context: i.isHighRisk ? '上次忘了' : (i.course || undefined),
       isHighRisk: i.isHighRisk,
     }))
 }

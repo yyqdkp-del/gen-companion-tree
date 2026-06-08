@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
-import { ChevronRight, MapPin, Check } from 'lucide-react'
+import { ChevronRight, MapPin } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import type { RootBriefing, BriefingItem } from '@/app/_shared/_components/design'
 import {
@@ -12,6 +12,8 @@ import {
   type MomentTheme,
   minutesUntilSchoolEnd,
 } from '@/app/_shared/_engine/momentCard'
+import SmartPackingPanel from '@/app/components/SmartPackingPanel'
+import type { SmartPackingItem } from '@/lib/packing/packingMemory'
 
 const TIER_MIN_H: Record<MomentTier, string> = {
   urgent: 'min(50vh, 420px)',
@@ -38,6 +40,11 @@ type Props = {
   onOpenChild: () => void
   onOpenInput: (prefill?: string) => void
   onOneTap: (todoId: string) => void
+  /** family_packing_memory 统一数据源 */
+  packingChildId?: string
+  packingUserId?: string
+  smartPacking?: SmartPackingItem[]
+  onPackingRefresh?: () => void | Promise<void>
 }
 
 function CornerHint({ icon: Icon }: { icon: LucideIcon }) {
@@ -164,32 +171,17 @@ function AfterSchoolBody({ data }: { data: MomentCardData }) {
 
 function PackingBody({
   data,
-  onPackReady,
+  packingChildId,
+  packingUserId,
+  smartPacking,
+  onPackingRefresh,
 }: {
   data: MomentCardData
-  onPackReady: () => void
+  packingChildId?: string
+  packingUserId?: string
+  smartPacking?: SmartPackingItem[]
+  onPackingRefresh?: () => void | Promise<void>
 }) {
-  const [checked, setChecked] = useState<Set<string>>(() => new Set())
-  const [celebrating, setCelebrating] = useState(false)
-
-  const toggleItem = (key: string) => {
-    setChecked((prev) => {
-      const next = new Set(prev)
-      if (next.has(key)) next.delete(key)
-      else next.add(key)
-      return next
-    })
-  }
-
-  const handleAllReady = (e: React.MouseEvent) => {
-    e.stopPropagation()
-    if (celebrating) return
-    setCelebrating(true)
-    window.setTimeout(() => {
-      onPackReady()
-    }, 1200)
-  }
-
   return (
     <>
       <h2
@@ -204,107 +196,35 @@ function PackingBody({
       >
         {data.title}
       </h2>
-      {data.bullets && data.bullets.length > 0 ? (
+      {packingChildId && packingUserId && smartPacking && onPackingRefresh ? (
+        <div style={{ marginTop: 14 }} onClick={(e) => e.stopPropagation()}>
+          <SmartPackingPanel
+            childId={packingChildId}
+            userId={packingUserId}
+            items={smartPacking}
+            onRefresh={onPackingRefresh}
+            variant="compact"
+            showManualAdd={false}
+          />
+        </div>
+      ) : data.bullets && data.bullets.length > 0 ? (
         <ul style={{ margin: '16px 0 0', padding: 0, listStyle: 'none' }}>
-          {data.bullets.map((b) => {
-            const key = `${b.item}-${b.context || ''}`
-            const done = checked.has(key)
-            return (
-              <li key={key} style={{ marginBottom: 12 }}>
-                <button
-                  type="button"
-                  onClick={() => toggleItem(key)}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'flex-start',
-                    gap: 10,
-                    width: '100%',
-                    background: 'none',
-                    border: 'none',
-                    padding: 0,
-                    cursor: 'pointer',
-                    textAlign: 'left',
-                    fontFamily: 'inherit',
-                  }}
-                >
-                  <span
-                    style={{
-                      width: 20,
-                      height: 20,
-                      borderRadius: 6,
-                      border: done ? 'none' : '1.5px solid rgba(164,99,85,0.45)',
-                      background: done ? 'var(--clay)' : 'transparent',
-                      flexShrink: 0,
-                      marginTop: 2,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      transition: 'background 200ms ease, border-color 200ms ease',
-                    }}
-                  >
-                    {done ? <Check size={12} color="#fff" strokeWidth={3} /> : null}
-                  </span>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div
-                      style={{
-                        fontFamily: 'var(--font-serif)',
-                        fontSize: 15,
-                        color: done ? 'var(--fg3)' : b.isHighRisk ? '#EA580C' : '#2d322f',
-                        lineHeight: 1.45,
-                        textDecoration: done ? 'line-through' : 'none',
-                        transition: 'color 200ms ease',
-                      }}
-                    >
-                      {b.item}
-                    </div>
-                    {b.isHighRisk ? (
-                      <div
-                        style={{
-                          fontFamily: 'var(--font-body)',
-                          fontSize: 11,
-                          color: '#EA580C',
-                          marginTop: 2,
-                        }}
-                      >
-                        ⚠️ 上次忘带过
-                      </div>
-                    ) : b.context ? (
-                      <div
-                        style={{
-                          fontFamily: 'var(--font-body)',
-                          fontSize: 11,
-                          color: 'var(--fg3)',
-                          marginTop: 2,
-                          textDecoration: done ? 'line-through' : 'none',
-                        }}
-                      >
-                        {b.context}
-                      </div>
-                    ) : null}
-                  </div>
-                </button>
-              </li>
-            )
-          })}
+          {data.bullets.map((b) => (
+            <li key={`${b.item}-${b.context || ''}`} style={{ marginBottom: 10 }}>
+              <div style={{ fontFamily: 'var(--font-serif)', fontSize: 15, color: '#2d322f' }}>
+                {b.item}
+              </div>
+              {b.isHighRisk ? (
+                <div style={{ fontSize: 11, color: '#EA580C', marginTop: 2, fontWeight: 600 }}>
+                  上次忘了
+                </div>
+              ) : b.context ? (
+                <div style={{ fontSize: 11, color: 'var(--fg3)', marginTop: 2 }}>{b.context}</div>
+              ) : null}
+            </li>
+          ))}
         </ul>
       ) : null}
-      <div style={{ marginTop: 'auto', paddingTop: 18 }}>
-        <motion.button
-          type="button"
-          className="gc-btn gc-btn--ghost"
-          whileTap={{ scale: 0.97 }}
-          onClick={handleAllReady}
-          animate={
-            celebrating
-              ? { backgroundColor: '#4a9b6e', color: '#fff', borderColor: '#4a9b6e' }
-              : { backgroundColor: 'transparent', color: 'var(--clay-deep)', borderColor: 'rgba(164,99,85,0.35)' }
-          }
-          transition={{ duration: 0.2, ease: 'easeOut' }}
-          style={{ width: '100%' }}
-        >
-          {celebrating ? '太棒了！' : '✓ 都准备好了'}
-        </motion.button>
-      </div>
     </>
   )
 }
@@ -526,6 +446,10 @@ export default function MomentCard({
   onOpenChild,
   onOpenInput,
   onOneTap,
+  packingChildId,
+  packingUserId,
+  smartPacking,
+  onPackingRefresh,
 }: Props) {
   const [hovered, setHovered] = useState(false)
   const eyebrow = data.eyebrow || '根对此刻的感知'
@@ -625,7 +549,10 @@ export default function MomentCard({
       ) : isPacking ? (
         <PackingBody
           data={data}
-          onPackReady={() => onAction({ type: 'pack_ready' })}
+          packingChildId={packingChildId}
+          packingUserId={packingUserId}
+          smartPacking={smartPacking}
+          onPackingRefresh={onPackingRefresh}
         />
       ) : isPickup ? (
         <PickupBody data={data} now={now} />

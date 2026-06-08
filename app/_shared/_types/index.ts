@@ -113,6 +113,11 @@ export type TodoItem = {
   delegated_to?: string
   status: string
   ai_action_data?: any
+  source?: string | null
+  child_id?: string | null
+  requires_action?: boolean | null
+  amount_thb?: number | null
+  source_url?: string | null
   _isTemp?: boolean
 }
 

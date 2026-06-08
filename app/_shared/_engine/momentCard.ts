@@ -527,7 +527,7 @@ export function buildMomentCard(p: BuildMomentParams): MomentCardData {
   if (hour >= 6 && hour < 9 && pendingSmartPack.length > 0 && !p.packReadyDismissed) {
     const bullets: PackLine[] = pendingSmartPack.map((i) => ({
       item: i.itemName,
-      context: i.isHighRisk ? '上次忘带过' : (i.course || undefined),
+      context: i.isHighRisk ? '上次忘了' : (i.course || undefined),
       isHighRisk: i.isHighRisk,
     }))
     return {
@@ -538,20 +538,6 @@ export function buildMomentCard(p: BuildMomentParams): MomentCardData {
       kidName,
       title: `${kidName} 的装备清单`,
       bullets,
-      primaryAction: { label: '✓ 都准备好了', action: { type: 'pack_ready' } },
-    }
-  }
-
-  const packLines = buildPackLines(p.todayClasses)
-  if (hour >= 6 && hour < 9 && packLines.length > 0 && !p.packReadyDismissed) {
-    return {
-      kind: 'packing',
-      tier: 'important',
-      theme: 'neutral',
-      eyebrow: '今天要带',
-      kidName,
-      title: `${kidName} 的装备清单`,
-      bullets: packLines,
       primaryAction: { label: '✓ 都准备好了', action: { type: 'pack_ready' } },
     }
   }

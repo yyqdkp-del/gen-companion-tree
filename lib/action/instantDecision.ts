@@ -21,6 +21,17 @@ export function getDaysLeftForTodo(dueDate?: string | null): number | null {
   return Math.ceil((due.getTime() - today.getTime()) / 86400000)
 }
 
+export function detectDimensionFromTitle(title: string): string {
+  if (!title) return 'education'
+  const t = title.toLowerCase()
+  if (t.match(/航班|flight|行程|机场|中转|值机|mu\d|ca\d/)) return 'mobility'
+  if (t.match(/学费|缴费|账单|payment|fee/)) return 'wealth'
+  if (t.match(/签证|visa|移民|immigration|tm\d/)) return 'compliance'
+  if (t.match(/生病|发烧|请假|sick|医院/)) return 'medical'
+  if (t.match(/机场|送.*机场|接.*机场/)) return 'mobility'
+  return 'education'
+}
+
 function buildLeaveEmail(child: InstantChild): string {
   const today = new Date().toLocaleDateString('en-US', {
     weekday: 'long',
@@ -185,7 +196,7 @@ export function buildInstantResponse(
   child: InstantChild | null,
   exchange: PlannerExchangeRate | null,
 ): RootDecision {
-  const dimension = String(todo.category || 'education')
+  const dimension = String(todo.category || detectDimensionFromTitle(String(todo.title || '')))
   const daysLeft = getDaysLeftForTodo(todo.due_date as string | undefined)
   const understand = buildInstantUnderstand(todo, child, daysLeft)
   const insight = buildInstantInsight(todo, dimension, exchange, daysLeft)
