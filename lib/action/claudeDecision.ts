@@ -709,4 +709,163 @@ export async function makeDecision(context: FamilyContext): Promise<RootDecision
   return resolveTemplates(decision, context)
 }
 
+function parseFastAction(raw: unknown, index: number): RootAction | null {
+  if (!raw || typeof raw !== 'object') return null
+  const a = raw as Record<string, unknown>
+  const executor = a.executor as RootAction['executor'] | undefined
+  if (!executor?.service) return null
+
+  return {
+    id: String(a.id || `action_${index}`),
+    label: String(a.label || '执行'),
+    type: a.type === 'secondary' ? 'secondary' : 'primary',
+    executor,
+    requiresConfirm: a.requiresConfirm === true,
+    confirmMessage: a.confirmMessage ? String(a.confirmMessage) : undefined,
+  }
+}
+
+function normalizeFastDecision(raw: RootDecision, context: FamilyContext): RootDecision {
+  const decision = validateDecision(raw)
+  decision.actions = (Array.isArray(raw.actions) ? raw.actions : [])
+    .map(parseFastAction)
+    .filter((a): a is RootAction => !!a)
+  decision.prepared = (Array.isArray(raw.prepared) ? raw.prepared : [])
+    .map(parsePrepared)
+    .filter(hasPreparedContent)
+
+  if (decision.actions.length === 0) {
+    decision.actions.push({
+      id: 'complete_todo',
+      label: '标记完成',
+      type: 'primary',
+      requiresConfirm: false,
+      executor: {
+        service: 'internal',
+        method: 'complete_todo',
+        params: { todoId: context.todo.id },
+      },
+    })
+  }
+
+  return decision
+}
+
+/** 单轮 Claude，无工具调用 — deep-analyze 快速路径（目标 30s 内） */
+export async function makeDecisionFast(context: FamilyContext): Promise<RootDecision> {
+  const apiKey = process.env.ANTHROPIC_API_KEY
+  if (!apiKey) throw new Error('ANTHROPIC_API_KEY 未配置')
+
+  const dimension = detectDimension(context.todo, context)
+  const dimensionPrompt = buildDimensionPrompt(dimension)
+  const cityLabel = context.mom.city || context.mom.country || '当地'
+
+  const systemPrompt = `你是「根」，帮助海外华人妈妈处理家庭事务。
+
+${dimensionPrompt}
+
+【严格规则】
+1. 只返回 JSON，不要任何其他文字
+2. 电话/地址用通用表述或留空，不能编造具体号码
+3. 用温暖中文，邮件草稿用英文
+4. 一次输出完整方案，不需要多轮
+
+用户位置：${cityLabel}
+识别场景：${dimension}
+
+【输出格式】
+{
+  "understanding": {
+    "situation": "2句话说清楚这件事",
+    "urgency": "critical|urgent|normal|low",
+    "emotion": "妈妈此刻的情绪",
+    "keyFacts": ["最重要的3个事实"]
+  },
+  "prepared": [
+    {
+      "type": "checklist|draft|phrase|info",
+      "label": "标题",
+      "content": "实际内容文字，不能为空",
+      "copyable": true,
+      "source": "ai_generated",
+      "disclaimer": ""
+    }
+  ],
+  "actions": [
+    {
+      "id": "唯一ID",
+      "label": "按钮文案（6字以内）",
+      "type": "primary|secondary",
+      "executor": {
+        "service": "gmail|calendar|url|grab|tel|internal",
+        "method": "open|create_draft|complete_todo",
+        "params": {}
+      },
+      "requiresConfirm": false
+    }
+  ],
+  "message": {
+    "headline": "一句话总结",
+    "detail": "详细说明",
+    "reassurance": "让妈妈安心的话"
+  },
+  "completion": {
+    "message": "完成后说什么",
+    "nextStep": ""
+  }
+}`
+
+  const daysLeft = context.todo.daysLeft
+  const daysLabel = daysLeft != null && daysLeft >= 0 ? `${daysLeft}天后` : '无截止日期'
+
+  const userMessage = `妈妈在：${context.mom.city}，${context.mom.country}
+孩子：${context.child.name}，${context.child.grade}，${context.child.school}
+待办：${context.todo.title}
+截止：${daysLabel}
+维度：${context.todo.dimension}
+天气：${context.realtime.weather?.condition || '未知'}${context.realtime.weather?.hasRain ? '，有雨' : ''}
+现在：${context.realtime.dayOfWeek} ${context.realtime.currentHour}点
+
+请生成完整方案，只返回JSON。`
+
+  const response = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01',
+    },
+    body: JSON.stringify({
+      model: AI_MODELS.claude.default,
+      max_tokens: 2000,
+      system: systemPrompt,
+      messages: [{ role: 'user', content: userMessage }],
+    }),
+  })
+
+  if (!response.ok) {
+    const errText = await response.text().catch(() => '')
+    throw new Error(`Claude API 错误: ${response.status} ${errText.slice(0, 200)}`)
+  }
+
+  const data = await response.json() as {
+    content?: Array<{ type: string; text?: string }>
+  }
+  const text = data.content?.find((b) => b.type === 'text')?.text || ''
+
+  console.log('[makeDecisionFast] response length', text.length)
+
+  try {
+    const clean = text.replace(/```json|```/g, '').trim()
+    const match = clean.match(/\{[\s\S]*\}/)
+    if (!match) throw new Error('no json')
+    const parsed = JSON.parse(match[0]) as RootDecision
+    const decision = normalizeFastDecision(parsed, context)
+    return resolveTemplates({ ...decision, isPartial: false }, context)
+  } catch {
+    console.error('[makeDecisionFast] parse error', text.slice(0, 200))
+    return resolveTemplates(buildFallbackDecision(context), context)
+  }
+}
+
 export { buildTemplateVars, resolveTemplates }
