@@ -37,10 +37,15 @@ function StepSchool({ data, onChange, schools }: { data: any; onChange: (d: any)
   const childId = typeof params?.id === 'string' && params.id !== 'new' ? params.id : null
   const lastSyncKeyRef = useRef('')
 
-  const triggerCalendarSync = useCallback((schoolName: string, grade: string) => {
+  const triggerCalendarSync = useCallback((
+    schoolName: string,
+    grade: string,
+    schoolWebsite?: string,
+  ) => {
     const name = schoolName.trim()
     if (!childId || !name) return
-    const syncKey = `${childId}:${name}`
+    const website = (schoolWebsite || '').trim()
+    const syncKey = `${childId}:${name}:${website}`
     if (lastSyncKeyRef.current === syncKey) return
     lastSyncKeyRef.current = syncKey
 
@@ -50,6 +55,7 @@ function StepSchool({ data, onChange, schools }: { data: any; onChange: (d: any)
       body: JSON.stringify({
         childId,
         schoolName: name,
+        schoolWebsite: website || undefined,
         grade: grade || '',
       }),
     }).catch(() => {
@@ -68,7 +74,7 @@ function StepSchool({ data, onChange, schools }: { data: any; onChange: (d: any)
     }
     onChange(next)
     if (schoolId && schoolId !== 'other' && schoolName) {
-      triggerCalendarSync(schoolName, next.grade || '')
+      triggerCalendarSync(schoolName, next.grade || '', data.school_website)
     }
   }
 
@@ -93,11 +99,24 @@ function StepSchool({ data, onChange, schools }: { data: any; onChange: (d: any)
           onChange={v => onChange({ ...data, school: v, school_name: v })}
           onBlur={() => {
             const name = (data.school || data.school_name || '').trim()
-            if (name) triggerCalendarSync(name, data.grade || '')
+            if (name) triggerCalendarSync(name, data.grade || '', data.school_website)
           }}
           placeholder="输入学校全名"
         />
       )}
+
+      <Field
+        label="学校官网（选填）"
+        type="url"
+        value={data.school_website || ''}
+        onChange={v => onChange({ ...data, school_website: v })}
+        onBlur={() => {
+          const website = (data.school_website || '').trim()
+          const name = (data.school_name || data.school || '').trim()
+          if (website && name) triggerCalendarSync(name, data.grade || '', website)
+        }}
+        placeholder="学校官网（选填，如 https://www.nis.ac.th）"
+      />
 
       <SelectField label="年级" value={data.grade || ''} onChange={v => onChange({ ...data, grade: v })}
         options={[

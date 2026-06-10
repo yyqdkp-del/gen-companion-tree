@@ -95,7 +95,7 @@ function ChildEditContent() {
     passport_number: '', passport_expiry: '', nationality: '',
   })
   const [schoolData, setSchoolData] = useState({
-    school_id: '', school: '', school_name: '', grade: '',
+    school_id: '', school: '', school_name: '', school_website: '', grade: '',
     school_start_time: '', school_end_time: '', transport_method: '',
   })
   const [scheduleData, setScheduleData] = useState({
@@ -130,7 +130,8 @@ function ChildEditContent() {
   const triggerSchoolCalendarSync = useCallback((childId: string, uid: string) => {
     const school_name = (schoolData.school_name || schoolData.school || '').trim()
     if (!school_name) return
-    const syncKey = `${childId}:${school_name}`
+    const school_website = (schoolData.school_website || '').trim()
+    const syncKey = `${childId}:${school_name}:${school_website}`
     if (lastSchoolSyncKeyRef.current === syncKey) return
     lastSchoolSyncKeyRef.current = syncKey
 
@@ -140,13 +141,17 @@ function ChildEditContent() {
       body: JSON.stringify({
         childId,
         schoolName: school_name,
+        schoolWebsite: school_website || undefined,
         grade: schoolData.grade || '',
       }),
     })
       .then(async (res) => {
         const data = await res.json().catch(() => ({}))
         if (res.ok && (data.ok || data.success)) {
-          toast('校历已更新', 'success')
+          const msg = typeof data.message === 'string' && data.message
+            ? data.message
+            : '校历已更新'
+          toast(msg, data.events === 0 ? 'info' : 'success')
         } else {
           toast('校历同步失败，可稍后重试', 'error')
         }
@@ -154,7 +159,7 @@ function ChildEditContent() {
       .catch(() => {
         toast('校历同步失败，可稍后重试', 'error')
       })
-  }, [schoolData.school_name, schoolData.school, schoolData.grade])
+  }, [schoolData.school_name, schoolData.school, schoolData.school_website, schoolData.grade])
 
   useEffect(() => {
     loadSchools()
@@ -230,6 +235,7 @@ function ChildEditContent() {
       school_id: schoolId,
       school: child.school || child.school_name || '',
       school_name: child.school_name || child.school || '',
+      school_website: (child as { school_website?: string | null }).school_website || '',
       grade: child.grade || '',
       school_start_time: child.school_start_time || '',
       school_end_time: child.school_end_time || '',
@@ -282,6 +288,7 @@ function ChildEditContent() {
           nationality: basicData.nationality.trim() || null,
           school: schoolData.school,
           school_name: schoolData.school_name || schoolData.school,
+          school_website: schoolData.school_website.trim() || null,
           grade: schoolData.grade,
           school_start_time: schoolData.school_start_time || null,
           school_end_time: schoolData.school_end_time || null,
@@ -348,6 +355,7 @@ function ChildEditContent() {
         const updatePayload = {
           school: schoolData.school,
           school_name: schoolData.school_name || schoolData.school,
+          school_website: schoolData.school_website.trim() || null,
           grade: schoolData.grade,
           school_start_time: schoolData.school_start_time || null,
           school_end_time: schoolData.school_end_time || null,
@@ -498,6 +506,7 @@ function ChildEditContent() {
         nationality: basicData.nationality.trim() || null,
         school: schoolData.school,
         school_name: schoolData.school_name || schoolData.school,
+        school_website: schoolData.school_website.trim() || null,
         grade: schoolData.grade,
         school_start_time: schoolData.school_start_time || null,
         school_end_time: schoolData.school_end_time || null,

@@ -7,17 +7,11 @@ import { geminiGenerateContentUrl } from '@/lib/ai/models'
 
 const GEMINI_URL = geminiGenerateContentUrl()
 
-type CalendarRow = {
+type CalendarEvent = {
   title: string
   date_start: string
   date_end?: string
-  type?: string
-}
-
-type ActivityRow = {
-  title: string
-  date?: string
-  description?: string
+  event_type?: string
 }
 
 function getServiceSupabase() {
@@ -25,18 +19,6 @@ function getServiceSupabase() {
     process.env.NEXT_PUBLIC_SUPABASE_URL || '',
     process.env.SUPABASE_SERVICE_ROLE_KEY || '',
   )
-}
-
-function parseJsonArray<T>(raw: string): T[] | null {
-  const cleaned = raw.replace(/```json|```/g, '').trim()
-  const match = cleaned.match(/\[[\s\S]*\]/)
-  if (!match) return null
-  try {
-    const parsed = JSON.parse(match[0])
-    return Array.isArray(parsed) ? parsed : null
-  } catch {
-    return null
-  }
 }
 
 function normalizeDate(v: unknown): string | null {
@@ -48,18 +30,59 @@ function normalizeDate(v: unknown): string | null {
   return s
 }
 
-async function callGeminiSearch(prompt: string): Promise<string> {
+function normalizeEventType(raw: unknown): string {
+  const t = typeof raw === 'string' ? raw.trim().toLowerCase() : ''
+  if (t === 'term' || t === 'holiday' || t === 'exam' || t === 'activity') return t
+  if (t === 'event') return 'activity'
+  return 'activity'
+}
+
+function parseEventsJson(text: string): CalendarEvent[] {
+  const cleaned = text.replace(/```json|```/g, '').trim()
+  const objectMatch = cleaned.match(/\{[\s\S]*\}/)
+  if (objectMatch) {
+    try {
+      const parsed = JSON.parse(objectMatch[0])
+      if (Array.isArray(parsed.events)) return parsed.events
+    } catch {
+      /* fall through */
+    }
+  }
+  const arrayMatch = cleaned.match(/\[[\s\S]*\]/)
+  if (arrayMatch) {
+    try {
+      const parsed = JSON.parse(arrayMatch[0])
+      if (Array.isArray(parsed)) return parsed
+    } catch {
+      /* ignore */
+    }
+  }
+  return []
+}
+
+async function callGemini(
+  prompt: string,
+  opts?: { search?: boolean; maxOutputTokens?: number; timeoutMs?: number },
+): Promise<string> {
   const key = process.env.GOOGLE_AI_API_KEY
   if (!key) throw new Error('GOOGLE_AI_API_KEY not configured')
+
+  const body: Record<string, unknown> = {
+    contents: [{ parts: [{ text: prompt }] }],
+    generationConfig: {
+      temperature: 0,
+      maxOutputTokens: opts?.maxOutputTokens ?? 1000,
+    },
+  }
+  if (opts?.search) {
+    body.tools = [{ google_search: {} }]
+  }
 
   const res = await fetch(`${GEMINI_URL}?key=${key}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      contents: [{ parts: [{ text: prompt }] }],
-      tools: [{ google_search: {} }],
-      generationConfig: { temperature: 0.2 },
-    }),
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(opts?.timeoutMs ?? 30000),
   })
 
   const data = await res.json().catch(() => ({}))
@@ -72,6 +95,85 @@ async function callGeminiSearch(prompt: string): Promise<string> {
   return parts.map((p: { text?: string }) => p.text || '').join('\n').trim()
 }
 
+async function fetchCalendarFromWebsite(
+  websiteUrl: string,
+  schoolName: string,
+): Promise<CalendarEvent[]> {
+  let url = websiteUrl.trim()
+  if (!url) return []
+  if (!/^https?:\/\//i.test(url)) {
+    url = `https://${url}`
+  }
+
+  let html = ''
+  try {
+    const pageResponse = await fetch(url, {
+      signal: AbortSignal.timeout(10000),
+      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; GenCompanionTree/1.0)' },
+    })
+    if (!pageResponse.ok) return []
+    html = await pageResponse.text()
+  } catch (e) {
+    console.warn('[sync-calendar] website fetch failed', e)
+    return []
+  }
+
+  const prompt = `从以下学校网页内容中提取2026年校历信息。
+
+学校：${schoolName}
+网页内容（部分）：
+${html.slice(0, 5000)}
+
+只提取以下类型的日期：
+- 学期开始/结束日期（term）
+- 放假日期（holiday）
+- 考试周（exam）
+- 重要活动（activity，如家长会、毕业典礼）
+
+不要提取：
+- 每周课程安排
+- 课外活动时间表
+- 日常作息时间
+
+返回JSON：
+{
+  "events": [
+    {
+      "title": "事件名称（中文）",
+      "date_start": "YYYY-MM-DD",
+      "date_end": "YYYY-MM-DD",
+      "event_type": "term|holiday|exam|activity"
+    }
+  ]
+}
+
+如果网页没有校历信息，返回 {"events": []}`
+
+  try {
+    const text = await callGemini(prompt, { maxOutputTokens: 1000 })
+    return parseEventsJson(text)
+  } catch (e) {
+    console.warn('[sync-calendar] website Gemini parse failed', e)
+    return []
+  }
+}
+
+async function searchCalendarOnline(schoolName: string): Promise<CalendarEvent[]> {
+  const prompt = `Search: "${schoolName}" academic calendar 2026 term dates holidays Thailand
+
+Return JSON only with school term dates, holidays, exam periods.
+Format: {"events": [{"title": "...", "date_start": "YYYY-MM-DD", "date_end": "YYYY-MM-DD", "event_type": "term|holiday|exam|activity"}]}
+If not found: {"events": []}`
+
+  try {
+    const text = await callGemini(prompt, { search: true, maxOutputTokens: 800, timeoutMs: 15000 })
+    return parseEventsJson(text)
+  } catch (e) {
+    console.warn('[sync-calendar] search Gemini failed', e)
+    return []
+  }
+}
+
 export async function POST(req: NextRequest) {
   try {
     const { user, error: authError } = await getAuthUser(req)
@@ -80,25 +182,21 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json().catch(() => ({}))
-    const child_id = String(body.childId || body.child_id || '').trim()
-    const school_name = String(body.schoolName || body.school_name || '').trim()
-    const grade = typeof body.grade === 'string' ? body.grade.trim() : ''
+    const childId = String(body.childId || body.child_id || '').trim()
+    const schoolName = String(body.schoolName || body.school_name || '').trim()
+    const schoolWebsite = String(body.schoolWebsite || body.school_website || '').trim()
 
-    if (!school_name) {
-      return NextResponse.json({ ok: false, error: 'no school name' })
+    if (!childId || !schoolName) {
+      return NextResponse.json({ ok: false, error: 'missing params' })
     }
 
-    if (!child_id) {
-      return NextResponse.json({ ok: false, error: 'Missing childId' })
-    }
-
-    const user_id = user.id
     const supabase = getServiceSupabase()
+    const user_id = user.id
 
     const { data: child } = await supabase
       .from('children')
-      .select('id, grade')
-      .eq('id', child_id)
+      .select('id, grade, school_website')
+      .eq('id', childId)
       .eq('user_id', user_id)
       .maybeSingle()
 
@@ -106,53 +204,45 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: false, error: 'Child not found' }, { status: 404 })
     }
 
-    const gradeHint = (grade || child.grade) ? `，年级：${grade || child.grade}` : ''
+    const website = schoolWebsite || child.school_website || ''
 
-    const calendarPrompt = `搜索 "${school_name}" 学校官方网站，找出：
-1. 当前学年学期开始/结束日期
-2. 所有公共假期和学校假期
-3. 考试周日期
-4. 家长日/开放日
-请先判断学校所在国家和城市，用当地语言+英文搜索。${gradeHint}
-只返回 JSON 数组，不要 markdown，每项：{ "title": string, "date_start": "YYYY-MM-DD", "date_end": "YYYY-MM-DD", "type": "holiday"|"exam"|"event"|"term" }`
+    console.log('[sync-calendar] start', schoolName, website || 'no website')
 
-    const activitiesPrompt = `搜索 "${school_name}" 近30天内发布的学校活动和通知，包括：
-运动会、表演、募捐、家长会、校外活动。${gradeHint}
-只返回 JSON 数组，不要 markdown，每项：{ "title": string, "date": "YYYY-MM-DD", "description": string }`
+    let events: CalendarEvent[] = []
 
-    const [calendarRaw, activitiesRaw] = await Promise.all([
-      callGeminiSearch(calendarPrompt),
-      callGeminiSearch(activitiesPrompt),
-    ])
-
-    const calendarParsed = parseJsonArray<CalendarRow>(calendarRaw)
-    const activitiesParsed = parseJsonArray<ActivityRow>(activitiesRaw)
-
-    if (!calendarParsed && !activitiesParsed) {
-      console.error('sync-school-calendar: failed to parse Gemini JSON', {
-        calendarRaw: calendarRaw.slice(0, 500),
-        activitiesRaw: activitiesRaw.slice(0, 500),
-      })
-      return NextResponse.json({ ok: false, error: 'Failed to parse Gemini response' })
+    if (website) {
+      events = await fetchCalendarFromWebsite(website, schoolName)
+      console.log('[sync-calendar] from website:', events.length, 'events')
     }
 
-    const calendarRows = (calendarParsed || [])
-      .map((row) => {
-        const title = typeof row.title === 'string' ? row.title.trim() : ''
-        const date_start = normalizeDate(row.date_start)
+    if (events.length === 0) {
+      events = await searchCalendarOnline(schoolName)
+      console.log('[sync-calendar] from search:', events.length, 'events')
+    }
+
+    if (events.length === 0) {
+      return NextResponse.json({
+        ok: true,
+        success: true,
+        events: 0,
+        message: '暂未找到校历，请在学校官网查询后手动添加',
+      })
+    }
+
+    const validEvents = events
+      .map((e) => {
+        const title = typeof e.title === 'string' ? e.title.trim() : ''
+        const date_start = normalizeDate(e.date_start)
         if (!title || !date_start) return null
-        const date_end = normalizeDate(row.date_end) || date_start
-        const event_type = ['holiday', 'exam', 'event', 'term'].includes(row.type || '')
-          ? row.type
-          : 'event'
+        const date_end = normalizeDate(e.date_end) || date_start
         return {
-          child_id,
+          child_id: childId,
           user_id,
           title,
           date_start,
           date_end,
-          event_type,
-          source: 'school_auto_sync',
+          event_type: normalizeEventType(e.event_type),
+          source: website ? 'school_website' : 'auto_search',
         }
       })
       .filter(Boolean) as {
@@ -165,104 +255,59 @@ export async function POST(req: NextRequest) {
         source: string
       }[]
 
-    let calendar_count = 0
-    if (calendarRows.length) {
-      const dateStarts = [...new Set(calendarRows.map((r) => r.date_start))]
-      const { data: existingRows, error: existingError } = await supabase
-        .from('child_school_calendar')
-        .select('date_start, title')
-        .eq('child_id', child_id)
-        .in('date_start', dateStarts)
-
-      if (existingError) {
-        console.error('sync-school-calendar: calendar lookup', existingError.message)
-        return NextResponse.json({ ok: false, error: existingError.message })
-      }
-
-      const existingKeys = new Set(
-        (existingRows || []).map((r) => `${r.date_start}\0${r.title}`),
-      )
-      const toInsert = calendarRows.filter(
-        (r) => !existingKeys.has(`${r.date_start}\0${r.title}`),
-      )
-
-      if (toInsert.length) {
-        const { data: inserted, error: calError } = await supabase
-          .from('child_school_calendar')
-          .insert(toInsert)
-          .select('id')
-
-        if (calError) {
-          console.error('sync-school-calendar: calendar insert', calError.message)
-          return NextResponse.json({ ok: false, error: calError.message })
-        }
-        calendar_count = inserted?.length ?? toInsert.length
-      }
+    if (!validEvents.length) {
+      return NextResponse.json({
+        ok: true,
+        success: true,
+        events: 0,
+        message: '暂未找到校历，请在学校官网查询后手动添加',
+      })
     }
 
-    const todoRows = (activitiesParsed || [])
-      .map((row) => {
-        const title = typeof row.title === 'string' ? row.title.trim() : ''
-        const due_date = normalizeDate(row.date)
-        if (!title || !due_date) return null
-        const description = typeof row.description === 'string' ? row.description.trim() : ''
-        return {
-          user_id,
-          child_id,
-          title,
-          due_date,
-          description: description || null,
-          source: 'school_auto',
-          status: 'pending',
-          priority: 'yellow',
-          category: 'education',
-        }
-      })
-      .filter(Boolean) as {
-        user_id: string
-        child_id: string
-        title: string
-        due_date: string
-        description: string | null
-        source: string
-        status: string
-        priority: string
-        category: string
-      }[]
+    const dateStarts = [...new Set(validEvents.map((e) => e.date_start))]
+    const { data: existingRows, error: existingError } = await supabase
+      .from('child_school_calendar')
+      .select('date_start, title')
+      .eq('child_id', childId)
+      .in('date_start', dateStarts)
 
-    let todo_count = 0
-    if (todoRows.length) {
-      const { data: inserted, error: todoError } = await supabase
-        .from('todo_items')
-        .insert(todoRows)
+    if (existingError) {
+      console.error('[sync-calendar] lookup failed', existingError.message)
+      return NextResponse.json({ ok: false, error: existingError.message })
+    }
+
+    const existingKeys = new Set(
+      (existingRows || []).map((r) => `${r.date_start}\0${r.title}`),
+    )
+    const toInsert = validEvents.filter(
+      (e) => !existingKeys.has(`${e.date_start}\0${e.title}`),
+    )
+
+    let count = 0
+    if (toInsert.length) {
+      const { data: inserted, error: insertError } = await supabase
+        .from('child_school_calendar')
+        .insert(toInsert)
         .select('id')
 
-      if (todoError) {
-        console.error('sync-school-calendar: todo insert', todoError.message)
-        return NextResponse.json({
-          ok: true,
-          success: true,
-          events: calendar_count,
-          calendar_count,
-          todo_count: 0,
-          warning: todoError.message,
-        })
+      if (insertError) {
+        console.error('[sync-calendar] insert failed', insertError.message)
+        return NextResponse.json({ ok: false, error: insertError.message })
       }
-      todo_count = inserted?.length ?? todoRows.length
+      count = inserted?.length ?? toInsert.length
     }
 
-    const events = calendar_count + todo_count
+    console.log('[sync-calendar] saved', count, 'events')
 
     return NextResponse.json({
       ok: true,
       success: true,
-      events,
-      calendar_count,
-      todo_count,
+      events: count,
+      message: count > 0 ? `已同步 ${count} 个校历事件` : '校历已是最新，无新增事件',
     })
   } catch (e: unknown) {
     const message = e instanceof Error ? e.message : 'Unknown error'
-    console.error('sync-school-calendar:', message)
+    console.error('[sync-calendar]', message)
     return NextResponse.json({ ok: false, error: message })
   }
 }
