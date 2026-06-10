@@ -161,7 +161,7 @@ export async function POST(req: NextRequest) {
 
     if (events.length === 0 && schoolProfile) {
       console.log('[sync-calendar] generating default calendar for', schoolProfile.curriculum)
-      events = generateDefaultCalendar(schoolProfile, CALENDAR_YEAR)
+      events = generateDefaultCalendar(schoolProfile)
       usedDefault = events.length > 0
     }
 
@@ -208,6 +208,19 @@ export async function POST(req: NextRequest) {
         event_type: string
         source: string
       }[]
+
+    if (source === 'auto_generated') {
+      const { error: deleteError } = await supabase
+        .from('child_school_calendar')
+        .delete()
+        .eq('child_id', childId)
+        .eq('source', 'auto_generated')
+
+      if (deleteError) {
+        console.error('[sync-calendar] cleanup failed', deleteError.message)
+        return NextResponse.json({ ok: false, error: deleteError.message })
+      }
+    }
 
     const dateStarts = [...new Set(validEvents.map((e) => e.date_start))]
     const { data: existingRows, error: existingError } = await supabase

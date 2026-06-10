@@ -192,34 +192,49 @@ export type CalendarEventRow = {
 
 export function generateDefaultCalendar(
   profile: SchoolProfile,
-  year: number,
+  _baseYear?: number,
 ): CalendarEventRow[] {
+  const now = new Date()
+  const currentMonth = now.getMonth() + 1
+  const currentYear = now.getFullYear()
+
   if (profile.curriculum === 'american') {
+    const schoolYearStart = currentMonth >= 8 ? currentYear : currentYear - 1
+    const y = schoolYearStart
+
     return [
-      { title: '第一学期开始', date_start: `${year}-08-15`, date_end: `${year}-08-15`, event_type: 'term' },
-      { title: '感恩节假期', date_start: `${year}-11-26`, date_end: `${year}-11-28`, event_type: 'holiday' },
-      { title: '圣诞假期开始', date_start: `${year}-12-20`, date_end: `${year + 1}-01-04`, event_type: 'holiday' },
-      { title: '第二学期开始', date_start: `${year + 1}-01-05`, date_end: `${year + 1}-01-05`, event_type: 'term' },
-      { title: '春假', date_start: `${year + 1}-03-28`, date_end: `${year + 1}-04-05`, event_type: 'holiday' },
-      { title: '学年结束', date_start: `${year + 1}-06-05`, date_end: `${year + 1}-06-05`, event_type: 'term' },
-      { title: '暑假', date_start: `${year + 1}-06-06`, date_end: `${year + 1}-08-14`, event_type: 'holiday' },
+      ...(currentMonth <= 6 ? [
+        { title: '学年结束', date_start: `${y + 1}-06-13`, date_end: `${y + 1}-06-13`, event_type: 'term' },
+        { title: '暑假开始', date_start: `${y + 1}-06-14`, date_end: `${y + 1}-08-14`, event_type: 'holiday' },
+      ] : []),
+      { title: `${y + 1}-${y + 2}学年开始`, date_start: `${y + 1}-08-15`, date_end: `${y + 1}-08-15`, event_type: 'term' },
+      { title: '感恩节假期', date_start: `${y + 1}-11-25`, date_end: `${y + 1}-11-27`, event_type: 'holiday' },
+      { title: '圣诞假期', date_start: `${y + 1}-12-20`, date_end: `${y + 2}-01-04`, event_type: 'holiday' },
+      { title: '第二学期开始', date_start: `${y + 2}-01-05`, date_end: `${y + 2}-01-05`, event_type: 'term' },
+      { title: '春假', date_start: `${y + 2}-03-28`, date_end: `${y + 2}-04-05`, event_type: 'holiday' },
+      { title: '学年结束', date_start: `${y + 2}-06-12`, date_end: `${y + 2}-06-12`, event_type: 'term' },
+      { title: '暑假', date_start: `${y + 2}-06-13`, date_end: `${y + 2}-08-14`, event_type: 'holiday' },
     ]
   }
 
   if (profile.curriculum === 'british') {
+    const schoolYearStart = currentMonth >= 8 ? currentYear : currentYear - 1
+    const y = schoolYearStart
+
     return [
-      { title: 'Term 1 开始', date_start: `${year}-08-25`, date_end: `${year}-08-25`, event_type: 'term' },
-      { title: 'Term 1 Half-Term', date_start: `${year}-10-19`, date_end: `${year}-10-27`, event_type: 'holiday' },
-      { title: 'Term 1 结束', date_start: `${year}-12-12`, date_end: `${year}-12-12`, event_type: 'term' },
-      { title: '圣诞假期', date_start: `${year}-12-13`, date_end: `${year + 1}-01-06`, event_type: 'holiday' },
-      { title: 'Term 2 开始', date_start: `${year + 1}-01-07`, date_end: `${year + 1}-01-07`, event_type: 'term' },
-      { title: 'Term 2 Half-Term', date_start: `${year + 1}-02-16`, date_end: `${year + 1}-02-24`, event_type: 'holiday' },
-      { title: 'Term 2 结束', date_start: `${year + 1}-03-27`, date_end: `${year + 1}-03-27`, event_type: 'term' },
-      { title: '复活节假期', date_start: `${year + 1}-03-28`, date_end: `${year + 1}-04-14`, event_type: 'holiday' },
-      { title: 'Term 3 开始', date_start: `${year + 1}-04-15`, date_end: `${year + 1}-04-15`, event_type: 'term' },
-      { title: 'Term 3 Half-Term', date_start: `${year + 1}-05-25`, date_end: `${year + 1}-06-02`, event_type: 'holiday' },
-      { title: '学年结束', date_start: `${year + 1}-07-11`, date_end: `${year + 1}-07-11`, event_type: 'term' },
-      { title: '暑假', date_start: `${year + 1}-07-12`, date_end: `${year + 1}-08-24`, event_type: 'holiday' },
+      ...(currentMonth <= 7 ? [
+        { title: '学年结束', date_start: `${y + 1}-07-11`, date_end: `${y + 1}-07-11`, event_type: 'term' },
+        { title: '暑假', date_start: `${y + 1}-07-12`, date_end: `${y + 1}-08-24`, event_type: 'holiday' },
+      ] : []),
+      { title: `${y + 1}-${y + 2}学年 Term 1 开始`, date_start: `${y + 1}-08-25`, date_end: `${y + 1}-08-25`, event_type: 'term' },
+      { title: 'Half-Term Break', date_start: `${y + 1}-10-19`, date_end: `${y + 1}-10-27`, event_type: 'holiday' },
+      { title: 'Term 1 结束', date_start: `${y + 1}-12-12`, date_end: `${y + 1}-12-12`, event_type: 'term' },
+      { title: '圣诞假期', date_start: `${y + 1}-12-13`, date_end: `${y + 2}-01-06`, event_type: 'holiday' },
+      { title: 'Term 2 开始', date_start: `${y + 2}-01-07`, date_end: `${y + 2}-01-07`, event_type: 'term' },
+      { title: 'Term 2 Half-Term', date_start: `${y + 2}-02-16`, date_end: `${y + 2}-02-24`, event_type: 'holiday' },
+      { title: '复活节假期', date_start: `${y + 2}-03-28`, date_end: `${y + 2}-04-14`, event_type: 'holiday' },
+      { title: 'Term 3 开始', date_start: `${y + 2}-04-15`, date_end: `${y + 2}-04-15`, event_type: 'term' },
+      { title: '学年结束', date_start: `${y + 2}-07-11`, date_end: `${y + 2}-07-11`, event_type: 'term' },
     ]
   }
 
