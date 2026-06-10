@@ -30,7 +30,7 @@ export async function fetchAppData(uid: string, signal?: AbortSignal) {
         .from('todo_items')
         .select('*')
         .eq('user_id', uid)
-        .not('status', 'in', '("done","dismissed")')
+        .not('status', 'in', '("done","dismissed","expired")')
         .order('created_at', { ascending: false })
         .limit(50),
       signal,

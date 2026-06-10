@@ -544,9 +544,28 @@ async function saveHotspots(
   const existingCategories = new Set(existing?.map((e: any) => e.category) || [])
 
   // 过滤掉今天已有同 category 的，urgent 除外（urgent 可以重复写入）
-  const toInsert = items.filter(item =>
+  const afterCategory = items.filter(item =>
     item.urgency === 'urgent' || !existingCategories.has(item.category)
   )
+
+  const sevenDaysAgo = new Date()
+  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
+
+  const { data: recentHotspots } = await supabase
+    .from('hotspot_items')
+    .select('title, category')
+    .eq('user_id', userId)
+    .gte('created_at', sevenDaysAgo.toISOString())
+
+  const recentTopics = recentHotspots?.map((h) => String(h.title || '').slice(0, 15)) || []
+
+  const toInsert = afterCategory.filter((item) => {
+    const titlePrefix = String(item.title || '').slice(0, 15)
+    const isDuplicate = recentTopics.some((recent) =>
+      recent.includes(titlePrefix) || titlePrefix.includes(recent),
+    )
+    return !isDuplicate
+  })
 
   if (!toInsert.length) return { ok: true, count: 0 }
 

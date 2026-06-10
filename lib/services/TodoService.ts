@@ -48,6 +48,7 @@ export interface TodoResult {
   ok: boolean
   id?: string
   error?: string
+  isDuplicate?: boolean
 }
 
 export interface TodoListItem {
@@ -77,22 +78,37 @@ export const TodoService = {
     try {
       const supabase = getDb(input.client)
 
-      if (input.dueDate && input.title) {
+      const cleanTitle = input.title.trim()
+
+      if (input.dueDate && cleanTitle) {
         const { data: existing } = await supabase
           .from('todo_items')
           .select('id')
           .eq('user_id', input.userId)
-          .eq('title', input.title)
+          .eq('title', cleanTitle)
           .eq('due_date', input.dueDate)
           .maybeSingle()
 
         if (existing) return { ok: true, id: existing.id }
       }
 
+      const { data: duplicate } = await supabase
+        .from('todo_items')
+        .select('id')
+        .eq('user_id', input.userId)
+        .eq('title', cleanTitle)
+        .eq('status', 'pending')
+        .maybeSingle()
+
+      if (duplicate) {
+        console.log('[TodoService] duplicate title, skip:', cleanTitle)
+        return { ok: true, id: duplicate.id, isDuplicate: true }
+      }
+
       const row: Record<string, unknown> = {
         user_id: input.userId,
         child_id: input.childId || null,
-        title: input.title,
+        title: cleanTitle,
         category: input.dimension,
         priority: input.priority,
         due_date: input.dueDate || null,
@@ -146,7 +162,7 @@ export const TodoService = {
         .from('todo_items')
         .select('id, title, category, priority, due_date, status, source, child_id')
         .eq('user_id', userId)
-        .neq('status', 'done')
+        .not('status', 'in', '("done","dismissed","expired")')
         .order('due_date', { ascending: true, nullsFirst: false })
         .limit(limit)
 

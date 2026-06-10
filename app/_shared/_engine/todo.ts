@@ -34,7 +34,7 @@ export function groupTodos(todos: TodoItem[], now: Date = new Date()): TodoGroup
   const in3days  = addDaysStr(now, 3)
 
   const pending = todos.filter(t =>
-    t.status !== 'done' && t.status !== 'dismissed' && !t._isTemp
+    t.status !== 'done' && t.status !== 'dismissed' && t.status !== 'expired' && !t._isTemp
   )
 
   const today_items = pending.filter(t =>
@@ -101,7 +101,7 @@ export function runTodoEngine(
   const advice       = getTodoAdvice(groups)
   const badge        = groups.today.length
   const totalPending = todos.filter(t =>
-    t.status !== 'done' && t.status !== 'dismissed' && !t._isTemp
+    t.status !== 'done' && t.status !== 'dismissed' && t.status !== 'expired' && !t._isTemp
   ).length
 
   return { groups, badge, state, advice, totalPending }

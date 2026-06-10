@@ -162,6 +162,31 @@ function cleanHotspotTitle(raw: string): string {
 async function handleConvertToTodo(body: any, userId: string) {
   const { hotspot_id, custom_title } = body
 
+  const { data: existing } = await supabase
+    .from('todo_items')
+    .select('id, status')
+    .eq('source_ref_id', hotspot_id)
+    .eq('user_id', userId)
+    .eq('source', 'hotspot')
+    .maybeSingle()
+
+  if (existing) {
+    await supabase
+      .from('hotspot_items')
+      .update({ status: 'read', linked_todo_id: existing.id })
+      .eq('id', hotspot_id)
+      .eq('user_id', userId)
+
+    return NextResponse.json({
+      ok: true,
+      todo_id: existing.id,
+      already_exists: true,
+      message: existing.status === 'pending'
+        ? '已在待办列表中'
+        : '这条已经处理过了',
+    })
+  }
+
   const { data: hotspot } = await supabase
     .from('hotspot_items')
     .select('*')
@@ -184,28 +209,6 @@ async function handleConvertToTodo(body: any, userId: string) {
   }
 
   const mappedCategory = categoryMap[hotspot.category] || 'other'
-
-  const { data: existing } = await supabase
-    .from('todo_items')
-    .select('id')
-    .eq('source_ref_id', hotspot_id)
-    .eq('source', 'hotspot')
-    .eq('user_id', userId)
-    .maybeSingle()
-
-  if (existing) {
-    await supabase
-      .from('hotspot_items')
-      .update({ status: 'read', linked_todo_id: existing.id })
-      .eq('id', hotspot_id)
-      .eq('user_id', userId)
-
-    return NextResponse.json({
-      ok: true,
-      todo_id: existing.id,
-      already_exists: true,
-    })
-  }
 
   const { data: todo } = await supabase
     .from('todo_items')
