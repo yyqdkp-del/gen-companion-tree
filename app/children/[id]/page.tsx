@@ -136,16 +136,16 @@ function ChildEditContent() {
 
     void fetchWithAuth('/api/children/sync-school-calendar', {
       method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        child_id: childId,
-        user_id: uid,
-        school_name,
+        childId,
+        schoolName: school_name,
         grade: schoolData.grade || '',
       }),
     })
       .then(async (res) => {
         const data = await res.json().catch(() => ({}))
-        if (res.ok && (data.success || data.skipped)) {
+        if (res.ok && (data.ok || data.success)) {
           toast('校历已更新', 'success')
         } else {
           toast('校历同步失败，可稍后重试', 'error')

@@ -1,15 +1,17 @@
 'use client'
-import React from 'react'
+import React, { useCallback, useRef } from 'react'
+import { useParams } from 'next/navigation'
 import { THEME } from '@/app/_shared/_constants/theme'
+import { fetchWithAuth } from '@/lib/auth/fetchWithAuth'
 
-function Field({ label, value, onChange, placeholder, type = 'text' }: {
+function Field({ label, value, onChange, placeholder, type = 'text', onBlur }: {
   label: string; value: string; onChange: (v: string) => void
-  placeholder?: string; type?: string
+  placeholder?: string; type?: string; onBlur?: () => void
 }) {
   return (
     <div style={{ marginBottom: 16 }}>
       <div style={{ fontSize: 12, color: THEME.muted, fontWeight: 700, marginBottom: 6, letterSpacing: '0.08em' }}>{label}</div>
-      <input type={type} value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder}
+      <input type={type} value={value} onChange={e => onChange(e.target.value)} onBlur={onBlur} placeholder={placeholder}
         style={{ width: '100%', padding: '12px 14px', borderRadius: 12, border: '1px solid rgba(0,0,0,0.1)', background: 'rgba(255,255,255,0.65)', fontSize: 14, color: THEME.text, outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit' }} />
     </div>
   )
@@ -31,16 +33,52 @@ function SelectField({ label, value, onChange, options }: {
 }
 
 function StepSchool({ data, onChange, schools }: { data: any; onChange: (d: any) => void; schools: any[] }) {
+  const params = useParams()
+  const childId = typeof params?.id === 'string' && params.id !== 'new' ? params.id : null
+  const lastSyncKeyRef = useRef('')
+
+  const triggerCalendarSync = useCallback((schoolName: string, grade: string) => {
+    const name = schoolName.trim()
+    if (!childId || !name) return
+    const syncKey = `${childId}:${name}`
+    if (lastSyncKeyRef.current === syncKey) return
+    lastSyncKeyRef.current = syncKey
+
+    void fetchWithAuth('/api/children/sync-school-calendar', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        childId,
+        schoolName: name,
+        grade: grade || '',
+      }),
+    }).catch(() => {
+      /* 后台同步，失败不打断填表；保存后 page 会再触发一次 */
+    })
+  }, [childId])
+
+  const handleSchoolSelect = (schoolId: string) => {
+    const school = schools.find(s => s.id === schoolId)
+    const schoolName = school?.name_full || ''
+    const next = {
+      ...data,
+      school_id: schoolId,
+      school: schoolName,
+      school_name: schoolName,
+    }
+    onChange(next)
+    if (schoolId && schoolId !== 'other' && schoolName) {
+      triggerCalendarSync(schoolName, next.grade || '')
+    }
+  }
+
   return (
     <div>
       <div style={{ fontSize: 15, fontWeight: 600, color: THEME.navy, marginBottom: 20 }}>学校信息 🏫</div>
 
       <div style={{ marginBottom: 16 }}>
         <div style={{ fontSize: 12, color: THEME.muted, fontWeight: 700, marginBottom: 6, letterSpacing: '0.08em' }}>就读学校</div>
-        <select value={data.school_id || ''} onChange={e => {
-          const school = schools.find(s => s.id === e.target.value)
-          onChange({ ...data, school_id: e.target.value, school: school?.name_full || '', school_name: school?.name_full || '' })
-        }}
+        <select value={data.school_id || ''} onChange={e => handleSchoolSelect(e.target.value)}
           style={{ width: '100%', padding: '12px 14px', borderRadius: 12, border: '1px solid rgba(0,0,0,0.1)', background: 'rgba(255,255,255,0.65)', fontSize: 14, color: THEME.text, outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit', appearance: 'none' }}>
           <option value="">请选择学校</option>
           {schools.map(s => <option key={s.id} value={s.id}>{s.name_full} ({s.name_short})</option>)}
@@ -53,6 +91,10 @@ function StepSchool({ data, onChange, schools }: { data: any; onChange: (d: any)
           label="学校名称"
           value={data.school || data.school_name || ''}
           onChange={v => onChange({ ...data, school: v, school_name: v })}
+          onBlur={() => {
+            const name = (data.school || data.school_name || '').trim()
+            if (name) triggerCalendarSync(name, data.grade || '')
+          }}
           placeholder="输入学校全名"
         />
       )}

@@ -53,8 +53,34 @@ export async function GET(req: NextRequest) {
     console.log(`[cleanup] expired ${toExpire.length} duplicate hotspot todos`)
   }
 
+  const yesterday = new Date()
+  yesterday.setDate(yesterday.getDate() - 1)
+  const yesterdayStr = yesterday.toISOString().slice(0, 10)
+
+  const { data: overdueTodos } = await supabase
+    .from('todo_items')
+    .select('id, title, category')
+    .eq('status', 'pending')
+    .lt('due_date', yesterdayStr)
+
+  const autoCloseDimensions = ['mobility', 'education', 'logistics']
+
+  for (const todo of overdueTodos || []) {
+    const status = autoCloseDimensions.includes(todo.category)
+      ? 'done'
+      : 'expired'
+
+    await supabase
+      .from('todo_items')
+      .update({ status })
+      .eq('id', todo.id)
+  }
+
+  console.log(`[cleanup] auto-closed ${overdueTodos?.length || 0} overdue todos`)
+
   return NextResponse.json({
     ok: true,
     expired: toExpire.length,
+    autoClosed: overdueTodos?.length || 0,
   })
 }

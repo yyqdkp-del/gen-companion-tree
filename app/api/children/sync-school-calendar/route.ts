@@ -76,50 +76,37 @@ export async function POST(req: NextRequest) {
   try {
     const { user, error: authError } = await getAuthUser(req)
     if (authError || !user) {
-      return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
+      return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
     }
 
     const body = await req.json().catch(() => ({}))
-    const child_id = typeof body.child_id === 'string' ? body.child_id.trim() : ''
-    const user_id = typeof body.user_id === 'string' ? body.user_id.trim() : ''
-    const school_name = typeof body.school_name === 'string' ? body.school_name.trim() : ''
+    const child_id = String(body.childId || body.child_id || '').trim()
+    const school_name = String(body.schoolName || body.school_name || '').trim()
     const grade = typeof body.grade === 'string' ? body.grade.trim() : ''
 
-    if (!child_id || !user_id || !school_name) {
-      return NextResponse.json({ success: false, error: 'Missing child_id, user_id, or school_name' })
+    if (!school_name) {
+      return NextResponse.json({ ok: false, error: 'no school name' })
     }
 
-    if (user_id !== user.id) {
-      return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 })
+    if (!child_id) {
+      return NextResponse.json({ ok: false, error: 'Missing childId' })
     }
 
+    const user_id = user.id
     const supabase = getServiceSupabase()
 
     const { data: child } = await supabase
       .from('children')
-      .select('id')
+      .select('id, grade')
       .eq('id', child_id)
       .eq('user_id', user_id)
       .maybeSingle()
 
     if (!child) {
-      return NextResponse.json({ success: false, error: 'Child not found' }, { status: 404 })
+      return NextResponse.json({ ok: false, error: 'Child not found' }, { status: 404 })
     }
 
-    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
-    const { data: recentSync } = await supabase
-      .from('child_school_calendar')
-      .select('id')
-      .eq('child_id', child_id)
-      .eq('source', 'school_auto_sync')
-      .gte('created_at', sevenDaysAgo)
-      .limit(1)
-
-    if (recentSync?.length) {
-      return NextResponse.json({ skipped: true })
-    }
-
-    const gradeHint = grade ? `，年级：${grade}` : ''
+    const gradeHint = (grade || child.grade) ? `，年级：${grade || child.grade}` : ''
 
     const calendarPrompt = `搜索 "${school_name}" 学校官方网站，找出：
 1. 当前学年学期开始/结束日期
@@ -146,7 +133,7 @@ export async function POST(req: NextRequest) {
         calendarRaw: calendarRaw.slice(0, 500),
         activitiesRaw: activitiesRaw.slice(0, 500),
       })
-      return NextResponse.json({ success: false, error: 'Failed to parse Gemini response' })
+      return NextResponse.json({ ok: false, error: 'Failed to parse Gemini response' })
     }
 
     const calendarRows = (calendarParsed || [])
@@ -189,7 +176,7 @@ export async function POST(req: NextRequest) {
 
       if (existingError) {
         console.error('sync-school-calendar: calendar lookup', existingError.message)
-        return NextResponse.json({ success: false, error: existingError.message })
+        return NextResponse.json({ ok: false, error: existingError.message })
       }
 
       const existingKeys = new Set(
@@ -207,7 +194,7 @@ export async function POST(req: NextRequest) {
 
         if (calError) {
           console.error('sync-school-calendar: calendar insert', calError.message)
-          return NextResponse.json({ success: false, error: calError.message })
+          return NextResponse.json({ ok: false, error: calError.message })
         }
         calendar_count = inserted?.length ?? toInsert.length
       }
@@ -253,7 +240,9 @@ export async function POST(req: NextRequest) {
       if (todoError) {
         console.error('sync-school-calendar: todo insert', todoError.message)
         return NextResponse.json({
+          ok: true,
           success: true,
+          events: calendar_count,
           calendar_count,
           todo_count: 0,
           warning: todoError.message,
@@ -262,14 +251,18 @@ export async function POST(req: NextRequest) {
       todo_count = inserted?.length ?? todoRows.length
     }
 
+    const events = calendar_count + todo_count
+
     return NextResponse.json({
+      ok: true,
       success: true,
+      events,
       calendar_count,
       todo_count,
     })
   } catch (e: unknown) {
     const message = e instanceof Error ? e.message : 'Unknown error'
     console.error('sync-school-calendar:', message)
-    return NextResponse.json({ success: false, error: message })
+    return NextResponse.json({ ok: false, error: message })
   }
 }
