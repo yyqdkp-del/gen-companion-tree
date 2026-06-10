@@ -148,6 +148,16 @@ async function handleMarkDone(body: any, userId: string) {
   return NextResponse.json({ ok: true })
 }
 
+function cleanHotspotTitle(raw: string): string {
+  return raw
+    .replace(/^跟进：/, '')
+    .replace(/【(.+?)】/, '$1')
+    .replace(/｜影响：.*/, '')
+    .replace(/｜建议：.*/, '')
+    .trim()
+    .slice(0, 60)
+}
+
 // ══ 热点转待办 ══
 async function handleConvertToTodo(body: any, userId: string) {
   const { hotspot_id, custom_title } = body
@@ -173,28 +183,63 @@ async function handleConvertToTodo(body: any, userId: string) {
     urgent: 'red', important: 'orange', lifestyle: 'yellow',
   }
 
-  const { data: todo } = await supabase.from('todo_items').insert({
-    user_id: userId,
-    title: custom_title || `跟进：${hotspot.title}`,
-    description: hotspot.summary,
-    category: categoryMap[hotspot.category] || 'other',
-    priority: priorityMap[hotspot.urgency] || 'yellow',
-    status: 'pending',
-    source: 'hotspot',
-    source_ref_id: hotspot_id,
-    ai_action_data: {
-      brain_instruction: {
-        dimension: categoryMap[hotspot.category] || 'other',
-        intent: hotspot.title,
-        context: hotspot.summary,
-        relevance: hotspot.relevance_reason,
-      }
-    },
-    one_tap_ready: false,
-  }).select().single()
+  const mappedCategory = categoryMap[hotspot.category] || 'other'
 
-  // 标记热点已读
-  await supabase.from('hotspot_items').update({ status: 'read' }).eq('id', hotspot_id).eq('user_id', userId)
+  const { data: existing } = await supabase
+    .from('todo_items')
+    .select('id')
+    .eq('source_ref_id', hotspot_id)
+    .eq('source', 'hotspot')
+    .eq('user_id', userId)
+    .maybeSingle()
 
-  return NextResponse.json({ ok: true, todo_id: todo?.id })
+  if (existing) {
+    await supabase
+      .from('hotspot_items')
+      .update({ status: 'read', linked_todo_id: existing.id })
+      .eq('id', hotspot_id)
+      .eq('user_id', userId)
+
+    return NextResponse.json({
+      ok: true,
+      todo_id: existing.id,
+      already_exists: true,
+    })
+  }
+
+  const { data: todo } = await supabase
+    .from('todo_items')
+    .insert({
+      user_id: userId,
+      title: custom_title || cleanHotspotTitle(hotspot.title),
+      description: hotspot.summary,
+      category: mappedCategory,
+      priority: priorityMap[hotspot.urgency] || 'yellow',
+      status: 'pending',
+      source: 'hotspot',
+      source_ref_id: hotspot_id,
+      ai_action_data: {
+        brain_instruction: {
+          dimension: mappedCategory,
+          intent: hotspot.title,
+          context: hotspot.summary,
+          relevance: hotspot.relevance_reason,
+        },
+      },
+      one_tap_ready: false,
+    })
+    .select()
+    .single()
+
+  await supabase
+    .from('hotspot_items')
+    .update({ status: 'read', linked_todo_id: todo?.id })
+    .eq('id', hotspot_id)
+    .eq('user_id', userId)
+
+  return NextResponse.json({
+    ok: true,
+    todo_id: todo?.id,
+    already_exists: false,
+  })
 }

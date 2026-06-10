@@ -109,14 +109,8 @@ export async function snoozeTodo(id: string, category?: string): Promise<void> {
 }
 
 export async function convertHotspotToTodo(hotspotId: string): Promise<void> {
-  const res = await fetchWithAuth('/api/action/perform', {
-    method: 'POST',
-    body: JSON.stringify({
-      action_type: 'convert_to_todo',
-      hotspot_id: hotspotId,
-    }),
-  })
-  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  const result = await convertHotspotToTodoAndMarkRead(hotspotId, () => {})
+  if (!result) throw new Error('convert failed')
 }
 
 /** 热点转待办后标记已读并触发同步（供 UI 层单一调用，避免与引擎列表逻辑耦合） */
@@ -124,8 +118,27 @@ export async function convertHotspotToTodoAndMarkRead(
   hotspotId: string,
   onRead: (id: string) => void,
   onSync?: () => void,
-): Promise<void> {
-  await convertHotspotToTodo(hotspotId)
-  onRead(hotspotId)
-  onSync?.()
+): Promise<{ todo_id: string; already_exists: boolean } | null> {
+  try {
+    const res = await fetchWithAuth('/api/action/perform', {
+      method: 'POST',
+      body: JSON.stringify({
+        action_type: 'convert_to_todo',
+        hotspot_id: hotspotId,
+      }),
+    })
+
+    const data = await res.json()
+    if (!data.ok) return null
+
+    onRead(hotspotId)
+    onSync?.()
+
+    return {
+      todo_id: data.todo_id,
+      already_exists: Boolean(data.already_exists),
+    }
+  } catch {
+    return null
+  }
 }

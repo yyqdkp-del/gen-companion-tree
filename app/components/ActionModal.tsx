@@ -2190,7 +2190,11 @@ export default function ActionModal({
   const isBrainMode = source_type === 'hotspot' && !!brainData
 
   const isHotspotInfoTodo = source_type === 'todo' && (
-    todo_source === 'hotspot' || title?.startsWith('跟进：【')
+    todo_source === 'hotspot' && (
+      title?.includes('｜影响：')
+      || title?.includes('｜建议：')
+      || title?.startsWith('跟进：【')
+    )
   )
 
   const packingChildId = todo_child_id

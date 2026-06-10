@@ -7,10 +7,17 @@ export function shouldShowOneKey(todo: {
   child_id?: string | null
   amount_thb?: number | null
 }): boolean {
-  if (todo.source === 'hotspot') return false
-
   if (!todo.title) return false
   if (todo.title.startsWith('📅')) return false
+
+  if (todo.source === 'hotspot') {
+    const isRawHotspot =
+      todo.title.includes('｜影响：')
+      || todo.title.includes('｜建议：')
+      || todo.title.startsWith('跟进：【')
+    return !isRawHotspot
+  }
+
   if (todo.title.startsWith('跟进：【')) return false
 
   const hasDeadline = !!todo.due_date

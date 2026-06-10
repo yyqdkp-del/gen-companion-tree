@@ -1,5 +1,5 @@
 'use client'
-import React, { useState, useCallback, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, ExternalLink, RefreshCw, ChevronDown, AlertTriangle, Plus } from 'lucide-react'
 import { THEME, URGENCY_CFG } from '@/app/_shared/_constants/theme'
@@ -13,6 +13,7 @@ import type { HotspotItem, BrainHotspotActionData } from '@/app/_shared/_types'
 import ActionModal from '@/app/components/ActionModal'
 import HotspotPreferences from '@/app/_shared/_components/HotspotPreferences'
 import { logOrAlertNetworkError } from '@/lib/errors/logOrAlertNetworkError'
+import { toast } from '@/app/components/Toast'
 import { track } from '@/lib/analytics/track'
 import { resolveHotspotLink, hotspotSearchUrl } from '@/lib/hotspot/url'
 import { shouldShowHotspotOneKey } from '@/lib/action/oneKeyEligibility'
@@ -61,15 +62,20 @@ function shouldShowOneKey(hotspot: HotspotItem): boolean {
   })
 }
 
-function HotspotCard({ item, onRead, onActionModal, onConvertTodo }: {
+function HotspotCard({ item, onRead, onActionModal, onSync }: {
   item: HotspotItem
   onRead: () => void
   onActionModal: () => void
-  onConvertTodo: () => Promise<void>
+  onSync?: () => void
 }) {
   const [expanded, setExpanded] = useState(false)
+  const [convertDone, setConvertDone] = useState(!!item.linked_todo_id)
   const [converting, setConverting] = useState(false)
   const [convertError, setConvertError] = useState(false)
+
+  useEffect(() => {
+    if (item.linked_todo_id) setConvertDone(true)
+  }, [item.linked_todo_id])
   const cfg = URGENCY_CFG[item.urgency]
   const titleStr = item.title || ''
   const tagMatch = titleStr.match(/【(.+?)】/)
@@ -101,12 +107,24 @@ function HotspotCard({ item, onRead, onActionModal, onConvertTodo }: {
 
   const handleConvert = async (e: React.MouseEvent) => {
     e.stopPropagation()
+    if (convertDone || converting) return
+
     setConverting(true)
     setConvertError(false)
     try {
-      await onConvertTodo()
-    } catch (e) {
-      if (!logOrAlertNetworkError(e)) setConvertError(true)
+      const result = await convertHotspotToTodoAndMarkRead(item.id, onRead, onSync)
+      if (!result) {
+        if (!logOrAlertNetworkError(new Error('convert failed'))) setConvertError(true)
+        return
+      }
+      setConvertDone(true)
+      if (result.already_exists) {
+        toast('已在待办列表中', 'info')
+      } else {
+        toast('已加入待办 ✓', 'success')
+      }
+    } catch (err) {
+      if (!logOrAlertNetworkError(err)) setConvertError(true)
     } finally {
       setConverting(false)
     }
@@ -241,16 +259,29 @@ function HotspotCard({ item, onRead, onActionModal, onConvertTodo }: {
                     <ExternalLink size={12} /> 了解更多
                   </motion.a>
                 )}
-                <motion.button whileTap={{ scale: 0.92 }}
-                  onClick={handleConvert} disabled={converting}
-                  style={{ display: 'flex', alignItems: 'center', gap: 5,
-                    padding: '8px 14px', borderRadius: 20,
-                    border: `0.5px solid ${RIAN_GOLD}`,
-                    background: 'rgba(164,99,85,0.08)',
-                    color: RIAN_GOLD, fontSize: 12, fontWeight: 500,
-                    cursor: converting ? 'default' : 'pointer',
-                    opacity: converting ? 0.6 : 1 }}>
-                  {converting ? '添加中…' : <><Plus size={12} /> 加入待办</>}
+                <motion.button
+                  whileTap={convertDone ? undefined : { scale: 0.92 }}
+                  onClick={handleConvert}
+                  disabled={convertDone || converting}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 5,
+                    padding: '8px 16px',
+                    borderRadius: 20,
+                    border: 'none',
+                    background: convertDone ? 'var(--accent-jade, #5c7a5e)' : 'var(--clay, #a46355)',
+                    color: '#fff',
+                    fontSize: 13,
+                    fontWeight: 500,
+                    cursor: convertDone ? 'default' : 'pointer',
+                    opacity: converting ? 0.6 : 1,
+                    transition: 'all 0.2s',
+                  }}
+                >
+                  {converting ? '添加中…'
+                    : convertDone ? '✓ 已加入待办'
+                    : <><Plus size={12} /> 加入待办</>}
                 </motion.button>
                 <motion.a
                   whileTap={{ scale: 0.92 }}
@@ -320,13 +351,6 @@ export default function HotspotSheet({ hotspots, onClose, onPatrol, patrolling, 
       }
     }
   }, [urgentCount, speak, stop, sorted])
-
-  const handleConvertTodo = useCallback(
-    async (item: HotspotItem) => {
-      await convertHotspotToTodoAndMarkRead(item.id, onRead, onSync)
-    },
-    [onRead, onSync],
-  )
 
   return (
     <>
@@ -417,7 +441,7 @@ export default function HotspotSheet({ hotspots, onClose, onPatrol, patrolling, 
               <HotspotCard key={item.id} item={item}
                 onRead={() => onRead(item.id)}
                 onActionModal={() => setSelectedHotspot(item)}
-                onConvertTodo={() => handleConvertTodo(item)}
+                onSync={onSync}
               />
             ))}
           </div>
