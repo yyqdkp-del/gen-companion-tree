@@ -1,6 +1,11 @@
 import { createClient } from '@supabase/supabase-js'
 import { Geofence, UserLocation } from './types'
 import { GEOFENCES, DEFAULT_GEOFENCE } from './data'
+import {
+  getUserHour,
+  getUserTimeString,
+  isUserLocalHour,
+} from '@/lib/time/userLocalTime'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || '',
@@ -221,48 +226,16 @@ export async function updateUserLocationByGPS(
 
 // ══ 工具函数 ══
 
-// 获取用户当前小时（按时区）
-export function getUserHour(timezone: string): number {
-  try {
-    const now = new Date()
-    const formatter = new Intl.DateTimeFormat('en-US', {
-      timeZone: timezone,
-      hour: 'numeric',
-      hour12: false,
-    })
-    return parseInt(formatter.format(now))
-  } catch {
-    return new Date().getHours()
-  }
-}
+export { getUserHour, getUserTimeString }
 
-// 获取用户当前时间字符串
-export function getUserTimeString(timezone: string): string {
-  try {
-    return new Date().toLocaleString('zh-CN', { timeZone: timezone })
-  } catch {
-    return new Date().toLocaleString('zh-CN')
-  }
-}
-
-// 判断是否是晨报时间（用户时区的 6:25-6:35）
+// 早间推送：用户本地 7:00（整点 cron 每小时检查）
 export function isMorningReportTime(timezone: string): boolean {
-  const hour = getUserHour(timezone)
-  const now = new Date()
-  const minute = parseInt(new Intl.DateTimeFormat('en-US', {
-    timeZone: timezone, minute: 'numeric',
-  }).format(now))
-  return hour === 6 && minute >= 25 && minute <= 35
+  return isUserLocalHour(timezone, 7)
 }
 
-// 判断是否是晚报时间（用户时区的 20:55-21:05）
+// 晚间推送：用户本地 21:00
 export function isEveningReportTime(timezone: string): boolean {
-  const hour = getUserHour(timezone)
-  const now = new Date()
-  const minute = parseInt(new Intl.DateTimeFormat('en-US', {
-    timeZone: timezone, minute: 'numeric',
-  }).format(now))
-  return hour === 21 && minute <= 5
+  return isUserLocalHour(timezone, 21)
 }
 
 // 获取所有支持的围栏列表

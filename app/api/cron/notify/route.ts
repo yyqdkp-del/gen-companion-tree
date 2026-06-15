@@ -57,7 +57,7 @@ async function logPush(userId: string, pushType: string, eventId?: string) {
 }
 
 // ────────────────────────────────────────
-// 晨报 06:30 — 今日全貌
+// 晨报 07:00（用户本地）— 今日全貌
 // ────────────────────────────────────────
 async function sendMorningReport(userId: string, timeZone: string) {
   const already = await alreadySent(userId, 'morning_report', timeZone)
@@ -333,13 +333,13 @@ export async function GET(req: NextRequest) {
         const isMorning = isMorningReportTime(timezone)
         const isEvening = isEveningReportTime(timezone)
 
-        // 晨报（用户时区 6:30）
+        // 晨报（用户本地 7:00）
         if (isMorning) {
           await sendMorningReport(userId, timezone)
-          tasks.push(`morning:${userId.slice(0,8)}(${userLocation.city})`)
+          tasks.push(`morning:${userId.slice(0, 8)}(${userLocation.city})`)
         }
 
-        // 晚报（用户时区 21:00）
+        // 晚报（用户本地 21:00）
         if (isEvening) {
           await sendEveningReminder(userId, timezone)
           tasks.push(`evening:${userId.slice(0,8)}(${userLocation.city})`)

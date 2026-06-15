@@ -184,12 +184,10 @@ export async function GET(req: NextRequest) {
     tasks.push(`patrol_tz:${patrolUserIds.length}`)
   }
 
-  // worker / notify / reminders：UTC 23:00 批次（约等于东南亚清晨，与原先单次 cron 对齐）
+  // worker / reminders：UTC 23:00 批次（与原先单次 cron 对齐）
   if (utcHour === 23 && utcMin < 10) {
     await trigger('/api/rian/worker')
     tasks.push('worker')
-    await trigger('/api/cron/notify')
-    tasks.push('notify')
     await trigger('/api/cron/reminders')
     tasks.push('reminders')
   }
