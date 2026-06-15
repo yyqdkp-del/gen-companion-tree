@@ -22,7 +22,9 @@ type ChildRow = {
   grade?: string | null
 }
 
-function getArchiveType(docType: DocumentType): string {
+function getArchiveType(docType: DocumentType, contentType?: string): string {
+  if (contentType === 'school_calendar') return 'school_term_calendar'
+  if (contentType === 'flight_itinerary') return 'mobility_todo'
   const map: Record<string, string> = {
     schedule: 'class_schedule',
     notice: 'school_calendar',
@@ -98,9 +100,10 @@ export async function autoArchive(
   processedData: unknown,
   userId: string,
   activeChildId?: string,
+  contentType?: string,
 ): Promise<AutoArchiveResult> {
   const childId = await matchChild(detection, userId, activeChildId)
-  const archiveType = getArchiveType(detection.docType)
+  const archiveType = getArchiveType(detection.docType, contentType)
   const requiresConfirm =
     !childId ||
     detection.confidence < 0.8 ||

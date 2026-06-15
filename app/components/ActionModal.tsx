@@ -21,7 +21,8 @@ import { shouldShowHotspotOneKey, shouldShowOneKey } from '@/lib/action/oneKeyEl
 import { SOURCE_CONFIG, type SourceLevel } from '@/lib/trust/sourceLabel'
 import { formatThb } from '@/lib/realtime/exchangeRate'
 import { resolveHotspotLink, hotspotSearchUrl } from '@/lib/hotspot/url'
-import { DECISION_CACHE_MS } from '@/lib/action/decisionCache'
+import { getCachedRootDecisionForUI } from '@/lib/action/decisionCache'
+import { buildInstantResponse } from '@/lib/action/instantDecision'
 import SmartPackingPanel from '@/app/components/SmartPackingPanel'
 import { useSmartPacking } from '@/lib/packing/useSmartPacking'
 
@@ -423,15 +424,6 @@ function getFreshExecutionPack(aiActionData?: any): ExecutionPack | null {
   return pack as ExecutionPack
 }
 
-function getFreshRootDecision(aiActionData?: Record<string, unknown>): RootDecision | null {
-  const decision = aiActionData?.root_decision as RootDecision | undefined
-  const cachedAt = (aiActionData?.cached_at || aiActionData?.prepared_at) as string | undefined
-  if (!decision || !cachedAt) return null
-  if ((decision as RootDecision & { isPartial?: boolean }).isPartial) return null
-  const ageMs = Date.now() - new Date(cachedAt).getTime()
-  if (ageMs >= DECISION_CACHE_MS) return null
-  return decision
-}
 
 function isPreparedItemVisible(item: PreparedItem): boolean {
   if (item.content == null) return false
@@ -726,7 +718,6 @@ function RootDecisionPanel({
   decision,
   userId,
   autoCompleted,
-  deepPending,
   onAllDone,
   onClose,
 }: {
@@ -860,40 +851,12 @@ function RootDecisionPanel({
 
   return (
     <div style={{ padding: '8px 0 4px' }}>
-      {deepPending && (
-        <div style={{ padding: '0 14px 8px' }}>
-          <div style={{
-            background: 'var(--canvas-warm, #fbf9f6)',
-            borderRadius: 20,
-            padding: '4px 12px',
-            fontSize: 12,
-            color: 'var(--text-muted, rgba(45,50,47,0.45))',
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: 6,
-          }}>
-            <span style={{
-              width: 6,
-              height: 6,
-              borderRadius: '50%',
-              background: 'var(--clay, #a46355)',
-            }}>
-              <motion.span
-                animate={{ opacity: [0.4, 1, 0.4] }}
-                transition={{ duration: 1.5, repeat: Infinity }}
-                style={{
-                  display: 'block',
-                  width: 6,
-                  height: 6,
-                  borderRadius: '50%',
-                  background: 'var(--clay, #a46355)',
-                }}
-              />
-            </span>
-            根正在深度分析...
-          </div>
-        </div>
-      )}
+      <motion.div
+        key={(decision as RootDecision & { isPartial?: boolean }).isPartial ? 'partial' : 'full'}
+        initial={{ opacity: 0.92 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.35 }}
+      >
       <div style={{ padding: '0 14px 12px' }}>
         <div style={{ fontSize: 17, fontWeight: 600, color: THEME.text, lineHeight: 1.4, marginBottom: 8 }}>
           {decision.message.headline}
@@ -977,11 +940,10 @@ function RootDecisionPanel({
           明天再说
         </motion.button>
       </div>
+      </motion.div>
     </div>
   )
 }
-
-// ── 语音播报（联动设置）──
 function speak(text: string) {
   if (typeof window === 'undefined' || !window.speechSynthesis) return
   const enabled = localStorage.getItem('speech_enabled')
@@ -2170,6 +2132,7 @@ export default function ActionModal({
   const [loadingStep, setLoadingStep] = useState(0)
   const [deepPending, setDeepPending] = useState(false)
   const deepRefreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const deepAnalyzeStartedRef = useRef<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [activeTab, setActiveTab] = useState<TabKey | null>(null)
 
@@ -2283,6 +2246,7 @@ export default function ActionModal({
         setDecision(result.decision as RootDecision)
         setBrainAutoCompleted(result.autoCompleted || [])
         setDeepPending(false)
+        deepAnalyzeStartedRef.current = null
         console.log('[ActionModal] decision updated with full content')
         onSync?.()
       } else {
@@ -2296,16 +2260,36 @@ export default function ActionModal({
     }
   }, [onSync, router])
 
+  const startDeepAnalysis = useCallback((todoId: string) => {
+    if (deepAnalyzeStartedRef.current === todoId) return
+    deepAnalyzeStartedRef.current = todoId
+    setDeepPending(true)
+    void triggerDeepAnalysis(todoId)
+  }, [triggerDeepAnalysis])
+
   useEffect(() => {
-    if (!loading) {
-      setLoadingStep(0)
-      return
-    }
-    const timer = window.setInterval(() => {
-      setLoadingStep((prev) => Math.min(prev + 1, LOADING_STEPS.length - 1))
-    }, 3000)
-    return () => window.clearInterval(timer)
-  }, [loading])
+    deepAnalyzeStartedRef.current = null
+  }, [source_id])
+
+  const buildClientInstantPreview = useCallback((): RootDecision => {
+    return buildInstantResponse(
+      {
+        id: source_id,
+        title,
+        category,
+        due_date,
+        ai_action_data,
+      },
+      todo_child_id
+        ? {
+          id: todo_child_id,
+          name: child_name || activeKid?.name,
+          grade: activeKid?.grade,
+        }
+        : null,
+      null,
+    )
+  }, [source_id, title, category, due_date, ai_action_data, todo_child_id, child_name, activeKid])
 
   useEffect(() => {
     if (!source_id) return
@@ -2317,6 +2301,7 @@ export default function ActionModal({
       setAutoCompleted([])
       setUserActions([])
       setBrainAutoCompleted([])
+      setDeepPending(false)
       setLoading(false)
       return
     }
@@ -2327,49 +2312,61 @@ export default function ActionModal({
       setAutoCompleted([])
       setUserActions([])
       setBrainAutoCompleted([])
+      setDeepPending(false)
       setLoading(false)
       return
     }
 
-    const cachedDecision = source_type === 'todo' ? getFreshRootDecision(ai_action_data) : null
+    const cachedUi = source_type === 'todo'
+      ? getCachedRootDecisionForUI(ai_action_data)
+      : { decision: null, isPartial: false }
+    const cachedDecision = cachedUi.decision
+    const cachedPack = source_type === 'todo' && !cachedDecision
+      ? getFreshExecutionPack(ai_action_data)
+      : source_type !== 'todo'
+        ? getFreshExecutionPack(ai_action_data)
+        : null
+
     if (cachedDecision) {
       setDecision(cachedDecision)
       setPack(null)
       setBrainAutoCompleted([])
       setLoading(false)
-    } else {
-      setDecision(null)
-    }
-
-    const cachedPack = source_type === 'todo' && !cachedDecision ? getFreshExecutionPack(ai_action_data) : null
-    if (cachedPack) {
+      if (cachedUi.isPartial || (ai_action_data as { deep_analysis_pending?: boolean })?.deep_analysis_pending) {
+        setDeepPending(true)
+      } else {
+        setDeepPending(false)
+      }
+    } else if (cachedPack) {
       setPack(cachedPack)
+      setDecision(null)
       syncAutoExecuteState(cachedPack)
+      setDeepPending(false)
       setLoading(false)
-    }
-
-    if (!cachedPack && !cachedDecision) {
+    } else if (source_type === 'todo') {
+      setDecision(buildClientInstantPreview())
       setPack(null)
       setAutoCompleted([])
       setUserActions([])
+      setBrainAutoCompleted([])
+      setDeepPending(true)
+      setLoading(false)
+    } else {
+      setPack(null)
+      setDecision(null)
+      setAutoCompleted([])
+      setUserActions([])
+      setDeepPending(false)
+      setLoading(true)
     }
 
-    if (!sessionReady) {
-      if (!cachedPack && !cachedDecision) setLoading(true)
-      return
-    }
-
-    if (!cachedPack && !cachedDecision) setLoading(true)
+    if (!sessionReady) return
 
     let cancelled = false
     void (async () => {
       const headers = await getJsonAuthHeaders()
       if (!headers.Authorization) {
-        if (!cancelled) {
-          toast('登录已过期，请重新登录', 'info')
-          window.location.href = '/auth'
-          setLoading(false)
-        }
+        if (!cancelled && source_type !== 'todo') setLoading(false)
         return
       }
       try {
@@ -2384,33 +2381,37 @@ export default function ActionModal({
         })
         const data = await res.json()
         if (cancelled) return
-        console.log('[ActionModal] execute response', data.ok, data.deepAnalysisPending)
         if (handleLimitReached(data, () => router.push('/upgrade'))) return
         if (data.ok && data.decision) {
           setDecision(data.decision as RootDecision)
           setBrainAutoCompleted(data.autoCompleted || [])
           setPack(null)
-          setLoading(false)
           if (data.deepAnalysisPending && (data.todoId || source_id)) {
-            console.log('[ActionModal] starting deep analysis')
-            setDeepPending(true)
-            void triggerDeepAnalysis(String(data.todoId || source_id))
-          } else {
+            startDeepAnalysis(String(data.todoId || source_id))
+          } else if (!(data.decision as RootDecision & { isPartial?: boolean }).isPartial) {
             setDeepPending(false)
           }
           onSync?.()
         } else if (data.ok && data.execution_pack) {
           setPack(data.execution_pack)
           setDecision(null)
+          setDeepPending(false)
           syncAutoExecuteState(data.execution_pack, data.autoCompleted, data.userActions)
           onSync?.()
         }
       } catch (e) {
         if (!cancelled) logOrAlertNetworkError(e)
       } finally {
-        if (!cancelled) setLoading(false)
+        if (!cancelled && source_type !== 'todo') setLoading(false)
       }
     })()
+
+    const needsBackgroundDeep = source_type === 'todo'
+      && sessionReady
+      && (!cachedDecision || cachedUi.isPartial)
+    if (needsBackgroundDeep) {
+      startDeepAnalysis(source_id)
+    }
 
     return () => {
       cancelled = true
@@ -2419,7 +2420,22 @@ export default function ActionModal({
         deepRefreshTimerRef.current = null
       }
     }
-  }, [source_id, source_type, sessionReady, ai_action_data, event_data, child_name, onSync, router, isBrainMode, isHotspotInfoTodo, showFullOneKey, triggerDeepAnalysis])
+  }, [
+    source_id, source_type, sessionReady, ai_action_data, event_data, child_name,
+    onSync, router, isBrainMode, isHotspotInfoTodo, showFullOneKey,
+    buildClientInstantPreview, startDeepAnalysis,
+  ])
+
+  useEffect(() => {
+    if (!loading) {
+      setLoadingStep(0)
+      return
+    }
+    const timer = window.setInterval(() => {
+      setLoadingStep((prev) => Math.min(prev + 1, LOADING_STEPS.length - 1))
+    }, 3000)
+    return () => window.clearInterval(timer)
+  }, [loading])
 
   const brainUrgencyLevel: 1 | 2 | 3 =
     brainData?.urgency === 'high' ? 3
@@ -2521,7 +2537,25 @@ export default function ActionModal({
                 </h2>
               </div>
               <motion.div whileTap={{ scale: 0.86 }} onClick={onClose}
-                style={{ cursor: 'pointer', padding: 4, marginLeft: 8 }}>
+                style={{ cursor: 'pointer', padding: 4, marginLeft: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
+                {deepPending && (
+                  <span
+                    title="根正在深度分析"
+                    style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: THEME.muted }}
+                  >
+                    <motion.span
+                      animate={{ opacity: [0.35, 1, 0.35] }}
+                      transition={{ duration: 1.4, repeat: Infinity }}
+                      style={{
+                        width: 7,
+                        height: 7,
+                        borderRadius: '50%',
+                        background: '#a46355',
+                        flexShrink: 0,
+                      }}
+                    />
+                  </span>
+                )}
                 <X size={18} color={THEME.muted} />
               </motion.div>
             </div>
@@ -2576,13 +2610,6 @@ export default function ActionModal({
                 }}>
                   {!sessionReady ? '正在恢复会话…' : LOADING_STEPS[loadingStep]}
                 </div>
-                <div style={{
-                  marginTop: 8,
-                  fontSize: 12,
-                  color: 'var(--text-muted, rgba(45,50,47,0.45))',
-                }}>
-                  通常需要10-20秒
-                </div>
               </div>
             )}
 
@@ -2592,7 +2619,6 @@ export default function ActionModal({
                 decision={decision}
                 userId={userId}
                 autoCompleted={brainAutoCompleted}
-                deepPending={deepPending}
                 onAllDone={() => onDone(source_id)}
                 onClose={onClose}
               />

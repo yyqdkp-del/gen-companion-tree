@@ -4,7 +4,7 @@ export const maxDuration = 60
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { getAuthUser } from '@/lib/auth/getAuthUser'
-import { checkLimit, recordUsage } from '@/lib/limits/usage'
+import { checkLimit } from '@/lib/limits/usage'
 import { isCachedRootDecisionValid } from '@/lib/action/decisionCache'
 import { makeDecisionFast } from '@/lib/action/claudeDecision'
 import { detectDimensionFromTitle, getDaysLeftForTodo } from '@/lib/action/instantDecision'
@@ -192,7 +192,7 @@ export async function POST(req: NextRequest) {
       .eq('id', todoId)
       .eq('user_id', user.id)
 
-    await recordUsage(user.id, 'one_tap')
+    // usage 已在 execute instant 阶段计入，此处不再重复扣次
 
     console.log('[deep-analyze] complete', Date.now() - startTime, 'ms')
 

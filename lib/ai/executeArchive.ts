@@ -24,7 +24,7 @@ export async function executeArchive(
   result: AutoArchiveResult,
   userId: string,
 ): Promise<void> {
-  if (!result.childId && result.archiveType !== 'family_document' && result.archiveType !== 'payment_todo') {
+  if (!result.childId && result.archiveType !== 'family_document' && result.archiveType !== 'payment_todo' && result.archiveType !== 'mobility_todo') {
     throw new Error('executeArchive: missing childId')
   }
 
@@ -80,6 +80,53 @@ export async function executeArchive(
           dimension: 'education',
           priority: 'orange',
           dueDate: dateOnly(todo.deadline) || undefined,
+          source: 'root_vision',
+          client: supabase,
+        })
+      }
+      break
+    }
+
+    case 'school_term_calendar': {
+      if (!result.childId) break
+      const events = Array.isArray(result.archiveData) ? result.archiveData : []
+
+      for (const event of events) {
+        const row = event as Record<string, unknown>
+        const title = str(row.title)
+        const dateStart = dateOnly(row.date_start || row.date)
+        if (!title || !dateStart) continue
+
+        await CalendarService.upsertEvent({
+          userId,
+          childId: result.childId,
+          title,
+          dateStart,
+          dateEnd: dateOnly(row.date_end) || dateStart,
+          eventType: str(row.event_type) || 'other',
+          source: 'root_vision',
+          client: supabase,
+        })
+      }
+      break
+    }
+
+    case 'mobility_todo': {
+      const flights = Array.isArray(result.archiveData) ? result.archiveData : []
+      for (const flight of flights) {
+        const row = flight as Record<string, unknown>
+        const flightNo = str(row.flightNumber)
+        const route = [row.departureCity, row.arrivalCity].map((c) => str(c)).filter(Boolean).join('→')
+        const title = flightNo ? `航班 ${flightNo}` : route || '出行航班'
+
+        await TodoService.create({
+          userId,
+          childId: result.childId || undefined,
+          title,
+          description: route || undefined,
+          dimension: 'mobility',
+          priority: 'orange',
+          dueDate: dateOnly(row.departureDate) || undefined,
           source: 'root_vision',
           client: supabase,
         })

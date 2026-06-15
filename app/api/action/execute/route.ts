@@ -579,24 +579,69 @@ export async function POST(req: NextRequest) {
       category = todo.category || 'other'
       urgencyLevel = todo.priority === 'red' ? 3 : todo.priority === 'orange' ? 2 : 1
 
-      // 没有缓存：返回 instant，前端调 deep-analyze
+      const aiExtra = (todo.ai_action_data || {}) as Record<string, unknown>
+      const existingPartial = aiExtra.root_decision as RootDecision | undefined
+      const partialCachedAt = String(aiExtra.cached_at || aiExtra.prepared_at || '')
+      if (
+        existingPartial
+        && (existingPartial as RootDecision & { isPartial?: boolean }).isPartial
+        && partialCachedAt
+        && Date.now() - new Date(partialCachedAt).getTime() < CACHE_DURATION_MS
+      ) {
+        const actionQueueId = await upsertActionQueue(
+          userId,
+          resolvedSourceType,
+          resolvedSourceId,
+          title,
+          category,
+          urgencyLevel,
+          { root_decision: existingPartial, autoCompleted: [] },
+        )
+        return NextResponse.json({
+          ...rootDecisionResponseBody(existingPartial, [], actionQueueId, true, {
+            deepAnalysisPending: aiExtra.deep_analysis_pending !== false,
+          }),
+          todoId: todo.id,
+        })
+      }
+
+      // 没有缓存：快速 instant，前端立刻展示后后台 deep-analyze
       const todoChildId = todo.child_id ? String(todo.child_id) : null
-      const [familyResult, exchangeResult] = await Promise.all([
-        FamilyService.getData(userId, {
-          childId: todoChildId || undefined,
-          includeTodos: false,
-          includeCalendar: false,
-          client: supabase,
-        }),
+      const [exchangeResult, childResult] = await Promise.all([
         getExchangeRate().catch(() => null),
+        todoChildId
+          ? supabase
+            .from('children')
+            .select('id, name, grade, school, school_name')
+            .eq('id', todoChildId)
+            .eq('user_id', userId)
+            .maybeSingle()
+          : Promise.resolve({ data: null }),
       ])
 
-      const resolvedChild = todoChildId
-        ? familyResult.children.find((c) => c.id === todoChildId) || familyResult.activeChild
-        : familyResult.activeChild
-
-      const instantChild = await loadInstantChild(supabase, resolvedChild?.id, resolvedChild)
+      const childRow = childResult.data
+      const instantChild = await loadInstantChild(
+        supabase,
+        childRow?.id || todoChildId,
+        childRow
+          ? { id: childRow.id, name: childRow.name, grade: childRow.grade }
+          : null,
+      )
       const instantDecision = buildInstantResponse(todo, instantChild, exchangeResult)
+      const cachedAt = new Date().toISOString()
+
+      await supabase
+        .from('todo_items')
+        .update({
+          ai_action_data: {
+            ...aiExtra,
+            root_decision: instantDecision,
+            cached_at: cachedAt,
+            deep_analysis_pending: true,
+          },
+        })
+        .eq('id', resolvedSourceId)
+        .eq('user_id', userId)
 
       const actionQueueId = await upsertActionQueue(
         userId,

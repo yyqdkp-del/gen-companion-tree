@@ -7,9 +7,8 @@ import { getUserLocation } from '@/lib/geofence'
 import { getTodayStr, getTodayStrInTimeZone } from '@/lib/date/localDate'
 import {
   buildRootVisionContext,
-  detectDocumentType,
   fetchImageForVision,
-  processDocument,
+  processUpload,
   type RootVisionAction,
   type RootVisionResult,
 } from '@/lib/ai/rootVision'
@@ -708,16 +707,45 @@ async function executeRootVisionActions(
         }
 
         case 'add_todo': {
-          const t = action.data as { action?: string; deadline?: string; required?: string }
+          const t = action.data as {
+            action?: string
+            deadline?: string
+            required?: string
+            dimension?: string
+          }
           const id = await executeTool('add_todo', {
             title: t?.action || action.label,
-            dimension: 'education',
+            dimension: (t?.dimension as TodoDimension) || 'education',
             priority: 2,
             due_date: t?.deadline || undefined,
             notes: t?.required || undefined,
             claude_advice: action.label,
           }, userId, jobId, childrenData, today, city)
           if (id) todoIds.push(id)
+          break
+        }
+
+        case 'save_calendar_events': {
+          if (!childId) break
+          const events = Array.isArray(action.data) ? action.data : []
+          for (const event of events) {
+            const row = event as Record<string, unknown>
+            const title = String(row.event || row.title || '').trim()
+            const dateStart = String(row.date_start || row.date || '').slice(0, 10)
+            if (!title || !dateStart) continue
+
+            await CalendarService.upsertEvent({
+              userId,
+              childId,
+              title,
+              dateStart,
+              dateEnd: String(row.date_end || dateStart).slice(0, 10),
+              description: row.location ? String(row.location) : undefined,
+              eventType: String(row.event_type || 'activity'),
+              source: 'root_vision',
+              client: supabase,
+            })
+          }
           break
         }
 
@@ -813,31 +841,52 @@ export async function processJob(job: any) {
         const { base64, mimeType } = await fetchImageForVision(file_url)
         const activeChildId = childrenData?.[0]?.id
 
-        const detection = await detectDocumentType(base64, mimeType)
-        rootVisionResult = await processDocument(base64, mimeType, detection)
-
-        const archiveResult = await autoArchive(
-          detection,
-          rootVisionResult.data,
+        const uploadResult = await processUpload(
+          { imageBase64: base64, text: processedContent || undefined, mimeType },
           userId,
-          activeChildId,
+          activeChildId || '',
         )
 
-        if (archiveResult.requiresConfirm) {
-          archivePending = archiveResult
+        if (uploadResult.needsClarification) {
           rootVisionResult = {
-            ...rootVisionResult,
-            summary: archiveResult.summary,
+            docType: 'unknown',
+            confidence: uploadResult.classification.confidence,
+            data: { clarification: uploadResult },
+            summary: uploadResult.question,
+            actions: [],
+            contentType: uploadResult.classification.type,
+            classification: uploadResult.classification,
           }
-          console.log('[rootVision] pending confirm:', archiveResult.archiveType, archiveResult.summary)
+          console.log('[rootVision] needs clarification:', uploadResult.classification.type)
         } else {
-          await executeArchive(archiveResult, userId)
-          autoArchived = true
-          rootVisionResult = {
-            ...rootVisionResult,
-            summary: archiveResult.summary,
+          rootVisionResult = uploadResult.vision
+
+          if (uploadResult.classification.type !== 'flight_itinerary' && rootVisionResult.detection) {
+            const archiveResult = await autoArchive(
+              rootVisionResult.detection,
+              rootVisionResult.data,
+              userId,
+              activeChildId,
+              uploadResult.classification.type,
+            )
+
+            if (archiveResult.requiresConfirm) {
+              archivePending = archiveResult
+              rootVisionResult = {
+                ...rootVisionResult,
+                summary: archiveResult.summary,
+              }
+              console.log('[rootVision] pending confirm:', archiveResult.archiveType, archiveResult.summary)
+            } else {
+              await executeArchive(archiveResult, userId)
+              autoArchived = true
+              rootVisionResult = {
+                ...rootVisionResult,
+                summary: archiveResult.summary,
+              }
+              console.log('[rootVision] auto archived:', archiveResult.archiveType, archiveResult.summary)
+            }
           }
-          console.log('[rootVision] auto archived:', archiveResult.archiveType, archiveResult.summary)
         }
       } catch (e) {
         console.error('[rootVision] auto archive failed:', e)

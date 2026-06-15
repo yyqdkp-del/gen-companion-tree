@@ -18,3 +18,20 @@ export function isCachedRootDecisionValid(
 
   return { valid: true, decision: cachedDecision, cachedAt }
 }
+
+/** UI 缓存：含 instant 预览（isPartial），用于打开一键办立刻展示 */
+export function getCachedRootDecisionForUI(
+  aiActionData: unknown,
+  maxAgeMs: number = DECISION_CACHE_MS,
+): { decision: RootDecision | null; isPartial: boolean } {
+  const aiData = (aiActionData || {}) as Record<string, unknown>
+  const decision = aiData.root_decision as RootDecision | undefined
+  const cachedAt = String(aiData.cached_at || aiData.prepared_at || '')
+  if (!decision || !cachedAt) return { decision: null, isPartial: false }
+
+  const cacheAge = Date.now() - new Date(cachedAt).getTime()
+  if (cacheAge >= maxAgeMs) return { decision: null, isPartial: false }
+
+  const isPartial = !isFullRootDecision(decision)
+  return { decision, isPartial }
+}
