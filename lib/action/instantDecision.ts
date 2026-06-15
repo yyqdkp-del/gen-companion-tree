@@ -1,7 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { parseThbAmount } from '@/lib/realtime/exchangeRate'
 import type { PlannerExchangeRate } from '@/lib/action/exchangeForPlanner'
-import type { RootAction, RootDecision } from '@/lib/action/rootBrain'
+import type { RootAction, RootDecision, PreparedItem } from '@/lib/action/rootBrain'
 
 export type InstantChild = {
   id?: string
@@ -76,25 +76,69 @@ export function buildInstantInsight(
       const cnyRate = exchange?.rates?.CNY
       if (cnyRate && amountThb) {
         const cny = Math.round(amountThb * cnyRate)
-        return `约合人民币¥${cny}，PromptPay转账手续费0%`
+        return `约合人民币¥${cny}，PromptPay转账手续费0%，根在为你计算最优方案`
       }
-      return '建议用PromptPay转账，手续费最低'
+      return 'PromptPay转账手续费0%，根在为你计算最优方案'
     }
-    case 'compliance': {
-      const days = daysLeft ?? getDaysLeftForTodo(todo.due_date as string | undefined)
-      if (days != null && days <= 7) return '⚠️ 非常紧急，需要尽快处理'
-      if (days != null && days <= 14) return '建议本周内预约'
-      return '建议提前准备材料'
-    }
+    case 'compliance':
+      return '根正在查询当地移民局信息...'
     case 'medical':
-      return '请假邮件已准备好，确认后一键发送'
+      return '根正在为你准备请假邮件，请稍等...'
     case 'education':
-      return '回复邮件已准备好，确认后一键发送'
-    case 'mobility':
-      return '出发前检查护照、行李和中转时间'
+      return '根正在为你准备回复邮件，请稍等...'
+    case 'mobility': {
+      const days = daysLeft ?? getDaysLeftForTodo(todo.due_date as string | undefined)
+      if (days != null && days <= 1) return '明天出发，今晚确认好所有准备'
+      if (days != null && days > 1) return `还有${days}天出发，根在为你准备出行清单`
+      return '根在为你准备出行清单'
+    }
     default:
       return '根正在为你分析最优方案...'
   }
+}
+
+function buildInstantPrepared(
+  dimension: string,
+  child: InstantChild | null,
+): PreparedItem[] {
+  const prepared: PreparedItem[] = []
+
+  if (dimension === 'education' || dimension === 'medical') {
+    if (child?.teacherEmail) {
+      prepared.push({
+        type: 'draft',
+        label: '邮件准备中...',
+        content: '根正在生成邮件内容，请稍等',
+        copyable: false,
+        source: 'ai_generated',
+        disclaimer: '深度分析完成后自动更新',
+      })
+    }
+  }
+
+  if (dimension === 'mobility') {
+    prepared.push({
+      type: 'checklist',
+      label: '基础出行清单',
+      content: '护照（所有人）\n手机充电宝\n行李确认\n出发前2小时到机场',
+      copyable: false,
+      source: 'knowledge_base',
+      disclaimer: '',
+    })
+  }
+
+  if (dimension === 'compliance') {
+    prepared.push({
+      type: 'info',
+      label: '根在查询当地移民局',
+      content: '正在获取最新材料清单...',
+      copyable: false,
+      source: 'ai_generated',
+      disclaimer: '深度分析完成后显示准确信息',
+    })
+  }
+
+  return prepared
 }
 
 export function buildInstantActions(
@@ -201,6 +245,7 @@ export function buildInstantResponse(
   const understand = buildInstantUnderstand(todo, child, daysLeft)
   const insight = buildInstantInsight(todo, dimension, exchange, daysLeft)
   const actions = buildInstantActions(todo, dimension, child)
+  const prepared = buildInstantPrepared(dimension, child)
 
   return {
     understanding: {
@@ -216,7 +261,7 @@ export function buildInstantResponse(
       keyFacts: [],
     },
     actions,
-    prepared: [],
+    prepared,
     message: {
       headline: String(todo.title || '待办'),
       detail: understand,

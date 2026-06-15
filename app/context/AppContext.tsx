@@ -324,6 +324,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return () => document.removeEventListener('visibilitychange', handleVisibility)
   }, [userId, globalMutate])
 
+  const processingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
   useEffect(() => {
     if (!userId) return
 
@@ -338,7 +340,22 @@ export function AppProvider({ children }: { children: ReactNode }) {
         const { status, extracted_events } = payload.new
 
         if (status === 'processing') {
+          if (processingTimeoutRef.current) {
+            clearTimeout(processingTimeoutRef.current)
+          }
           setProcessStatus({ status: 'processing', message: '根正在整理中...' })
+          processingTimeoutRef.current = setTimeout(() => {
+            setProcessStatus(null)
+            console.log('[AppContext] processing timeout, cleared')
+            processingTimeoutRef.current = null
+          }, 30000)
+        }
+
+        if (status === 'done' || status === 'failed') {
+          if (processingTimeoutRef.current) {
+            clearTimeout(processingTimeoutRef.current)
+            processingTimeoutRef.current = null
+          }
         }
 
         if (status === 'done') {
@@ -369,7 +386,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
       })
       .subscribe()
 
-    return () => { supabase.removeChannel(channel) }
+    return () => {
+      if (processingTimeoutRef.current) {
+        clearTimeout(processingTimeoutRef.current)
+        processingTimeoutRef.current = null
+      }
+      supabase.removeChannel(channel)
+    }
   }, [userId, globalMutate])
 
   const value = useMemo<AppContextType>(

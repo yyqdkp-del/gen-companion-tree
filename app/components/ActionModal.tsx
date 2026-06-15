@@ -22,7 +22,7 @@ import { SOURCE_CONFIG, type SourceLevel } from '@/lib/trust/sourceLabel'
 import { formatThb } from '@/lib/realtime/exchangeRate'
 import { resolveHotspotLink, hotspotSearchUrl } from '@/lib/hotspot/url'
 import { getCachedRootDecisionForUI } from '@/lib/action/decisionCache'
-import { buildInstantResponse } from '@/lib/action/instantDecision'
+import { buildInstantResponse, detectDimensionFromTitle } from '@/lib/action/instantDecision'
 import SmartPackingPanel from '@/app/components/SmartPackingPanel'
 import { useSmartPacking } from '@/lib/packing/useSmartPacking'
 
@@ -2179,10 +2179,13 @@ export default function ActionModal({
     onSync?.()
   }, [reloadSmartPacking, onSync])
 
+  const todoDimension = category || detectDimensionFromTitle(title || '')
+
   const showPackingConfirm = !!packingChildId
     && smartPacking.length > 0
     && !isBrainMode
     && !isHotspotInfoTodo
+    && ['mobility', 'education', 'medical', 'logistics'].includes(todoDimension)
 
   const resolvedTodoPriority = todo_priority
     || (urgency_level === 3 ? 'red' : urgency_level === 2 ? 'orange' : 'yellow')
@@ -2242,6 +2245,20 @@ export default function ActionModal({
 
       if (handleLimitReached(result, () => router.push('/upgrade'))) return
 
+      if (!result.ok) {
+        setDeepPending(false)
+        if (result.error !== 'limit_reached') {
+          setDecision((prev) => prev ? {
+            ...prev,
+            message: {
+              ...prev.message,
+              reassurance: '网络繁忙，基础方案已就绪，完整分析稍后重试',
+            },
+          } : prev)
+        }
+        return
+      }
+
       if (result.ok && result.decision && !(result.decision as RootDecision & { isPartial?: boolean }).isPartial) {
         setDecision(result.decision as RootDecision)
         setBrainAutoCompleted(result.autoCompleted || [])
@@ -2257,6 +2274,13 @@ export default function ActionModal({
       const message = e instanceof Error ? e.message : String(e)
       console.error('[ActionModal] deep-analyze error', message)
       setDeepPending(false)
+      setDecision((prev) => prev ? {
+        ...prev,
+        message: {
+          ...prev.message,
+          detail: `${prev.message.detail}\n\n（根暂时无法获取更多信息，基础功能仍可使用）`,
+        },
+      } : prev)
     }
   }, [onSync, router])
 

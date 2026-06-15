@@ -1773,12 +1773,42 @@ export default function BasePage() {
             )}
             {processStatus.status === 'done' && <span>✓</span>}
             {processStatus.status === 'failed' && <span>⚠</span>}
-            <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 13, fontWeight: 500, color: '#fff' }}>{processStatus.message}</div>
-              {processStatus.status === 'done' && (
-                <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)', marginTop: 2 }}>点击查看待办</div>
-              )}
-            </div>
+            {processStatus.status === 'processing' ? (
+              <div style={{
+                flex: 1,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: 8,
+              }}>
+                <span style={{ fontSize: 13, fontWeight: 500, color: '#fff' }}>🌱 根正在整理中...</span>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setProcessStatus(null)
+                  }}
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    color: 'rgba(255,255,255,0.7)',
+                    fontSize: 18,
+                    cursor: 'pointer',
+                    padding: '0 8px',
+                    lineHeight: 1,
+                  }}
+                >
+                  ×
+                </button>
+              </div>
+            ) : (
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 13, fontWeight: 500, color: '#fff' }}>{processStatus.message}</div>
+                {processStatus.status === 'done' && (
+                  <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)', marginTop: 2 }}>点击查看待办</div>
+                )}
+              </div>
+            )}
           </motion.div>
         )}
       </AnimatePresence>
