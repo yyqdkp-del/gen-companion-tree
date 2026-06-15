@@ -673,7 +673,7 @@ export function detectDimension(
   if (/签证|visa|移民|immigration|tm7|tm47|tm30|报到/.test(title)) return 'compliance'
   if (/生病|发烧|请假|sick|fever|hospital|急诊|emergency/.test(title)) return 'medical'
   if (/通知|notice|permission|consent|活动|同意书/.test(title)) return 'education'
-  if (/航班|flight|机场|airport|出发|回国/.test(title)) return 'mobility'
+  if (/航班|flight|机场|airport|出发|回国|飞[\u4e00-\u9fa5]|[\u4e00-\u9fa5].*飞/.test(title)) return 'mobility'
   if (/买|购|装备|服装|游泳|运动|shopping/.test(title)) return 'logistics'
   if (/房东|维修|tm30|landlord|repair/.test(title)) return 'estate'
   if (/礼物|聚会|生日|party|gift|dinner|约会|请客/.test(title)) return 'social'

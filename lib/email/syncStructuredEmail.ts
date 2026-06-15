@@ -1,55 +1,43 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
-import type { EmailExtraction } from '@/lib/email/pdfExtractor'
 import type { ExtractedEmail } from '@/lib/email/gmailExtract'
 import { EmailService } from '@/lib/services/EmailService'
-import {
-  buildEmailExtractionFromStructured,
-} from '@/lib/email/persistEmailExtraction'
+import { buildStructuredEmailExtraction } from '@/lib/email/emailPipeline'
 
 export type StructuredEmailInput = {
   userId: string
   messageId: string
   email: ExtractedEmail
-  bodyExtraction: EmailExtraction | null
-  attachmentExtractions: Array<EmailExtraction | null>
-  merged: {
-    allEvents: EmailExtraction['events']
-    allAmounts: EmailExtraction['amounts']
-    allRequirements: string[]
-    summaryParts: string[]
-  }
 }
 
 export async function persistStructuredEmail(
   supabase: SupabaseClient,
   input: StructuredEmailInput,
-): Promise<{ eventsWritten: number; todosWritten: number }> {
-  const { userId, messageId, email, merged, bodyExtraction } = input
-  const summary = merged.summaryParts.filter(Boolean).join('；') || email.subject
+): Promise<{
+  eventsWritten: number
+  todosWritten: number
+  summary: string
+  contentType?: string
+} | null> {
+  const { userId, messageId, email } = input
 
-  const extraction = buildEmailExtractionFromStructured({
-    messageId,
+  const extraction = await buildStructuredEmailExtraction({
     subject: email.subject,
+    body: email.body,
     from: email.from,
     date: email.date,
-    summary,
-    docType: bodyExtraction?.docType || 'school',
-    events: merged.allEvents,
-    amounts: merged.allAmounts,
-    requirements: merged.allRequirements,
-    hasAttachments: email.attachments.length > 0,
+    messageId,
+    attachments: email.attachments,
   })
 
-  const result = await EmailService.persist(
-    extraction,
-    userId,
-    undefined,
-    supabase,
-  )
+  if (!extraction) return null
+
+  const result = await EmailService.persist(extraction, userId, undefined, supabase)
 
   return {
     eventsWritten: result.eventsWritten ?? 0,
     todosWritten: result.todosWritten ?? 0,
+    summary: extraction.summary,
+    contentType: extraction.contentType,
   }
 }
 

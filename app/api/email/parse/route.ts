@@ -8,16 +8,12 @@ import { addDaysToYmd, getTodayStr } from '@/lib/date/localDate'
 import { fetchResidentCity } from '@/lib/family/resolveResidentCity'
 import { AI_MODELS } from '@/lib/ai/models'
 import { extractEmailWithAttachments } from '@/lib/email/gmailExtract'
-import {
-  extractFromAttachment,
-  extractFromEmailBody,
-  mergeExtractions,
-} from '@/lib/email/pdfExtractor'
 import { persistStructuredEmail } from '@/lib/email/syncStructuredEmail'
 import {
   buildEmailExtractionFromClaude,
   persistEmailExtraction,
 } from '@/lib/email/persistEmailExtraction'
+import { classifyEmailContent } from '@/lib/email/emailClassification'
 import { getValidAccessToken } from '@/lib/google/tokenStore'
 
 const MAKE_WEBHOOK_URL = process.env.NEXT_PUBLIC_MAKE_WEBHOOK_URL || ''
@@ -53,37 +49,20 @@ async function processStructuredEmail(
     }
   }
 
-  const bodyExtraction = await extractFromEmailBody(extracted.body, extracted.subject)
-  const attachmentExtractions = await Promise.all(
-    extracted.attachments.map((att) =>
-      extractFromAttachment(att.data, att.mimeType, att.filename, extracted.subject),
-    ),
-  )
-
-  const merged = mergeExtractions([bodyExtraction, ...attachmentExtractions])
-  const hasContent =
-    merged.summaryParts.length > 0 ||
-    merged.allEvents.length > 0 ||
-    merged.allAmounts.length > 0 ||
-    merged.allRequirements.length > 0
-
-  if (!hasContent) return null
-
   const messageId = email.message_id || `${email.from}_${email.date}`
-  const { eventsWritten, todosWritten } = await persistStructuredEmail(supabase, {
+  const persisted = await persistStructuredEmail(supabase, {
     userId,
     messageId,
     email: extracted,
-    bodyExtraction,
-    attachmentExtractions,
-    merged,
   })
+
+  if (!persisted) return null
 
   return {
     ok: true,
-    summary: merged.summaryParts.filter(Boolean).join('；') || extracted.subject,
-    events_created: eventsWritten,
-    todos_created: todosWritten,
+    summary: persisted.summary || extracted.subject,
+    events_created: persisted.eventsWritten,
+    todos_created: persisted.todosWritten,
     has_attachments: extracted.attachments.length > 0,
   }
 }
@@ -164,7 +143,7 @@ ${email.body}
     {
       "title": "待办标题",
       "priority": "red|orange|yellow|green",
-      "category": "education|compliance|wealth|medical|logistics|social",
+      "category": "education|compliance|wealth|medical|logistics|social|mobility",
       "due_date": "YYYY-MM-DD或null",
       "ai_draft": "AI起草的回复草稿（如果需要回复）或null",
       "ai_action_type": "send_email|pay|book|buy|fill_form|sign|null",
@@ -618,7 +597,12 @@ export async function POST(req: NextRequest) {
         }
 
         // ── 降级：Claude 全文解析（Make webhook 等无附件场景）──
-        // Claude解析
+        const classification = await classifyEmailContent({
+          subject: email.subject,
+          body: email.body,
+        })
+        console.log('[email/parse] claude path classified:', classification.type, classification.confidence)
+
         const parsed = await parseEmailWithClaude(email, familyContext, city)
 
         if (parsed.email_type === 'spam' || parsed.confidence < 0.3) {
@@ -626,8 +610,7 @@ export async function POST(req: NextRequest) {
           continue
         }
 
-        // 写入统一邮件层
-        const extraction = buildEmailExtractionFromClaude(parsed, email)
+        const extraction = buildEmailExtractionFromClaude(parsed, email, classification)
         const { eventsWritten, todosWritten } = await persistEmailExtraction(
           supabase,
           extraction,

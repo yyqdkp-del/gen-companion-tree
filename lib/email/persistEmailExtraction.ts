@@ -1,4 +1,19 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
+import type { TodoDimension, TodoPriority } from '@/lib/services/TodoService'
+import type { ClassificationResult, ContentType } from '@/lib/vision/contentClassifier'
+import {
+  contentTypeToDimension,
+  contentTypeToEmailDocType,
+  isSchoolRelatedContent,
+} from '@/lib/email/emailClassification'
+import { normalizeEmailDate } from '@/lib/email/emailDateParser'
+
+export interface EmailTodoItem {
+  title: string
+  dimension: TodoDimension
+  due_date?: string | null
+  priority?: TodoPriority
+}
 
 export interface EmailExtraction {
   emailId: string
@@ -7,6 +22,10 @@ export interface EmailExtraction {
   receivedAt: string
   summary: string
   docType: string
+  contentType: ContentType
+  classification?: ClassificationResult
+  dimension: TodoDimension
+  isSchoolRelated: boolean
   events: Array<{
     title: string
     date: string
@@ -20,6 +39,8 @@ export interface EmailExtraction {
     purpose: string
     due_date?: string
   }>
+  todos: EmailTodoItem[]
+  /** @deprecated 兼容 processed_emails.extracted_requirements */
   requirements: string[]
   hasAttachments: boolean
 }
@@ -57,16 +78,20 @@ export async function persistEmailExtraction(
       source_type: 'gmail',
       source: 'gmail',
       status: 'active',
-      is_school_related: true,
-      email_type: extraction.docType || 'school',
+      is_school_related: extraction.isSchoolRelated,
+      email_type: extraction.docType,
       processed_at: new Date().toISOString(),
       extracted_events: extraction.events,
       extracted_amounts: extraction.amounts,
-      extracted_requirements: extraction.requirements,
+      extracted_requirements: extraction.todos.map((t) => ({
+        title: t.title,
+        due_date: t.due_date,
+        dimension: t.dimension,
+      })),
       has_attachments: extraction.hasAttachments,
       attachment_count: extraction.hasAttachments ? 1 : 0,
       events_created: extraction.events.length,
-      todos_created: extraction.amounts.length + extraction.requirements.length,
+      todos_created: extraction.amounts.length + extraction.todos.length,
       updated_at: new Date().toISOString(),
     },
     { onConflict: 'message_id' },
@@ -75,7 +100,7 @@ export async function persistEmailExtraction(
   let eventsWritten = 0
   let todosWritten = 0
 
-  if (activeChildId) {
+  if (activeChildId && extraction.isSchoolRelated && extraction.contentType !== 'flight_itinerary') {
     for (const event of extraction.events) {
       if (!event.title || !event.date) continue
 
@@ -101,7 +126,7 @@ export async function persistEmailExtraction(
         requires_items: event.requires_items || [],
         source: 'gmail',
         source_email_id: extraction.emailId,
-        event_type: 'activity',
+        event_type: extraction.contentType === 'school_calendar' ? 'holiday' : 'activity',
       })
 
       if (!error) eventsWritten += 1
@@ -124,22 +149,28 @@ export async function persistEmailExtraction(
         source_email_id: extraction.emailId,
         amount: amount.amount,
         currency: amount.currency,
+        content_type: extraction.contentType,
       },
     })
     if (!error) todosWritten += 1
   }
 
-  for (const req of extraction.requirements) {
-    if (!req?.trim()) continue
+  for (const todo of extraction.todos) {
+    if (!todo.title?.trim()) continue
     const { error } = await supabase.from('todo_items').insert({
       user_id: userId,
       child_id: activeChildId,
-      title: req.trim(),
-      category: 'education',
-      priority: 'yellow',
+      title: todo.title.trim(),
+      category: todo.dimension,
+      priority: todo.priority || 'yellow',
       status: 'pending',
+      due_date: todo.due_date || null,
       source: 'gmail',
-      ai_action_data: { source_email_id: extraction.emailId },
+      ai_action_data: {
+        source_email_id: extraction.emailId,
+        content_type: extraction.contentType,
+        classification_reason: extraction.classification?.reason,
+      },
     })
     if (!error) todosWritten += 1
   }
@@ -147,7 +178,6 @@ export async function persistEmailExtraction(
   return { eventsWritten, todosWritten }
 }
 
-/** Gemini/pdfExtractor 合并结果 → 统一 EmailExtraction */
 export function buildEmailExtractionFromStructured(input: {
   messageId: string
   subject: string
@@ -155,29 +185,58 @@ export function buildEmailExtractionFromStructured(input: {
   date: string
   summary: string
   docType?: string
+  contentType?: ContentType
+  classification?: ClassificationResult
+  dimension?: TodoDimension
+  isSchoolRelated?: boolean
   events: EmailExtraction['events']
   amounts: EmailExtraction['amounts']
-  requirements: string[]
+  todos: EmailTodoItem[]
   hasAttachments: boolean
 }): EmailExtraction {
+  const contentType = input.contentType || 'school_notice'
   return {
     emailId: input.messageId,
     subject: input.subject,
     fromAddress: input.from,
     receivedAt: input.date ? new Date(input.date).toISOString() : new Date().toISOString(),
     summary: input.summary,
-    docType: input.docType || 'school',
+    docType: input.docType || contentTypeToEmailDocType(contentType),
+    contentType,
+    classification: input.classification,
+    dimension: input.dimension || contentTypeToDimension(contentType),
+    isSchoolRelated: input.isSchoolRelated ?? isSchoolRelatedContent(contentType),
     events: input.events,
     amounts: input.amounts,
-    requirements: input.requirements,
+    todos: input.todos,
+    requirements: input.todos.map((t) => t.title),
     hasAttachments: input.hasAttachments,
   }
 }
 
-/** Claude 全文解析 → 统一 EmailExtraction（校历/待办/已处理记录） */
+const CLAUDE_CATEGORY_MAP: Record<string, TodoDimension> = {
+  education: 'education',
+  compliance: 'compliance',
+  wealth: 'wealth',
+  medical: 'medical',
+  logistics: 'logistics',
+  social: 'social',
+  mobility: 'mobility',
+}
+
+function mapClaudeCategory(raw?: string, emailType?: string): TodoDimension {
+  if (raw && CLAUDE_CATEGORY_MAP[raw]) return CLAUDE_CATEGORY_MAP[raw]
+  if (emailType === 'finance') return 'wealth'
+  if (emailType === 'visa_compliance') return 'compliance'
+  if (emailType === 'medical') return 'medical'
+  return 'education'
+}
+
+/** Claude 全文解析 → 统一 EmailExtraction */
 export function buildEmailExtractionFromClaude(
   parsed: {
     email_type?: string
+    is_school_related?: boolean
     summary?: string
     events?: Array<{
       title?: string
@@ -187,6 +246,7 @@ export function buildEmailExtractionFromClaude(
       requires_items?: string[]
       requires_payment?: number | null
       payment_deadline?: string | null
+      deadline?: string | null
     }>
     todos?: Array<{
       title?: string
@@ -195,16 +255,26 @@ export function buildEmailExtractionFromClaude(
     }>
   },
   email: { message_id?: string; from: string; subject: string; date: string },
+  classification?: ClassificationResult,
 ): EmailExtraction {
+  const receivedAt = email.date ? new Date(email.date).toISOString() : new Date().toISOString()
+  const contentType = classification?.type
+    || (parsed.email_type === 'finance' ? 'invoice_bill' : 'school_notice')
+
+  const dimension = classification
+    ? contentTypeToDimension(classification.type)
+    : mapClaudeCategory(undefined, parsed.email_type)
+
   const events = (parsed.events || [])
-    .filter((e) => e.title && e.date_start)
+    .filter((e) => e.title)
     .map((e) => ({
       title: String(e.title),
-      date: String(e.date_start),
+      date: normalizeEmailDate(e.date_start, receivedAt) || '',
       requires_action: Boolean(e.requires_action),
       requires_items: e.requires_items || [],
-      deadline: e.payment_deadline || e.date_end || undefined,
+      deadline: normalizeEmailDate(e.payment_deadline || e.deadline || e.date_end, receivedAt) || undefined,
     }))
+    .filter((e) => e.date)
 
   const amounts = (parsed.events || [])
     .filter((e) => e.requires_payment && Number(e.requires_payment) > 0)
@@ -212,23 +282,37 @@ export function buildEmailExtractionFromClaude(
       amount: Number(e.requires_payment),
       currency: 'THB',
       purpose: String(e.title || email.subject),
-      due_date: e.payment_deadline || e.date_start || undefined,
+      due_date: normalizeEmailDate(e.payment_deadline || e.date_start, receivedAt) || undefined,
     }))
 
-  const requirements = (parsed.todos || [])
-    .map((t) => String(t.title || '').trim())
-    .filter(Boolean)
+  const todos: EmailTodoItem[] = (parsed.todos || [])
+    .filter((t) => t.title?.trim())
+    .map((t) => ({
+      title: String(t.title).trim(),
+      dimension: mapClaudeCategory(t.category, parsed.email_type),
+      due_date: normalizeEmailDate(t.due_date, receivedAt) || null,
+      priority: 'orange' as const,
+    }))
+
+  const isSchool = classification
+    ? isSchoolRelatedContent(classification.type)
+    : parsed.is_school_related !== false
 
   return {
     emailId: email.message_id || `${email.from}_${email.date}`,
     subject: email.subject,
     fromAddress: email.from,
-    receivedAt: email.date ? new Date(email.date).toISOString() : new Date().toISOString(),
+    receivedAt,
     summary: String(parsed.summary || email.subject).slice(0, 200),
-    docType: parsed.email_type || 'school',
-    events,
+    docType: contentTypeToEmailDocType(contentType),
+    contentType,
+    classification,
+    dimension,
+    isSchoolRelated: isSchool && contentType !== 'flight_itinerary',
+    events: contentType === 'flight_itinerary' ? [] : events,
     amounts,
-    requirements,
+    todos,
+    requirements: todos.map((t) => t.title),
     hasAttachments: false,
   }
 }

@@ -13,6 +13,14 @@ export type ExtractedEvent = {
   deadline?: string
 }
 
+export type ExtractedTodo = {
+  title: string
+  date?: string
+  due_date?: string | null
+  dimension?: string
+  deadline?: string
+}
+
 export type DiscoveryItem = {
   id: string
   sourceKind: DiscoverySourceKind
@@ -21,6 +29,7 @@ export type DiscoveryItem = {
   createdAt: string
   table: 'processed_emails' | 'raw_inputs'
   extractedEvents?: ExtractedEvent[]
+  extractedTodos?: ExtractedTodo[]
   messageId?: string
   hasAttachments?: boolean
 }
@@ -33,21 +42,33 @@ function mapEmailRow(row: {
   message_id?: string | null
   created_at: string
   extracted_events?: unknown
+  extracted_requirements?: unknown
+  email_type?: string | null
   has_attachments?: boolean | null
 }): DiscoveryItem {
   const summary = String(row.summary || row.subject || '邮件中有新信息').trim()
   const events = Array.isArray(row.extracted_events)
     ? (row.extracted_events as ExtractedEvent[])
     : []
+  const extractedTodos = Array.isArray(row.extracted_requirements)
+    ? (row.extracted_requirements as ExtractedTodo[])
+    : []
+
+  const label = row.email_type === 'flight'
+    ? '✈️ 出行邮件'
+    : row.email_type === 'invoice'
+      ? '💰 账单邮件'
+      : '📧 学校邮件'
 
   return {
     id: row.id,
     sourceKind: 'email',
-    sourceLabel: '📧 学校邮件',
+    sourceLabel: label,
     summary,
     createdAt: row.created_at,
     table: 'processed_emails',
     extractedEvents: events,
+    extractedTodos,
     messageId: row.message_id || undefined,
     hasAttachments: !!row.has_attachments,
   }
@@ -108,7 +129,7 @@ export async function fetchDiscoveries(userId: string): Promise<DiscoveryItem[]>
 
   const emailPrimary = await supabase
     .from('processed_emails')
-    .select('id, source_type, summary, subject, message_id, created_at, status, extracted_events, has_attachments')
+    .select('id, source_type, summary, subject, message_id, created_at, status, extracted_events, extracted_requirements, email_type, has_attachments')
     .eq('user_id', userId)
     .gt('created_at', sevenDaysAgo)
     .neq('status', 'dismissed')
@@ -161,7 +182,7 @@ export async function fetchRecentEmailDiscovery(userId: string): Promise<Discove
   const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
   const { data } = await supabase
     .from('processed_emails')
-    .select('id, source_type, summary, subject, message_id, created_at, status, extracted_events, has_attachments')
+    .select('id, source_type, summary, subject, message_id, created_at, status, extracted_events, extracted_requirements, email_type, has_attachments')
     .eq('user_id', userId)
     .eq('status', 'active')
     .eq('source_type', 'gmail')
@@ -203,18 +224,23 @@ export async function dismissDiscovery(userId: string, item: DiscoveryItem): Pro
 }
 
 export async function addDiscoveryToTodo(userId: string, item: DiscoveryItem): Promise<void> {
-  const title = item.summary.length > 80
-    ? `跟进：${item.summary.slice(0, 80)}`
-    : item.summary
+  const firstTodo = item.extractedTodos?.[0]
+  const firstEvent = item.extractedEvents?.[0]
+  const dueDate = firstTodo?.due_date || firstEvent?.deadline || firstEvent?.date || null
+  const title = firstTodo?.title || firstEvent?.title || item.summary.slice(0, 120)
+  const dimension = firstTodo?.dimension || 'education'
+
   const { error } = await supabase.from('todo_items').insert({
     user_id: userId,
     title,
     description: item.summary,
     priority: 'orange',
     status: 'pending',
-    source: 'rian',
+    source: 'gmail',
     source_ref_id: item.id,
-    due_date: getTodayStr(),
+    due_date: dueDate,
+    category: dimension,
+    ai_action_data: item.messageId ? { source_email_id: item.messageId } : undefined,
   })
   if (error) throw error
 }
@@ -266,7 +292,7 @@ export async function addDiscoveryReminder(userId: string, item: DiscoveryItem):
   const { error } = await supabase.from('todo_items').insert({
     user_id: userId,
     child_id: childId,
-    title: firstEvent?.title ? `提醒：${firstEvent.title}` : `跟进：${item.summary.slice(0, 60)}`,
+    title: firstEvent?.title ? `提醒：${firstEvent.title}` : item.summary.slice(0, 80),
     description: item.summary,
     priority: 'orange',
     status: 'pending',
