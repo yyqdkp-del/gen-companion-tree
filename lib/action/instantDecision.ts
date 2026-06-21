@@ -21,6 +21,10 @@ export function getDaysLeftForTodo(dueDate?: string | null): number | null {
   return Math.ceil((due.getTime() - today.getTime()) / 86400000)
 }
 
+function hasTeacherEmail(child: InstantChild | null): boolean {
+  return !!(child?.teacherEmail && child.teacherEmail.includes('@'))
+}
+
 export function detectDimensionFromTitle(title: string): string {
   if (!title) return 'education'
   const t = title.toLowerCase()
@@ -67,6 +71,7 @@ export function buildInstantInsight(
   dimension: string,
   exchange: PlannerExchangeRate | null,
   daysLeft: number | null,
+  child: InstantChild | null,
 ): string {
   switch (dimension) {
     case 'wealth': {
@@ -83,9 +88,15 @@ export function buildInstantInsight(
     case 'compliance':
       return '根正在查询当地移民局信息...'
     case 'medical':
-      return '根正在为你准备请假邮件，请稍等...'
-    case 'education':
-      return '根正在为你准备回复邮件，请稍等...'
+    case 'education': {
+      console.log('[instant] teacher_email check:', dimension, hasTeacherEmail(child))
+      if (!hasTeacherEmail(child)) {
+        return '需要先填写老师邮箱，才能一键发送请假/回复邮件'
+      }
+      return dimension === 'medical'
+        ? '根正在准备请假邮件...'
+        : '根正在准备回复邮件...'
+    }
     case 'mobility': {
       const days = daysLeft ?? getDaysLeftForTodo(todo.due_date as string | undefined)
       if (days != null && days <= 1) return '明天出发，今晚确认好所有准备'
@@ -165,26 +176,40 @@ export function buildInstantActions(
       break
 
     case 'medical':
-    case 'education':
-      if (child?.teacherEmail) {
+    case 'education': {
+      console.log('[instant] teacher_email check:', dimension, hasTeacherEmail(child))
+      if (!hasTeacherEmail(child)) {
         actions.push({
-          id: 'email',
-          label: dimension === 'medical' ? '发请假邮件给老师' : '发邮件给老师',
+          id: 'fill_teacher_email',
+          label: '填写老师邮箱',
           type: 'primary',
           executor: {
-            service: 'gmail',
-            method: 'create_draft',
-            params: {
-              to: child.teacherEmail,
-              subject: `Absence Notice - ${child.nameEn || child.name || 'Student'}`,
-              body: buildLeaveEmail(child),
-            },
+            service: 'url',
+            method: 'open',
+            params: { url: `/children/${child?.id || ''}` },
           },
-          requiresConfirm: true,
-          confirmMessage: `确认发送给 ${child.teacherName || '老师'}？`,
+          requiresConfirm: false,
         })
+        break
       }
+      actions.push({
+        id: 'email',
+        label: dimension === 'medical' ? '发请假邮件给老师' : '发邮件给老师',
+        type: 'primary',
+        executor: {
+          service: 'gmail',
+          method: 'create_draft',
+          params: {
+            to: child!.teacherEmail,
+            subject: `Absence Notice - ${child!.nameEn || child!.name || 'Student'}`,
+            body: buildLeaveEmail(child!),
+          },
+        },
+        requiresConfirm: true,
+        confirmMessage: `确认发送给 ${child!.teacherName || '老师'}？`,
+      })
       break
+    }
 
     case 'compliance':
       actions.push({
@@ -243,7 +268,7 @@ export function buildInstantResponse(
   const dimension = String(todo.category || detectDimensionFromTitle(String(todo.title || '')))
   const daysLeft = getDaysLeftForTodo(todo.due_date as string | undefined)
   const understand = buildInstantUnderstand(todo, child, daysLeft)
-  const insight = buildInstantInsight(todo, dimension, exchange, daysLeft)
+  const insight = buildInstantInsight(todo, dimension, exchange, daysLeft, child)
   const actions = buildInstantActions(todo, dimension, child)
   const prepared = buildInstantPrepared(dimension, child)
 

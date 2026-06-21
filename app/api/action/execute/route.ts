@@ -598,7 +598,7 @@ export async function POST(req: NextRequest) {
           { root_decision: existingPartial, autoCompleted: [] },
         )
         return NextResponse.json({
-          ...rootDecisionResponseBody(existingPartial, [], actionQueueId, true, {
+          ...rootDecisionResponseBody(existingPartial, [], actionQueueId, false, {
             deepAnalysisPending: aiExtra.deep_analysis_pending !== false,
           }),
           todoId: todo.id,
@@ -655,11 +655,17 @@ export async function POST(req: NextRequest) {
 
       await recordUsage(userId, 'one_tap')
 
+      const todoId = String(todo.id)
+      console.log('[execute] returning instant, deepAnalysisPending: true, todoId:', todoId)
+
       return NextResponse.json({
-        ...rootDecisionResponseBody(instantDecision, [], actionQueueId, false, {
-          deepAnalysisPending: true,
-        }),
-        todoId: todo.id,
+        ok: true,
+        decision: instantDecision,
+        deepAnalysisPending: true,
+        todoId,
+        autoCompleted: [],
+        action_queue_id: actionQueueId,
+        cached: false,
       })
     }
 

@@ -6,10 +6,11 @@ import { createClient } from '@supabase/supabase-js'
 import { getAuthUser } from '@/lib/auth/getAuthUser'
 import { checkLimit } from '@/lib/limits/usage'
 import { isCachedRootDecisionValid } from '@/lib/action/decisionCache'
-import { makeDecisionFast } from '@/lib/action/claudeDecision'
+import { makeDecision, makeDecisionFast } from '@/lib/action/claudeDecision'
+import { buildFamilyContext } from '@/lib/action/contextBuilder'
 import { detectDimensionFromTitle, getDaysLeftForTodo } from '@/lib/action/instantDecision'
 import { getExchangeRate } from '@/lib/action/exchangeForPlanner'
-import type { FamilyContext } from '@/lib/action/rootBrain'
+import type { FamilyContext, RootDecision } from '@/lib/action/rootBrain'
 import { getUserLocation, type UserLocation } from '@/lib/intelligence/realtime'
 import { getTodayWeather } from '@/lib/realtime/weather'
 import { parseThbAmount } from '@/lib/realtime/exchangeRate'
@@ -173,7 +174,27 @@ export async function POST(req: NextRequest) {
 
     console.log('[deep-analyze] context built', Date.now() - startTime, 'ms')
 
-    const decision = await makeDecisionFast(slimContext)
+    const NEEDS_REAL_TOOLS = ['compliance', 'medical']
+    console.log(
+      '[deep-analyze] dimension:',
+      dimension,
+      'using:',
+      NEEDS_REAL_TOOLS.includes(dimension) ? 'makeDecision' : 'makeDecisionFast',
+    )
+
+    let decision: RootDecision
+
+    if (NEEDS_REAL_TOOLS.includes(dimension)) {
+      console.log('[deep-analyze] dimension requires tools:', dimension)
+
+      const fullContext = await buildFamilyContext(user.id, todoId, supabase)
+      decision = await makeDecision(fullContext)
+
+      console.log('[deep-analyze] makeDecision complete, prepared count:', decision.prepared?.length || 0)
+      console.log('[deep-analyze] prepared sources:', decision.prepared?.map((p) => p.source))
+    } else {
+      decision = await makeDecisionFast(slimContext)
+    }
 
     console.log('[deep-analyze] decision done', Date.now() - startTime, 'ms')
 
